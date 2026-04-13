@@ -1,0 +1,23 @@
+{
+  "get_current_time": {
+    "description": "获取当前的日期、时间和星期",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  "calculate": {
+    "description": "计算数学表达式的结果，支持加减乘除、幂运算、括号",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "数学表达式，例如 2+3*4 或 (100-20)/8"
+        }
+      },
+      "required": ["expression"]
+    }
+  }
+}
