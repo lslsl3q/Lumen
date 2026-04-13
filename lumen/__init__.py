@@ -11,6 +11,8 @@ from . import history
 from . import memory
 from .prompt import list_characters, load_character, build_system_prompt, build_messages
 from .tools import TOOL_DEFINITIONS, get_tool_prompt, execute_tool, parse_tool_call
+from .config import client, get_model, DEFAULT_MODEL
+from . import llm
 
 __all__ = [
     "load",
@@ -27,4 +29,8 @@ __all__ = [
     "get_tool_prompt",
     "execute_tool",
     "parse_tool_call",
+    "client",
+    "get_model",
+    "DEFAULT_MODEL",
+    "llm",
 ]

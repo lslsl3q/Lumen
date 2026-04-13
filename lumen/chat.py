@@ -3,24 +3,14 @@ Lumen - 对话核心模块
 所有对话逻辑都在这，不管是终端还是网页都调用这里
 """
 
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
 from .prompt import load_character, build_system_prompt, list_characters
 from .context import trim_messages
 from . import history
 from . import memory
 from . import tools
+from .config import get_model
+from .llm import chat
 from tool_lib.registry import get_registry
-
-# 1. 加载配置
-load_dotenv()
-
-client = OpenAI(
-    base_url=os.getenv("API_URL"),
-    api_key=os.getenv("API_KEY"),
-)
-MODEL = os.getenv("MODEL", "gemini-2.5-flash")
 
 # 2. 当前状态
 current_character_id = "default"
@@ -129,11 +119,9 @@ def chat_non_stream(user_input: str) -> str:
     history.save_message(current_session_id, "user", user_input)
 
     trimmed = trim_messages(messages)
+    model = get_model()
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=trimmed,
-    )
+    response = chat(trimmed, model, stream=False)
 
     reply = response.choices[0].message.content
     messages.append({"role": "assistant", "content": reply})
@@ -147,13 +135,10 @@ def chat_stream(user_input: str):
     history.save_message(current_session_id, "user", user_input)
 
     trimmed = trim_messages(messages)
+    model = get_model()
 
     # 第一次调用：先收集完整回复，检查是否要调用工具
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=trimmed,
-        stream=True,
-    )
+    response = chat(trimmed, model, stream=True)
 
     reply = ""
     for chunk in response:
@@ -181,11 +166,7 @@ def chat_stream(user_input: str):
 
             # 让 AI 重新思考（不流式输出，因为这是内部重试）
             trimmed = trim_messages(messages)
-            response = client.chat.completions.create(
-                model=MODEL,
-                messages=trimmed,
-                stream=False,
-            )
+            response = chat(trimmed, model, stream=False)
             retry_reply = response.choices[0].message.content
 
             # 递归处理重新思考的结果
@@ -204,11 +185,7 @@ def chat_stream(user_input: str):
 
         # 第二次调用：让 AI 根据工具结果回答用户（这次流式输出）
         trimmed = trim_messages(messages)
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=trimmed,
-            stream=True,
-        )
+        response = chat(trimmed, model, stream=True)
 
         final_reply = ""
         for chunk in response:

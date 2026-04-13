@@ -3,18 +3,8 @@ Lumen - 记忆系统
 会话结束时生成摘要，新会话开始时注入记忆
 """
 
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
 from . import history
-
-# 复用 chat.py 一样的 API 配置
-load_dotenv()
-client = OpenAI(
-    base_url=os.getenv("API_URL"),
-    api_key=os.getenv("API_KEY"),
-)
-MODEL = os.getenv("MODEL", "deepseek-chat")
+from .llm import chat
 
 
 def generate_summary(messages: list) -> str:
@@ -37,8 +27,10 @@ def generate_summary(messages: list) -> str:
 
     # 调 AI 生成摘要
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
+        from .config import get_model
+        model = get_model()
+
+        response = chat(
             messages=[
                 {
                     "role": "system",
@@ -53,6 +45,8 @@ def generate_summary(messages: list) -> str:
                 },
                 {"role": "user", "content": f"<conversation>\n{conversation_text}</conversation>"},
             ],
+            model=model,
+            stream=False,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
