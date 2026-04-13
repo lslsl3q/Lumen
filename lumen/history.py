@@ -8,8 +8,8 @@ import sqlite3
 import os
 from datetime import datetime
 
-# 数据库文件路径
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+# 数据库文件路径（现在在上层目录）
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 
 

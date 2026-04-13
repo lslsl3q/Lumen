@@ -6,8 +6,8 @@ Lumen - 提示词构建器
 import json
 import os
 
-# 角色卡片文件夹
-CHARACTERS_DIR = os.path.join(os.path.dirname(__file__), "characters")
+# 角色卡片文件夹（现在在上层目录）
+CHARACTERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "characters")
 
 
 def list_characters():
@@ -54,7 +54,7 @@ def build_system_prompt(character: dict, dynamic_context: list = None) -> str:
     # 第二层：工具注入（从角色配置读取 tools 字段）
     tools = character.get("tools", [])
     if tools:
-        from tools import get_tool_prompt_from_registry
+        from .tools import get_tool_prompt_from_registry
         tool_prompt = get_tool_prompt_from_registry(tools)
         if tool_prompt:
             parts.append(tool_prompt)

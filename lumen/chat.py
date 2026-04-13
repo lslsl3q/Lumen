@@ -6,11 +6,11 @@ Lumen - 对话核心模块
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
-from prompt import load_character, build_system_prompt, list_characters
-from context import trim_messages
-import history
-import memory
-import tools
+from .prompt import load_character, build_system_prompt, list_characters
+from .context import trim_messages
+from . import history
+from . import memory
+from . import tools
 from tool_lib.registry import get_registry
 
 # 1. 加载配置

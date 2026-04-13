@@ -6,7 +6,7 @@ Lumen - 记忆系统
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
-import history
+from . import history
 
 # 复用 chat.py 一样的 API 配置
 load_dotenv()

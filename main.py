@@ -1,12 +1,12 @@
 """
 Lumen - 网页界面
-只管显示，不管逻辑，所有对话都调用 chat.py
+只管显示，不管逻辑，所有对话都调用 lumen.chat
 """
 
 import gradio as gr
-from chat import chat_stream, reset, load
-from prompt import list_characters
-import history
+from lumen.chat import chat_stream, reset, load
+from lumen.prompt import list_characters
+from lumen import history
 
 
 def get_character_choices():
@@ -49,7 +49,7 @@ def load_old_session(session_id):
     # 从数据库加载，用默认角色
     character = load("default", session_id=session_id)
     # 把消息转成 Gradio 格式
-    from chat import messages
+    from lumen.chat import messages
     chatbot_msgs = []
     for msg in messages:
         if msg["role"] in ("user", "assistant"):
