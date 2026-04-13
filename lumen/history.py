@@ -6,7 +6,9 @@ Lumen - 对话历史存储
 
 import sqlite3
 import os
+import json
 from datetime import datetime
+from typing import Dict, Any, Optional, List
 
 # 数据库文件路径（现在在上层目录）
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
@@ -20,6 +22,24 @@ def _get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # 让查询结果像字典一样用
     return conn
+
+
+def _migrate_add_metadata():
+    """数据库迁移：给 messages 表添加 metadata 字段"""
+    conn = _get_conn()
+    cursor = conn.cursor()
+
+    # 检查 metadata 字段是否存在
+    cursor.execute("PRAGMA table_info(messages)")
+    columns = [row["name"] for row in cursor.fetchall()]
+
+    if "metadata" not in columns:
+        print("[数据库迁移] 添加 metadata 字段到 messages 表...")
+        cursor.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
+        conn.commit()
+        print("[数据库迁移] ✅ 完成")
+
+    conn.close()
 
 
 def _init_db():
@@ -38,6 +58,7 @@ def _init_db():
             session_id  TEXT,
             role        TEXT,
             content     TEXT,
+            metadata    TEXT,
             created_at  TEXT
         );
 
@@ -50,6 +71,9 @@ def _init_db():
         );
     """)
     conn.close()
+
+    # 数据库迁移：给现有表添加 metadata 字段
+    _migrate_add_metadata()
 
 
 # 程序启动时自动初始化数据库
@@ -70,13 +94,22 @@ def new_session(character_id: str = "default") -> str:
     return session_id
 
 
-def save_message(session_id: str, role: str, content: str):
-    """保存一条消息到数据库"""
+def save_message(session_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None):
+    """保存一条消息到数据库
+
+    Args:
+        session_id: 会话 ID
+        role: 消息角色（user/assistant/system）
+        content: 消息内容
+        metadata: 消息元数据（可选），会转换为 JSON 存储
+    """
     now = datetime.now().isoformat()
+    metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+
     conn = _get_conn()
     conn.execute(
-        "INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)",
-        (session_id, role, content, now),
+        "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+        (session_id, role, content, metadata_json, now),
     )
     # 更新会话的最后活跃时间
     conn.execute(
@@ -87,15 +120,36 @@ def save_message(session_id: str, role: str, content: str):
     conn.close()
 
 
-def load_session(session_id: str) -> list:
-    """加载某个会话的所有消息，返回 messages 列表（跟 chat.py 的格式一样）"""
+def load_session(session_id: str) -> List[Dict[str, Any]]:
+    """加载某个会话的所有消息，返回 messages 列表
+
+    Args:
+        session_id: 会话 ID
+
+    Returns:
+        消息列表，格式：[{"role": ..., "content": ..., "metadata": ...}, ...]
+    """
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT role, content FROM messages WHERE session_id = ? ORDER BY id",
+        "SELECT role, content, metadata FROM messages WHERE session_id = ? ORDER BY id",
         (session_id,),
     ).fetchall()
     conn.close()
-    return [{"role": row["role"], "content": row["content"]} for row in rows]
+
+    messages = []
+    for row in rows:
+        msg = {"role": row["role"], "content": row["content"]}
+        # 解析 metadata（如果有）
+        if row["metadata"]:
+            try:
+                msg["metadata"] = json.loads(row["metadata"])
+            except json.JSONDecodeError:
+                msg["metadata"] = {"type": "normal", "folded": False}
+        else:
+            msg["metadata"] = {"type": "normal", "folded": False}
+        messages.append(msg)
+
+    return messages
 
 
 def list_sessions(limit: int = 20) -> list:

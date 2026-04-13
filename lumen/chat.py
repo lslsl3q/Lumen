@@ -150,38 +150,113 @@ def chat_stream(user_input: str):
     tool_call = tools.parse_tool_call(reply)
 
     if tool_call:
-        # AI 想调用工具 → 先验证 → 再执行
-        tool_name = tool_call.get("tool", "")
-        tool_params = tool_call.get("params", {})
+        mode = tool_call.get("mode", "single")
 
-        # 验证工具调用是否正确
-        validation_error = validate_tool_call(tool_name, tool_params)
-        if validation_error:
-            # 验证失败 → 反馈给 AI，让它重新思考
-            print(f"[工具验证] ❌ {validation_error}")
-            error_feedback = f"[系统提示] 你的工具调用有误：{validation_error}。请重新分析用户需求，选择正确的工具和参数。"
+        # ========== 单个工具 ==========
+        if mode == "single":
+            tool_name = tool_call.get("tool", "")
+            tool_params = tool_call.get("params", {})
 
+            # 验证工具调用是否正确
+            validation_error = validate_tool_call(tool_name, tool_params)
+            if validation_error:
+                # 验证失败 → 反馈给 AI，让它重新思考
+                print(f"[工具验证] ❌ {validation_error}")
+                error_feedback = f"[系统提示] 你的工具调用有误：{validation_error}。请重新分析用户需求，选择正确的工具和参数。"
+
+                messages.append({"role": "assistant", "content": reply})
+                messages.append({"role": "user", "content": error_feedback})
+
+                # 让 AI 重新思考（不流式输出，因为这是内部重试）
+                trimmed = trim_messages(messages)
+                response = chat(trimmed, model, stream=False)
+                retry_reply = response.choices[0].message.content
+
+                # 递归处理重新思考的结果
+                messages.append({"role": "assistant", "content": retry_reply})
+                yield retry_reply
+                history.save_message(current_session_id, "assistant", retry_reply)
+                return
+
+            # 验证通过 → 执行工具
+            tool_result = tools.execute_tool(tool_name, tool_params)
+            print(f"[工具调用] {tool_name}({tool_params}) → {tool_result['success'] and '✅' or '❌'}")
+            if tool_result["success"]:
+                print(f"  数据: {tool_result['data']}")
+                print(f"  耗时: {tool_result.get('execution_time', 'N/A')}ms")
+            else:
+                print(f"  错误: {tool_result['error_code']} - {tool_result['error_message']}")
+
+            # 发送完整结果给 AI（用于判断成功/失败，调试问题）
+            import json
             messages.append({"role": "assistant", "content": reply})
-            messages.append({"role": "user", "content": error_feedback})
+            messages.append({
+                "role": "user",
+                "content": json.dumps(tool_result, ensure_ascii=False),
+                "metadata": {
+                    "type": "tool_result",
+                    "tool_name": tool_name,
+                    "folded": False
+                }
+            })
 
-            # 让 AI 重新思考（不流式输出，因为这是内部重试）
-            trimmed = trim_messages(messages)
-            response = chat(trimmed, model, stream=False)
-            retry_reply = response.choices[0].message.content
+        # ========== 多个工具并行 ==========
+        elif mode == "parallel":
+            calls = tool_call.get("calls", [])
 
-            # 递归处理重新思考的结果
-            messages.append({"role": "assistant", "content": retry_reply})
-            yield retry_reply
-            history.save_message(current_session_id, "assistant", retry_reply)
-            return
+            # 验证所有工具调用
+            all_errors = []
+            for call in calls:
+                tool_name = call.get("tool", "")
+                tool_params = call.get("params", {})
+                error = validate_tool_call(tool_name, tool_params)
+                if error:
+                    all_errors.append(f"- {tool_name}: {error}")
 
-        # 验证通过 → 执行工具
-        tool_result = tools.execute_tool(tool_name, tool_params)
-        print(f"[工具调用] {tool_name}({tool_params}) → {tool_result}")
+            if all_errors:
+                # 有验证失败 → 反馈给 AI
+                print(f"[工具验证] ❌ 并行调用有误:\n" + "\n".join(all_errors))
+                error_feedback = f"[系统提示] 你的并行工具调用有误：\n" + "\n".join(all_errors) + "\n请重新分析用户需求，选择正确的工具和参数。"
 
-        # 把工具调用的过程加入消息历史
-        messages.append({"role": "assistant", "content": reply})
-        messages.append({"role": "user", "content": f"[工具执行结果] {tool_result}"})
+                messages.append({"role": "assistant", "content": reply})
+                messages.append({"role": "user", "content": error_feedback})
+
+                # 让 AI 重新思考
+                trimmed = trim_messages(messages)
+                response = chat(trimmed, model, stream=False)
+                retry_reply = response.choices[0].message.content
+
+                messages.append({"role": "assistant", "content": retry_reply})
+                yield retry_reply
+                history.save_message(current_session_id, "assistant", retry_reply)
+                return
+
+            # 验证通过 → 并发执行所有工具
+            print(f"[工具调用] 🔄 并行执行 {len(calls)} 个工具...")
+            results = tools.execute_tools_parallel(calls)
+
+            # 打印结果
+            for r in results:
+                status = "✅" if r["success"] else "❌"
+                print(f"  - {r['tool']}: {status}")
+                if r["success"]:
+                    print(f"    数据: {r['data']}")
+                    print(f"    耗时: {r.get('execution_time', 'N/A')}ms")
+                else:
+                    print(f"    错误: {r['error_code']} - {r['error_message']}")
+
+            # 发送完整结果给 AI（JSON 数组格式）
+            import json
+            messages.append({"role": "assistant", "content": reply})
+            messages.append({
+                "role": "user",
+                "content": json.dumps(results, ensure_ascii=False),
+                "metadata": {
+                    "type": "tool_result_parallel",
+                    "tool_count": len(results),
+                    "folded": False
+                }
+            })
 
         # 第二次调用：让 AI 根据工具结果回答用户（这次流式输出）
         trimmed = trim_messages(messages)

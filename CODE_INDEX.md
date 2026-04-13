@@ -2,7 +2,7 @@
 
 > **用途**：这是 Lumen 项目的代码地图。新会话开始时先读这个文件，了解项目组织结构，然后按需读取具体代码。
 
-**最后更新**：2026-04-13
+**最后更新**：2026-04-13 21:30
 
 ---
 
@@ -16,9 +16,10 @@ Lumen/
 │   ├── llm.py               # LLM适配器层（统一调用接口）
 │   ├── chat.py              # 对话核心逻辑
 │   ├── prompt.py            # 提示词构建（角色卡片→系统提示词）
-│   ├── tools.py             # 工具调用系统（解析、执行）
-│   ├── context.py           # 上下文管理（消息裁剪）
-│   ├── history.py           # 对话历史存储（SQLite）
+│   ├── tools.py             # 工具调用系统（解析、执行、返回值统一）
+│   ├── message_types.py     # 消息类型和元数据定义（支持上下文折叠）
+│   ├── context.py           # 上下文管理（消息裁剪、折叠接口）
+│   ├── history.py           # 对话历史存储（SQLite、支持元数据）
 │   └── memory.py            # 记忆系统（会话摘要）
 │
 ├── tool_lib/                # 🟢 工具定义库
@@ -55,9 +56,10 @@ Lumen/
 | **llm.py** | LLM适配器层 | config | `chat()` | 统一不同厂商的调用格式 |
 | **chat.py** | 对话核心 | 所有核心模块 | `chat_stream()`, `load()`, `reset()` | 处理用户对话、工具调用 |
 | **prompt.py** | 提示词构建 | 无 | `build_system_prompt()`, `build_messages()` | 角色卡片→系统提示词 |
-| **tools.py** | 工具调用 | tool_lib.registry | `execute_tool()`, `parse_tool_call()` | AI调用工具的解析和执行 |
-| **context.py** | 上下文管理 | 无 | `trim_messages()` | 控制上下文长度 |
-| **history.py** | 历史存储 | sqlite3 | `save_message()`, `load_session()` | SQLite读写对话历史 |
+| **tools.py** | 工具调用 | tool_lib.registry | `execute_tool()`, `execute_tools_parallel()`, `parse_tool_call()`, `ErrorCode` | AI调用工具的解析和执行，支持并行，返回值统一 |
+| **message_types.py** | 消息类型定义 | 无 | `MessageType`, `MessageMetadata`, `create_message()`, `fold_tool_calls()` | 定义消息类型和元数据，支持上下文折叠 |
+| **context.py** | 上下文管理 | message_types | `trim_messages()`, `fold_tool_calls()`（预留）, `filter_for_ai()` | 控制上下文长度，过滤折叠消息 |
+| **history.py** | 历史存储 | sqlite3 | `save_message()`, `load_session()`（支持metadata） | SQLite读写对话历史，支持元数据存储 |
 | **memory.py** | 记忆系统 | history, llm | `generate_summary()`, `get_memory_context()` | 会话摘要生成和注入 |
 
 ### 调用关系图
@@ -72,8 +74,9 @@ chat.py (对话核心)
   ├─→ tools.py (工具调用)
   │     ↓
   │   tool_lib/registry.py
-  ├─→ context.py (裁剪上下文)
-  ├─→ history.py (存储历史)
+  ├─→ message_types.py (创建带元数据的消息)
+  ├─→ context.py (裁剪上下文、过滤折叠消息)
+  ├─→ history.py (存储历史和元数据)
   └─→ memory.py (记忆摘要)
 ```
 
@@ -159,14 +162,30 @@ chat.py (对话核心)
 ```
 AI回复 → 解析工具调用 → tools.parse_tool_call()
                 ↓
-        是否想调用工具？
-    是 → 验证参数 → validate_tool_call()
-            ↓
-        验证通过？ → 执行工具 → tools.execute_tool()
-            ↓                      ↓
-        失败→反馈AI            tool_lib/registry.py
-            ↓
-        重新调用LLM（带工具结果）
+        返回格式：{"mode": "single" | "parallel", ...}
+                ↓
+    ┌───────────┴───────────┐
+    ↓                       ↓
+单个工具                  多个工具并行
+validate_tool_call()      验证所有工具
+    ↓                       ↓
+execute_tool()        execute_tools_parallel()
+    ↓                       ↓
+返回标准格式：           返回标准格式列表：
+{                        [
+  "success": bool,         {success, tool, data, ...},
+  "tool": str,             ...
+  "data": any,           ]
+  "error_code": str,
+  ...
+]
+    ↓                       ↓
+创建带元数据的消息      创建带元数据的消息
+message_types.create...   message_types.create...
+    ↓                       ↓
+保存到 history（支持metadata）
+    ↓
+重新调用LLM（带完整的工具结果 JSON）
 ```
 
 ---
@@ -183,6 +202,43 @@ AI回复 → 解析工具调用 → tools.parse_tool_call()
 | **修改上下文长度** | `lumen/context.py` |
 | **查看历史记录** | `data/history.db`（用SQLite工具）|
 | **修改界面** | `main.py` |
+| **了解消息类型** | `lumen/message_types.py` |
+
+---
+
+## 📦 上下文折叠机制（已预留接口）
+
+### 设计原理
+
+工具调用会产生中间消息（AI 输出的 JSON + 返回结果），这些消息在 AI 已处理后可以折叠。
+
+### 消息生命周期
+
+```
+第 N 轮（工具调用）：
+1. user: "2+2等于几？"
+2. assistant: {"tool": "calculate", ...}           ← tool_call
+3. user: {"success": true, "data": "2+2=4", ...}   ← tool_result
+4. assistant: "2+2等于4"                            ← AI 已输出结果
+
+第 N+1 轮（调用 fold_tool_calls）：
+- 检测 2-3 是工具调用对
+- 检测 4 存在（AI 已处理）
+- 标记消息 3 为 folded=True
+
+发送给 AI 时（调用 filter_for_ai）：
+- folded=True 的消息不发送
+- 但保留在数据库，前端可展开查看
+```
+
+### 实现状态
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| **消息元数据** | ✅ 完成 | history.py 支持 metadata 存储 |
+| **折叠接口** | ✅ 预留 | context.py 中 fold_tool_calls() |
+| **过滤接口** | ✅ 完成 | context.py 中 filter_for_ai() |
+| **具体折叠逻辑** | 🔜 待实现 | 等 5+ 工具时再实现 |
 
 ---
 
@@ -201,6 +257,10 @@ AI回复 → 解析工具调用 → tools.parse_tool_call()
 
 | 日期 | 变更 | 原因 |
 |------|------|------|
+| 2026-04-13 21:30 | 新增 message_types.py | 支持消息类型和元数据，为上下文折叠打基础 |
+| 2026-04-13 21:30 | 更新 tools.py | 返回值统一格式化，支持并行工具调用 |
+| 2026-04-13 21:30 | 更新 context.py | 预留 fold_tool_calls() 和 filter_for_ai() 接口 |
+| 2026-04-13 21:30 | 更新 history.py | 支持元数据存储，数据库迁移 |
 | 2026-04-13 | 创建初始索引 | 项目结构化 |
 | 2026-04-13 | 新增 config.py, llm.py | 重构配置管理 |
 
