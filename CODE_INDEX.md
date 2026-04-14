@@ -2,7 +2,7 @@
 
 > **用途**：这是 Lumen 项目的代码地图。新会话开始时先读这个文件，了解项目组织结构，然后按需读取具体代码。
 
-**最后更新**：2026-04-13 21:30
+**最后更新**：2026-04-14 16:30
 
 ---
 
@@ -22,6 +22,30 @@ Lumen/
 │   ├── history.py           # 对话历史存储（SQLite、支持元数据）
 │   └── memory.py            # 记忆系统（会话摘要）
 │
+├── lumen-Front/             # 🟢 前端项目（Tauri 2桌面应用）
+│   ├── src/                 # React TypeScript源代码
+│   │   ├── ChatInterface.tsx    # 聊天界面组件
+│   │   ├── api/               # API客户端（连接FastAPI后端）
+│   │   │   └── chat.ts        # 聊天API接口
+│   │   ├── hooks/             # React Hooks
+│   │   │   └── useChat.ts     # 聊天状态管理
+│   │   ├── App.tsx            # 应用入口
+│   │   └── main.tsx           # React入口
+│   ├── src-tauri/           # Rust后端（Tauri 2）
+│   │   ├── Cargo.toml        # Rust依赖配置
+│   │   ├── src/              # Rust源代码
+│   │   ├── tauri.conf.json   # Tauri配置
+│   │   └── icons/            # 应用图标
+│   ├── package.json         # Node.js依赖
+│   ├── vite.config.ts       # Vite构建配置
+│   ├── tailwind.config.js   # Tailwind CSS配置
+│   └── tsconfig.json        # TypeScript配置
+│
+├── api/                     # 🟢 FastAPI后端接口
+│   └── routes/
+│       ├── chat.py          # 聊天API端点
+│       └── session.py       # 会话管理API端点
+│
 ├── tool_lib/                # 🟢 工具定义库
 │   ├── registry.py          # 工具注册系统（CRUD、验证）
 │   └── registry.json        # 工具定义存储
@@ -36,7 +60,6 @@ Lumen/
 ├── tests/                   # 🟢 测试代码
 │   └── test_context.py      # context模块测试
 │
-├── main.py                  # 网页界面入口（Gradio）
 ├── requirements.txt         # 依赖清单
 ├── .env                     # 环境配置（API_URL, API_KEY, MODEL）
 ├── .gitignore               # Git忽略规则
@@ -65,19 +88,24 @@ Lumen/
 ### 调用关系图
 
 ```
-main.py (界面)
-  ↓
-chat.py (对话核心)
-  ├─→ config.py (获取模型)
-  ├─→ llm.py (调用LLM)
-  ├─→ prompt.py (构建提示词)
-  ├─→ tools.py (工具调用)
+前端层（Tauri 2 + React）
+  ↓ HTTP请求
+BFF层（FastAPI）
+  ├─→ api/routes/chat.py
+  ├─→ api/routes/session.py
+  └─→ api/routes/character.py
+     ↓
+chat.py（对话核心）
+  ├─→ config.py（获取模型）
+  ├─→ llm.py（调用LLM）
+  ├─→ prompt.py（构建提示词）
+  ├─→ tools.py（工具调用）
   │     ↓
   │   tool_lib/registry.py
-  ├─→ message_types.py (创建带元数据的消息)
-  ├─→ context.py (裁剪上下文、过滤折叠消息)
-  ├─→ history.py (存储历史和元数据)
-  └─→ memory.py (记忆摘要)
+  ├─→ message_types.py（创建带元数据的消息）
+  ├─→ context.py（裁剪上下文、过滤折叠消息）
+  ├─→ history.py（存储历史和元数据）
+  └─→ memory.py（记忆摘要）
 ```
 
 ---
@@ -124,6 +152,222 @@ chat.py (对话核心)
 
 ---
 
+## 🟢 前端模块 (lumen-Front/)
+
+**技术栈**：Tauri 2 + React 18 + TypeScript 5.6 + Tailwind CSS 3.4 + Vite 6
+
+| 文件 | 职责 | 依赖 | 关键函数/组件 | 使用场景 |
+|------|------|------|-------------|----------|
+| **ChatInterface.tsx** | 聊天界面组件 | useChat, chat.ts | 显示消息、处理输入 | 用户聊天界面 |
+| **api/chat.ts** | API客户端 | fetch | `sendMessage()` | 连接FastAPI后端 |
+| **hooks/useChat.ts** | 聊天状态管理 | React useState | `sendMessage()`, `messages`, `isLoading` | 管理聊天状态和消息列表 |
+| **App.tsx** | 应用入口 | ChatInterface | 渲染主界面 | 应用根组件 |
+| **src-tauri/Cargo.toml** | Rust依赖配置 | tauri 2.10 | 定义Rust后端依赖 | Tauri桌面应用后端 |
+| **src-tauri/tauri.conf.json** | Tauri配置 | - | 窗口设置、构建配置 | 桌面应用配置 |
+
+### 前端架构
+
+```
+┌─────────────────────────────────────────────────────┐
+│           前端层：Tauri 2 桌面应用                   │
+├─────────────────────────────────────────────────────┤
+│  React + TypeScript                                │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  App.tsx                                      │   │
+│  │    ↓                                          │   │
+│  │  ChatInterface.tsx (聊天界面)                 │   │
+│  │    ↓                                          │   │
+│  │  useChat Hook (状态管理)                       │   │
+│  │    ↓                                          │   │
+│  │  API客户端层                                   │   │
+│  │  - api/chat.ts (HTTP请求)                     │   │
+│  │  - api/websocket.ts (WebSocket) 🔜            │   │
+│  └─────────────────────────────────────────────┘   │
+│                      ↓                              │
+│  Tauri Bridge (进程间通信)                          │
+│                      ↓                              │
+│  Rust后端 (src-tauri/) - 系统调用、窗口管理          │
+└─────────────────────────────────────────────────────┘
+         ↓                              ↓
+    HTTP/SSE                        WebSocket 🔜
+         ↓                              ↓
+┌─────────────────────────────────────────────────────┐
+│        BFF层：FastAPI 后端 (localhost:8000)         │
+├─────────────────────────────────────────────────────┤
+│  API适配层（Backend For Frontend）                  │
+│                                                       │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  HTTP/SSE 接口                               │   │
+│  │  - api/routes/chat.py      (聊天API)        │   │
+│  │  - api/routes/session.py   (会话管理)       │   │
+│  │  适用场景：请求-响应、流式推送               │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                       │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  WebSocket 接口 🔜                           │   │
+│  │  - api/ws/voice.py          (语音流)         │   │
+│  │  - api/ws/screen.py         (屏幕流)         │   │
+│  │  - api/ws/control.py        (桌面控制)       │   │
+│  │  - api/ws/ui_style.py       (AI控制UI)       │   │
+│  │  适用场景：双向实时通信、音视频流            │   │
+│  └─────────────────────────────────────────────┘   │
+│                                                       │
+│  职责：鉴权、限流、协议转换、数据格式化               │
+└─────────────────────────────────────────────────────┘
+                      ↓ 调用
+┌─────────────────────────────────────────────────────┐
+│     AI Agent逻辑层：lumen/ 核心代码 (Python)         │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────┐   │
+│  │  chat.py           (对话核心)                │   │
+│  │  tools.py          (工具调用系统)            │   │
+│  │  context.py        (上下文管理)              │   │
+│  │  history.py        (对话历史存储)            │   │
+│  │  memory.py         (记忆系统)                │   │
+│  │  prompt.py         (提示词构建)              │   │
+│  │  llm.py            (LLM适配器层)             │   │
+│  │  config.py         (配置管理)                │   │
+│  └─────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+                      ↓ 数据访问
+┌─────────────────────────────────────────────────────┐
+│              数据层：存储和检索                      │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────────┐      │
+│  │  SQLite        │  │  向量存储 🔜        │      │
+│  │  history.db    │  │  vector_store/      │      │
+│  └─────────────────┘  └─────────────────────┘      │
+│  ┌─────────────────┐  ┌─────────────────────┐      │
+│  │  工具注册表     │  │  知识图谱 🔜        │      │
+│  │  tool_lib/      │  │  knowledge/         │      │
+│  └─────────────────┘  └─────────────────────┘      │
+│  ┌─────────────────┐                                  │
+│  │  角色配置       │                                  │
+│  │  characters/    │                                  │
+│  └─────────────────┘                                  │
+└─────────────────────────────────────────────────────┘
+```
+
+### 通信协议选择
+
+| 功能 | 协议 | 原因 | 状态 |
+|------|------|------|------|
+| **聊天消息** | HTTP + SSE | 请求-响应模式，流式推送LLM回复 | ✅ 已实现 |
+| **会话管理** | HTTP | CRUD操作，一次性请求 | ✅ 已实现 |
+| **语音录制** | WebSocket | 双向实时音频流 | 🔜 待开发 |
+| **语音转文字** | HTTP | 上传音频文件，返回文字 | 🔜 待开发 |
+| **屏幕录制** | WebSocket | 实时视频流传输 | 🔜 待开发 |
+| **桌面控制** | WebSocket | 实时双向指令 | 🔜 待开发 |
+| **AI控制UI** | SSE | 服务器单向推送样式更新 | 🔜 待开发 |
+
+### 开发环境配置
+
+**启动命令**：
+```bash
+cd lumen-Front
+pnpm tauri dev
+```
+
+**端口配置**：
+- Vite前端：http://localhost:1420
+- FastAPI后端：http://localhost:8000
+
+**环境要求**：
+- Node.js (通过pnpm管理依赖)
+- Rust/Cargo (Tauri后端)
+- Python (FastAPI后端，在父目录)
+
+---
+
+## 🟢 FastAPI后端 (api/)
+
+**技术栈**：FastAPI + Python
+
+**层级定位**：BFF层（Backend For Frontend）
+
+**核心职责**：
+- ✅ 协议适配：HTTP → 内部Python调用
+- ✅ 数据格式化：JSON → lumen/内部对象
+- ✅ 鉴权认证：用户身份验证（待实现）
+- ✅ 请求限流：防止API滥用（待实现）
+- ✅ 流式推送：SSE支持（待实现）
+
+| 文件 | 职责 | 端点 | 使用场景 |
+|------|------|------|----------|
+| **routes/chat.py** | 聊天API | POST /chat/send, POST /chat/stream | 处理聊天请求，调用lumen/chat.py |
+| **routes/session.py** | 会话管理 | POST /new, POST /load, GET /list, DELETE /delete | 会话CRUD操作，调用lumen/history.py |
+| **ws/voice.py** | 语音WebSocket | WS /ws/voice | 实时语音流处理（待开发） |
+| **ws/screen.py** | 屏幕WebSocket | WS /ws/screen | 实时屏幕流处理（待开发） |
+| **ws/control.py** | 控制WebSocket | WS /ws/control | 实时桌面控制指令（待开发） |
+| **ws/ui_style.py** | UI样式WebSocket | WS /ws/ui_style | AI实时控制UI样式（待开发） |
+
+### BFF层调用流程
+
+**HTTP路径（简单请求）：**
+```
+HTTP请求 (JSON)
+  ↓
+FastAPI路由 (api/routes/*.py)
+  ↓
+参数验证 + 数据转换
+  ↓
+调用 lumen/ 核心逻辑
+  ↓
+返回结果 + 格式化
+  ↓
+HTTP响应 (JSON)
+```
+
+**SSE路径（流式推送）：**
+```
+HTTP请求
+  ↓
+FastAPI路由
+  ↓
+调用 lumen/ 核心逻辑
+  ↓
+流式生成数据
+  ↓
+SSE连接推送
+  ↓
+前端实时更新
+```
+
+**WebSocket路径（实时双向）：** 🔜
+```
+WebSocket连接建立
+  ↓
+持久化连接
+  ↓
+双向实时数据流
+  ├─ 前端 → 后端：语音流、屏幕流
+  └─ 后端 → 前端：转写结果、控制指令
+  ↓
+连接关闭
+```
+
+### WebSocket连接管理
+
+**连接建立流程：**
+```
+1. 前端启动 → 创建WebSocket连接
+2. 握手认证（Token验证）
+3. 连接建立成功
+4. 心跳检测（保持连接）
+5. 异常重连机制
+```
+
+**消息格式：**
+```json
+{
+  "type": "voice_data" | "screen_data" | "control_cmd" | "ui_style",
+  "payload": { ... },
+  "timestamp": 1234567890
+}
+```
+
+---
+
 ## 🟡 未来独立模块
 
 **判断标准**：可选 + 低耦合 + 复杂逻辑
@@ -139,12 +383,21 @@ chat.py (对话核心)
 
 ## 📊 数据流
 
-### 典型对话流程
+### 典型对话流程（三层架构）
 
 ```
-1. 用户输入 → main.py (Gradio界面)
-2. main.py → chat.chat_stream(用户输入)
-3. chat.py:
+【前端层】
+1. 用户输入 → ChatInterface.tsx
+2. useChat Hook 管理状态
+3. api/chat.ts 发送HTTP请求
+
+【BFF层】
+4. FastAPI接收请求 (api/routes/chat.py)
+5. 参数验证 + 数据格式化
+6. 调用 lumen.chat.chat_stream()
+
+【AI逻辑层】
+7. chat.py:
    ├─ 构建消息: prompt.build_messages()
    ├─ 裁剪上下文: context.trim_messages()
    ├─ 获取模型: config.get_model()
@@ -154,7 +407,15 @@ chat.py (对话核心)
    │   ├─ 执行: tools.execute_tool()
    │   └─ 重试LLM: llm.chat()
    ├─ 保存历史: history.save_message()
-   └─ 返回结果 → main.py → 用户
+   └─ 返回结果
+
+【BFF层】
+8. FastAPI接收结果
+9. 格式化为JSON响应
+
+【前端层】
+10. React接收响应
+11. 更新UI显示
 ```
 
 ### 工具调用流程
@@ -201,8 +462,12 @@ message_types.create...   message_types.create...
 | **修改记忆策略** | `lumen/memory.py` |
 | **修改上下文长度** | `lumen/context.py` |
 | **查看历史记录** | `data/history.db`（用SQLite工具）|
-| **修改界面** | `main.py` |
+| **修改桌面界面** | `lumen-Front/src/ChatInterface.tsx` |
+| **修改前端API** | `lumen-Front/src/api/chat.ts` |
+| **修改后端API** | `api/routes/chat.py` |
 | **了解消息类型** | `lumen/message_types.py` |
+| **启动桌面应用** | `cd lumen-Front && pnpm tauri dev` |
+| **启动后端服务** | 双击 `启动后端.bat` (Windows) 或运行 `启动.sh` (Linux/Mac) |
 
 ---
 
@@ -257,6 +522,8 @@ message_types.create...   message_types.create...
 
 | 日期 | 变更 | 原因 |
 |------|------|------|
+| 2026-04-14 16:30 | 新增 lumen-Front/ | 新增Tauri 2桌面应用前端 |
+| 2026-04-14 16:30 | 新增 api/routes/ | FastAPI后端API接口 |
 | 2026-04-13 21:30 | 新增 message_types.py | 支持消息类型和元数据，为上下文折叠打基础 |
 | 2026-04-13 21:30 | 更新 tools.py | 返回值统一格式化，支持并行工具调用 |
 | 2026-04-13 21:30 | 更新 context.py | 预留 fold_tool_calls() 和 filter_for_ai() 接口 |

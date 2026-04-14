@@ -1,4 +1,11 @@
+# Lumen AI 依赖清单
+
+# 核心依赖
 openai
 python-dotenv
-gradio
 asteval
+
+# API 服务
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6

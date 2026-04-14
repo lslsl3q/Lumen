@@ -18,10 +18,31 @@ Lumen 是一个个人学习项目，用于探索 LLM 应用的各种模式：
 
 ## 快速开始
 
+### 启动后端服务
+
+**Windows:**
 ```bash
 pip install -r requirements.txt
-python main.py
+启动后端.bat
 ```
+
+**Linux/Mac:**
+```bash
+pip install -r requirements.txt
+./启动.sh
+```
+
+后端将运行在: http://127.0.0.1:8888
+
+### 启动桌面应用
+
+```bash
+cd lumen-Front
+pnpm install
+pnpm tauri dev
+```
+
+或使用启动脚本: `lumen-Front\启动并测试.bat`
 
 ## 许可
 
