@@ -9,8 +9,9 @@ from typing import List, Optional
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.prompt import load_character, list_characters, build_system_prompt
-from lumen.chat import load
+from lumen.prompt.character import load_character, list_characters
+from lumen.prompt.builder import build_system_prompt
+from lumen.core.session import get_session_manager
 
 
 # ========================================
@@ -31,6 +32,12 @@ class SwitchCharacterResponse(BaseModel):
     message: str
     character_id: str
     session_id: str
+
+
+class SwitchCharacterRequest(BaseModel):
+    """切换角色请求"""
+    character_id: str
+    session_id: str = "default"
 
 
 # ========================================
@@ -88,27 +95,31 @@ async def get_character(character_id: str) -> CharacterInfo:
 
 
 @router.post("/switch")
-async def switch_character(character_id: str, create_new_session: bool = True) -> SwitchCharacterResponse:
+async def switch_character(req: SwitchCharacterRequest) -> SwitchCharacterResponse:
     """
     切换角色
 
     Args:
-        character_id: 要切换到的角色 ID
-        create_new_session: 是否创建新会话，默认 True
+        req: 包含 character_id 和 session_id 的请求体
 
     Returns:
         切换结果
     """
     try:
-        # 加载角色（会创建新会话）
-        load(character_id, session_id=None if create_new_session else None)
+        manager = get_session_manager()
+        session = manager.get(req.session_id)
 
-        from lumen.chat import current_session_id
+        if not session:
+            # 会话不存在，创建新会话
+            session = manager.create_new(req.character_id)
+        else:
+            # 会话存在，切换角色
+            session.switch_character(req.character_id)
 
         return SwitchCharacterResponse(
-            message=f"已切换到角色：{character_id}",
-            character_id=character_id,
-            session_id=current_session_id
+            message=f"已切换到角色：{req.character_id}",
+            character_id=req.character_id,
+            session_id=session.session_id
         )
 
     except Exception as e:

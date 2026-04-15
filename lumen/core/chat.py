@@ -3,19 +3,36 @@ Lumen - 对话核心模块
 所有对话逻辑都在这，不管是终端还是网页都调用这里
 """
 
-from .prompt import load_character, build_system_prompt, list_characters
-from .context import trim_messages
-from . import history
-from . import memory
-from . import tools
-from .config import get_model
-from .llm import chat
-from tool_lib.registry import get_registry
+import logging
 
-# 2. 当前状态
-current_character_id = "default"
-current_session_id = None  # 当前会话ID
-messages = []
+from lumen.core.session import ChatSession
+from lumen.prompt.character import load_character
+from lumen.prompt.builder import build_system_prompt
+from lumen.core.context import trim_messages
+from lumen.services import history
+from lumen.services import memory
+from lumen.tools.base import execute_tool, execute_tools_parallel, get_tool_prompt
+from lumen.tools.parse import parse_tool_call
+from lumen.config import get_model
+from lumen.services.llm import chat
+from lumen.tools.registry import get_registry
+from lumen.prompt.template import render_messages, collect_variables
+
+logger = logging.getLogger(__name__)
+
+
+def _prepare_messages(messages, character_id: str = "default"):
+    """预处理消息：裁剪上下文 + 模板变量替换
+
+    所有发给 LLM 的消息都必须经过这个函数
+
+    Args:
+        messages: 原始消息列表
+        character_id: 当前角色ID，用于加载对应的记忆
+    """
+    trimmed = trim_messages(messages)
+    variables = collect_variables(character_id)
+    return render_messages(trimmed, variables)
 
 
 def validate_tool_call(tool_name: str, tool_params: dict) -> str:
@@ -66,75 +83,44 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str:
     return None
 
 
-def load(character_id: str = "default", session_id: str = None):
-    """加载角色，初始化聊天历史
+def chat_non_stream(user_input: str, session: ChatSession) -> str:
+    """非流式：等AI想完了再一次性返回
 
-    character_id: 角色ID
-    session_id: 如果传了，就从数据库加载旧会话；不传就创建新会话
+    Args:
+        user_input: 用户输入
+        session: ChatSession 实例
+
+    Returns:
+        AI 的完整回复
     """
-    global current_character_id, current_session_id, messages
+    session.messages.append({"role": "user", "content": user_input})
+    history.save_message(session.session_id, "user", user_input)
 
-    # 切会话前，给当前会话生成摘要（有实际对话内容才摘要）
-    if current_session_id:
-        chat_msgs = [m for m in messages if m["role"] != "system"]
-        if len(chat_msgs) > 1:
-            memory.summarize_session(current_session_id, current_character_id, messages)
-
-    current_character_id = character_id
-    character = load_character(character_id)
-
-    # 读取记忆，注入到 system prompt
-    memory_text = memory.get_memory_context(character_id)
-    tool_text = tools.get_tool_prompt()
-
-    dynamic_context = []
-    if memory_text:
-        dynamic_context.append({"content": memory_text, "injection_point": "system"})
-    if tool_text:
-        dynamic_context.append({"content": tool_text, "injection_point": "system"})
-
-    system_prompt = build_system_prompt(
-        character,
-        dynamic_context if dynamic_context else None
-    )
-
-    if session_id:
-        # 加载旧会话
-        current_session_id = session_id
-        old_messages = history.load_session(session_id)
-        messages = [{"role": "system", "content": system_prompt}] + old_messages
-    else:
-        # 创建新会话
-        current_session_id = history.new_session(character_id)
-        # 把系统提示词也存一份
-        messages = [{"role": "system", "content": system_prompt}]
-        history.save_message(current_session_id, "system", system_prompt)
-
-    return character
-
-
-def chat_non_stream(user_input: str) -> str:
-    """非流式：等AI想完了再一次性返回"""
-    messages.append({"role": "user", "content": user_input})
-    history.save_message(current_session_id, "user", user_input)
-
-    trimmed = trim_messages(messages)
+    trimmed = _prepare_messages(session.messages, session.character_id)
     model = get_model()
 
     response = chat(trimmed, model, stream=False)
 
     reply = response.choices[0].message.content
-    messages.append({"role": "assistant", "content": reply})
-    history.save_message(current_session_id, "assistant", reply)
+    session.messages.append({"role": "assistant", "content": reply})
+    history.save_message(session.session_id, "assistant", reply)
     return reply
 
 
-def chat_stream(user_input: str):
-    """流式：AI想到一个字就给你一个字（支持工具调用）"""
-    messages.append({"role": "user", "content": user_input})
-    history.save_message(current_session_id, "user", user_input)
+def chat_stream(user_input: str, session: ChatSession):
+    """流式：AI想到一个字就给你一个字（支持工具调用）
 
-    trimmed = trim_messages(messages)
+    Args:
+        user_input: 用户输入
+        session: ChatSession 实例
+
+    Yields:
+        AI 的回复内容（增量）
+    """
+    session.messages.append({"role": "user", "content": user_input})
+    history.save_message(session.session_id, "user", user_input)
+
+    trimmed = _prepare_messages(session.messages, session.character_id)
     model = get_model()
 
     # 第一次调用：先收集完整回复，检查是否要调用工具
@@ -147,7 +133,7 @@ def chat_stream(user_input: str):
             reply += content
 
     # 检查 AI 是不是想调用工具
-    tool_call = tools.parse_tool_call(reply)
+    tool_call = parse_tool_call(reply)
 
     if tool_call:
         mode = tool_call.get("mode", "single")
@@ -161,36 +147,36 @@ def chat_stream(user_input: str):
             validation_error = validate_tool_call(tool_name, tool_params)
             if validation_error:
                 # 验证失败 → 反馈给 AI，让它重新思考
-                print(f"[工具验证] ❌ {validation_error}")
+                logger.warning(f"工具验证失败: {validation_error}")
                 error_feedback = f"[系统提示] 你的工具调用有误：{validation_error}。请重新分析用户需求，选择正确的工具和参数。"
 
-                messages.append({"role": "assistant", "content": reply})
-                messages.append({"role": "user", "content": error_feedback})
+                session.messages.append({"role": "assistant", "content": reply})
+                session.messages.append({"role": "user", "content": error_feedback})
 
                 # 让 AI 重新思考（不流式输出，因为这是内部重试）
-                trimmed = trim_messages(messages)
+                trimmed = _prepare_messages(session.messages, session.character_id)
                 response = chat(trimmed, model, stream=False)
                 retry_reply = response.choices[0].message.content
 
                 # 递归处理重新思考的结果
-                messages.append({"role": "assistant", "content": retry_reply})
+                session.messages.append({"role": "assistant", "content": retry_reply})
                 yield retry_reply
-                history.save_message(current_session_id, "assistant", retry_reply)
+                history.save_message(session.session_id, "assistant", retry_reply)
                 return
 
             # 验证通过 → 执行工具
-            tool_result = tools.execute_tool(tool_name, tool_params)
-            print(f"[工具调用] {tool_name}({tool_params}) → {tool_result['success'] and '✅' or '❌'}")
+            tool_result = execute_tool(tool_name, tool_params)
+            logger.info(f"工具调用: {tool_name}({tool_params}) → {'✅' if tool_result['success'] else '❌'}")
             if tool_result["success"]:
-                print(f"  数据: {tool_result['data']}")
-                print(f"  耗时: {tool_result.get('execution_time', 'N/A')}ms")
+                logger.debug(f"  数据: {tool_result['data']}")
+                logger.debug(f"  耗时: {tool_result.get('execution_time', 'N/A')}ms")
             else:
-                print(f"  错误: {tool_result['error_code']} - {tool_result['error_message']}")
+                logger.warning(f"  错误: {tool_result['error_code']} - {tool_result['error_message']}")
 
             # 发送完整结果给 AI（用于判断成功/失败，调试问题）
             import json
-            messages.append({"role": "assistant", "content": reply})
-            messages.append({
+            session.messages.append({"role": "assistant", "content": reply})
+            session.messages.append({
                 "role": "user",
                 "content": json.dumps(tool_result, ensure_ascii=False),
                 "metadata": {
@@ -215,40 +201,40 @@ def chat_stream(user_input: str):
 
             if all_errors:
                 # 有验证失败 → 反馈给 AI
-                print(f"[工具验证] ❌ 并行调用有误:\n" + "\n".join(all_errors))
+                logger.warning(f"并行工具验证失败:\n" + "\n".join(all_errors))
                 error_feedback = f"[系统提示] 你的并行工具调用有误：\n" + "\n".join(all_errors) + "\n请重新分析用户需求，选择正确的工具和参数。"
 
-                messages.append({"role": "assistant", "content": reply})
-                messages.append({"role": "user", "content": error_feedback})
+                session.messages.append({"role": "assistant", "content": reply})
+                session.messages.append({"role": "user", "content": error_feedback})
 
                 # 让 AI 重新思考
-                trimmed = trim_messages(messages)
+                trimmed = _prepare_messages(session.messages, session.character_id)
                 response = chat(trimmed, model, stream=False)
                 retry_reply = response.choices[0].message.content
 
-                messages.append({"role": "assistant", "content": retry_reply})
+                session.messages.append({"role": "assistant", "content": retry_reply})
                 yield retry_reply
-                history.save_message(current_session_id, "assistant", retry_reply)
+                history.save_message(session.session_id, "assistant", retry_reply)
                 return
 
             # 验证通过 → 并发执行所有工具
-            print(f"[工具调用] 🔄 并行执行 {len(calls)} 个工具...")
-            results = tools.execute_tools_parallel(calls)
+            logger.info(f"并行执行 {len(calls)} 个工具...")
+            results = execute_tools_parallel(calls)
 
             # 打印结果
             for r in results:
                 status = "✅" if r["success"] else "❌"
-                print(f"  - {r['tool']}: {status}")
+                logger.info(f"  - {r['tool']}: {status}")
                 if r["success"]:
-                    print(f"    数据: {r['data']}")
-                    print(f"    耗时: {r.get('execution_time', 'N/A')}ms")
+                    logger.debug(f"    数据: {r['data']}")
+                    logger.debug(f"    耗时: {r.get('execution_time', 'N/A')}ms")
                 else:
-                    print(f"    错误: {r['error_code']} - {r['error_message']}")
+                    logger.warning(f"    错误: {r['error_code']} - {r['error_message']}")
 
             # 发送完整结果给 AI（JSON 数组格式）
             import json
-            messages.append({"role": "assistant", "content": reply})
-            messages.append({
+            session.messages.append({"role": "assistant", "content": reply})
+            session.messages.append({
                 "role": "user",
                 "content": json.dumps(results, ensure_ascii=False),
                 "metadata": {
@@ -259,7 +245,7 @@ def chat_stream(user_input: str):
             })
 
         # 第二次调用：让 AI 根据工具结果回答用户（这次流式输出）
-        trimmed = trim_messages(messages)
+        trimmed = _prepare_messages(session.messages, session.character_id)
         response = chat(trimmed, model, stream=True)
 
         final_reply = ""
@@ -270,19 +256,10 @@ def chat_stream(user_input: str):
                 yield final_reply
 
         # 保存最终回复（工具调用过程不存，只存最终回答）
-        messages.append({"role": "assistant", "content": final_reply})
-        history.save_message(current_session_id, "assistant", final_reply)
+        session.messages.append({"role": "assistant", "content": final_reply})
+        history.save_message(session.session_id, "assistant", final_reply)
     else:
         # 普通对话，直接返回
-        messages.append({"role": "assistant", "content": reply})
-        history.save_message(current_session_id, "assistant", reply)
+        session.messages.append({"role": "assistant", "content": reply})
+        history.save_message(session.session_id, "assistant", reply)
         yield reply
-
-
-def reset():
-    """清空聊天历史，用当前角色创建新会话"""
-    return load(current_character_id)
-
-
-# 启动时加载默认角色（创建新会话）
-load("default")

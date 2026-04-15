@@ -11,6 +11,7 @@ export interface ChatResponse {
 }
 
 export interface Message {
+  id: string;              // 唯一标识
   role: 'user' | 'assistant';
   content: string;
 }

@@ -33,12 +33,13 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character
+from api.routes import chat, session, character, config
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
 app.include_router(session.router, prefix="/sessions", tags=["会话"])
 app.include_router(character.router, prefix="/characters", tags=["角色"])
+app.include_router(config.router, prefix="/config", tags=["配置"])
 
 
 # 根路径健康检查

@@ -1,12 +1,4 @@
 {
-  "get_current_time": {
-    "description": "获取当前的日期、时间和星期",
-    "parameters": {
-      "type": "object",
-      "properties": {},
-      "required": []
-    }
-  },
   "calculate": {
     "description": "计算数学表达式的结果，支持加减乘除、幂运算、括号",
     "parameters": {

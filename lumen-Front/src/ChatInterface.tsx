@@ -24,9 +24,9 @@ function ChatInterface() {
 
       {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.map((message, index) => (
+        {messages.map((message) => (
           <div
-            key={index}
+            key={message.id}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div

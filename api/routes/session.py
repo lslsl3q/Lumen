@@ -9,8 +9,8 @@ from typing import List, Optional
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.chat import load, reset, current_session_id
-from lumen import history
+from lumen.core.session import get_session_manager
+from lumen.services import history
 
 
 # ========================================
@@ -20,7 +20,13 @@ from lumen import history
 class NewSessionResponse(BaseModel):
     """新会话响应"""
     session_id: str
+    character_id: str
     message: str
+
+
+class SessionRequest(BaseModel):
+    """会话操作请求（加载/删除等）"""
+    session_id: str
 
 
 class SessionListItem(BaseModel):
@@ -44,14 +50,15 @@ async def create_session(character_id: str = "default") -> NewSessionResponse:
         character_id: 角色ID，默认为 default
 
     Returns:
-        新会话的 ID
+        新会话的信息
     """
     try:
-        # 加载角色，创建新会话
-        load(character_id, session_id=None)
+        manager = get_session_manager()
+        session = manager.create_new(character_id)
 
         return NewSessionResponse(
-            session_id=current_session_id,
+            session_id=session.session_id,
+            character_id=session.character_id,
             message=f"已创建新会话，使用角色：{character_id}"
         )
 
@@ -60,23 +67,24 @@ async def create_session(character_id: str = "default") -> NewSessionResponse:
 
 
 @router.post("/load")
-async def load_session(session_id: str) -> dict:
+async def load_session(req: SessionRequest) -> dict:
     """
     加载指定会话
 
     Args:
-        session_id: 会话ID
+        req: 包含 session_id 的请求体
 
     Returns:
         加载结果
     """
     try:
-        # 使用默认角色加载会话
-        load("default", session_id=session_id)
+        manager = get_session_manager()
+        session = manager.get_or_create(req.session_id)
 
         return {
-            "message": f"已加载会话：{session_id}",
-            "session_id": session_id
+            "message": f"已加载会话：{req.session_id}",
+            "session_id": session.session_id,
+            "character_id": session.character_id
         }
 
     except Exception as e:
@@ -111,19 +119,21 @@ async def list_sessions(limit: int = 20) -> List[SessionListItem]:
         raise HTTPException(status_code=500, detail=f"获取会话列表失败: {str(e)}")
 
 
-@router.delete("/delete")
+@router.delete("/{session_id}")
 async def delete_session(session_id: str) -> dict:
     """
     删除指定会话
 
     Args:
-        session_id: 会话ID
+        session_id: 会话ID（URL路径参数）
 
     Returns:
         删除结果
     """
     try:
-        history.delete_session(session_id)
+        manager = get_session_manager()
+        manager.remove(session_id)  # 从内存中移除
+        history.delete_session(session_id)  # 从数据库中删除
 
         return {"message": f"已删除会话：{session_id}"}
 
@@ -132,20 +142,32 @@ async def delete_session(session_id: str) -> dict:
 
 
 @router.post("/reset")
-async def reset_current() -> dict:
+async def reset_session(session_id: str = "default") -> dict:
     """
-    重置当前会话（清空聊天历史，创建新会话）
+    重置指定会话（清空聊天历史，创建新会话）
+
+    Args:
+        session_id: 会话ID，默认为 "default"
 
     Returns:
         重置结果
     """
     try:
-        reset()
+        manager = get_session_manager()
+        session = manager.get(session_id)
+
+        if not session:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
+        session.reset()
 
         return {
             "message": "已重置会话",
-            "session_id": current_session_id
+            "session_id": session.session_id,
+            "character_id": session.character_id
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"重置会话失败: {str(e)}")

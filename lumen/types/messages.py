@@ -105,25 +105,72 @@ def create_message(role: str,
     }
 
 
-def create_tool_call_message(tool_name: str, params: Dict) -> Dict[str, Any]:
-    """创建工具调用消息"""
+def create_tool_call_message(tool_name: str, params: Dict,
+                               run_in_background: bool = False) -> Dict[str, Any]:
+    """创建工具调用消息（新格式）
+
+    Args:
+        tool_name: 工具名称
+        params: 工具参数
+        run_in_background: 是否后台运行
+
+    Returns:
+        工具调用消息字典
+    """
     import json
+    import uuid
+    from datetime import datetime
+
+    # 生成唯一调用 ID
+    call_id = f"call_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+
+    # 构建新格式的工具调用
+    tool_call = {
+        "type": "tool_call",
+        "id": call_id,
+        "tool": tool_name,
+        "params": params
+    }
+
+    # 可选参数
+    if run_in_background:
+        tool_call["run_in_background"] = True
+
     return create_message(
         role="assistant",
-        content=json.dumps({"tool": tool_name, "params": params}),
+        content=json.dumps(tool_call, ensure_ascii=False),
         msg_type=MessageType.TOOL_CALL,
-        tool_name=tool_name
+        tool_name=tool_name,
+        tool_call_id=call_id  # 记录调用 ID 到元数据
     )
 
 
-def create_tool_result_message(result: Dict[str, Any]) -> Dict[str, Any]:
-    """创建工具结果消息"""
+def create_tool_result_message(result: Dict[str, Any],
+                                 tool_call_id: Optional[str] = None) -> Dict[str, Any]:
+    """创建工具结果消息（新格式）
+
+    Args:
+        result: 工具执行结果（来自 execute_tool）
+        tool_call_id: 关联的工具调用 ID
+
+    Returns:
+        工具结果消息字典
+    """
     import json
+
+    # 构建新格式的工具结果
+    tool_result = {
+        "type": "tool_result",
+        "tool_call_id": tool_call_id,
+        "result": result
+    }
+
     return create_message(
         role="user",
-        content=json.dumps(result, ensure_ascii=False),
+        content=json.dumps(tool_result, ensure_ascii=False),
         msg_type=MessageType.TOOL_RESULT,
         tool_name=result.get("tool"),
+        tool_call_id=tool_call_id,
         folded=False
     )
 

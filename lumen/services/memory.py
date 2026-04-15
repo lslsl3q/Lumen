@@ -3,8 +3,12 @@ Lumen - 记忆系统
 会话结束时生成摘要，新会话开始时注入记忆
 """
 
-from . import history
-from .llm import chat
+import logging
+
+from lumen.services import history
+from lumen.services.llm import chat
+
+logger = logging.getLogger(__name__)
 
 
 def generate_summary(messages: list) -> str:
@@ -27,7 +31,7 @@ def generate_summary(messages: list) -> str:
 
     # 调 AI 生成摘要
     try:
-        from .config import get_model
+        from lumen.config import get_model
         model = get_model()
 
         response = chat(
@@ -50,8 +54,8 @@ def generate_summary(messages: list) -> str:
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
-        # 摘要失败不影响正常使用，打印错误后静默跳过
-        print(f"[记忆] 摘要生成失败: {e}")
+        # 摘要失败不影响正常使用，记录错误后静默跳过
+        logger.error(f"摘要生成失败: {e}")
         return ""
 
 
@@ -60,7 +64,7 @@ def summarize_session(session_id: str, character_id: str, messages: list):
     summary = generate_summary(messages)
     if summary:
         history.save_summary(session_id, character_id, summary)
-        print(f"[记忆] 已保存会话 {session_id} 的摘要")
+        logger.info(f"已保存会话 {session_id} 的摘要")
 
 
 def get_memory_context(character_id: str) -> str:

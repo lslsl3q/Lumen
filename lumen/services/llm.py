@@ -3,7 +3,7 @@ Lumen - LLM 适配器层
 统一不同厂商的调用格式，方便扩展支持多种模型
 """
 
-from .config import client
+from lumen.config import client, LLM_TIMEOUT
 
 
 def chat(messages: list, model: str, stream: bool = False):
@@ -24,11 +24,11 @@ def chat(messages: list, model: str, stream: bool = False):
     """
     # TODO: 以后根据 model 名称前缀选择不同适配器
     # if model.startswith("claude-"):
-    #     return _anthropic_chat(messages, model, stream)
+    #     return _anthropic_chat(messages, model)
     # elif model.startswith("gemini-"):
-    #     return _gemini_chat(messages, model, stream)
+    #     return _gemini_chat(messages, model)
     # else:
-    #     return _openai_chat(messages, model, stream)
+    #     return _openai_chat(messages, model)
 
     # 当前：默认使用 OpenAI 兼容格式
     return _openai_chat(messages, model, stream)
@@ -43,11 +43,20 @@ def _openai_chat(messages: list, model: str, stream: bool = False):
     - 通义千问
     - Gemini（通过 OpenAI 兼容接口）
     - 其他使用 OpenAI 格式的 API
+
+    Args:
+        messages: 消息列表
+        model: 模型名称
+        stream: 是否流式输出
+
+    超时设置：
+        默认 60 秒，可通过环境变量 LLM_TIMEOUT 调整
     """
     return client.chat.completions.create(
         model=model,
         messages=messages,
         stream=stream,
+        timeout=LLM_TIMEOUT,  # 设置超时时间
     )
 
 

@@ -5,13 +5,21 @@ import { useState, useCallback } from 'react';
 import { sendMessage } from '../api/chat';
 
 export interface Message {
+  id: string;              // 唯一标识
   role: 'user' | 'assistant';
   content: string;
 }
 
+/**
+ * 生成唯一消息 ID
+ */
+function generateMessageId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '你好！我是 Lumen AI，有什么可以帮你的吗？' }
+    { id: 'msg_init', role: 'assistant', content: '你好！我是 Lumen AI，有什么可以帮你的吗？' }
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
@@ -20,8 +28,12 @@ export function useChat() {
   const sendMessageToAPI = useCallback(async (messageContent: string) => {
     if (!messageContent.trim()) return;
 
-    // 添加用户消息
-    const userMessage: Message = { role: 'user', content: messageContent };
+    // 添加用户消息（带唯一 ID）
+    const userMessage: Message = {
+      id: generateMessageId(),
+      role: 'user',
+      content: messageContent
+    };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -31,8 +43,12 @@ export function useChat() {
       // 调用API
       const response = await sendMessage(messageContent);
 
-      // 添加助手回复
-      const assistantMessage: Message = { role: 'assistant', content: response.reply };
+      // 添加助手回复（带唯一 ID）
+      const assistantMessage: Message = {
+        id: generateMessageId(),
+        role: 'assistant',
+        content: response.reply
+      };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err) {
       console.error('发送消息失败:', err);
@@ -48,7 +64,7 @@ export function useChat() {
 
   const resetChat = useCallback(() => {
     setMessages([
-      { role: 'assistant', content: '你好！我是 Lumen AI，有什么可以帮你的吗？' }
+      { id: 'msg_init', role: 'assistant', content: '你好！我是 Lumen AI，有什么可以帮你的吗？' }
     ]);
     setError(null);
   }, []);

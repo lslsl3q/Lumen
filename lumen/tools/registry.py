@@ -4,7 +4,6 @@ Lumen - 工具注册系统
 """
 
 import json
-import os
 from pathlib import Path
 
 
@@ -38,19 +37,16 @@ def validate_tool_definition(name: str, definition: dict) -> tuple:
     else:
         params = definition["parameters"]
 
-        # 检查 parameters.type
         if "type" not in params:
             errors.append("parameters 缺少 type 字段")
         elif params["type"] != "object":
             errors.append(f"parameters.type 必须是 'object'，当前是 '{params['type']}'")
 
-        # 检查 parameters.properties
         if "properties" not in params:
             errors.append("parameters 缺少 properties 字段")
         elif not isinstance(params["properties"], dict):
             errors.append("parameters.properties 必须是对象")
         else:
-            # 验证每个参数定义
             for param_name, param_def in params["properties"].items():
                 if not isinstance(param_def, dict):
                     errors.append(f"参数 '{param_name}' 的定义必须是对象")
@@ -61,12 +57,10 @@ def validate_tool_definition(name: str, definition: dict) -> tuple:
                 elif param_def["type"] not in ["string", "number", "integer", "boolean", "array", "object"]:
                     errors.append(f"参数 '{param_name}' 的 type '{param_def['type']}' 无效")
 
-                # 检查 enum
                 if "enum" in param_def:
                     if not isinstance(param_def["enum"], list):
                         errors.append(f"参数 '{param_name}' 的 enum 必须是数组")
 
-        # 检查 parameters.required
         if "required" in params:
             if not isinstance(params["required"], list):
                 errors.append("parameters.required 必须是数组")
@@ -87,14 +81,13 @@ class ToolRegistry:
     """工具注册表 - 管理所有工具的定义"""
 
     def __init__(self, registry_path: str = None):
-        """
-        初始化工具注册表
+        """初始化工具注册表
 
         Args:
             registry_path: 工具注册表 JSON 文件路径
         """
         if registry_path is None:
-            # 默认路径：tools/registry.json
+            # 默认路径：和本文件同目录的 registry.json
             registry_path = Path(__file__).parent / "registry.json"
 
         self.registry_path = Path(registry_path)
@@ -111,7 +104,6 @@ class ToolRegistry:
             with open(self.registry_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # 验证所有工具定义
             valid_tools = {}
             for name, definition in data.items():
                 is_valid, error = validate_tool_definition(name, definition)
@@ -135,13 +127,7 @@ class ToolRegistry:
             print(f"[ToolRegistry] 保存失败: {e}")
 
     def register(self, name: str, definition: dict):
-        """
-        注册一个新工具（会先验证定义）
-
-        Args:
-            name: 工具名称
-            definition: 工具定义（包含 description 和 parameters）
-        """
+        """注册一个新工具（会先验证定义）"""
         is_valid, error = validate_tool_definition(name, definition)
         if not is_valid:
             print(f"[ToolRegistry] ❌ 工具 '{name}' 验证失败: {error}")
@@ -162,8 +148,7 @@ class ToolRegistry:
         return self.tools.get(name)
 
     def get_tools(self, names: list = None) -> dict:
-        """
-        获取工具定义
+        """获取工具定义
 
         Args:
             names: 工具名称列表，如果为 None 则返回所有工具
@@ -193,6 +178,7 @@ class ToolRegistry:
 
 # 全局单例
 _registry_instance = None
+
 
 def get_registry() -> ToolRegistry:
     """获取全局工具注册表单例"""

@@ -10,7 +10,8 @@ import json
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.chat import chat_stream, messages as current_messages
+from lumen.core.session import get_session_manager
+from lumen.core.chat import chat_stream, ChatSession
 
 
 # ========================================
@@ -21,6 +22,12 @@ class ChatRequest(BaseModel):
     """发送消息请求"""
     message: str
     session_id: Optional[str] = None  # 可选：指定会话ID
+
+
+class StreamRequest(BaseModel):
+    """流式聊天请求"""
+    message: str
+    session_id: str = "default"
 
 
 class ChatResponse(BaseModel):
@@ -45,41 +52,44 @@ async def send_message(req: ChatRequest) -> ChatResponse:
         AI 的完整回复
     """
     try:
-        # 调用核心逻辑
-        reply = ""
-        for chunk in chat_stream(req.message):
-            reply = chunk  # 取最后一个完整回复
+        manager = get_session_manager()
+        session = manager.get_or_create(req.session_id or "default")
 
-        # 获取当前会话ID
-        from lumen.chat import current_session_id
-        session_id = current_session_id or "default"
+        reply = ""
+        for chunk in chat_stream(req.message, session):
+            reply = chunk
 
         return ChatResponse(
             reply=reply,
-            session_id=session_id
+            session_id=session.session_id
         )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"聊天失败: {str(e)}")
 
 
-@router.get("/stream")
-async def stream_chat(message: str):
+@router.post("/stream")
+async def stream_chat(req: StreamRequest):
     """
     流式聊天（Server-Sent Events）
 
     实时返回 AI 的每个字，适合打字机效果
 
     Args:
-        message: 用户消息
+        req: 包含用户消息和会话ID的请求体
 
     Returns:
         SSE 格式的流式响应
     """
+    from fastapi.responses import StreamingResponse
+
+    manager = get_session_manager()
+    session = manager.get_or_create(req.session_id)
+
     async def generate():
         """生成 SSE 流"""
         try:
-            for chunk in chat_stream(message):
+            for chunk in chat_stream(req.message, session):
                 # SSE 格式：data: <内容>\n\n
                 yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
 
@@ -94,22 +104,33 @@ async def stream_chat(message: str):
 
 
 @router.get("/history")
-async def get_history():
+async def get_history(session_id: str = "default"):
     """
     获取当前会话的聊天历史
+
+    Args:
+        session_id: 会话ID，默认为 "default"
 
     Returns:
         消息列表（不含系统提示词）
     """
     try:
+        manager = get_session_manager()
+        session = manager.get(session_id)
+
+        if not session:
+            raise HTTPException(status_code=404, detail="会话不存在")
+
         # 过滤掉系统提示词，只返回用户和助手的对话
         history = [
             {"role": msg["role"], "content": msg["content"]}
-            for msg in current_messages
+            for msg in session.messages
             if msg["role"] in ("user", "assistant")
         ]
 
         return {"messages": history}
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取历史失败: {str(e)}")

@@ -7,21 +7,36 @@ Lumen - 对话历史存储
 import sqlite3
 import os
 import json
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
-# 数据库文件路径（现在在上层目录）
+logger = logging.getLogger(__name__)
+
+# 数据库文件路径（lumen/data/）
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 
+# 模块级单例连接，整个进程复用同一个
+_conn: Optional[sqlite3.Connection] = None
+
 
 def _get_conn():
-    """获取数据库连接"""
-    # 确保 data 文件夹存在
-    os.makedirs(DATA_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # 让查询结果像字典一样用
-    return conn
+    """获取数据库连接（单例复用，进程内只建立一个连接）"""
+    global _conn
+    if _conn is None:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        _conn.row_factory = sqlite3.Row
+    return _conn
+
+
+def close_conn():
+    """关闭数据库连接（程序退出时调用）"""
+    global _conn
+    if _conn is not None:
+        _conn.close()
+        _conn = None
 
 
 def _migrate_add_metadata():
@@ -34,12 +49,10 @@ def _migrate_add_metadata():
     columns = [row["name"] for row in cursor.fetchall()]
 
     if "metadata" not in columns:
-        print("[数据库迁移] 添加 metadata 字段到 messages 表...")
+        logger.info("数据库迁移: 添加 metadata 字段到 messages 表...")
         cursor.execute("ALTER TABLE messages ADD COLUMN metadata TEXT")
         conn.commit()
-        print("[数据库迁移] ✅ 完成")
-
-    conn.close()
+        logger.info("数据库迁移: 完成")
 
 
 def _init_db():
@@ -70,7 +83,6 @@ def _init_db():
             created_at   TEXT
         );
     """)
-    conn.close()
 
     # 数据库迁移：给现有表添加 metadata 字段
     _migrate_add_metadata()
@@ -90,7 +102,6 @@ def new_session(character_id: str = "default") -> str:
         (session_id, character_id, now, now),
     )
     conn.commit()
-    conn.close()
     return session_id
 
 
@@ -117,7 +128,6 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
         (now, session_id),
     )
     conn.commit()
-    conn.close()
 
 
 def load_session(session_id: str) -> List[Dict[str, Any]]:
@@ -134,7 +144,6 @@ def load_session(session_id: str) -> List[Dict[str, Any]]:
         "SELECT role, content, metadata FROM messages WHERE session_id = ? ORDER BY id",
         (session_id,),
     ).fetchall()
-    conn.close()
 
     messages = []
     for row in rows:
@@ -159,7 +168,6 @@ def list_sessions(limit: int = 20) -> list:
         "SELECT id, character_id, created_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
         (limit,),
     ).fetchall()
-    conn.close()
     return [(row["id"], row["character_id"], row["created_at"]) for row in rows]
 
 
@@ -170,7 +178,6 @@ def delete_session(session_id: str):
     conn.execute("DELETE FROM summaries WHERE session_id = ?", (session_id,))
     conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
     conn.commit()
-    conn.close()
 
 
 def save_summary(session_id: str, character_id: str, summary: str):
@@ -182,7 +189,6 @@ def save_summary(session_id: str, character_id: str, summary: str):
         (session_id, character_id, summary, now),
     )
     conn.commit()
-    conn.close()
 
 
 def load_summaries(character_id: str, limit: int = 3) -> list:
@@ -194,5 +200,4 @@ def load_summaries(character_id: str, limit: int = 3) -> list:
         "SELECT session_id, summary FROM summaries WHERE character_id = ? ORDER BY id DESC LIMIT ?",
         (character_id, limit),
     ).fetchall()
-    conn.close()
     return [(row["session_id"], row["summary"]) for row in rows]

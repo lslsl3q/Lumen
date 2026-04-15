@@ -11,14 +11,16 @@ from typing import List, Dict, Any
 # ========================================
 
 def fold_tool_calls(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """折叠历史工具调用消息
+    """折叠历史工具调用消息 - NOT YET IMPLEMENTED
+
+    此功能已预留接口，等待实现。当前直接返回原消息列表。
 
     原理：
     1. 检测工具调用对（assistant tool_call + user tool_result）
     2. 如果下一条 assistant 消息存在（说明 AI 已输出结果）
     3. 标记 tool_result 消息为 folded=True
 
-    不是删除消息，而是标记折叠。折叠的消息：
+    折叠的消息：
     - 保留在数据库中
     - 前端可以展开查看
     - 不发送给 AI
@@ -29,11 +31,7 @@ def fold_tool_calls(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     Returns:
         标记后的消息列表（原列表的浅拷贝）
     """
-    # TODO: 以后实现
-    # 实现逻辑：
-    # 1. 遍历消息，检测 tool_call / tool_result 对
-    # 2. 检查下一条是否是 assistant 消息（AI 已处理）
-    # 3. 如果是，标记 tool_result 为 folded=True
+    # TODO: 待实现 - 当前直接返回原列表
     return messages
 
 
