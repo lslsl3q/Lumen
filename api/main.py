@@ -4,7 +4,14 @@ Lumen API 服务
 """
 
 import sys
+import logging
 from pathlib import Path
+
+# 配置日志级别（让 lumen 模块的 logger.info() 能显示出来）
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(name)s] %(message)s"
+)
 
 # 添加项目根目录到 Python 路径
 # 这样可以导入 lumen、api 等模块

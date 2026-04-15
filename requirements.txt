@@ -4,6 +4,7 @@
 openai
 python-dotenv
 asteval
+jsonschema
 
 # API 服务
 fastapi>=0.104.0

@@ -288,6 +288,7 @@ def get_tool_prompt_from_registry(tool_names: List[str] = None) -> str:
 - id: 可选，调用ID（系统自动生成，一般不需要手动指定）
 
 规则：
+- 涉及数学计算时，必须使用 calculate 工具，不要自己计算
 - 只有确实需要使用工具时才输出JSON，普通对话正常回复文字
 - type 字段必须包含，否则工具调用会被忽略
 - 不要在JSON前后加任何解释文字

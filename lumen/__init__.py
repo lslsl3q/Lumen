@@ -11,8 +11,8 @@ from lumen.core.session import ChatSession, SessionManager, get_session_manager
 # 聊天功能（core/）
 from lumen.core.chat import validate_tool_call, chat_stream, chat_non_stream
 
-# 上下文管理（core/）
-from lumen.core.context import trim_messages, fold_tool_calls, filter_for_ai
+# 上下文管理（services/context/）
+from lumen.services.context import trim_messages, fold_tool_calls, filter_for_ai
 
 # 模块引用
 from lumen.services import history
@@ -47,7 +47,7 @@ from lumen.tools.base import (
 from lumen.tools.parse import parse_tool_call
 
 # 配置（顶层）
-from lumen.config import client, get_model, DEFAULT_MODEL
+from lumen.config import client, get_model, DEFAULT_MODEL, MAX_TOOL_ITERATIONS
 
 # LLM 模块引用
 from lumen.services import llm
@@ -103,4 +103,5 @@ __all__ = [
     "client",
     "get_model",
     "DEFAULT_MODEL",
+    "MAX_TOOL_ITERATIONS",
 ]

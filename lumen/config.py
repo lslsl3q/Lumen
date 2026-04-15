@@ -69,6 +69,10 @@ DEFAULT_MODEL = os.getenv("MODEL", "glm-5.1")
 # 可以通过环境变量 LLM_TIMEOUT 覆盖
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
 
+# ReAct 循环最大轮次（防止 AI 无限调用工具）
+# 可以通过环境变量 MAX_TOOL_ITERATIONS 覆盖
+MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
+
 
 def get_model(character_config: dict = None) -> str:
     """获取当前应该使用的模型
