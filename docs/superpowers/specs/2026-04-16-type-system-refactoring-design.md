@@ -139,10 +139,12 @@ SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEv
 新建文件，定义工具协议（所有工具必须返回标准形状）：
 
 ```python
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Any, Optional, List, Dict, Union
 
 class ToolResult(BaseModel):
+    model_config = ConfigDict(extra="allow")  # 允许工具返回额外字段
+
     success: bool
     tool: str
     data: Any = None
@@ -150,6 +152,7 @@ class ToolResult(BaseModel):
     error_message: Optional[str] = None
     timestamp: Optional[str] = None
     execution_time: Optional[float] = None
+    error_detail: Optional[Dict[str, Any]] = None
 
 class SingleToolCall(BaseModel):
     mode: str = "single"
@@ -177,6 +180,7 @@ class CharacterCard(BaseModel):
     description: Optional[str] = None
     greeting: Optional[str] = None
     tools: List[str] = []
+    model: Optional[str] = None
 
 class DynamicContext(TypedDict):
     content: str
