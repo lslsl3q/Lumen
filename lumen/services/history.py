@@ -177,6 +177,18 @@ def list_sessions(limit: int = 20) -> list[SessionInfo]:
     ]
 
 
+def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
+    """获取单个会话的基本信息（从数据库查询，不依赖内存）"""
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT character_id FROM sessions WHERE id = ?",
+        (session_id,),
+    ).fetchone()
+    if row:
+        return {"session_id": session_id, "character_id": row["character_id"]}
+    return None
+
+
 def delete_session(session_id: str):
     """删除一个会话及其所有消息和摘要"""
     conn = _get_conn()

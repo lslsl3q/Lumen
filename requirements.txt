@@ -5,6 +5,9 @@ openai
 python-dotenv
 asteval
 jsonschema
+ddgs
+httpx
+trafilatura
 
 # API 服务
 fastapi>=0.104.0

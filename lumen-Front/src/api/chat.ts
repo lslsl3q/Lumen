@@ -2,6 +2,7 @@
  * 聊天API客户端
  * 连接到FastAPI后端
  */
+import { HistoryMessage } from '../types/session';
 
 const API_BASE_URL = 'http://127.0.0.1:8888';
 
@@ -42,11 +43,38 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
 }
 
 /**
- * 流式发送聊天消息（预留接口）
+ * SSE 事件类型
+ */
+export interface StreamEvent {
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'done' | 'error';
+  content?: string;
+  status?: string;
+  message?: string;
+  tool?: string | string[];
+  params?: Record<string, unknown>;
+  success?: boolean;
+  data?: unknown;
+  error?: string;
+  exit_reason?: string;
+  mode?: string;
+}
+
+/**
+ * 流式发送聊天消息
+ *
+ * 后端返回结构化事件流：
+ * - text:       文本片段，拼接到回复中
+ * - status:     状态变化（thinking / tool_error / max_iterations）
+ * - tool_start: 工具开始执行
+ * - tool_result: 工具执行结果
+ * - done:       流式结束，携带 exit_reason
+ * - error:      错误信息
  */
 export async function sendMessageStream(
   message: string,
-  onChunk: (chunk: string) => void
+  onText: (text: string) => void,
+  onEvent?: (event: StreamEvent) => void,
+  sessionId?: string
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -54,7 +82,7 @@ export async function sendMessageStream(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, session_id: sessionId || 'default' }),
     });
 
     if (!response.ok) {
@@ -82,8 +110,13 @@ export async function sendMessageStream(
           const data = line.slice(6);
           if (data === '[DONE]') continue;
           try {
-            const parsed = JSON.parse(data);
-            onChunk(parsed.content || parsed.text || '');
+            const event: StreamEvent = JSON.parse(data);
+            // 文本事件 → 拼接到回复
+            if (event.type === 'text' && event.content) {
+              onText(event.content);
+            }
+            // 所有事件都通知上层（用于未来 UI 展示工具状态）
+            onEvent?.(event);
           } catch (e) {
             // 忽略解析错误
           }
@@ -94,4 +127,15 @@ export async function sendMessageStream(
     console.error('流式发送失败:', error);
     throw error;
   }
+}
+
+/**
+ * 获取会话聊天历史
+ */
+export async function getHistory(sessionId: string): Promise<{
+  messages: HistoryMessage[];
+}> {
+  const res = await fetch(`${API_BASE_URL}/chat/history?session_id=${encodeURIComponent(sessionId)}`);
+  if (!res.ok) throw new Error(`获取历史失败: ${res.status}`);
+  return res.json();
 }

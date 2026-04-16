@@ -80,7 +80,7 @@ class ChatSession:
         old_messages = history.load_session(self.session_id)
         self.messages = [{"role": "system", "content": system_prompt}] + old_messages
 
-    def switch_character(self, new_character_id: str):
+    async def switch_character(self, new_character_id: str):
         """切换角色（创建新会话）"""
         from lumen.services import memory
 
@@ -88,7 +88,7 @@ class ChatSession:
         if self.session_id:
             chat_msgs = [m for m in self.messages if m["role"] != "system"]
             if len(chat_msgs) > 1:
-                memory.summarize_session(self.session_id, self.character_id, self.messages)
+                await memory.summarize_session(self.session_id, self.character_id, self.messages)
 
         # 重置为新角色
         self.character_id = new_character_id
@@ -119,14 +119,28 @@ class SessionManager:
     def get_or_create(self, session_id: str = "default") -> ChatSession:
         """获取或创建会话
 
+        优先从内存获取，若不在内存则查数据库：
+        - 数据库存在 → 加载已有会话（带历史消息）
+        - 数据库不存在 → 创建新会话
+
         Args:
-            session_id: 会话ID，如果不存在则创建新会话
+            session_id: 会话ID
 
         Returns:
             ChatSession 实例
         """
         if session_id not in self._sessions:
-            self._sessions[session_id] = ChatSession(character_id="default")
+            from lumen.services import history as history_service
+            info = history_service.get_session_info(session_id)
+            if info:
+                # 数据库中存在，加载已有会话（触发 _initialize_existing）
+                self._sessions[session_id] = ChatSession(
+                    character_id=info["character_id"],
+                    session_id=session_id,
+                )
+            else:
+                # 数据库中也不存在，创建新会话
+                self._sessions[session_id] = ChatSession(character_id="default")
         return self._sessions[session_id]
 
     def create_new(self, character_id: str = "default") -> ChatSession:
@@ -138,10 +152,10 @@ class SessionManager:
         Returns:
             新创建的 ChatSession 实例
         """
-        import uuid
-        new_id = f"sess_{uuid.uuid4().hex[:12]}"
         session = ChatSession(character_id=character_id)
-        self._sessions[new_id] = session
+        # 用 _initialize_new() 生成的实际 session_id（datetime 格式）作为字典 key
+        # 之前用 uuid 做 key 导致 key 和 session.session_id 不一致，API 无法通过返回的 id 找到会话
+        self._sessions[session.session_id] = session
         return session
 
     def get(self, session_id: str) -> Optional[ChatSession]:

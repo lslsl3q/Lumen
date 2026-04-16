@@ -79,6 +79,9 @@ def _load_builtin_tools():
     from lumen.tools.web_search import execute as exec_search
     register_handler("web_search", exec_search)
 
+    from lumen.tools.web_fetch import execute as exec_fetch
+    register_handler("web_fetch", exec_fetch)
+
 
 # ========================================
 # 工具执行

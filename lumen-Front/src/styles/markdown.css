@@ -1,0 +1,168 @@
+/* === Lumen Markdown 暗色主题 === */
+
+.markdown-body {
+  line-height: 1.7;
+  word-wrap: break-word;
+}
+
+/* 标题 */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  font-weight: 600;
+  color: #e2e8f0;
+  letter-spacing: 0.02em;
+}
+
+.markdown-body h1 { font-size: 1.4em; }
+.markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid rgba(20, 184, 166, 0.15); padding-bottom: 0.3em; }
+.markdown-body h3 { font-size: 1.1em; }
+.markdown-body h4 { font-size: 1em; color: #94a3b8; }
+
+/* 段落 */
+.markdown-body p {
+  margin: 0.5em 0;
+}
+
+/* 链接 */
+.markdown-body a {
+  color: #2dd4bf;
+  text-decoration: underline;
+  text-decoration-color: rgba(45, 212, 191, 0.3);
+  text-underline-offset: 2px;
+}
+.markdown-body a:hover {
+  color: #5eead4;
+  text-decoration-color: rgba(94, 234, 212, 0.5);
+}
+
+/* 行内代码 */
+.markdown-body .markdown-inline-code {
+  background: rgba(20, 184, 166, 0.1);
+  color: #5eead4;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+}
+
+/* 代码块容器 */
+.markdown-body .markdown-code-block {
+  margin: 0.6em 0;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 184, 166, 0.1);
+  font-size: 0.88em;
+}
+
+/* react-syntax-highlighter 内部的 div 和 pre */
+.markdown-body .markdown-code-block div {
+  border-radius: 8px;
+}
+
+/* 列表 */
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0.4em 0;
+  padding-left: 1.6em;
+}
+
+.markdown-body ul {
+  list-style: none;
+}
+.markdown-body ul li {
+  position: relative;
+}
+.markdown-body ul li::before {
+  content: '·';
+  position: absolute;
+  left: -1em;
+  color: #14b8a6;
+  font-weight: bold;
+}
+
+.markdown-body ol {
+  list-style: none;
+  counter-reset: md-ol;
+}
+.markdown-body ol li {
+  counter-increment: md-ol;
+  position: relative;
+}
+.markdown-body ol li::before {
+  content: counter(md-ol) '.';
+  position: absolute;
+  left: -1.6em;
+  color: #14b8a6;
+  font-weight: 500;
+  font-size: 0.85em;
+}
+
+/* 任务列表 */
+.markdown-body input[type="checkbox"] {
+  accent-color: #14b8a6;
+  margin-right: 0.4em;
+  transform: scale(1.1);
+}
+
+/* 引用 */
+.markdown-body blockquote {
+  margin: 0.5em 0;
+  padding: 0.4em 1em;
+  border-left: 3px solid #14b8a6;
+  background: rgba(20, 184, 166, 0.04);
+  color: #94a3b8;
+  border-radius: 0 6px 6px 0;
+}
+.markdown-body blockquote p {
+  margin: 0.2em 0;
+}
+
+/* 表格 */
+.markdown-body table {
+  margin: 0.6em 0;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9em;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 0.5em 0.8em;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  text-align: left;
+}
+.markdown-body th {
+  background: rgba(20, 184, 166, 0.08);
+  color: #e2e8f0;
+  font-weight: 600;
+}
+.markdown-body tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+/* 分割线 */
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid rgba(100, 116, 139, 0.2);
+  margin: 1em 0;
+}
+
+/* 加粗 */
+.markdown-body strong {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+/* 删除线 */
+.markdown-body del {
+  color: #64748b;
+}
+
+/* 图片 */
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}

@@ -6,7 +6,7 @@ Lumen - 统一配置管理
 import os
 import sys
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 # 加载环境变量
 load_dotenv()
@@ -55,8 +55,8 @@ MODEL=gemini-2.5-flash
 _validate_env()
 
 
-# API 客户端（全局单例）
-client = OpenAI(
+# API 客户端（全局单例，异步版）
+client = AsyncOpenAI(
     base_url=os.getenv("API_URL"),
     api_key=os.getenv("API_KEY"),
 )

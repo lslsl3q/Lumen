@@ -3,7 +3,7 @@
 > **用途**：这是 Lumen 项目的代码地图。新会话开始时先读这个文件，了解项目组织结构，然后按需读取具体代码。
 > **架构哲学**：按系统角色（关注点）分层组织，不按业务功能分。详见 [memory/architecture_philosophy.md](memory/architecture_philosophy.md)。
 
-**最后更新**：2026-04-16 (全链路异步化 + 前端流式显示)
+**最后更新**：2026-04-16 (T2.1 Markdown渲染 + T2.2 会话侧边栏/历史持久化)
 
 ---
 
@@ -32,7 +32,8 @@ Lumen/
 │   │   ├── registry.py           # 工具注册中心（CRUD、验证）
 │   │   ├── registry.json         # 工具定义数据
 │   │   ├── calculate.py          # 工具：计算器
-│   │   └── web_search.py         # 工具：网页搜索（调用 services/search.py）
+│   │   ├── web_search.py         # 工具：网页搜索（调用 services/search.py）
+│   │   └── web_fetch.py          # 工具：网页抓取（调用 services/fetch.py）
 │   │
 │   ├── services/                 # 基础设施 — "神经"
 │   │   ├── types.py              # SearchResult、SessionInfo
@@ -41,6 +42,7 @@ Lumen/
 │   │   │   └── manager.py        # 折叠 + 过滤 + 裁剪
 │   │   ├── llm.py                # LLM适配器（异步，OpenAI兼容格式）
 │   │   ├── search.py             # 搜索服务（DuckDuckGo后端，可切换）
+│   │   ├── fetch.py              # 网页抓取服务（httpx异步获取+文本提取）
 │   │   ├── history.py            # SQLite持久化（会话、消息、摘要）
 │   │   ├── memory.py             # 记忆系统（异步摘要生成、记忆注入）
 │   │   ├── vector_store.py       # 【预留】向量存储
@@ -68,10 +70,22 @@ Lumen/
 ├── lumen-Front/                  # 前端（Tauri 2 桌面应用）
 │   ├── src/
 │   │   ├── App.tsx               # 应用入口
-│   │   ├── ChatInterface.tsx     # 聊天界面（Lumen暗色主题，流式显示，工具状态可视化）
-│   │   ├── api/chat.ts           # HTTP客户端（SSE流式 + 非流式）
-│   │   ├── hooks/useChat.ts      # 聊天状态Hook（流式状态管理、工具调用追踪）
-│   │   └── styles/               # 样式
+│   │   ├── api/
+│   │   │   ├── chat.ts           # HTTP客户端（SSE流式 + 历史加载）
+│   │   │   └── session.ts        # 会话API客户端（CRUD + 重置）
+│   │   ├── hooks/
+│   │   │   ├── useChat.ts        # 聊天状态Hook（流式 + 会话管理 + 历史加载）
+│   │   │   └── useSessions.ts    # 会话列表Hook（CRUD + 日期格式化）
+│   │   ├── components/
+│   │   │   ├── ChatInterface.tsx # 布局容器（协调 Sidebar + Panel）
+│   │   │   ├── ChatSidebar.tsx   # 会话侧边栏（列表 + 新建/删除/切换）
+│   │   │   ├── ChatPanel.tsx     # 聊天面板（消息列表 + 工具状态 + 输入框）
+│   │   │   └── MarkdownContent.tsx # Markdown渲染（语法高亮 + 流式光标）
+│   │   ├── types/
+│   │   │   └── session.ts        # 会话/历史消息类型
+│   │   └── styles/
+│   │       ├── App.css           # 主样式（Lumen暗色主题）
+│   │       └── markdown.css      # Markdown暗色主题样式
 │   └── src-tauri/                # Rust后端（Tauri壳）
 │
 ├── tests/                        # 测试
@@ -108,7 +122,7 @@ api/routes/chat.py ──→ lumen/core/chat.py（聊天主循环）
 | 文件 | 职责 | 关键函数 |
 |------|------|----------|
 | `chat.py` | ReAct 循环（异步生成器，推理→行动→观察→...→回答），工具调用流程 | `async chat_stream()`, `async chat_non_stream()`, `validate_tool_call()` |
-| `session.py` | 会话生命周期（switch_character为异步，会触发AI摘要） | `ChatSession`, `SessionManager`, `get_session_manager()` |
+| `session.py` | 会话生命周期（内存+DB双查，switch_character异步） | `ChatSession`, `SessionManager`, `get_session_manager()` |
 
 ### tools/ — 工具系统
 
@@ -119,6 +133,7 @@ api/routes/chat.py ──→ lumen/core/chat.py（聊天主循环）
 | `registry.py` | 工具注册表 | `get_registry()`, `ToolRegistry` |
 | `calculate.py` | 数学计算 | `execute()` |
 | `web_search.py` | 网页搜索 | `execute()` |
+| `web_fetch.py` | 网页抓取 | `execute()` |
 
 **添加新工具**：在 `tools/` 下新建 `.py` 文件，实现 `execute(params) -> dict`，然后在 `base.py` 的 `_load_builtin_tools()` 中注册。
 
@@ -129,7 +144,8 @@ api/routes/chat.py ──→ lumen/core/chat.py（聊天主循环）
 | `context/` | 上下文窗口管理（折叠+裁剪+过滤） | `fold_tool_calls()`, `trim_messages()`, `filter_for_ai()` |
 | `llm.py` | LLM统一接口（异步，AsyncOpenAI） | `async chat()` |
 | `search.py` | 搜索服务（DuckDuckGo，可切换后端） | `search()` |
-| `history.py` | SQLite存储 | `save_message()`, `load_session()`, `new_session()`, `close_conn()` |
+| `fetch.py` | 网页抓取服务（httpx异步） | `async fetch_url()` |
+| `history.py` | SQLite存储 | `save_message()`, `load_session()`, `new_session()`, `get_session_info()`, `close_conn()` |
 | `memory.py` | 记忆系统（异步摘要生成） | `async generate_summary()`, `get_memory_context()`, `async summarize_session()` |
 
 ### prompt/ — 提示词构建
@@ -179,7 +195,7 @@ api/routes/chat.py ──→ lumen/core/chat.py（聊天主循环）
 | 修改对话逻辑 | `lumen/core/chat.py` |
 | 修改记忆策略 | `lumen/services/memory.py` |
 | 修改上下文长度 | `lumen/services/context/` |
-| 修改桌面界面 | `lumen-Front/src/ChatInterface.tsx` |
+| 修改桌面界面 | `lumen-Front/src/components/` |
 | 修改后端API | `api/routes/` |
 | 启动桌面应用 | `cd lumen-Front && pnpm tauri dev` |
 | 启动后端服务 | `启动后端.bat`（Windows）或 `启动.sh`（Linux/Mac） |
@@ -198,6 +214,15 @@ api/routes/chat.py ──→ lumen/core/chat.py（聊天主循环）
 | 2026-04-16 | api/routes/chat.py: 删除线程池桥，改用 async for | 全链路异步后不再需要翻译 |
 | 2026-04-16 | 前端：ChatInterface 暗色主题 + 流式显示 | Lumen视觉重设计，逐字输出+工具状态胶囊 |
 | 2026-04-16 | 前端：useChat.ts 切换到 sendMessageStream | 接入后端SSE流式，实时显示 |
+| 2026-04-16 | 前端：MarkdownContent + markdown.css | T2.1 Markdown渲染+语法高亮+流式光标 |
+| 2026-04-16 | 前端：ChatSidebar + ChatPanel + 新ChatInterface | T2.2 文件结构整理，旧ChatInterface移入components/ |
+| 2026-04-16 | 前端：api/session.ts + hooks/useSessions.ts + types/session.ts | T2.2 会话管理API客户端+Hook+类型 |
+| 2026-04-16 | 前端：useChat 新增 session 管理 + 历史加载 | T2.2 自动创建会话、加载历史、清空消息 |
+| 2026-04-16 | api/chat.ts 新增 getHistory + sendMessageStream 传 sessionId | T2.2 前端对接会话历史API |
+| 2026-04-16 | session.py: create_new 修复 key bug + get_or_create DB 回退 | T2.2 修复session_id不一致和内存miss问题 |
+| 2026-04-16 | history.py: 新增 get_session_info() | T2.2 支持从数据库查询会话基本信息 |
+| 2026-04-16 | api/chat.py: /chat/history 内存miss时回退数据库 | T2.2 后端重启后也能加载历史 |
+| 2026-04-16 | 新增 services/fetch.py + tools/web_fetch.py | T1 新增网页抓取工具（httpx异步） |
 | 2026-04-15 | 新增 services/search.py 搜索服务 | 搜索引擎是基础设施，按架构哲学归 services 层 |
 | 2026-04-15 | 新增 tools/web_search.py 网页搜索工具 | 让 AI 能搜索互联网实时信息 |
 | 2026-04-15 | registry.json 新增 web_search 定义 | 工具定义注册 |

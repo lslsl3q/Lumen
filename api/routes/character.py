@@ -114,7 +114,7 @@ async def switch_character(req: SwitchCharacterRequest) -> SwitchCharacterRespon
             session = manager.create_new(req.character_id)
         else:
             # 会话存在，切换角色
-            session.switch_character(req.character_id)
+            await session.switch_character(req.character_id)
 
         return SwitchCharacterResponse(
             message=f"已切换到角色：{req.character_id}",
