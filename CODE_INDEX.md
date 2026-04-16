@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-16（T2.3 角色管理完成）
+**最后更新**：2026-04-16（T1 文件工具完成）
 
 ---
 
@@ -14,7 +14,7 @@ Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择）
 │   ├── characters/               # 角色数据（JSON）
-│   ├── data/                     # 运行时数据（history.db）
+│   ├── data/                     # 运行时数据（history.db、file_workspaces.json）
 │   │
 │   ├── core/                     # 大脑 — 决策循环、会话状态
 │   │   ├── chat.py               # ReAct 循环（异步生成器，SSE流式输出）
@@ -25,9 +25,13 @@ Lumen/
 │   │   ├── parse.py              # AI输出 → 工具调用 解析
 │   │   ├── registry.py           # 工具注册中心（CRUD、验证）
 │   │   ├── registry.json         # 工具定义数据（含 usage_guide 字段）
+│   │   ├── types.py              # 模块级类型（ErrorCode 常量、ToolDefinition TypedDict）
+│   │   ├── file_security.py      # 文件安全层（工作区白名单+系统黑名单+路径验证）
 │   │   ├── calculate.py          # 计算器
 │   │   ├── web_search.py         # 网页搜索（→ services/search.py）
-│   │   └── web_fetch.py          # 网页抓取（→ services/fetch.py）
+│   │   ├── web_fetch.py          # 网页抓取（→ services/fetch.py）
+│   │   ├── file_read.py          # 文件读取（read/list/glob/grep/info）
+│   │   └── file_write.py         # 文件写入（write/edit/append/copy/move/rename/delete/mkdir/download）
 │   │
 │   ├── services/                 # 神经 — 基础设施
 │   │   ├── context/              # 上下文管理（折叠、裁剪、过滤）

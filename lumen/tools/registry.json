@@ -48,5 +48,85 @@
       },
       "required": ["url"]
     }
+  },
+  "file_read": {
+    "description": "文件读取工具，支持多种操作：读取文件内容、列出目录、按文件名搜索、按内容搜索、查看文件信息",
+    "usage_guide": "需要读取文件、查看目录结构、搜索文件或搜索文件内容时使用。action决定具体操作：read读文件内容（支持文本/图片/PDF）、list列目录、glob按模式搜索文件名、grep按正则搜索文件内容、info查文件元信息。搜索文件名用glob，搜索文件内容用grep。注意：当用户描述的路径不明确时（如'D盘软件文件夹'），先用list查看父目录，确认实际路径名后再操作，不要猜测路径。匹配目录名时要考虑中英文对应（软件=Software、游戏=Game、文档=Documents、下载=Download）和常见缩写，不要只做字面匹配。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "操作类型：read读文件、list列目录、glob按模式搜索文件名、grep按正则搜索文件内容、info查文件信息"
+        },
+        "path": {
+          "type": "string",
+          "description": "文件或目录的绝对路径"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "搜索模式（glob用文件名模式如**/*.py，grep用正则表达式）"
+        },
+        "encoding": {
+          "type": "string",
+          "description": "文件编码，默认utf-8"
+        },
+        "offset": {
+          "type": "integer",
+          "description": "read操作的起始行号，默认1"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "read操作的最大行数，默认2000"
+        },
+        "case_sensitive": {
+          "type": "boolean",
+          "description": "grep操作是否区分大小写，默认false"
+        }
+      },
+      "required": ["action", "path"]
+    }
+  },
+  "file_write": {
+    "description": "文件写入工具，支持多种操作：写文件、精确编辑、追加、复制、移动、重命名、删除（到回收站）、创建目录、从URL下载",
+    "usage_guide": "需要创建、修改、管理文件时使用。action决定具体操作：write创建或覆盖文件、edit精确替换文件中的文本（需提供old_string和new_string）、append追加内容、copy复制、move移动、rename重命名、delete删除到回收站、mkdir创建目录、download从URL下载。write会自动创建父目录并备份已有文件。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "操作类型：write写文件、edit精确替换、append追加、copy复制、move移动、rename重命名、delete删除到回收站、mkdir创建目录、download从URL下载"
+        },
+        "path": {
+          "type": "string",
+          "description": "文件或目录的绝对路径"
+        },
+        "content": {
+          "type": "string",
+          "description": "要写入或追加的内容（write/append时必填）"
+        },
+        "old_string": {
+          "type": "string",
+          "description": "要替换的原始文本（edit时必填，必须精确匹配）"
+        },
+        "new_string": {
+          "type": "string",
+          "description": "替换后的新文本（edit时必填）"
+        },
+        "destination": {
+          "type": "string",
+          "description": "目标路径（copy/move/rename时必填）"
+        },
+        "url": {
+          "type": "string",
+          "description": "下载地址（download时必填）"
+        },
+        "encoding": {
+          "type": "string",
+          "description": "文件编码，默认utf-8"
+        }
+      },
+      "required": ["action", "path"]
+    }
   }
 }

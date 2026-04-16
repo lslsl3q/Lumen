@@ -5,12 +5,16 @@ Lumen - 工具执行引擎
 
 import json
 import time
+import importlib
+import logging
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from lumen.tools.types import ErrorCode  # 保留此导入：calculate.py 和 web_search.py 通过 base.py 间接导入 ErrorCode
 from lumen.types.tools import ToolResult
+
+logger = logging.getLogger(__name__)
 
 
 # ========================================
@@ -72,15 +76,22 @@ def register_handler(name: str, handler: callable):
 
 
 def _load_builtin_tools():
-    """加载内置工具（延迟导入，避免循环依赖）"""
-    from lumen.tools.calculate import execute as exec_calc
-    register_handler("calculate", exec_calc)
+    """自动加载工具：从 registry.json 读取工具名 → import 对应模块 → 注册 execute 函数"""
+    from lumen.tools.registry import get_registry
 
-    from lumen.tools.web_search import execute as exec_search
-    register_handler("web_search", exec_search)
+    registry = get_registry()
+    tool_names = registry.list_tools()
 
-    from lumen.tools.web_fetch import execute as exec_fetch
-    register_handler("web_fetch", exec_fetch)
+    for tool_name in tool_names:
+        try:
+            module = importlib.import_module(f"lumen.tools.{tool_name}")
+            if hasattr(module, "execute"):
+                register_handler(tool_name, module.execute)
+                logger.info(f"自动注册工具: {tool_name}")
+            else:
+                logger.warning(f"工具 '{tool_name}' 模块中没有 execute 函数，跳过")
+        except ImportError as e:
+            logger.warning(f"工具 '{tool_name}' 导入失败: {e}")
 
 
 # ========================================

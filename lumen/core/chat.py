@@ -120,24 +120,16 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
                 yield {"type": "text", "content": content}
 
         # ---- 处理本轮结果 ----
+        # 无论回复开头是不是 {，都尝试从完整文本中解析工具调用
+        # 原因：有些模型会在 JSON 前加解释文字（如"让我读取文件..."）
+        tool_call = parse_tool_call(full_text) if full_text.strip() else None
 
-        if is_tool_call is None or is_tool_call is False:
+        if not tool_call:
             if tool_iterations > 0:
                 exit_reason = "completed_after_tools"
             session.messages.append({"role": "assistant", "content": full_text})
             history.save_message(session.session_id, "assistant", full_text)
             logger.info(f"[ReAct] 循环结束: {exit_reason}，共 {tool_iterations} 轮工具调用")
-            yield {"type": "done", "exit_reason": exit_reason}
-            return
-
-        tool_call = parse_tool_call(full_text)
-
-        if not tool_call:
-            if tool_iterations > 0:
-                exit_reason = "completed_after_tools"
-            yield {"type": "text", "content": full_text}
-            session.messages.append({"role": "assistant", "content": full_text})
-            history.save_message(session.session_id, "assistant", full_text)
             yield {"type": "done", "exit_reason": exit_reason}
             return
 

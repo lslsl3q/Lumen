@@ -22,6 +22,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 _RESOURCE_FILES = {
     "env": os.path.join(_PROJECT_ROOT, ".env"),
     "tools": os.path.join(_PROJECT_ROOT, "lumen", "tools", "registry.json"),
+    "workspaces": os.path.join(_PROJECT_ROOT, "lumen", "data", "file_workspaces.json"),
 }
 
 
@@ -56,6 +57,12 @@ _RESOURCE_INFO = {
     "tools": ConfigItem(
         name="tools",
         description="工具注册表（工具定义和参数 Schema）",
+        type="json",
+        editable=True,
+    ),
+    "workspaces": ConfigItem(
+        name="workspaces",
+        description="文件工作区配置（允许 AI 访问的目录、只读模式等）",
         type="json",
         editable=True,
     ),
