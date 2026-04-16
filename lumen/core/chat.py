@@ -5,6 +5,7 @@ Lumen - 对话核心模块
 
 import json
 import logging
+from typing import AsyncGenerator
 
 import jsonschema
 
@@ -20,18 +21,16 @@ from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat
 from lumen.tools.registry import get_registry
 from lumen.prompt.template import render_messages, collect_variables
+from lumen.types.messages import Message, MessageType
+from lumen.types.events import SSEEvent
 
 logger = logging.getLogger(__name__)
 
 
-def _prepare_messages(messages, character_id: str = "default"):
+def _prepare_messages(messages: list[Message], character_id: str = "default") -> list[Message]:
     """预处理消息：折叠工具调用 → 裁剪上下文 → 过滤已折叠 → 模板变量替换
 
     所有发给 LLM 的消息都必须经过这个函数
-
-    Args:
-        messages: 原始消息列表（不会被修改）
-        character_id: 当前角色ID，用于加载对应的记忆
     """
     folded = fold_tool_calls(messages)
     trimmed = trim_messages(folded)
@@ -43,23 +42,15 @@ def _prepare_messages(messages, character_id: str = "default"):
 def validate_tool_call(tool_name: str, tool_params: dict) -> str:
     """验证 AI 的工具调用是否正确
 
-    使用 jsonschema 标准库验证参数，工具定义本身就是 JSON Schema 格式。
-
-    Args:
-        tool_name: 工具名称
-        tool_params: 参数字典
-
     Returns:
         None 如果验证通过，错误消息字符串如果验证失败
     """
     registry = get_registry()
 
-    # 1. 检查工具是否存在
     if not registry.exists(tool_name):
         available = registry.list_tools()
         return f"工具 '{tool_name}' 不存在，可用工具: {', '.join(available)}"
 
-    # 2. 用工具的 JSON Schema 定义验证参数
     tool_def = registry.get_tool(tool_name)
     params_schema = tool_def.get("parameters", {})
 
@@ -71,23 +62,15 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str:
     return None
 
 
-def chat_non_stream(user_input: str, session: ChatSession) -> str:
-    """非流式：等AI想完了再一次性返回
-
-    Args:
-        user_input: 用户输入
-        session: ChatSession 实例
-
-    Returns:
-        AI 的完整回复
-    """
+async def chat_non_stream(user_input: str, session: ChatSession) -> str:
+    """非流式：等AI想完了再一次性返回"""
     session.messages.append({"role": "user", "content": user_input})
     history.save_message(session.session_id, "user", user_input)
 
     trimmed = _prepare_messages(session.messages, session.character_id)
     model = get_model()
 
-    response = chat(trimmed, model, stream=False)
+    response = await chat(trimmed, model, stream=False)
 
     reply = response.choices[0].message.content
     session.messages.append({"role": "assistant", "content": reply})
@@ -95,63 +78,74 @@ def chat_non_stream(user_input: str, session: ChatSession) -> str:
     return reply
 
 
-def chat_stream(user_input: str, session: ChatSession):
-    """流式对话（ReAct 循环：推理 → 行动 → 观察 → ... → 回答）
-
-    核心流程：
-    1. AI 思考并决定是否调用工具
-    2. 如果调用工具 → 执行 → 把结果喂回给 AI → 回到第1步
-    3. 如果不调用工具 → 输出最终回答 → 结束
-
-    退出原因（exit_reason）：
-    - "completed": AI 正常完成任务，未调用工具直接回答
-    - "completed_after_tools": AI 调用工具后完成任务
-    - "max_iterations": 达到最大轮次，强制输出回答
-
-    Args:
-        user_input: 用户输入
-        session: ChatSession 实例
+async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[SSEEvent, None]:
+    """流式对话（ReAct 循环）
 
     Yields:
-        AI 的最终回复内容（最后一个 yield 会带 exit_reason 属性）
+        SSEEvent — TypedDict 类型的事件（text/done/tool_start/tool_result/status）
     """
     session.messages.append({"role": "user", "content": user_input})
     history.save_message(session.session_id, "user", user_input)
 
     model = get_model()
-    exit_reason = "completed"  # 默认：正常完成
-    tool_iterations = 0  # 记录实际工具调用轮数
+    exit_reason = "completed"
+    tool_iterations = 0
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         trimmed = _prepare_messages(session.messages, session.character_id)
-        response = chat(trimmed, model, stream=True)
+        response = await chat(trimmed, model, stream=True)
 
-        # 收集完整回复（需要完整文本才能解析工具调用）
-        reply = ""
-        for chunk in response:
+        buffer = ""
+        is_tool_call = None
+        full_text = ""
+
+        async for chunk in response:
             content = chunk.choices[0].delta.content
-            if content:
-                reply += content
+            if not content:
+                continue
 
-        # 解析工具调用
-        tool_call = parse_tool_call(reply)
+            buffer += content
+            full_text += content
 
-        if not tool_call:
-            # 无工具调用 → 这是最终回答
+            if is_tool_call is None:
+                stripped = buffer.strip()
+                if stripped:
+                    if stripped[0] == '{':
+                        is_tool_call = True
+                    else:
+                        is_tool_call = False
+                        yield {"type": "text", "content": buffer}
+                        buffer = ""
+            elif not is_tool_call:
+                yield {"type": "text", "content": content}
+
+        # ---- 处理本轮结果 ----
+
+        if is_tool_call is None or is_tool_call is False:
             if tool_iterations > 0:
                 exit_reason = "completed_after_tools"
-            session.messages.append({"role": "assistant", "content": reply})
-            history.save_message(session.session_id, "assistant", reply)
+            session.messages.append({"role": "assistant", "content": full_text})
+            history.save_message(session.session_id, "assistant", full_text)
             logger.info(f"[ReAct] 循环结束: {exit_reason}，共 {tool_iterations} 轮工具调用")
-            yield reply
+            yield {"type": "done", "exit_reason": exit_reason}
+            return
+
+        tool_call = parse_tool_call(full_text)
+
+        if not tool_call:
+            if tool_iterations > 0:
+                exit_reason = "completed_after_tools"
+            yield {"type": "text", "content": full_text}
+            session.messages.append({"role": "assistant", "content": full_text})
+            history.save_message(session.session_id, "assistant", full_text)
+            yield {"type": "done", "exit_reason": exit_reason}
             return
 
         # --- 有工具调用，进入 ReAct 循环 ---
         tool_iterations += 1
         logger.info(f"[ReAct 第{iteration + 1}轮] 检测到工具调用: {tool_call.get('mode')}")
 
-        # 保存 AI 的工具调用原文（LLM 需要看到自己之前的输出才能继续推理）
-        session.messages.append({"role": "assistant", "content": reply})
+        session.messages.append({"role": "assistant", "content": full_text})
 
         mode = tool_call.get("mode", "single")
 
@@ -162,45 +156,43 @@ def chat_stream(user_input: str, session: ChatSession):
 
             validation_error = validate_tool_call(tool_name, tool_params)
             if validation_error:
-                # 验证失败 → 反馈错误，继续循环让 AI 重试
                 logger.warning(f"工具验证失败: {validation_error}")
+                yield {"type": "status", "status": "tool_error", "message": validation_error}
                 error_feedback = (
                     f"[系统提示] 你的工具调用有误：{validation_error}。"
                     "请重新分析用户需求，选择正确的工具和参数。"
                 )
                 session.messages.append({"role": "user", "content": error_feedback})
-                continue  # 回到循环顶部，让 AI 重新思考
+                continue
 
-            # 验证通过 → 执行工具
+            yield {"type": "tool_start", "tool": tool_name, "params": tool_params}
             tool_result = execute_tool(tool_name, tool_params)
             logger.info(
                 f"工具调用: {tool_name}({tool_params}) → "
                 f"{'✅' if tool_result['success'] else '❌'}"
             )
-            if tool_result["success"]:
-                logger.debug(f"  数据: {tool_result['data']}")
-                logger.debug(f"  耗时: {tool_result.get('execution_time', 'N/A')}ms")
-            else:
-                logger.warning(
-                    f"  错误: {tool_result['error_code']} - {tool_result['error_message']}"
-                )
+            yield {
+                "type": "tool_result",
+                "tool": tool_name,
+                "success": tool_result["success"],
+                "data": tool_result.get("data"),
+                "error": tool_result.get("error_message"),
+            }
 
-            # 把工具结果追加到对话历史
             session.messages.append({
                 "role": "user",
                 "content": json.dumps(tool_result, ensure_ascii=False),
                 "metadata": {
                     "type": "tool_result",
                     "tool_name": tool_name,
-                    "folded": False
-                }
+                    "folded": False,
+                },
             })
 
         # ========== 多个工具并行 ==========
         elif mode == "parallel":
             calls = tool_call.get("calls", [])
 
-            # 验证所有工具调用
             all_errors = []
             for call in calls:
                 error = validate_tool_call(call.get("tool", ""), call.get("params", {}))
@@ -209,6 +201,7 @@ def chat_stream(user_input: str, session: ChatSession):
 
             if all_errors:
                 logger.warning(f"并行工具验证失败:\n" + "\n".join(all_errors))
+                yield {"type": "status", "status": "tool_error", "message": "并行工具验证失败"}
                 error_feedback = (
                     "[系统提示] 你的并行工具调用有误：\n"
                     + "\n".join(all_errors)
@@ -217,13 +210,21 @@ def chat_stream(user_input: str, session: ChatSession):
                 session.messages.append({"role": "user", "content": error_feedback})
                 continue
 
-            # 验证通过 → 并发执行所有工具
+            tool_names = [c.get("tool") for c in calls]
+            yield {"type": "tool_start", "tool": tool_names, "mode": "parallel"}
             logger.info(f"并行执行 {len(calls)} 个工具...")
             results = execute_tools_parallel(calls)
 
             for r in results:
                 status = "✅" if r["success"] else "❌"
                 logger.info(f"  - {r['tool']}: {status}")
+                yield {
+                    "type": "tool_result",
+                    "tool": r["tool"],
+                    "success": r["success"],
+                    "data": r.get("data"),
+                    "error": r.get("error_message"),
+                }
 
             session.messages.append({
                 "role": "user",
@@ -231,27 +232,34 @@ def chat_stream(user_input: str, session: ChatSession):
                 "metadata": {
                     "type": "tool_result_parallel",
                     "tool_count": len(results),
-                    "folded": False
-                }
+                    "folded": False,
+                },
             })
 
-        # 循环继续 → 下一轮 AI 会看到工具结果，决定是继续调用还是输出最终回答
-
-    # 达到最大迭代次数，强制 AI 输出最终回答
+    # 达到最大迭代次数
     exit_reason = "max_iterations"
     logger.warning(
         f"[ReAct] 达到最大工具调用次数限制 ({MAX_TOOL_ITERATIONS})，强制输出回答"
     )
+    yield {"type": "status", "status": "max_iterations"}
+
     session.messages.append({
         "role": "user",
         "content": (
             "[系统提示] 已达到最大思考轮次限制。"
             "请基于已有的工具执行结果，直接给出最终回答，不要再调用工具。"
-        )
+        ),
     })
     trimmed = _prepare_messages(session.messages, session.character_id)
-    response = chat(trimmed, model, stream=False)
-    final_reply = response.choices[0].message.content
+    response = await chat(trimmed, model, stream=True)
+
+    final_reply = ""
+    async for chunk in response:
+        content = chunk.choices[0].delta.content
+        if content:
+            final_reply += content
+            yield {"type": "text", "content": content}
+
     session.messages.append({"role": "assistant", "content": final_reply})
     history.save_message(session.session_id, "assistant", final_reply)
-    yield final_reply
+    yield {"type": "done", "exit_reason": exit_reason}
