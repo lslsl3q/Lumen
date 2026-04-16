@@ -8,6 +8,8 @@ import os
 import re
 import logging
 
+from lumen.prompt.types import CharacterCard
+
 logger = logging.getLogger(__name__)
 
 # 角色卡片文件夹（lumen/characters/）
@@ -21,7 +23,7 @@ def _validate_char_id(char_id: str) -> str:
     return char_id
 
 
-def list_characters():
+def list_characters() -> list[tuple[str, str]]:
     """列出所有可用角色，返回 [(文件名, 角色名), ...]"""
     characters = []
     if not os.path.exists(CHARACTERS_DIR):
@@ -32,24 +34,29 @@ def list_characters():
             filepath = os.path.join(CHARACTERS_DIR, filename)
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    card = json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
+                    raw = json.load(f)
+                card = CharacterCard.model_validate(raw)
+            except Exception as e:
                 logger.warning("跳过损坏的角色文件 %s: %s", filename, e)
                 continue
-            char_id = filename[:-5]  # "default.json" → "default"
-            characters.append((char_id, card.get("name", char_id)))
+            char_id = filename[:-5]
+            characters.append((char_id, card.name))
     return characters
 
 
 def load_character(char_id: str) -> dict:
-    """根据角色ID加载角色卡片
+    """加载角色卡片，用 CharacterCard Pydantic 校验后返回 dict
 
-    char_id 就是文件名去掉 .json，比如 "default"
-    返回整个JSON字典
+    返回 dict（而非 Pydantic 模型）以保持向后兼容
     """
     _validate_char_id(char_id)
     filepath = os.path.join(CHARACTERS_DIR, f"{char_id}.json")
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"角色不存在: {char_id}")
+
     with open(filepath, "r", encoding="utf-8") as f:
-        return json.load(f)
+        raw = json.load(f)
+
+    # Pydantic 校验：缺少必填字段或类型错误会抛出 ValidationError
+    card = CharacterCard.model_validate(raw)
+    return card.model_dump(exclude_none=True)

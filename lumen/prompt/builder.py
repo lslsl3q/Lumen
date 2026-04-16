@@ -3,8 +3,10 @@ Lumen - 提示词构建器
 把角色卡片 + 动态内容拼成发给AI的提示词
 """
 
+from lumen.prompt.types import DynamicContext
 
-def build_system_prompt(character: dict, dynamic_context: list = None) -> str:
+
+def build_system_prompt(character: dict, dynamic_context: list[DynamicContext] = None) -> str:
     """把角色卡片 + 动态内容拼成系统提示词（三明治结构）
 
     结构（从上到下）：
@@ -51,7 +53,7 @@ def build_system_prompt(character: dict, dynamic_context: list = None) -> str:
     return "\n\n".join(parts)
 
 
-def build_messages(character: dict, user_input: str, history: list, dynamic_context: list = None):
+def build_messages(character: dict, user_input: str, history: list, dynamic_context: list[DynamicContext] = None):
     """组装完整的消息列表，处理动态注入的不同位置
 
     返回可以直接发给AI的 messages 列表
