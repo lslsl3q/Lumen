@@ -1,35 +1,34 @@
 """
 Lumen - 工具调用解析
-从 AI 回复文本中提取工具调用 JSON
+从 AI 回复文本中提取工具调用 JSON，Pydantic 校验后返回 dict
 """
 
 import json
-from typing import Optional
+from typing import Optional, Dict, Any
+
+from lumen.types.tools import SingleToolCall, ParallelToolCall
 
 
-def parse_tool_call(text: str):
-    """从 AI 回复中解析工具调用（仅支持新格式）
+def parse_tool_call(text: str) -> Optional[Dict[str, Any]]:
+    """从 AI 回复中解析工具调用
 
     新格式要求：
-    - 单个工具: {"type": "tool_call", "tool": "xxx", "params": {...}, "timeout": 30}
+    - 单个工具: {"type": "tool_call", "tool": "xxx", "params": {...}}
     - 多个工具: {"type": "tool_call_parallel", "calls": [...]}
 
-    返回格式：
-    - 单个工具: {"mode": "single", "tool": "xxx", "params": {...}, "call_id": "..."}
-    - 多个工具: {"mode": "parallel", "calls": [...]}
-    - 无工具调用: None
+    返回：
+    - 解析成功：标准化的 dict（经 Pydantic 校验）
+    - 无工具调用：None
     """
     text = text.strip()
 
     def extract_json(text: str) -> Optional[dict]:
         """从文本中提取 JSON（支持嵌套花括号）"""
-        # 尝试直接解析整个文本
         try:
             return json.loads(text)
         except (json.JSONDecodeError, ValueError):
             pass
 
-        # 找第一个 {，然后匹配对应的 }
         start_idx = text.find('{')
         if start_idx < 0:
             return None
@@ -69,34 +68,32 @@ def parse_tool_call(text: str):
     if not data or not isinstance(data, dict):
         return None
 
-    # 检查是否包含 type 字段（必须）
     if "type" not in data:
         return None
 
     msg_type = data.get("type")
 
-    # 单个工具调用
+    # 单个工具调用 — Pydantic 校验
     if msg_type == "tool_call" and "tool" in data:
-        result = {
-            "mode": "single",
-            "tool": data["tool"],
-            "params": data.get("params", {})
-        }
+        call = SingleToolCall(
+            mode="single",
+            tool=data["tool"],
+            params=data.get("params", {}),
+        )
         if "id" in data:
-            result["call_id"] = data["id"]
+            call.call_id = data["id"]
         if "run_in_background" in data:
-            result["run_in_background"] = data["run_in_background"]
-        return result
+            call.run_in_background = data["run_in_background"]
+        return call.model_dump(exclude_none=True)
 
-    # 多个工具并行
+    # 多个工具并行 — Pydantic 校验
     if msg_type == "tool_call_parallel" and "calls" in data:
-        result = {
-            "mode": "parallel",
-            "calls": data["calls"]
-        }
+        parallel = ParallelToolCall(
+            mode="parallel",
+            calls=data["calls"],
+        )
         if "id" in data:
-            result["call_id"] = data["id"]
-        return result
+            parallel.call_id = data["id"]
+        return parallel.model_dump(exclude_none=True)
 
-    # 未知格式
     return None
