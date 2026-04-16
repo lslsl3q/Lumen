@@ -89,7 +89,7 @@ interface ChatPanelProps {
   error: string | null;
   onInputChange: (value: string) => void;
   onSendMessage: (message: string) => void;
-  onResetChat: () => void;
+  onResetSession: () => void;
 }
 
 function ChatPanel({
@@ -99,7 +99,7 @@ function ChatPanel({
   error,
   onInputChange,
   onSendMessage,
-  onResetChat,
+  onResetSession,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -144,7 +144,7 @@ function ChatPanel({
           </h1>
         </div>
         <button
-          onClick={onResetChat}
+          onClick={onResetSession}
           className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
         >
           新对话

@@ -1,6 +1,6 @@
 {
   "productName": "Lumen AI",
-  "version": "0.1.0",
+  "version": "0.0.5",
   "identifier": "com.lumen.ai",
   "build": {
     "beforeDevCommand": "pnpm dev",

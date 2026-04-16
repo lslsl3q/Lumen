@@ -21,6 +21,7 @@ sys.path.insert(0, str(project_root))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 # 创建 FastAPI 应用
@@ -47,6 +48,11 @@ app.include_router(chat.router, prefix="/chat", tags=["聊天"])
 app.include_router(session.router, prefix="/sessions", tags=["会话"])
 app.include_router(character.router, prefix="/characters", tags=["角色"])
 app.include_router(config.router, prefix="/config", tags=["配置"])
+
+# 挂载头像静态文件目录
+avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"
+avatars_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/avatars", StaticFiles(directory=str(avatars_dir)), name="avatars")
 
 
 # 根路径健康检查

@@ -5,7 +5,7 @@ DynamicContext（TypedDict）内部传递
 """
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from typing import TypedDict
 
 
@@ -17,6 +17,8 @@ class CharacterCard(BaseModel):
     greeting: Optional[str] = None
     tools: List[str] = []
     model: Optional[str] = None
+    avatar: Optional[str] = None           # 头像文件名（如 "default.png"）
+    tool_tips: Dict[str, str] = {}         # 用户自定义的工具提示（fallback 到 registry 的 usage_guide）
 
 
 class DynamicContext(TypedDict):

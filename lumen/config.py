@@ -3,6 +3,9 @@ Lumen - 统一配置管理
 所有配置项集中在这里，方便动态调整
 """
 
+# 项目版本号（三处同步：config.py / package.json / tauri.conf.json）
+__version__ = "0.0.5"
+
 import os
 import sys
 from dotenv import load_dotenv

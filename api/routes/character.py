@@ -2,14 +2,18 @@
 角色管理 API 接口
 """
 
-from fastapi import APIRouter, HTTPException
+import json
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.prompt.character import load_character, list_characters
+from lumen.prompt.character import (
+    load_character, list_characters,
+    create_character, update_character, delete_character, save_avatar
+)
 from lumen.prompt.builder import build_system_prompt
 from lumen.core.session import get_session_manager
 
@@ -25,6 +29,9 @@ class CharacterInfo(BaseModel):
     description: Optional[str] = None
     greeting: Optional[str] = None
     system_prompt: Optional[str] = None
+    avatar: Optional[str] = None
+    tools: List[str] = []
+    tool_tips: Optional[Dict[str, str]] = None
 
 
 class SwitchCharacterResponse(BaseModel):
@@ -50,19 +57,33 @@ async def get_characters() -> List[dict]:
     获取所有可用角色列表
 
     Returns:
-        角色列表，每项包含 (display_name, id)
+        角色列表，每项包含 id、name、avatar
     """
     try:
         chars = list_characters()
 
-        return [
-            {
-                "id": char_id,
-                "name": name,
-                "display_name": name  # 前端显示的名称
-            }
-            for name, char_id in chars
-        ]
+        # 补充头像信息
+        result = []
+        for char_summary in chars:
+            try:
+                full = load_character(char_summary["id"])
+                result.append({
+                    "id": char_summary["id"],
+                    "name": char_summary["name"],
+                    "display_name": char_summary["name"],
+                    "avatar": full.get("avatar"),
+                    "description": full.get("description"),
+                    "tools": full.get("tools", []),
+                })
+            except Exception:
+                # 加载详情失败，用基本信息兜底
+                result.append({
+                    "id": char_summary["id"],
+                    "name": char_summary["name"],
+                    "display_name": char_summary["name"],
+                })
+
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取角色列表失败: {str(e)}")
@@ -72,12 +93,6 @@ async def get_characters() -> List[dict]:
 async def get_character(character_id: str) -> CharacterInfo:
     """
     获取指定角色的详细信息
-
-    Args:
-        character_id: 角色 ID
-
-    Returns:
-        角色详细信息
     """
     try:
         char = load_character(character_id)
@@ -87,9 +102,14 @@ async def get_character(character_id: str) -> CharacterInfo:
             name=char.get("name", "未知角色"),
             description=char.get("description"),
             greeting=char.get("greeting"),
-            system_prompt=char.get("system_prompt")
+            system_prompt=char.get("system_prompt"),
+            avatar=char.get("avatar"),
+            tools=char.get("tools", []),
+            tool_tips=char.get("tool_tips"),
         )
 
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"角色不存在: {character_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取角色信息失败: {str(e)}")
 
@@ -98,22 +118,14 @@ async def get_character(character_id: str) -> CharacterInfo:
 async def switch_character(req: SwitchCharacterRequest) -> SwitchCharacterResponse:
     """
     切换角色
-
-    Args:
-        req: 包含 character_id 和 session_id 的请求体
-
-    Returns:
-        切换结果
     """
     try:
         manager = get_session_manager()
         session = manager.get(req.session_id)
 
         if not session:
-            # 会话不存在，创建新会话
             session = manager.create_new(req.character_id)
         else:
-            # 会话存在，切换角色
             await session.switch_character(req.character_id)
 
         return SwitchCharacterResponse(
@@ -124,3 +136,109 @@ async def switch_character(req: SwitchCharacterRequest) -> SwitchCharacterRespon
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"切换角色失败: {str(e)}")
+
+
+@router.post("/create")
+async def api_create_character(
+    character_id: str = Form(...),
+    data: str = Form(...),  # JSON 字符串，包含角色字段
+    avatar: Optional[UploadFile] = File(None),
+) -> dict:
+    """
+    创建新角色
+
+    接收 multipart/form-data：character_id + data(JSON) + 可选头像文件
+    """
+    try:
+        # 解析角色数据
+        char_data = json.loads(data)
+
+        # 处理头像上传
+        if avatar:
+            file_data = await avatar.read()
+            avatar_filename = save_avatar(character_id, avatar.filename, file_data)
+            char_data["avatar"] = avatar_filename
+
+        result = create_character(character_id, char_data)
+        return {"message": f"角色 {character_id} 创建成功", "character": result}
+
+    except FileExistsError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"创建角色失败: {str(e)}")
+
+
+@router.put("/{character_id}")
+async def api_update_character(
+    character_id: str,
+    data: str = Form(...),  # JSON 字符串，包含要更新的字段
+    avatar: Optional[UploadFile] = File(None),
+) -> dict:
+    """
+    更新已有角色
+
+    接收 multipart/form-data：data(JSON) + 可选头像文件
+    只更新 data 中包含的字段，不覆盖未提交的字段
+    """
+    try:
+        updates = json.loads(data)
+
+        # 处理头像上传
+        if avatar:
+            file_data = await avatar.read()
+            avatar_filename = save_avatar(character_id, avatar.filename, file_data)
+            updates["avatar"] = avatar_filename
+
+        result = update_character(character_id, updates)
+        return {"message": f"角色 {character_id} 更新成功", "character": result}
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"更新角色失败: {str(e)}")
+
+
+@router.delete("/{character_id}")
+async def api_delete_character(character_id: str) -> dict:
+    """
+    删除角色（禁止删除 default）
+    """
+    try:
+        delete_character(character_id)
+        return {"message": f"角色 {character_id} 已删除"}
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除角色失败: {str(e)}")
+
+
+@router.post("/upload-avatar")
+async def api_upload_avatar(
+    character_id: str = Form(...),
+    avatar: UploadFile = File(...),
+) -> dict:
+    """
+    单独上传/更新角色头像
+    """
+    try:
+        file_data = await avatar.read()
+        avatar_filename = save_avatar(character_id, avatar.filename, file_data)
+
+        # 同时更新角色 JSON 中的 avatar 字段
+        update_character(character_id, {"avatar": avatar_filename})
+
+        return {"message": "头像上传成功", "avatar": avatar_filename}
+
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"头像上传失败: {str(e)}")

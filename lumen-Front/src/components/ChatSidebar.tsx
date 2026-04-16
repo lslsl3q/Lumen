@@ -2,9 +2,12 @@
  * 会话侧边栏 — 纯渲染组件
  *
  * 职责：显示会话列表，用户可选择、新建、删除会话
+ * 底部包含角色选择器，可快速切换角色
  * 所有数据和回调来自 props，不管理状态
  */
 import { SessionListItem } from '../types/session';
+import { CharacterListItem } from '../types/character';
+import CharacterSelector from './CharacterSelector';
 
 interface ChatSidebarProps {
   sessions: SessionListItem[];
@@ -14,6 +17,11 @@ interface ChatSidebarProps {
   onNewSession: () => void;
   onDeleteSession: (sessionId: string) => void;
   formatLabel: (sessionId: string) => string;
+  // 角色相关
+  characters: CharacterListItem[];
+  currentCharacterId: string;
+  onSwitchCharacter: (characterId: string) => void;
+  onManageCharacters: () => void;
 }
 
 /** 单个会话条目 */
@@ -77,6 +85,10 @@ function ChatSidebar({
   onNewSession,
   onDeleteSession,
   formatLabel,
+  characters,
+  currentCharacterId,
+  onSwitchCharacter,
+  onManageCharacters,
 }: ChatSidebarProps) {
   return (
     <div className="w-64 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
@@ -125,6 +137,14 @@ function ChatSidebar({
           ))
         )}
       </div>
+
+      {/* 底部角色选择器 */}
+      <CharacterSelector
+        characters={characters}
+        currentCharacterId={currentCharacterId}
+        onSelect={onSwitchCharacter}
+        onManageClick={onManageCharacters}
+      />
     </div>
   );
 }

@@ -5,7 +5,7 @@
  * 遵循单向依赖：hook → api/session.ts
  */
 import { useState, useCallback, useEffect } from 'react';
-import { createSession, listSessions, deleteSession as apiDeleteSession } from '../api/session';
+import { createSession, listSessions, deleteSession as apiDeleteSession, resetSession as apiResetSession } from '../api/session';
 import { SessionListItem } from '../types/session';
 
 /** 格式化 session_id 为可读标签
@@ -87,6 +87,11 @@ export function useSessions() {
     }
   }, [currentSessionId, refreshSessions]);
 
+  /** 重置会话（清空历史，但会话 ID 不变） */
+  const resetSession = useCallback(async (sessionId: string) => {
+    await apiResetSession(sessionId);
+  }, []);
+
   return {
     sessions,
     currentSessionId,
@@ -95,6 +100,7 @@ export function useSessions() {
     createNewSession,
     switchSession,
     deleteSession: handleDeleteSession,
+    resetSession,
     refreshSessions,
     formatSessionLabel,
   };

@@ -182,8 +182,15 @@ def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Opt
 # 从注册表生成工具提示词
 # ========================================
 
-def get_tool_prompt_from_registry(tool_names: List[str] = None) -> str:
-    """从工具注册表生成工具提示词"""
+def get_tool_prompt_from_registry(tool_names: List[str] = None, tool_tips: Dict[str, str] = None) -> str:
+    """从工具注册表生成工具提示词
+
+    每个工具的描述、参数、使用指南绑定在一起输出，
+    避免工具多时描述和使用规则距离过远导致注意力衰减。
+
+    tool_tips: 角色自定义的工具提示 {tool_name: custom_tip}
+              优先使用自定义提示，fallback 到 registry 的 usage_guide
+    """
     from lumen.tools.registry import get_registry
 
     registry = get_registry()
@@ -192,54 +199,51 @@ def get_tool_prompt_from_registry(tool_names: List[str] = None) -> str:
     if not tools_def:
         return ""
 
-    tool_lines = []
+    tool_blocks = []
     for name, definition in tools_def.items():
+        # 工具描述
+        desc = definition.get("description", "")
+        lines = [f"【{name}】{desc}"]
+
+        # 参数
         params = definition.get("parameters", {}).get("properties", {})
         if params:
             param_parts = []
             for param_name, param_info in params.items():
-                param_parts.append(f'"{param_name}": {param_info.get("description", param_name)}')
-            params_text = "，参数: {" + ", ".join(param_parts) + "}"
-        else:
-            params_text = ""
+                param_parts.append(f'  "{param_name}": {param_info.get("description", param_name)}')
+            lines.append("参数:")
+            lines.extend(param_parts)
 
-        tool_lines.append(f'- {name}: {definition["description"]}{params_text}')
+        # 使用指南（自定义 tips 优先，fallback 到 registry 的 usage_guide）
+        tip = (tool_tips or {}).get(name) or definition.get("usage_guide")
+        if tip:
+            lines.append(f"使用时机: {tip}")
 
-    tools_text = "\n".join(tool_lines)
+        tool_blocks.append("\n".join(lines))
+
+    tools_text = "\n\n".join(tool_blocks)
 
     return f"""<tools>
 你可以使用以下工具来帮助用户：
+
 {tools_text}
 
-在使用工具前，请先思考：
-1. 用户的问题是否需要使用工具？
-2. 如果需要，应该使用哪个（些）工具？
-3. 这些工具之间是否有依赖关系？（后一个工具需要前一个的结果）
-4. 工具的参数是否齐全？如果参数不齐全，请先询问用户。
-
-当你需要使用工具时，请使用以下格式：
+调用格式：
 
 【单个工具调用】：
 {{"type": "tool_call", "tool": "工具名", "params": {{"参数名": "参数值"}}}}
 
-【多个工具并行】（多个工具互不依赖时，会被同时执行）：
+【多个工具并行】（多个工具互不依赖时）：
 {{"type": "tool_call_parallel", "calls": [
   {{"tool": "工具名1", "params": {{...}}}},
   {{"tool": "工具名2", "params": {{...}}}}
 ]}}
 
-字段说明：
-- type: 必填，消息类型（"tool_call" 或 "tool_call_parallel"）
-- tool: 必填，工具名称
-- params: 必填，工具参数（字典）
-- id: 可选，调用ID（系统自动生成，一般不需要手动指定）
-
 规则：
-- 涉及数学计算时，必须使用 calculate 工具，不要自己计算
 - 只有确实需要使用工具时才输出JSON，普通对话正常回复文字
-- type 字段必须包含，否则工具调用会被忽略
 - 不要在JSON前后加任何解释文字
 - 如果多个工具有依赖关系，请分步调用单个工具
+- type 字段必须包含，否则工具调用会被忽略
 </tools>"""
 
 

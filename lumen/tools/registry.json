@@ -1,6 +1,7 @@
 {
   "calculate": {
     "description": "计算数学表达式的结果，支持加减乘除、幂运算、括号",
+    "usage_guide": "用户需要数学计算时必须调用，不要自己心算。适合加减乘除、百分比、单位换算等场景。",
     "parameters": {
       "type": "object",
       "properties": {
@@ -14,6 +15,7 @@
   },
   "web_search": {
     "description": "搜索互联网获取实时信息，适合回答需要最新数据的问题",
+    "usage_guide": "需要实时信息、事实查询、新闻、天气、价格等可能随时间变化的内容时使用。不确定时先搜索再回答。",
     "parameters": {
       "type": "object",
       "properties": {
@@ -31,6 +33,7 @@
   },
   "web_fetch": {
     "description": "抓取指定URL的网页内容并提取正文文本，适合读取文章、博客、文档等公开页面",
+    "usage_guide": "用户提供URL想了解页面内容，或搜索结果中需要进一步读取某个网页详情时使用。通常在 web_search 之后调用。",
     "parameters": {
       "type": "object",
       "properties": {

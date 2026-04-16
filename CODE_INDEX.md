@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-16
+**最后更新**：2026-04-16（T2.3 角色管理完成）
 
 ---
 
@@ -21,10 +21,10 @@ Lumen/
 │   │   └── session.py            # 会话生命周期（内存+DB双查）
 │   │
 │   ├── tools/                    # 双手 — 每个工具一个 .py
-│   │   ├── base.py               # 执行引擎、结果格式化、提示词生成
+│   │   ├── base.py               # 执行引擎、结果格式化、提示词生成（含 usage_guide）
 │   │   ├── parse.py              # AI输出 → 工具调用 解析
 │   │   ├── registry.py           # 工具注册中心（CRUD、验证）
-│   │   ├── registry.json         # 工具定义数据
+│   │   ├── registry.json         # 工具定义数据（含 usage_guide 字段）
 │   │   ├── calculate.py          # 计算器
 │   │   ├── web_search.py         # 网页搜索（→ services/search.py）
 │   │   └── web_fetch.py          # 网页抓取（→ services/fetch.py）
@@ -41,8 +41,9 @@ Lumen/
 │   │   └── emotion.py            # 【预留】情感引擎
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
-│   │   ├── builder.py            # 系统提示词拼接（角色+工具+动态注入）
-│   │   ├── character.py          # 角色卡片加载
+│   │   ├── builder.py            # 系统提示词拼接（角色+工具+动态注入，透传 tool_tips）
+│   │   ├── character.py          # 角色卡片加载 + CRUD + 头像管理
+│   │   ├── types.py              # CharacterCard Pydantic 模型
 │   │   └── template.py           # 模板变量系统（{{xxx}} 替换）
 │   │
 │   └── types/                    # 词汇 — 类型定义
@@ -55,16 +56,17 @@ Lumen/
 │   └── routes/
 │       ├── chat.py               # 聊天（send/stream/history）
 │       ├── session.py            # 会话（new/load/list/delete/reset）
-│       ├── character.py          # 角色（list/get/switch）
+│       ├── character.py          # 角色（list/get/switch/create/update/delete/upload-avatar）
 │       └── config.py             # 配置（list/read/update）
 │
 ├── lumen-Front/                  # 前端（Tauri 2 桌面应用）
 │   └── src/
-│       ├── App.tsx               # 应用入口
-│       ├── api/                  # HTTP 客户端（chat.ts, session.ts）
-│       ├── hooks/                # 状态管理（useChat.ts, useSessions.ts）
-│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent）
-│       ├── types/                # 类型定义（session.ts）
+│       ├── App.tsx               # 应用入口（HashRouter 路由）
+│       ├── api/                  # HTTP 客户端（chat.ts, session.ts, character.ts）
+│       ├── hooks/                # 状态管理（useChat.ts, useSessions.ts, useCharacters.ts）
+│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CharacterSelector）
+│       ├── pages/                # 页面组件（CharacterList, CharacterEditor）
+│       ├── types/                # 类型定义（session.ts, character.ts）
 │       └── styles/               # 样式（App.css, markdown.css）
 │
 ├── tests/                        # 测试
@@ -107,6 +109,10 @@ api/routes/chat.py ──→ lumen/core/chat.py（ReAct 主循环）
 | `GET` | `/characters/list` | 角色列表 |
 | `GET` | `/characters/{id}` | 角色详情 |
 | `POST` | `/characters/switch` | 切换角色 |
+| `POST` | `/characters/create` | 创建角色（含头像上传） |
+| `PUT` | `/characters/{id}` | 更新角色（含头像上传） |
+| `DELETE` | `/characters/{id}` | 删除角色 |
+| `POST` | `/characters/upload-avatar` | 上传头像 |
 | `GET` | `/config/list` | 配置项列表 |
 | `GET` | `/config/{resource}` | 读取配置 |
 | `POST` | `/config/{resource}` | 更新配置 |

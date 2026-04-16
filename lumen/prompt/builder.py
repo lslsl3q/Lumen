@@ -22,26 +22,34 @@ def build_system_prompt(character: dict, dynamic_context: list[DynamicContext] =
             "injection_point": "system" | "before_user" | "after_user"
         }
     """
-    # 第一层：角色卡片的 system_prompt
-    parts = [character.get("system_prompt", "")]
+    # 第一层：角色元数据（自动组合，不需要用户在 system_prompt 里重复）
+    parts = []
+    if character.get("name"):
+        parts.append(f"你的名字是{character['name']}。")
+    if character.get("description"):
+        parts.append(f"角色设定：{character['description']}。")
 
-    # 第二层：工具注入（从角色配置读取 tools 字段）
+    # 第二层：角色的 system_prompt 核心
+    if character.get("system_prompt"):
+        parts.append(character["system_prompt"])
+
+    # 第三层：工具注入（从角色配置读取 tools 字段，带自定义 tips）
     has_tools = False
     tools = character.get("tools", [])
     if tools:
         from lumen.tools.base import get_tool_prompt_from_registry
-        tool_prompt = get_tool_prompt_from_registry(tools)
+        tool_prompt = get_tool_prompt_from_registry(tools, character.get("tool_tips"))
         if tool_prompt:
             parts.append(tool_prompt)
             has_tools = True
 
-    # 第三层：动态注入（只拼 injection_point == "system" 的）
+    # 第四层：动态注入（只拼 injection_point == "system" 的）
     if dynamic_context:
         for item in dynamic_context:
             if item.get("injection_point", "system") == "system":
                 parts.append(item["content"])
 
-    # 第四层（兜底）：强制角色保持——放在最后，权重最高
+    # 第五层（兜底）：强制角色保持——放在最后，权重最高
     if has_tools and character.get("system_prompt"):
         parts.append(
             "【角色保持】\n"
