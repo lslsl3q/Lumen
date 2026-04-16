@@ -1,6 +1,6 @@
 """
 Lumen - 工具执行引擎
-错误代码、结果格式化、工具分发、并行执行
+结果格式化（Pydantic 校验）、工具分发、并行执行
 """
 
 import json
@@ -9,66 +9,37 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-
-# ========================================
-# 错误代码定义
-# ========================================
-
-class ErrorCode:
-    """工具执行错误代码
-
-    格式：类别.子类.具体错误
-    例如：PARAM.INVALID.VALUE, TIMEOUT.EXECUTION, API.RATE_LIMIT
-    """
-
-    # 参数错误
-    PARAM_MISSING = "PARAM.MISSING"        # 缺少必需参数
-    PARAM_INVALID = "PARAM.INVALID"        # 参数格式错误
-    PARAM_EMPTY = "PARAM.EMPTY"            # 参数为空
-    PARAM_TYPE = "PARAM.TYPE"              # 参数类型错误
-
-    # 执行错误
-    EXEC_TIMEOUT = "EXEC.TIMEOUT"          # 执行超时
-    EXEC_FAILED = "EXEC.FAILED"            # 执行失败
-    EXEC_DENIED = "EXEC.DENIED"            # 权限不足
-
-    # 外部服务错误
-    API_UNAVAILABLE = "API.UNAVAILABLE"    # 服务不可用
-    API_RATE_LIMIT = "API.RATE_LIMIT"      # 速率限制
-    API_ERROR = "API.ERROR"                # API 错误
-
-    # 工具错误
-    TOOL_UNKNOWN = "TOOL.UNKNOWN"          # 未知工具
-    TOOL_BROKEN = "TOOL.BROKEN"            # 工具损坏
+from lumen.tools.types import ErrorCode  # 保留此导入：calculate.py 和 web_search.py 通过 base.py 间接导入 ErrorCode
+from lumen.types.tools import ToolResult
 
 
 # ========================================
-# 返回值辅助函数
+# 返回值辅助函数（Pydantic 校验 → 返回 dict）
 # ========================================
 
 def success_result(tool: str, data: Any, **metadata) -> Dict[str, Any]:
-    """构造成功结果"""
-    return {
-        "success": True,
-        "tool": tool,
-        "data": data,
-        "timestamp": datetime.now().isoformat(),
-        **metadata
-    }
+    """构造成功结果（Pydantic 校验后返回 dict）"""
+    result = ToolResult(
+        success=True,
+        tool=tool,
+        data=data,
+        timestamp=datetime.now().isoformat(),
+        **metadata,
+    )
+    return result.model_dump(exclude_none=True)
 
 
 def error_result(tool: str, code: str, message: str, detail: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """构造错误结果"""
-    result = {
-        "success": False,
-        "tool": tool,
-        "error_code": code,
-        "error_message": message,
-        "timestamp": datetime.now().isoformat()
-    }
-    if detail:
-        result["error_detail"] = detail
-    return result
+    """构造错误结果（Pydantic 校验后返回 dict）"""
+    result = ToolResult(
+        success=False,
+        tool=tool,
+        error_code=code,
+        error_message=message,
+        timestamp=datetime.now().isoformat(),
+        error_detail=detail,
+    )
+    return result.model_dump(exclude_none=True)
 
 
 def format_result_for_ai(result: Dict[str, Any]) -> str:
@@ -92,17 +63,11 @@ def format_result_for_ai(result: Dict[str, Any]) -> str:
 # 工具注册表（名称 → 执行函数的映射）
 # ========================================
 
-# 每个工具模块注册自己的执行函数到这里
 _TOOL_HANDLERS: Dict[str, callable] = {}
 
 
 def register_handler(name: str, handler: callable):
-    """注册工具执行函数
-
-    Args:
-        name: 工具名称
-        handler: 执行函数，接收 (params: dict) 返回标准化结果
-    """
+    """注册工具执行函数"""
     _TOOL_HANDLERS[name] = handler
 
 
@@ -111,41 +76,31 @@ def _load_builtin_tools():
     from lumen.tools.calculate import execute as exec_calc
     register_handler("calculate", exec_calc)
 
+    from lumen.tools.web_search import execute as exec_search
+    register_handler("web_search", exec_search)
+
 
 # ========================================
 # 工具执行
 # ========================================
 
 def execute_tool(name: str, params: dict) -> Dict[str, Any]:
-    """执行工具调用，返回标准化结果
-
-    Args:
-        name: 工具名称
-        params: 工具参数
-
-    Returns:
-        标准化的结果字典
-    """
+    """执行工具调用，返回标准化结果"""
     start_time = time.perf_counter()
 
-    # 参数验证
     if not isinstance(params, dict):
         return error_result(
             name,
             ErrorCode.PARAM_TYPE,
             f"参数必须是字典类型，收到: {type(params).__name__}",
-            {"received_type": type(params).__name__}
         )
 
-    # 确保内置工具已加载
     if not _TOOL_HANDLERS:
         _load_builtin_tools()
 
-    # 工具分发
     handler = _TOOL_HANDLERS.get(name)
     if handler:
         result = handler(params)
-        # 补充执行时间（如果工具自己没算）
         if "execution_time" not in result:
             result["execution_time"] = round((time.perf_counter() - start_time) * 1000, 2)
         return result
@@ -154,21 +109,11 @@ def execute_tool(name: str, params: dict) -> Dict[str, Any]:
         name,
         ErrorCode.TOOL_UNKNOWN,
         f"未知工具: {name}",
-        {"available_tools": list(_TOOL_HANDLERS.keys())}
     )
 
 
 def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
-    """并发执行多个工具调用
-
-    Args:
-        calls: 工具调用列表，格式: [{"tool": "xxx", "params": {...}}, ...]
-        max_workers: 最大并发线程数，默认为5
-        timeout: 单个任务超时时间（秒），None表示不限制
-
-    Returns:
-        执行结果列表，每个元素都是 execute_tool 返回的标准化结果字典
-    """
+    """并发执行多个工具调用"""
     if not calls:
         return []
 
@@ -194,7 +139,6 @@ def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Opt
                     call["tool"],
                     ErrorCode.EXEC_FAILED,
                     f"工具提交失败: {e}",
-                    {"error_type": type(e).__name__}
                 ))
 
         index_to_result = {}
