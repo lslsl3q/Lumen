@@ -11,6 +11,9 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
+from lumen.types.messages import Message
+from lumen.services.types import SessionInfo
+
 logger = logging.getLogger(__name__)
 
 # 数据库文件路径（lumen/data/）
@@ -130,7 +133,7 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
     conn.commit()
 
 
-def load_session(session_id: str) -> List[Dict[str, Any]]:
+def load_session(session_id: str) -> list[Message]:
     """加载某个会话的所有消息，返回 messages 列表
 
     Args:
@@ -161,14 +164,17 @@ def load_session(session_id: str) -> List[Dict[str, Any]]:
     return messages
 
 
-def list_sessions(limit: int = 20) -> list:
+def list_sessions(limit: int = 20) -> list[SessionInfo]:
     """列出最近的会话，返回 [(会话ID, 角色名, 创建时间), ...]"""
     conn = _get_conn()
     rows = conn.execute(
         "SELECT id, character_id, created_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
         (limit,),
     ).fetchall()
-    return [(row["id"], row["character_id"], row["created_at"]) for row in rows]
+    return [
+        {"session_id": row["id"], "character_id": row["character_id"], "created_at": row["created_at"]}
+        for row in rows
+    ]
 
 
 def delete_session(session_id: str):

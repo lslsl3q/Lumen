@@ -107,9 +107,9 @@ async def list_sessions(limit: int = 20) -> List[SessionListItem]:
 
         return [
             SessionListItem(
-                session_id=s[0],
-                character_id=s[1],
-                created_at=s[2],
+                session_id=s["session_id"],
+                character_id=s["character_id"],
+                created_at=s["created_at"],
                 message_count=0  # 暂时设置为0，以后可以查询消息数量
             )
             for s in sessions

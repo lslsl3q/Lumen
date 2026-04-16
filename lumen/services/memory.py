@@ -7,11 +7,12 @@ import logging
 
 from lumen.services import history
 from lumen.services.llm import chat
+from lumen.types.messages import Message
 
 logger = logging.getLogger(__name__)
 
 
-def generate_summary(messages: list) -> str:
+async def generate_summary(messages: list[Message]) -> str:
     """调 AI 给一段对话生成摘要
 
     messages: 当前会话的消息列表（会去掉 system 消息）
@@ -34,7 +35,7 @@ def generate_summary(messages: list) -> str:
         from lumen.config import get_model
         model = get_model()
 
-        response = chat(
+        response = await chat(
             messages=[
                 {
                     "role": "system",
@@ -59,9 +60,9 @@ def generate_summary(messages: list) -> str:
         return ""
 
 
-def summarize_session(session_id: str, character_id: str, messages: list):
+async def summarize_session(session_id: str, character_id: str, messages: list[Message]):
     """给一个会话生成摘要并保存到数据库"""
-    summary = generate_summary(messages)
+    summary = await generate_summary(messages)
     if summary:
         history.save_summary(session_id, character_id, summary)
         logger.info(f"已保存会话 {session_id} 的摘要")

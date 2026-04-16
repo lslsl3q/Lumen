@@ -10,12 +10,14 @@ Lumen - 上下文窗口管理
 
 from typing import List, Dict, Any
 
+from lumen.types.messages import Message
+
 
 # ========================================
 # 工具调用折叠
 # ========================================
 
-def fold_tool_calls(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def fold_tool_calls(messages: list[Message]) -> list[Message]:
     """折叠历史工具调用消息对
 
     检测模式：assistant(工具调用JSON) → user(tool_result) → assistant(最终回答)
@@ -65,7 +67,7 @@ def fold_tool_calls(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return result
 
 
-def filter_for_ai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def filter_for_ai(messages: list[Message]) -> list[Message]:
     """过滤消息，只发送给 AI 未折叠的
 
     Args:
@@ -84,7 +86,7 @@ def filter_for_ai(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # 上下文裁剪
 # ========================================
 
-def trim_messages(messages: List[Dict[str, Any]], max_messages: int = 50) -> List[Dict[str, Any]]:
+def trim_messages(messages: list[Message], max_messages: int = 50) -> list[Message]:
     """截断太长的聊天历史
 
     保留规则：

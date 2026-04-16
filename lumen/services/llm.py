@@ -4,10 +4,11 @@ Lumen - LLM 适配器层
 """
 
 from lumen.config import client, LLM_TIMEOUT
+from lumen.types.messages import Message
 
 
-def chat(messages: list, model: str, stream: bool = False):
-    """统一聊天接口
+async def chat(messages: list[Message], model: str, stream: bool = False):
+    """统一聊天接口（异步版）
 
     Args:
         messages: 消息列表，格式 [{"role": "user", "content": "..."}, ...]
@@ -16,26 +17,18 @@ def chat(messages: list, model: str, stream: bool = False):
 
     Returns:
         stream=False: 返回完整响应对象（response.choices[0].message.content）
-        stream=True: 返回迭代器（for chunk in response）
+        stream=True: 返回异步迭代器（async for chunk in response）
 
     注意：
         当前只支持 OpenAI 兼容格式（DeepSeek、通义、Gemini 等）
         以后需要支持 Anthropic 等其他厂商时，在这里添加对应的适配器
     """
-    # TODO: 以后根据 model 名称前缀选择不同适配器
-    # if model.startswith("claude-"):
-    #     return _anthropic_chat(messages, model)
-    # elif model.startswith("gemini-"):
-    #     return _gemini_chat(messages, model)
-    # else:
-    #     return _openai_chat(messages, model)
-
-    # 当前：默认使用 OpenAI 兼容格式
-    return _openai_chat(messages, model, stream)
+    # 当前：默认使用 OpenAI 兼容格式（异步）
+    return await _openai_chat(messages, model, stream)
 
 
-def _openai_chat(messages: list, model: str, stream: bool = False):
-    """OpenAI 兼容格式适配器
+async def _openai_chat(messages: list[Message], model: str, stream: bool = False):
+    """OpenAI 兼容格式适配器（异步版）
 
     支持的厂商：
     - OpenAI 官方
@@ -52,20 +45,9 @@ def _openai_chat(messages: list, model: str, stream: bool = False):
     超时设置：
         默认 60 秒，可通过环境变量 LLM_TIMEOUT 调整
     """
-    return client.chat.completions.create(
+    return await client.chat.completions.create(
         model=model,
         messages=messages,
         stream=stream,
-        timeout=LLM_TIMEOUT,  # 设置超时时间
+        timeout=LLM_TIMEOUT,
     )
-
-
-# 未来可以添加更多适配器：
-# def _anthropic_chat(messages, model, stream):
-#     from anthropic import Anthropic
-#     client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-#     ...
-#
-# def _gemini_chat(messages, model, stream):
-#     import google.generativeai as genai
-#     ...
