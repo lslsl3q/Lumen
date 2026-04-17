@@ -20,12 +20,12 @@ html, body, #root {
 /* === 发光效果 === */
 
 .glow-teal {
-  box-shadow: 0 0 12px rgba(20, 184, 166, 0.12),
+  box-shadow: 0 0 12px var(--glow-primary),
               inset 0 0 8px rgba(20, 184, 166, 0.06);
 }
 
 .glow-amber {
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.12),
+  box-shadow: 0 0 12px var(--glow-accent),
               inset 0 0 8px rgba(245, 158, 11, 0.06);
 }
 

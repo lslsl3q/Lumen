@@ -9,8 +9,6 @@ from lumen.tools.base import (
     format_result_for_ai,
     execute_tool,
     execute_tools_parallel,
-    get_tool_prompt,
-    get_tool_prompt_from_registry,
 )
 from lumen.tools.parse import parse_tool_call
 from lumen.tools.registry import get_registry, ToolRegistry
@@ -23,8 +21,6 @@ __all__ = [
     "execute_tool",
     "execute_tools_parallel",
     "parse_tool_call",
-    "get_tool_prompt",
-    "get_tool_prompt_from_registry",
     "get_registry",
     "ToolRegistry",
 ]

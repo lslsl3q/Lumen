@@ -76,6 +76,10 @@ LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
 # 可以通过环境变量 MAX_TOOL_ITERATIONS 覆盖
 MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
 
+# WebSocket 推送通道设置
+# 心跳间隔（秒），保持连接存活（应对休眠唤醒）
+WS_HEARTBEAT_INTERVAL = float(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
+
 
 def get_model(character_config: dict = None) -> str:
     """获取当前应该使用的模型

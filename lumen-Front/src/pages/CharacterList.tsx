@@ -52,7 +52,7 @@ function CharacterList() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="min-h-screen bg-surface-deep text-slate-200">
       {/* 顶栏 */}
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-8">
@@ -147,7 +147,7 @@ function CharacterList() {
 
                 {/* 头像 + 名字 */}
                 <div className="flex items-center gap-4 mb-3">
-                  <div className="w-12 h-12 rounded-full bg-slate-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-surface-elevated flex-shrink-0 overflow-hidden flex items-center justify-center">
                     {char.avatar ? (
                       <img
                         src={getAvatarUrl(char.avatar)!}

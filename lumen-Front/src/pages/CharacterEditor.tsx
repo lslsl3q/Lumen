@@ -194,14 +194,14 @@ function CharacterEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-600">
+      <div className="min-h-screen bg-surface-deep flex items-center justify-center text-slate-600">
         加载中...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="min-h-screen bg-surface-deep text-slate-200">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center gap-4 mb-8">
@@ -237,7 +237,7 @@ function CharacterEditor() {
               <div className="flex-shrink-0">
                 <label className="block cursor-pointer group">
                   <div className="
-                    w-24 h-24 rounded-full bg-slate-800 border-2 border-dashed border-slate-700
+                    w-24 h-24 rounded-full bg-surface border-2 border-dashed border-surface-elevated
                     flex items-center justify-center overflow-hidden
                     group-hover:border-teal-500/40 transition-all duration-200
                   ">

@@ -36,7 +36,6 @@ from lumen.prompt.builder import build_system_prompt, build_messages
 
 # 工具系统（tools/）
 from lumen.tools.base import (
-    get_tool_prompt,
     execute_tool,
     execute_tools_parallel,
     format_result_for_ai,
@@ -45,6 +44,9 @@ from lumen.tools.base import (
     error_result,
 )
 from lumen.tools.parse import parse_tool_call
+
+# 工具提示词（prompt/）
+from lumen.prompt.tool_prompt import get_tool_prompt
 
 # 配置（顶层）
 from lumen.config import client, get_model, DEFAULT_MODEL, MAX_TOOL_ITERATIONS
@@ -90,7 +92,6 @@ __all__ = [
     "build_messages",
 
     # 工具系统
-    "get_tool_prompt",
     "execute_tool",
     "execute_tools_parallel",
     "parse_tool_call",

@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { useSessions } from '../hooks/useSessions';
 import { useCharacters } from '../hooks/useCharacters';
+import { usePersona } from '../hooks/usePersona';
 import ChatSidebar from './ChatSidebar';
 import ChatPanel from './ChatPanel';
 
@@ -16,6 +17,7 @@ function ChatInterface() {
   const chat = useChat();
   const sessions = useSessions();
   const characters = useCharacters();
+  const persona = usePersona();
   const navigate = useNavigate();
 
   // 初始化同步：sessions 加载完后，把第一个会话的历史加载到 chat
@@ -84,6 +86,21 @@ function ChatInterface() {
     navigate('/settings/characters');
   }, [navigate]);
 
+  /** 跳转到设置页 */
+  const handleOpenSettings = useCallback(() => {
+    navigate('/settings/config');
+  }, [navigate]);
+
+  /** 切换 Persona */
+  const handleSwitchPersona = useCallback(async (personaId: string | null) => {
+    await persona.switchTo(personaId);
+  }, [persona]);
+
+  /** 跳转到 Persona 管理页 */
+  const handleManagePersonas = useCallback(() => {
+    navigate('/settings/personas');
+  }, [navigate]);
+
   return (
     <div className="flex h-screen">
       <ChatSidebar
@@ -98,6 +115,12 @@ function ChatInterface() {
         currentCharacterId={characters.currentCharacterId}
         onSwitchCharacter={handleSwitchCharacter}
         onManageCharacters={handleManageCharacters}
+        onOpenSettings={handleOpenSettings}
+        personas={persona.personas}
+        activePersonaId={persona.activeId}
+        activePersonaName={persona.activeName}
+        onSwitchPersona={handleSwitchPersona}
+        onManagePersonas={handleManagePersonas}
       />
       <ChatPanel
         messages={chat.messages}

@@ -138,7 +138,7 @@ function ChatPanel({
       {/* 顶栏 */}
       <header className="flex items-center justify-between px-6 py-3 border-b border-slate-800/60">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
+          <div className="w-2 h-2 rounded-full bg-primary-light shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
           <h1 className="text-lg font-light tracking-widest text-slate-300 uppercase">
             Lumen
           </h1>

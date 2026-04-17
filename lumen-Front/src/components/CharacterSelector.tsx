@@ -50,7 +50,7 @@ function CharacterSelector({
         "
       >
         {/* 头像 */}
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full bg-surface-elevated flex-shrink-0 overflow-hidden flex items-center justify-center">
           {current?.avatar ? (
             <img
               src={getAvatarUrl(current.avatar)!}
@@ -101,7 +101,7 @@ function CharacterSelector({
                   }
                 `}
               >
-                <div className="w-6 h-6 rounded-full bg-slate-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
+                <div className="w-6 h-6 rounded-full bg-surface-elevated flex-shrink-0 overflow-hidden flex items-center justify-center">
                   {char.avatar ? (
                     <img src={getAvatarUrl(char.avatar)!} alt={char.name} className="w-full h-full object-cover" />
                   ) : (

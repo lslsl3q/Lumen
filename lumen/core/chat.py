@@ -15,7 +15,7 @@ from lumen.prompt.builder import build_system_prompt
 from lumen.services.context import trim_messages, fold_tool_calls, filter_for_ai
 from lumen.services import history
 from lumen.services import memory
-from lumen.tools.base import execute_tool, execute_tools_parallel, get_tool_prompt
+from lumen.tools.base import execute_tool, execute_tools_parallel
 from lumen.tools.parse import parse_tool_call
 from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat

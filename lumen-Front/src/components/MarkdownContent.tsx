@@ -67,7 +67,7 @@ export default function MarkdownContent({ content, isStreaming }: MarkdownConten
       </Markdown>
       {/* 流式光标 */}
       {isStreaming && (
-        <span className="inline-block w-[2px] h-[1.1em] bg-teal-400 animate-cursor align-text-bottom ml-[1px]" />
+        <span className="inline-block w-[2px] h-[1.1em] bg-primary-light animate-cursor align-text-bottom ml-[1px]" />
       )}
     </div>
   );

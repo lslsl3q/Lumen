@@ -32,19 +32,14 @@ class ChatSession:
         from lumen.prompt.character import load_character
         from lumen.prompt.builder import build_system_prompt
         from lumen.services import memory, history
-        from lumen.tools.base import get_tool_prompt
-
         character = load_character(self.character_id)
 
         # 构建系统提示词
         memory_text = memory.get_memory_context(self.character_id)
-        tool_text = get_tool_prompt()
 
         dynamic_context = []
         if memory_text:
             dynamic_context.append({"content": memory_text, "injection_point": "system"})
-        if tool_text:
-            dynamic_context.append({"content": tool_text, "injection_point": "system"})
 
         system_prompt = build_system_prompt(character, dynamic_context or None)
 
@@ -60,19 +55,14 @@ class ChatSession:
         from lumen.prompt.character import load_character
         from lumen.prompt.builder import build_system_prompt
         from lumen.services import memory, history
-        from lumen.tools.base import get_tool_prompt
-
         character = load_character(self.character_id)
 
-        # 构建系统提示词（包含记忆和工具）
+        # 构建系统提示词（包含记忆）
         memory_text = memory.get_memory_context(self.character_id)
-        tool_text = get_tool_prompt()
 
         dynamic_context = []
         if memory_text:
             dynamic_context.append({"content": memory_text, "injection_point": "system"})
-        if tool_text:
-            dynamic_context.append({"content": tool_text, "injection_point": "system"})
 
         system_prompt = build_system_prompt(character, dynamic_context or None)
 
@@ -103,6 +93,25 @@ class ChatSession:
         self.messages = []
         self.character_id = current_char
         self._initialize_new()
+
+    def reload_system_prompt(self):
+        """重载系统提示词（Persona 切换后调用）
+
+        只替换 messages[0]（system 消息），不丢失聊天历史
+        """
+        from lumen.prompt.character import load_character
+        from lumen.prompt.builder import build_system_prompt
+        from lumen.services import memory
+
+        character = load_character(self.character_id)
+        memory_text = memory.get_memory_context(self.character_id)
+
+        dynamic_context = []
+        if memory_text:
+            dynamic_context.append({"content": memory_text, "injection_point": "system"})
+
+        system_prompt = build_system_prompt(character, dynamic_context or None)
+        self.messages[0] = {"role": "system", "content": system_prompt}
 
 
 class SessionManager:

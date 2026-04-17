@@ -7,7 +7,9 @@
  */
 import { SessionListItem } from '../types/session';
 import { CharacterListItem } from '../types/character';
+import { PersonaListItem } from '../types/persona';
 import CharacterSelector from './CharacterSelector';
+import PersonaPanel from './PersonaPanel';
 
 interface ChatSidebarProps {
   sessions: SessionListItem[];
@@ -22,6 +24,14 @@ interface ChatSidebarProps {
   currentCharacterId: string;
   onSwitchCharacter: (characterId: string) => void;
   onManageCharacters: () => void;
+  // 设置
+  onOpenSettings: () => void;
+  // Persona 相关
+  personas: PersonaListItem[];
+  activePersonaId: string | null;
+  activePersonaName: string | null;
+  onSwitchPersona: (personaId: string | null) => void;
+  onManagePersonas: () => void;
 }
 
 /** 单个会话条目 */
@@ -89,29 +99,54 @@ function ChatSidebar({
   currentCharacterId,
   onSwitchCharacter,
   onManageCharacters,
+  onOpenSettings,
+  personas,
+  activePersonaId,
+  activePersonaName,
+  onSwitchPersona,
+  onManagePersonas,
 }: ChatSidebarProps) {
   return (
     <div className="w-64 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
       {/* 顶栏 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/40">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
+          <div className="w-2 h-2 rounded-full bg-primary-light shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
           <span className="text-sm font-light tracking-widest text-slate-400 uppercase">
             Lumen
           </span>
         </div>
-        <button
-          onClick={onNewSession}
-          className="
-            w-7 h-7 rounded-lg flex items-center justify-center
-            text-amber-400 bg-amber-500/10 border border-amber-500/20
-            hover:bg-amber-500/20 hover:border-amber-500/40
-            transition-all duration-150 text-lg leading-none
-          "
-          title="新建会话"
-        >
-          +
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onOpenSettings}
+            className="
+              w-7 h-7 rounded-lg flex items-center justify-center
+              text-slate-400 hover:text-teal-400
+              hover:bg-teal-500/10
+              transition-all duration-150
+            "
+            title="设置"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+          <button
+            onClick={onNewSession}
+            className="
+              w-7 h-7 rounded-lg flex items-center justify-center
+              text-amber-400 bg-amber-500/10 border border-amber-500/20
+              hover:bg-amber-500/20 hover:border-amber-500/40
+              transition-all duration-150 text-lg leading-none
+            "
+            title="新建会话"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       {/* 会话列表 */}
@@ -138,7 +173,15 @@ function ChatSidebar({
         )}
       </div>
 
-      {/* 底部角色选择器 */}
+      {/* 底部：Persona 切换 + 角色选择器 */}
+      <PersonaPanel
+        personas={personas}
+        activeId={activePersonaId}
+        activeName={activePersonaName}
+        onSelect={onSwitchPersona}
+        onManageClick={onManagePersonas}
+      />
+      {/* 角色选择器 */}
       <CharacterSelector
         characters={characters}
         currentCharacterId={currentCharacterId}

@@ -33,11 +33,21 @@ def build_system_prompt(character: dict, dynamic_context: list[DynamicContext] =
     if character.get("system_prompt"):
         parts.append(character["system_prompt"])
 
+    # ★ 第 2.5 层：Persona 注入（用户身份信息，不受 token 裁剪）
+    # Persona 不走 dynamic_context，有独立的持久化和不受预算裁剪的语义
+    try:
+        from lumen.prompt.persona import get_active_persona_text
+        persona_text = get_active_persona_text()
+        if persona_text:
+            parts.append(persona_text)
+    except Exception:
+        pass  # Persona 加载失败不影响正常对话
+
     # 第三层：工具注入（从角色配置读取 tools 字段，带自定义 tips）
     has_tools = False
     tools = character.get("tools", [])
     if tools:
-        from lumen.tools.base import get_tool_prompt_from_registry
+        from lumen.prompt.tool_prompt import get_tool_prompt_from_registry
         tool_prompt = get_tool_prompt_from_registry(tools, character.get("tool_tips"))
         if tool_prompt:
             parts.append(tool_prompt)

@@ -1,0 +1,8 @@
+{
+  "name": "用户",
+  "description": "一个热爱编程的开发者，主要用 Python 和 TypeScript",
+  "traits": [
+    "喜欢简洁的代码",
+    "习惯用 TDD"
+  ]
+}
