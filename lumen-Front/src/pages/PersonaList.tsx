@@ -16,7 +16,6 @@ function PersonaList() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [newId, setNewId] = useState('');
   const [newName, setNewName] = useState('');
 
   const loadList = useCallback(async () => {
@@ -51,11 +50,28 @@ function PersonaList() {
     }
   };
 
-  const handleCreate = () => {
-    const id = newId.trim();
+  const handleCreate = async () => {
     const name = newName.trim();
-    if (!id || !name) return;
-    navigate(`/settings/personas/new?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`);
+    if (!name) return;
+
+    try {
+      const response = await fetch('http://127.0.0.1:8888/personas/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description: '', traits: [] }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || '创建失败');
+      }
+
+      setShowCreate(false);
+      setNewName('');
+      loadList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '创建失败');
+    }
   };
 
   return (
@@ -100,25 +116,13 @@ function PersonaList() {
         {showCreate && (
           <div className="mb-6 p-5 rounded-xl bg-slate-900/60 border border-indigo-500/20">
             <div className="text-sm text-slate-300 mb-4">新建 Persona</div>
-            <div className="flex gap-3 mb-3">
-              <input
-                value={newId}
-                onChange={e => setNewId(e.target.value)}
-                placeholder="ID（英文，用于文件名）"
-                className="
-                  flex-1 px-3 py-2 rounded-lg text-sm bg-slate-800/60
-                  border border-slate-700/60 text-slate-200
-                  placeholder:text-slate-600
-                  focus:border-indigo-500/40 focus:outline-none
-                  transition-all duration-150
-                "
-              />
+            <div className="mb-3">
               <input
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 placeholder="名称"
                 className="
-                  flex-1 px-3 py-2 rounded-lg text-sm bg-slate-800/60
+                  w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                   border border-slate-700/60 text-slate-200
                   placeholder:text-slate-600
                   focus:border-indigo-500/40 focus:outline-none
@@ -128,14 +132,14 @@ function PersonaList() {
             </div>
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => { setShowCreate(false); setNewId(''); setNewName(''); }}
+                onClick={() => { setShowCreate(false); setNewName(''); }}
                 className="px-3 py-1.5 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-all"
               >
                 取消
               </button>
               <button
                 onClick={handleCreate}
-                disabled={!newId.trim() || !newName.trim()}
+                disabled={!newName.trim()}
                 className="
                   px-4 py-1.5 rounded-lg text-sm
                   bg-indigo-500/20 text-indigo-300 border border-indigo-500/30

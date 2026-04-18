@@ -148,27 +148,34 @@ async def switch_character(req: SwitchCharacterRequest) -> SwitchCharacterRespon
 
 @router.post("/create")
 async def api_create_character(
-    character_id: str = Form(...),
+    character_id: Optional[str] = Form(None),  # 改为可选，未提供时自动生成
     data: str = Form(...),  # JSON 字符串，包含角色字段
     avatar: Optional[UploadFile] = File(None),
 ) -> dict:
     """
     创建新角色
 
-    接收 multipart/form-data：character_id + data(JSON) + 可选头像文件
+    接收 multipart/form-data：可选 character_id + data(JSON) + 可选头像文件
+    如果未提供 character_id，将自动生成唯一 ID
     """
     try:
         # 解析角色数据
         char_data = json.loads(data)
 
+        # 如果没有提供 ID，先生成一个
+        final_id = character_id
+        if final_id is None:
+            from lumen.services.character import _generate_character_id
+            final_id = _generate_character_id()
+
         # 处理头像上传
         if avatar:
             file_data = await avatar.read()
-            avatar_filename = save_avatar(character_id, avatar.filename, file_data)
+            avatar_filename = save_avatar(final_id, avatar.filename, file_data)
             char_data["avatar"] = avatar_filename
 
-        result = create_character(character_id, char_data)
-        return {"message": f"角色 {character_id} 创建成功", "character": result}
+        result = create_character(final_id, char_data)
+        return {"message": f"角色 {final_id} 创建成功", "character": result}
 
     except FileExistsError as e:
         raise HTTPException(status_code=409, detail=str(e))

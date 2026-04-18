@@ -53,11 +53,15 @@ def build_system_prompt(character: dict, dynamic_context: list[DynamicContext] =
             parts.append(tool_prompt)
             has_tools = True
 
-    # 第四层：动态注入（只拼 injection_point == "system" 的）
+    # 第四层：动态注入（只拼 injection_point == "system" 的，按 depth 和 order 排序）
     if dynamic_context:
-        for item in dynamic_context:
-            if item.get("injection_point", "system") == "system":
-                parts.append(item["content"])
+        # 排序：先按 order（优先级），再按 depth（深度）
+        system_items = sorted(
+            [item for item in dynamic_context if item.get("injection_point", "system") == "system"],
+            key=lambda x: (x.get("order", 0), x.get("depth", 4))
+        )
+        for item in system_items:
+            parts.append(item["content"])
 
     # 第五层（兜底）：强制角色保持——放在最后，权重最高
     if has_tools and character.get("system_prompt"):
@@ -86,19 +90,25 @@ def build_messages(character: dict, user_input: str, history: list, dynamic_cont
     for msg in history:
         messages.append(msg)
 
-    # 动态注入：user消息之前
+    # 动态注入：user消息之前（按 depth 和 order 排序）
     if dynamic_context:
-        for item in dynamic_context:
-            if item.get("injection_point") == "before_user":
-                messages.append({"role": "system", "content": item["content"]})
+        before_user_items = sorted(
+            [item for item in dynamic_context if item.get("injection_point") == "before_user"],
+            key=lambda x: (x.get("order", 0), x.get("depth", 4))
+        )
+        for item in before_user_items:
+            messages.append({"role": "system", "content": item["content"]})
 
     # 用户消息
     messages.append({"role": "user", "content": user_input})
 
-    # 动态注入：user消息之后
+    # 动态注入：user消息之后（按 depth 和 order 排序）
     if dynamic_context:
-        for item in dynamic_context:
-            if item.get("injection_point") == "after_user":
-                messages.append({"role": "system", "content": item["content"]})
+        after_user_items = sorted(
+            [item for item in dynamic_context if item.get("injection_point") == "after_user"],
+            key=lambda x: (x.get("order", 0), x.get("depth", 4))
+        )
+        for item in after_user_items:
+            messages.append({"role": "system", "content": item["content"]})
 
     return messages

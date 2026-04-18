@@ -24,12 +24,11 @@ export async function getCharacter(id: string): Promise<CharacterDetail> {
 
 /** POST /characters/create — 创建角色（multipart/form-data） */
 export async function createCharacter(
-  characterId: string,
   data: CharacterFormData,
   avatarFile?: File,
-): Promise<{ message: string; character: CharacterDetail }> {
+): Promise<{ message: string; character: CharacterDetail & { id: string } }> {
   const formData = new FormData();
-  formData.append('character_id', characterId);
+  // 不再添加 character_id，让后端自动生成
   formData.append('data', JSON.stringify(data));
   if (avatarFile) {
     formData.append('avatar', avatarFile);

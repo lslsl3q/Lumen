@@ -12,6 +12,7 @@ import { AuthorsNoteConfig } from '../types/authorNote';
 import CharacterSelector from './CharacterSelector';
 import PersonaPanel from './PersonaPanel';
 import AuthorNotePanel from './AuthorNotePanel';
+import WorldBookPanel from './WorldBookPanel';
 
 interface ChatSidebarProps {
   sessions: SessionListItem[];
@@ -34,6 +35,8 @@ interface ChatSidebarProps {
   activePersonaName: string | null;
   onSwitchPersona: (personaId: string | null) => void;
   onManagePersonas: () => void;
+  // World Book 相关
+  onManageWorldBooks: () => void;
   // Author's Note 相关
   authorNoteConfig: AuthorsNoteConfig | null;
   authorNoteLoading: boolean;
@@ -115,6 +118,7 @@ function ChatSidebar({
   activePersonaName,
   onSwitchPersona,
   onManagePersonas,
+  onManageWorldBooks,
   authorNoteConfig,
   authorNoteLoading,
   onAuthorNoteToggle,
@@ -207,6 +211,7 @@ function ChatSidebar({
         onSelect={onSwitchPersona}
         onManageClick={onManagePersonas}
       />
+      <WorldBookPanel onManageClick={onManageWorldBooks} />
       {/* 角色选择器 */}
       <CharacterSelector
         characters={characters}

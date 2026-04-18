@@ -13,6 +13,7 @@ class PersonaCard(BaseModel):
     name: str
     description: str = ""
     traits: List[str] = []
+    avatar: Optional[str] = None  # 头像 URL
 
 
 class ActivePersona(BaseModel):
@@ -22,10 +23,11 @@ class ActivePersona(BaseModel):
 
 class PersonaCreateRequest(BaseModel):
     """API 创建请求"""
-    id: str                             # Persona ID（用于文件名）
+    id: Optional[str] = None             # Persona ID（可选，未提供时自动生成）
     name: str
     description: str = ""
     traits: List[str] = []
+    avatar: Optional[str] = None        # 头像 URL
 
 
 class PersonaUpdateRequest(BaseModel):
@@ -33,3 +35,4 @@ class PersonaUpdateRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     traits: Optional[List[str]] = None
+    avatar: Optional[str] = None        # 头像 URL

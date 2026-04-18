@@ -12,6 +12,8 @@ import {
   createPersona as apiCreate,
   updatePersona as apiUpdate,
 } from '../api/persona';
+import * as avatarApi from '../api/avatar';
+import type { AvatarItem } from '../types/avatar';
 
 function PersonaEditor() {
   const { id } = useParams<{ id: string }>();
@@ -25,10 +27,25 @@ function PersonaEditor() {
   const [description, setDescription] = useState('');
   const [traits, setTraits] = useState<string[]>([]);
   const [newTrait, setNewTrait] = useState('');
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [availableAvatars, setAvailableAvatars] = useState<AvatarItem[]>([]);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // 加载头像列表
+  useEffect(() => {
+    (async () => {
+      try {
+        const avatars = await avatarApi.listAvatars();
+        setAvailableAvatars(avatars);
+      } catch (err) {
+        console.error('加载头像列表失败:', err);
+      }
+    })();
+  }, []);
 
   // 加载已有数据（编辑模式）
   useEffect(() => {
@@ -47,6 +64,7 @@ function PersonaEditor() {
         setName(data.name);
         setDescription(data.description);
         setTraits(data.traits || []);
+        setAvatar(data.avatar || null);
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败');
       } finally {
@@ -86,6 +104,7 @@ function PersonaEditor() {
           name: trimmedName,
           description: description.trim(),
           traits,
+          avatar,
         });
       } else {
         const trimmedId = personaId.trim();
@@ -98,6 +117,7 @@ function PersonaEditor() {
           name: trimmedName,
           description: description.trim(),
           traits,
+          avatar,
         });
       }
 
@@ -110,7 +130,7 @@ function PersonaEditor() {
     } finally {
       setIsSaving(false);
     }
-  }, [isEditMode, personaId, name, description, traits, navigate]);
+  }, [isEditMode, personaId, name, description, traits, avatar, navigate]);
 
   if (isLoading) {
     return (
@@ -207,6 +227,45 @@ function PersonaEditor() {
             />
           </div>
 
+          {/* 头像选择 */}
+          <div>
+            <label className="block text-sm text-slate-400 mb-2">头像</label>
+            {avatar ? (
+              <div className="flex items-center gap-4 mb-3">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-800/40 border border-slate-700/60">
+                  <img
+                    src={avatar}
+                    alt="当前头像"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <button
+                  onClick={() => setAvatar(null)}
+                  className="
+                    px-3 py-1.5 rounded-lg text-sm
+                    bg-red-500/10 text-red-400 border border-red-500/20
+                    hover:bg-red-500/20
+                    transition-all duration-150
+                  "
+                >
+                  移除头像
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAvatarPicker(true)}
+                className="
+                  w-full px-3 py-8 rounded-lg text-sm
+                  bg-slate-800/60 border border-dashed border-slate-700/60
+                  text-slate-500 hover:text-slate-400 hover:border-slate-600/60
+                  transition-all duration-150
+                "
+              >
+                + 选择头像
+              </button>
+            )}
+          </div>
+
           {/* 特征标签 */}
           <div>
             <label className="block text-sm text-slate-400 mb-2">特征标签</label>
@@ -275,6 +334,91 @@ function PersonaEditor() {
             </button>
           </div>
         </div>
+
+        {/* 头像选择器弹窗 */}
+        {showAvatarPicker && (
+          <div
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+            onClick={() => setShowAvatarPicker(false)}
+          >
+            <div
+              className="bg-slate-900 rounded-xl border border-slate-700/60 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* 弹窗标题 */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/60">
+                <h3 className="text-lg text-slate-200">选择头像</h3>
+                <button
+                  onClick={() => setShowAvatarPicker(false)}
+                  className="text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* 头像网格 */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {availableAvatars.length === 0 ? (
+                  <div className="text-center py-12 text-slate-600">
+                    <p className="mb-2">暂无头像</p>
+                    <p className="text-sm">请先在设置中上传头像</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-4">
+                    {availableAvatars.map(av => (
+                      <button
+                        key={av.id}
+                        onClick={() => {
+                          setAvatar(av.url);
+                          setShowAvatarPicker(false);
+                        }}
+                        className={`
+                          aspect-square rounded-lg overflow-hidden border-2 transition-all
+                          ${avatar === av.url
+                            ? 'border-amber-500 ring-2 ring-amber-500/30'
+                            : 'border-slate-700/60 hover:border-slate-600'
+                          }
+                        `}
+                      >
+                        <img
+                          src={av.url}
+                          alt={av.filename}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 底部按钮 */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700/60">
+                <button
+                  onClick={() => navigate('/settings/avatars')}
+                  className="
+                    px-4 py-2 rounded-lg text-sm
+                    bg-slate-800/60 text-slate-400 border border-slate-700/60
+                    hover:bg-slate-800/80 hover:text-slate-300
+                    transition-all duration-150
+                  "
+                >
+                  上传新头像
+                </button>
+                <button
+                  onClick={() => setShowAvatarPicker(false)}
+                  className="
+                    px-4 py-2 rounded-lg text-sm
+                    bg-indigo-500/20 text-indigo-300 border border-indigo-500/30
+                    hover:bg-indigo-500/30
+                    transition-all duration-150
+                  "
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

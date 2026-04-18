@@ -8,6 +8,9 @@ import json
 import os
 import re
 import logging
+import time
+import random
+import string
 
 from lumen.types.persona import PersonaCard, ActivePersona
 
@@ -30,6 +33,17 @@ def _validate_persona_id(persona_id: str) -> str:
     if not re.match(r'^[a-zA-Z0-9_\-]+$', persona_id):
         raise ValueError(f"非法的 Persona ID: {persona_id}")
     return persona_id
+
+
+def _generate_persona_id() -> str:
+    """生成唯一的 Persona ID
+
+    格式：persona{时间戳后6位}{3位随机字符}
+    例如：persona234567abc
+    """
+    timestamp = str(int(time.time()))[-6:]  # 时间戳后6位
+    random_chars = ''.join(random.choices(string.ascii_lowercase, k=3))  # 3位小写字母
+    return f"persona{timestamp}{random_chars}"
 
 
 # ========================================
@@ -71,8 +85,18 @@ def load_persona(persona_id: str) -> dict:
     return card.model_dump()
 
 
-def create_persona(persona_id: str, data: dict) -> dict:
-    """创建新 Persona"""
+def create_persona(persona_id: str | None, data: dict) -> dict:
+    """创建新 Persona
+
+    persona_id: Persona ID（如果为 None 则自动生成）
+    data: Persona 数据
+
+    返回创建后的 Persona dict，包含生成的 id
+    """
+    # 如果没有提供 ID，自动生成
+    if persona_id is None:
+        persona_id = _generate_persona_id()
+
     _validate_persona_id(persona_id)
     os.makedirs(PERSONAS_DIR, exist_ok=True)
     filepath = os.path.join(PERSONAS_DIR, f"{persona_id}.json")
@@ -81,6 +105,8 @@ def create_persona(persona_id: str, data: dict) -> dict:
 
     card = PersonaCard.model_validate(data)
     raw = card.model_dump()
+    # 添加 id 字段到返回结果
+    raw["id"] = persona_id
 
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(raw, f, ensure_ascii=False, indent=2)

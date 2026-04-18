@@ -4,6 +4,9 @@ import CharacterList from './pages/CharacterList';
 import CharacterEditor from './pages/CharacterEditor';
 import PersonaList from './pages/PersonaList';
 import PersonaEditor from './pages/PersonaEditor';
+import WorldBookList from './pages/WorldBookList';
+import WorldBookEditor from './pages/WorldBookEditor';
+import AvatarManager from './pages/AvatarManager';
 import ConfigList from './pages/ConfigList';
 import ConfigEditor from './pages/ConfigEditor';
 import PushNotification from './components/PushNotification';
@@ -27,6 +30,13 @@ function App() {
         <Route path="/settings/personas" element={<PersonaList />} />
         <Route path="/settings/personas/new" element={<PersonaEditor />} />
         <Route path="/settings/personas/:id" element={<PersonaEditor />} />
+
+        {/* 世界书管理页面 */}
+        <Route path="/settings/worldbooks" element={<WorldBookList />} />
+        <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
+
+        {/* 头像管理页面 */}
+        <Route path="/settings/avatars" element={<AvatarManager />} />
 
         {/* 配置管理页面 */}
         <Route path="/settings/config" element={<ConfigList />} />

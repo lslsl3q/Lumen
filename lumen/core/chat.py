@@ -85,6 +85,77 @@ def _inject_authors_note(messages: list[Message], session_id: str) -> list[Messa
     return result
 
 
+def _inject_worldbook(messages: list[Message], character_id: str) -> list[Message]:
+    """在消息流中注入世界书内容（基于关键词匹配）
+
+    扫描聊天历史，匹配关键词后自动注入相关设定。
+    返回新的消息列表（不影响原始消息）。
+    """
+    from lumen.prompt.worldbook_matcher import get_injection_context
+
+    # 获取世界书动态上下文
+    worldbook_contexts = get_injection_context(
+        messages,
+        character_id
+    )
+
+    if not worldbook_contexts:
+        return messages
+
+    # 找到最后一条 user 消息的位置
+    last_user_idx = -1
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i]["role"] == "user":
+            last_user_idx = i
+            break
+
+    if last_user_idx == -1:
+        # 没有 user 消息，注入到末尾
+        for ctx in worldbook_contexts:
+            messages.append({"role": "system", "content": ctx["content"]})
+        return messages
+
+    # 按 injection_point 分组注入
+    before_sys_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "before_sys"]
+    after_sys_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "after_sys"]
+    before_user_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "before_user"]
+    after_user_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "after_user"]
+
+    # 构建新消息列表
+    result = []
+
+    # before_sys: 插入到第一条消息之前（系统提示词前）
+    if before_sys_msgs:
+        for ctx in before_sys_msgs:
+            result.append({"role": "system", "content": ctx["content"]})
+
+    # 原有消息
+    result.extend(messages)
+
+    # after_sys: 插入到第一条消息之后（系统提示词后）
+    if after_sys_msgs:
+        # 找第一条消息的插入位置
+        insert_idx = 1 if len(messages) > 0 else 0
+        for ctx in reversed(after_sys_msgs):  # 倒序插入，保持顺序
+            result.insert(insert_idx, {"role": "system", "content": ctx["content"]})
+
+    # before_user: 插入到最后一条 user 消息之前
+    if before_user_msgs:
+        insert_idx = last_user_idx
+        for ctx in before_user_msgs:
+            result.insert(insert_idx, {"role": "system", "content": ctx["content"]})
+            insert_idx += 1
+
+    # after_user: 插入到最后一条 user 消息之后
+    if after_user_msgs:
+        insert_idx = last_user_idx + 1
+        for ctx in after_user_msgs:
+            result.insert(insert_idx, {"role": "system", "content": ctx["content"]})
+            insert_idx += 1
+
+    return result
+
+
 def validate_tool_call(tool_name: str, tool_params: dict) -> str:
     """验证 AI 的工具调用是否正确
 
@@ -172,6 +243,7 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
 
         trimmed = _prepare_messages(session.messages, session.character_id)
         trimmed = _inject_authors_note(trimmed, session.session_id)
+        trimmed = _inject_worldbook(trimmed, session.character_id)  # 世界书注入
         response = await chat(trimmed, model, stream=True)
 
         buffer = ""

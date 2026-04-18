@@ -10,12 +10,26 @@ import json
 import os
 import re
 import logging
+import time
+import random
+import string
 
 from lumen.prompt.types import CharacterCard
 
 logger = logging.getLogger(__name__)
 
 CHARACTERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "characters")
+
+
+def _generate_character_id() -> str:
+    """生成唯一的角色 ID
+
+    格式：char{时间戳后6位}{3位随机字符}
+    例如：char234567abc
+    """
+    timestamp = str(int(time.time()))[-6:]  # 时间戳后6位
+    random_chars = ''.join(random.choices(string.ascii_lowercase, k=3))  # 3位小写字母
+    return f"char{timestamp}{random_chars}"
 
 
 def _validate_char_id(char_id: str) -> str:
@@ -25,14 +39,18 @@ def _validate_char_id(char_id: str) -> str:
     return char_id
 
 
-def create_character(char_id: str, data: dict) -> dict:
+def create_character(char_id: str | None, data: dict) -> dict:
     """创建新角色
 
-    char_id: 角色ID（用于文件名）
+    char_id: 角色ID（用于文件名，如果为 None 则自动生成）
     data: 角色数据（至少包含 name）
 
-    返回创建后的角色 dict
+    返回创建后的角色 dict，包含生成的 id
     """
+    # 如果没有提供 ID，自动生成
+    if char_id is None:
+        char_id = _generate_character_id()
+
     _validate_char_id(char_id)
     filepath = os.path.join(CHARACTERS_DIR, f"{char_id}.json")
     if os.path.exists(filepath):
@@ -40,6 +58,8 @@ def create_character(char_id: str, data: dict) -> dict:
 
     card = CharacterCard.model_validate(data)
     raw = card.model_dump(exclude_none=True)
+    # 添加 id 字段到返回结果
+    raw["id"] = char_id
 
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(raw, f, ensure_ascii=False, indent=2)

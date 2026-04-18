@@ -165,11 +165,6 @@ function CharacterEditor() {
     e.preventDefault();
     setError(null);
 
-    const targetId = isEditMode ? id! : characterId.trim();
-    if (!targetId) {
-      setError('请输入角色ID');
-      return;
-    }
     if (!form.name.trim()) {
       setError('请输入角色名字');
       return;
@@ -189,11 +184,14 @@ function CharacterEditor() {
       const dataToSubmit = { ...form, tool_tips: cleanedTips };
 
       if (isEditMode) {
-        await apiUpdate(targetId, dataToSubmit, avatarFile || undefined);
+        await apiUpdate(id!, dataToSubmit, avatarFile || undefined);
+        navigate('/settings/characters');
       } else {
-        await apiCreate(targetId, dataToSubmit, avatarFile || undefined);
+        // 新建模式，不传 ID，让后端自动生成
+        const result = await apiCreate(dataToSubmit, avatarFile || undefined);
+        // 使用后端返回的 ID 导航
+        navigate(`/settings/characters/${result.id}`);
       }
-      navigate('/settings/characters');
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -267,33 +265,6 @@ function CharacterEditor() {
 
               {/* ID + 名字 */}
               <div className="flex-1 space-y-3">
-                {/* 角色 ID */}
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">角色 ID</label>
-                  {isEditMode ? (
-                    <div className="px-3 py-2 rounded-lg bg-slate-800/40 text-sm text-slate-500 border border-slate-800/40">
-                      {id}
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={characterId}
-                      onChange={e => setCharacterId(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-                      placeholder="例如: my_character"
-                      className="
-                        w-full px-3 py-2 rounded-lg text-sm
-                        bg-slate-800/40 border border-slate-700/40
-                        text-slate-200 placeholder-slate-600
-                        focus:border-teal-500/40 focus:outline-none
-                        transition-all duration-150
-                      "
-                    />
-                  )}
-                  <div className="text-[10px] text-slate-600 mt-0.5">
-                    只允许英文字母、数字、下划线、横杠，创建后不可修改
-                  </div>
-                </div>
-
                 {/* 名字 */}
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">名字</label>

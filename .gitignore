@@ -44,9 +44,15 @@ env/
 data/
 
 # ========================================
-# 用户个人数据（Persona 身份数据，只追踪模板 default.json）
+# 用户个人数据（Persona / 世界书 / 角色，只追踪 default 模板）
 # ========================================
 lumen/personas/*.json
+lumen/worldbooks/*.json
+lumen/characters/*.json
+lumen/characters/avatars/
+
+# 前端公共资源（头像上传目录，运行时生成）
+lumen-Front/public/avatars/
 
 # ========================================
 # 测试和覆盖率

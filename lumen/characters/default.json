@@ -11,6 +11,7 @@
     "file_write"
   ],
   "model": "deepseek-chat",
+  "avatar": "default.png",
   "tool_tips": {},
   "auto_compact": true,
   "compact_threshold": 0.7

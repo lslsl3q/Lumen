@@ -42,7 +42,10 @@ async def api_get_active_persona():
 
 @router.post("/create")
 async def api_create_persona(req: PersonaCreateRequest):
-    """创建新 Persona"""
+    """创建新 Persona
+
+    如果未提供 ID，将自动生成唯一 ID
+    """
     try:
         persona = create_persona(req.id, {
             "name": req.name,
@@ -51,7 +54,7 @@ async def api_create_persona(req: PersonaCreateRequest):
         })
         return persona
     except FileExistsError:
-        raise HTTPException(status_code=409, detail=f"Persona 已存在: {req.id}")
+        raise HTTPException(status_code=409, detail=f"Persona 已存在: {req.id or 'auto-generated'}")
 
 
 @router.post("/switch")

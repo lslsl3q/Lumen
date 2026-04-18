@@ -130,6 +130,11 @@ function ChatInterface() {
     navigate('/settings/personas');
   }, [navigate]);
 
+  /** 跳转到世界书管理页 */
+  const handleManageWorldBooks = useCallback(() => {
+    navigate('/settings/worldbooks');
+  }, [navigate]);
+
   return (
     <div className="flex h-screen">
       <ChatSidebar
@@ -150,6 +155,7 @@ function ChatInterface() {
         activePersonaName={persona.activeName}
         onSwitchPersona={handleSwitchPersona}
         onManagePersonas={handleManagePersonas}
+        onManageWorldBooks={handleManageWorldBooks}
         authorNoteConfig={authorNote.config}
         authorNoteLoading={authorNote.isLoading}
         onAuthorNoteToggle={authorNote.toggle}

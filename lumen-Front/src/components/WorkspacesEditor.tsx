@@ -137,8 +137,8 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
           >
             <span
               className={`
-                absolute top-0.5 w-4 h-4 rounded-full bg-slate-300 transition-transform duration-200
-                ${readonlyMode ? 'translate-x-5' : 'translate-x-0.5'}
+                absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-slate-300 transition-transform duration-200
+                ${readonlyMode ? 'translate-x-[20px]' : ''}
               `}
             />
           </button>

@@ -68,43 +68,69 @@ function ConfigList() {
         {isLoading ? (
           <div className="text-center py-16 text-slate-600">加载中...</div>
         ) : (
-          /* 配置卡片列表 */
-          <div className="space-y-4">
-            {configs.map(config => {
-              const meta = TYPE_META[config.type] || { icon: '?', color: 'text-slate-400' };
-              return (
+          <>
+            {/* 配置卡片列表 */}
+            <div className="space-y-4">
+              {configs.map(config => {
+                const meta = TYPE_META[config.type] || { icon: '?', color: 'text-slate-400' };
+                return (
+                  <div
+                    key={config.name}
+                    onClick={() => navigate(`/settings/config/${config.name}`)}
+                    className="
+                      group relative p-5 rounded-xl cursor-pointer
+                      bg-slate-900/60 border border-slate-800/40
+                      hover:border-teal-500/30 hover:bg-slate-900/80
+                      transition-all duration-200
+                    "
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* 图标 */}
+                      <div className={`text-2xl font-mono ${meta.color}`}>
+                        {meta.icon}
+                      </div>
+                      {/* 信息 */}
+                      <div className="flex-1">
+                        <div className="text-base text-slate-200">{config.name}</div>
+                        <div className="text-sm text-slate-500 mt-0.5">{config.description}</div>
+                      </div>
+                      {/* 箭头 */}
+                      <svg
+                        className="w-4 h-4 text-slate-600 group-hover:text-teal-400 transition-colors"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 其他功能入口 */}
+            <div className="mt-8 pt-6 border-t border-slate-800/40">
+              <h3 className="text-sm text-slate-500 mb-4">其他功能</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
-                  key={config.name}
-                  onClick={() => navigate(`/settings/config/${config.name}`)}
+                  onClick={() => navigate('/settings/avatars')}
                   className="
-                    group relative p-5 rounded-xl cursor-pointer
+                    group p-4 rounded-xl cursor-pointer
                     bg-slate-900/60 border border-slate-800/40
-                    hover:border-teal-500/30 hover:bg-slate-900/80
+                    hover:border-amber-500/30 hover:bg-slate-900/80
                     transition-all duration-200
                   "
                 >
-                  <div className="flex items-center gap-4">
-                    {/* 图标 */}
-                    <div className={`text-2xl font-mono ${meta.color}`}>
-                      {meta.icon}
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">🖼️</div>
+                    <div>
+                      <div className="text-base text-slate-200">头像管理</div>
+                      <div className="text-sm text-slate-500">上传和管理头像</div>
                     </div>
-                    {/* 信息 */}
-                    <div className="flex-1">
-                      <div className="text-base text-slate-200">{config.name}</div>
-                      <div className="text-sm text-slate-500 mt-0.5">{config.description}</div>
-                    </div>
-                    {/* 箭头 */}
-                    <svg
-                      className="w-4 h-4 text-slate-600 group-hover:text-teal-400 transition-colors"
-                      fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>
