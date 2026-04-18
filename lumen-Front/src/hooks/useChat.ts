@@ -88,10 +88,24 @@ export interface MemoryDebugLayer {
   tokens: number;
   content: string;
 }
+export interface RecalledMessage {
+  role: string;
+  content: string;
+  session_id: string;
+  created_at: string;
+}
+export interface RecallLogEntry {
+  keyword: string;
+  source: string;
+  results: number;
+  tokens: number;
+  messages: RecalledMessage[];
+}
 export interface MemoryDebugData {
   layers: MemoryDebugLayer[];
   total_tokens: number;
   context_size: number;
+  recall_log: RecallLogEntry[];
 }
 
 /** 消息 */
@@ -244,6 +258,7 @@ export function useChat() {
                   layers: event.layers || [],
                   total_tokens: event.total_tokens || 0,
                   context_size: event.context_size || 4096,
+                  recall_log: event.recall_log || [],
                 });
                 return prev; // 不修改消息列表
               }

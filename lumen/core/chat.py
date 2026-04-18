@@ -294,7 +294,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         trimmed = _inject_authors_note(trimmed, session.session_id)
         trimmed = _inject_worldbook(trimmed, session.character_id)
         if iteration == 0:
-            trimmed, _ = _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
+            trimmed, recall_log = _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
 
         # /tokens 记忆调试：yield 提示词分层信息
         if memory_debug and iteration == 0:
@@ -312,6 +312,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 "layers": layer_infos,
                 "total_tokens": estimate_messages_tokens(trimmed),
                 "context_size": character_config.get("context_size") or 4096,
+                "recall_log": recall_log,
             }
 
         response = await chat(trimmed, model, stream=True)

@@ -167,20 +167,28 @@ def get_relevant_memories(
         return fallback, recall_log
 
     # 搜索每个关键词
-    all_hits = {}  # (session_id, content) -> hit dict，去重用
+    all_hits = {}  # (session_id, content[:100]) -> hit dict，去重用
     for kw in keywords:
         hits = history.search_messages(kw, character_id, limit=5)
+        kw_messages = []
         kw_result_count = 0
         for hit in hits:
             key = (hit["session_id"], hit["content"][:100])
             if key not in all_hits:
                 all_hits[key] = hit
                 kw_result_count += 1
+                kw_messages.append({
+                    "role": hit["role"],
+                    "content": hit["content"][:500],
+                    "session_id": hit["session_id"],
+                    "created_at": hit.get("created_at", ""),
+                })
         recall_log.append({
             "keyword": kw,
             "source": "sqlite",
             "results": kw_result_count,
             "tokens": 0,
+            "messages": kw_messages,
         })
 
     if not all_hits:

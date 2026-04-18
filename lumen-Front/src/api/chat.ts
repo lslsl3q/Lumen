@@ -61,6 +61,13 @@ export interface StreamEvent {
   layers?: { name: string; tokens: number; content: string }[];
   total_tokens?: number;
   context_size?: number;
+  recall_log?: {
+    keyword: string;
+    source: string;
+    results: number;
+    tokens: number;
+    messages: { role: string; content: string; session_id: string; created_at: string }[];
+  }[];
 }
 
 /**

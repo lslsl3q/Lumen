@@ -49,12 +49,30 @@ class MemoryDebugLayer(TypedDict):
     content: str       # 该层的完整内容
 
 
+class RecalledMessage(TypedDict):
+    """召回的单条历史消息"""
+    role: str          # "user" | "assistant"
+    content: str       # 消息内容（截断到500字符）
+    session_id: str    # 来源会话ID
+    created_at: str    # 时间戳
+
+
+class RecallLogEntry(TypedDict):
+    """单个关键词的召回记录"""
+    keyword: str       # 搜索关键词
+    source: str        # "sqlite" | "summary"
+    results: int       # 命中结果数
+    tokens: int        # 消耗的 token 数
+    messages: list     # list[RecalledMessage]
+
+
 class MemoryDebugEvent(TypedDict, total=False):
-    """记忆调试事件 — /tokens 命令开启后 yield"""
+    """记忆调试事件 — /medebug 命令开启后 yield"""
     type: str          # "memory_debug"
     layers: list       # list[MemoryDebugLayer]
     total_tokens: int  # 总 token 数
     context_size: int  # 角色的上下文窗口大小
+    recall_log: list   # list[RecallLogEntry]
 
 
 # chat_stream 的 yield 类型

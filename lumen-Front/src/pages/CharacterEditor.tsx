@@ -46,7 +46,7 @@ function CharacterEditor() {
   const isEditMode = !!id;
 
   // 表单状态
-  const [characterId, setCharacterId] = useState('');
+
   const [form, setForm] = useState<CharacterFormData>({
     name: '',
     description: '',
@@ -196,7 +196,7 @@ function CharacterEditor() {
         // 新建模式，不传 ID，让后端自动生成
         const result = await apiCreate(dataToSubmit, avatarFile || undefined);
         // 使用后端返回的 ID 导航
-        navigate(`/settings/characters/${result.id}`);
+        navigate(`/settings/characters/${result.character.id}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');

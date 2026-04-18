@@ -15,6 +15,7 @@ import { CommandResult } from '../commands/registry';
 import { getTokenUsage } from '../api/chat';
 import ChatSidebar from './ChatSidebar';
 import ChatPanel from './ChatPanel';
+import DebugDrawer from './DebugDrawer';
 import { MEMORY_DEBUG_STORAGE_KEY } from '../pages/TokenInspector';
 
 function ChatInterface() {
@@ -83,6 +84,7 @@ function ChatInterface() {
           layers: chat.memoryDebugInfo.layers,
           totalTokens: chat.memoryDebugInfo.total_tokens,
           contextSize: chat.memoryDebugInfo.context_size,
+          recallLog: chat.memoryDebugInfo.recall_log,
           timestamp: Date.now(),
         }));
       } catch { /* localStorage 写入失败忽略 */ }
@@ -156,7 +158,7 @@ function ChatInterface() {
   }, [navigate]);
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       <ChatSidebar
         sessions={sessions.sessions}
         currentSessionId={sessions.currentSessionId}
@@ -197,12 +199,14 @@ function ChatInterface() {
         onAbort={chat.abort}
         characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
         characterAvatar={characters.currentCharacter?.avatar}
-        memoryDebugMode={chat.memoryDebugMode}
-        memoryDebugInfo={chat.memoryDebugInfo ? {
-          layers: chat.memoryDebugInfo.layers,
-          totalTokens: chat.memoryDebugInfo.total_tokens,
-          contextSize: chat.memoryDebugInfo.context_size,
-        } : null}
+      />
+      <DebugDrawer
+        open={chat.memoryDebugMode}
+        onClose={() => chat.toggleMemoryDebug()}
+        layers={chat.memoryDebugInfo?.layers || []}
+        totalTokens={chat.memoryDebugInfo?.total_tokens || 0}
+        contextSize={chat.memoryDebugInfo?.context_size || 0}
+        recallLog={chat.memoryDebugInfo?.recall_log || null}
       />
     </div>
   );

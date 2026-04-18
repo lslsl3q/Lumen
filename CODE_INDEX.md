@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-19（跨会话记忆 + Token Inspector + 工具持久化修复）
+**最后更新**：2026-04-19（右侧调试抽屉 DebugDrawer + 记忆召回详情 + 工具持久化修复）
 
 ---
 
@@ -62,7 +62,7 @@ Lumen/
 │   │
 │   └── types/                    # 词汇 — 类型定义
 │       ├── messages.py           # 消息类型（TypedDict）+ 工厂函数
-│       ├── events.py             # SSE 事件类型（含 MemoryDebugEvent 记忆调试事件）
+│       ├── events.py             # SSE 事件类型（含 MemoryDebugEvent + RecallLogEntry 召回详情）
 │       ├── ws_events.py          # WebSocket 推送事件类型（TypedDict）
 │       ├── tools.py              # 工具协议类型（Pydantic）
 │       ├── persona.py            # Persona 类型（PersonaCard + ActivePersona Pydantic 模型）
@@ -89,7 +89,7 @@ Lumen/
 │       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
 │       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook）
-│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
+│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, DebugDrawer, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
 │       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector）
 │       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css）
