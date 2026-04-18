@@ -168,6 +168,7 @@ function ChatInterface() {
         onInputChange={chat.setInput}
         onSendMessage={handleSendMessage}
         onCommandResult={handleCommandResult}
+        onAbort={chat.abort}
         characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
         characterAvatar={characters.currentCharacter?.avatar}
       />

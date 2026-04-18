@@ -4,8 +4,8 @@
  * 职责：管理消息列表、流式接收状态、工具调用追踪、会话历史加载
  * 遵循单向依赖：hook → api/chat.ts + api/session.ts，不直接操作 DOM 或 SSE
  */
-import { useState, useCallback } from 'react';
-import { sendMessageStream, getHistory, StreamEvent } from '../api/chat';
+import { useState, useCallback, useRef } from 'react';
+import { sendMessageStream, getHistory, cancelChat, StreamEvent } from '../api/chat';
 import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
 
@@ -103,6 +103,7 @@ export function useChat() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   /** 加载指定会话的历史消息 */
   const loadHistory = useCallback(async (sessionId: string) => {
@@ -175,6 +176,9 @@ export function useChat() {
     setIsLoading(true);
     setError(null);
 
+    // 创建新的 AbortController
+    abortControllerRef.current = new AbortController();
+
     try {
       await sendMessageStream(
         messageContent,
@@ -230,9 +234,23 @@ export function useChat() {
           });
         },
         // sessionId
-        sessionId
+        sessionId,
+        abortControllerRef.current.signal
       );
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // 用户主动中断，不视为错误
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last.id === assistantId) {
+            updated[updated.length - 1] = { ...last, isStreaming: false };
+          }
+          return updated;
+        });
+        setIsLoading(false);
+        return;
+      }
       console.error('Stream failed:', err);
       // 出错时：如果 AI 消息还是空的，就删掉它；如果已有部分文本，保留
       setMessages(prev => {
@@ -250,6 +268,7 @@ export function useChat() {
       setInput(messageContent);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
   }, [currentSessionId]);
 
@@ -269,6 +288,22 @@ export function useChat() {
     setMessages(prev => [...prev, msg]);
   }, []);
 
+  /** 中断当前流式生成 */
+  const abort = useCallback(async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (currentSessionId) {
+      try {
+        await cancelChat(currentSessionId);
+      } catch {
+        // 忽略取消 API 的错误
+      }
+    }
+    setIsLoading(false);
+  }, [currentSessionId]);
+
   return {
     messages,
     isLoading,
@@ -282,5 +317,6 @@ export function useChat() {
     currentSessionId,
     setCurrentSessionId,
     error,
+    abort,
   };
 }
