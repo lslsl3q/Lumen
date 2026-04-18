@@ -109,20 +109,36 @@ def get_memory_context(character_id: str) -> str:
     return memory_text
 
 
-def _extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
-    """从用户输入中提取搜索关键词（简单规则，不依赖分词库）"""
+# 单字虚词 — 包含这些字的 bigram 优先级低（不大可能是实义词）
+_FUNC_CHARS = set("的了过得地是在有和就也都要会能但吗呢吧啊哦嗯我你他她这那")
+
+
+def _extract_keywords(text: str, max_keywords: int = 8) -> list[str]:
+    """从用户输入中提取搜索关键词（滑动窗口 bigram，不依赖分词库）
+
+    中文没有空格分隔词语，贪婪正则会把整句当一个"词"。
+    用 2 字滑动窗口（bigram）拆分，过滤停用词后取最可能有意义的词。
+    含虚词字符的 bigram 排到后面，让实义词优先。
+    """
     import re
 
-    # 提取中文词组（2-8字）和英文单词（3+字母）
-    cn_words = re.findall(r'[\u4e00-\u9fff]{2,8}', text)
+    # 英文单词（3+字母，按空格自然分隔）
     en_words = re.findall(r'[a-zA-Z]{3,}', text)
+    candidates = [(w.lower(), False) for w in en_words]
 
-    candidates = cn_words + [w.lower() for w in en_words]
+    # 中文 bigram：提取连续汉字段，每段做 2 字滑动窗口
+    cn_segments = re.findall(r'[\u4e00-\u9fff]{2,}', text)
+    for seg in cn_segments:
+        for i in range(len(seg) - 1):
+            pair = seg[i:i + 2]
+            # 标记是否含虚词字符
+            has_func = pair[0] in _FUNC_CHARS or pair[1] in _FUNC_CHARS
+            candidates.append((pair, has_func))
 
-    # 去停用词 + 去重 + 保留顺序
+    # 排序：不含虚词的优先，同优先级内保持原顺序
     seen = set()
     keywords = []
-    for w in candidates:
+    for w, _ in sorted(candidates, key=lambda x: (x[1], candidates.index(x))):
         if w not in _STOP_WORDS and w not in seen:
             seen.add(w)
             keywords.append(w)
