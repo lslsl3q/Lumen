@@ -98,7 +98,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
               flex-1 px-4 py-2.5 rounded-lg text-sm font-mono
               bg-slate-800/40 border border-slate-700/40
               text-slate-200 placeholder-slate-600
-              focus:outline-none focus:border-teal-500/40
+              focus:outline-none focus:border-amber-500/40
               transition-all duration-200
             "
           />
@@ -107,8 +107,8 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
             disabled={!newPath.trim()}
             className="
               px-4 py-2.5 rounded-lg text-sm
-              bg-teal-500/10 border border-teal-500/30 text-teal-400
-              hover:bg-teal-500/20 hover:border-teal-500/50
+              bg-amber-500/10 border border-amber-500/30 text-amber-400
+              hover:bg-amber-500/20 hover:border-amber-500/50
               disabled:opacity-30 disabled:cursor-not-allowed
               transition-all duration-200
             "
@@ -132,7 +132,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
             onClick={() => setReadonlyMode(!readonlyMode)}
             className={`
               relative w-10 h-5 rounded-full transition-colors duration-200
-              ${readonlyMode ? 'bg-teal-500/30' : 'bg-slate-700'}
+              ${readonlyMode ? 'bg-amber-500/30' : 'bg-slate-700'}
             `}
           >
             <span
@@ -157,7 +157,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
               w-24 px-3 py-1.5 rounded-lg text-sm
               bg-slate-900/60 border border-slate-700/40
               text-slate-200
-              focus:outline-none focus:border-teal-500/40
+              focus:outline-none focus:border-amber-500/40
               transition-all duration-200
             "
           />
@@ -171,8 +171,8 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
           disabled={isSaving || !hasChanges}
           className="
             px-5 py-2.5 rounded-lg text-sm font-medium
-            bg-teal-500/10 border border-teal-500/30 text-teal-400
-            hover:bg-teal-500/20 hover:border-teal-500/50
+            bg-amber-500/10 border border-amber-500/30 text-amber-400
+            hover:bg-amber-500/20 hover:border-amber-500/50
             disabled:opacity-30 disabled:cursor-not-allowed
             transition-all duration-200
           "

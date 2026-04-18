@@ -29,20 +29,20 @@
 
 /* 链接 */
 .markdown-body a {
-  color: #2dd4bf;
+  color: #fbbf24;
   text-decoration: underline;
-  text-decoration-color: rgba(45, 212, 191, 0.3);
+  text-decoration-color: rgba(251, 191, 36, 0.3);
   text-underline-offset: 2px;
 }
 .markdown-body a:hover {
-  color: #5eead4;
-  text-decoration-color: rgba(94, 234, 212, 0.5);
+  color: #fcd34d;
+  text-decoration-color: rgba(252, 211, 77, 0.5);
 }
 
 /* 行内代码 */
 .markdown-body .markdown-inline-code {
-  background: rgba(20, 184, 166, 0.1);
-  color: #5eead4;
+  background: rgba(251, 191, 36, 0.1);
+  color: #fcd34d;
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
@@ -53,7 +53,7 @@
 .markdown-body .markdown-code-block {
   margin: 0.6em 0;
   border-radius: 8px;
-  border: 1px solid rgba(20, 184, 166, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.15);
   font-size: 0.88em;
 }
 
@@ -79,7 +79,7 @@
   content: '·';
   position: absolute;
   left: -1em;
-  color: #14b8a6;
+  color: #fbbf24;
   font-weight: bold;
 }
 
@@ -95,7 +95,7 @@
   content: counter(md-ol) '.';
   position: absolute;
   left: -1.6em;
-  color: #14b8a6;
+  color: #fbbf24;
   font-weight: 500;
   font-size: 0.85em;
 }
@@ -107,14 +107,14 @@
   transform: scale(1.1);
 }
 
-/* 引用 */
+/* 引用 — 琥珀色背景替代左边框 */
 .markdown-body blockquote {
   margin: 0.5em 0;
-  padding: 0.4em 1em;
-  border-left: 3px solid #14b8a6;
-  background: rgba(20, 184, 166, 0.04);
+  padding: 0.6em 1em;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  background: rgba(251, 191, 36, 0.05);
   color: #94a3b8;
-  border-radius: 0 6px 6px 0;
+  border-radius: 4px;
 }
 .markdown-body blockquote p {
   margin: 0.2em 0;
@@ -134,7 +134,7 @@
   text-align: left;
 }
 .markdown-body th {
-  background: rgba(20, 184, 166, 0.08);
+  background: rgba(251, 191, 36, 0.1);
   color: #e2e8f0;
   font-weight: 600;
 }

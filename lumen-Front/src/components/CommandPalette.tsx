@@ -47,7 +47,7 @@ function CommandPalette({ input, onSelect, visible }: CommandPaletteProps) {
             w-full px-3 py-2 flex items-center gap-2 text-left text-sm
             transition-all duration-75
             ${idx === selectedIndex
-              ? 'bg-teal-500/10 text-teal-300'
+              ? 'bg-amber-500/10 text-amber-300'
               : 'text-slate-400 hover:bg-slate-800/60'
             }
           `}

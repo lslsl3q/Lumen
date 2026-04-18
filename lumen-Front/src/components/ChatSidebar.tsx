@@ -64,8 +64,8 @@ function SessionItem({
       className={`
         group relative px-4 py-3 cursor-pointer transition-all duration-150
         ${isActive
-          ? 'bg-teal-500/5 border-l-2 border-teal-400'
-          : 'border-l-2 border-transparent hover:bg-slate-800/40'
+          ? 'bg-amber-500/10'
+          : 'hover:bg-slate-800/40'
         }
       `}
     >
@@ -128,7 +128,7 @@ function ChatSidebar({
       {/* 顶栏 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/40">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-primary-light shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
+          <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
           <span className="text-sm font-light tracking-widest text-slate-400 uppercase">
             Lumen
           </span>
@@ -138,8 +138,8 @@ function ChatSidebar({
             onClick={onOpenSettings}
             className="
               w-7 h-7 rounded-lg flex items-center justify-center
-              text-slate-400 hover:text-teal-400
-              hover:bg-teal-500/10
+              text-slate-400 hover:text-amber-400
+              hover:bg-amber-500/10
               transition-all duration-150
             "
             title="设置"

@@ -60,7 +60,7 @@ function ModelSelect({ value, onChange, placeholder = '选择或输入模型名'
           className="
             w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
             px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-            focus:outline-none focus:border-teal-500/50
+            focus:outline-none focus:border-amber-500/50
           "
         />
         <p className="text-xs text-amber-500/60 mt-1">无法获取模型列表，请手动输入</p>
@@ -93,8 +93,8 @@ function ModelSelect({ value, onChange, placeholder = '选择或输入模型名'
   const inputClass = `
     w-full bg-slate-900/60 border rounded-lg
     px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-    focus:outline-none focus:border-teal-500/50
-    ${isOpen ? 'border-teal-500/50' : 'border-slate-700/60'}
+    focus:outline-none focus:border-amber-500/50
+    ${isOpen ? 'border-amber-500/50' : 'border-slate-700/60'}
   `;
 
   return (
@@ -123,8 +123,8 @@ function ModelSelect({ value, onChange, placeholder = '选择或输入模型名'
               onClick={() => handleSelect('')}
               className={`
                 w-full text-left px-3 py-2 text-sm
-                hover:bg-teal-500/10 transition-colors
-                ${!value ? 'text-teal-400' : 'text-slate-400'}
+                hover:bg-amber-500/10 transition-colors
+                ${!value ? 'text-amber-400' : 'text-slate-400'}
               `}
             >
               （留空使用全局默认）
@@ -143,8 +143,8 @@ function ModelSelect({ value, onChange, placeholder = '选择或输入模型名'
                 onClick={() => handleSelect(model.id)}
                 className={`
                   w-full text-left px-3 py-2 text-sm transition-colors
-                  hover:bg-teal-500/10
-                  ${value === model.id ? 'text-teal-400 bg-teal-500/5' : 'text-slate-300'}
+                  hover:bg-amber-500/10
+                  ${value === model.id ? 'text-amber-400 bg-amber-500/5' : 'text-slate-300'}
                 `}
               >
                 <span className="font-mono">{model.id}</span>

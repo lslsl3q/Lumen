@@ -20,42 +20,108 @@ function Avatar({ src, name, className = '' }: { src?: string | null; name?: str
       {src ? (
         <img src={getAvatarUrl(src)!} alt={name} className="w-full h-full object-cover" />
       ) : (
-        <span className="text-xs text-teal-400">{(name || 'AI')[0]}</span>
+        <span className="text-xs text-amber-400">{(name || 'AI')[0]}</span>
       )}
     </div>
   );
 }
 
-/** 工具调用独立气泡 */
+/** 工具调用独立气泡 — 极简线条风格 + 渐进式信息 */
 function ToolCallBlock({ call }: { call: ToolCall }) {
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const isRunning = call.status === 'running';
-  const isError = call.status === 'done' && call.success === false;
+  const isDone = call.status === 'done';
+  const isError = isDone && call.success === false;
+  const isSuccess = isDone && call.success !== false;
+
+  // 状态颜色（低饱和度，符合极简风格）
+  const statusColor = isRunning ? 'slate' : isError ? 'red' : 'emerald';
+  const bgColor = isRunning ? 'bg-slate-800/40' : isError ? 'bg-red-950/20' : 'bg-emerald-950/20';
+  const textColor = isRunning ? 'text-slate-400' : isError ? 'text-red-400' : 'text-emerald-400';
+  const borderColor = isRunning ? 'border-slate-700/40' : isError ? 'border-red-900/40' : 'border-emerald-900/40';
+
+  // 计算参数摘要（取前两个参数）
+  const paramsSummary = call.params
+    ? Object.entries(call.params)
+        .slice(0, 2)
+        .map(([k, v]) => `${k}=${JSON.stringify(v).slice(0, 20)}${JSON.stringify(v).length > 20 ? '...' : ''}`)
+        .join(', ')
+    : null;
 
   return (
-    <div className="flex justify-start pl-10">
+    <div className="flex justify-start pl-10 mb-2">
       <div
         className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono
-          max-w-[75%]
-          border-l-2
-          ${isRunning
-            ? 'bg-amber-500/5 border-amber-500/60 text-amber-300/80'
-            : isError
-              ? 'bg-red-500/5 border-red-500/60 text-red-300/80'
-              : 'bg-emerald-500/5 border-emerald-500/60 text-emerald-300/80'
-          }
+          w-full max-w-[600px] rounded border ${borderColor} ${bgColor}
+          transition-all duration-200 ease-out
+          ${isExpanded ? 'py-3' : 'py-2'}
         `}
       >
-        {isRunning ? (
-          <span className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin-slow" />
-        ) : isError ? (
-          <span>&#x2717;</span>
-        ) : (
-          <span>&#x2713;</span>
-        )}
-        <span>{call.name}</span>
-        {isError && call.error && (
-          <span className="text-red-400/60 ml-1 truncate max-w-[200px]">{call.error}</span>
+        {/* 折叠状态：工具名 + 状态 */}
+        <div
+          className={`
+            flex items-center justify-between px-3 cursor-pointer select-none
+            ${isExpanded ? 'mb-2' : ''}
+          `}
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-2">
+            {/* 状态指示器 — 极简几何形状 */}
+            {isRunning ? (
+              <div className="w-2 h-2 rounded-full border border-slate-500 border-t-transparent animate-spin" />
+            ) : isError ? (
+              <div className="w-2 h-2 rounded-full bg-red-400" />
+            ) : (
+              <div className="w-2 h-2 rounded-full border-2 border-emerald-400" />
+            )}
+
+            {/* 工具名 — 等宽字体 */}
+            <span className={`text-xs font-mono ${textColor}`}>
+              {call.name}
+            </span>
+          </div>
+
+          {/* 展开/折叠指示器 */}
+          <div
+            className={`
+              text-xs text-slate-600 transition-transform duration-200
+              ${isExpanded ? 'rotate-90' : ''}
+            `}
+          >
+            ▶
+          </div>
+        </div>
+
+        {/* 展开状态：详情信息 */}
+        {isExpanded && (
+          <div className="px-3 pb-2 space-y-2">
+            {/* 参数详情 */}
+            {call.params && Object.keys(call.params).length > 0 && (
+              <div>
+                <div className="text-xs text-slate-600 mb-1 font-medium">参数</div>
+                <pre className="text-xs text-slate-400 font-mono bg-black/20 rounded p-2 overflow-x-auto">
+                  {JSON.stringify(call.params, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* 错误信息 */}
+            {isError && call.error && (
+              <div>
+                <div className="text-xs text-red-600 mb-1 font-medium">错误</div>
+                <div className="text-xs text-red-400 font-mono bg-red-950/30 rounded p-2">
+                  {call.error}
+                </div>
+              </div>
+            )}
+
+            {/* 运行中提示 */}
+            {isRunning && (
+              <div className="text-xs text-slate-500 italic">
+                执行中...
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -70,7 +136,7 @@ function ThinkingIndicator({ characterName, characterAvatar }: {
   return (
     <div className="flex justify-start items-start gap-2">
       <Avatar src={characterAvatar} name={characterName} />
-      <div className="rounded-lg px-4 py-3 bg-slate-800/40 border border-teal-500/10">
+      <div className="rounded-lg px-4 py-3 bg-slate-800/40 border border-amber-500/10">
         <div className="flex items-center gap-1">
           <span
             className="block w-1.5 h-1.5 animate-pixel-breathe"
@@ -157,7 +223,7 @@ function MessageBubble({ message, characterName, characterAvatar }: {
   return (
     <div className="flex justify-start items-start gap-2">
       <Avatar src={characterAvatar} name={characterName} />
-      <div className="max-w-[75%] rounded-lg px-4 py-3 bg-slate-800/40 border border-teal-500/10 text-slate-200">
+      <div className="max-w-[75%] rounded-lg px-4 py-3 bg-slate-800/40 border border-amber-500/10 text-slate-200">
         <MarkdownContent
           content={message.content || (!message.isStreaming ? '(无文本回复)' : '')}
           isStreaming={message.isStreaming}
@@ -340,7 +406,7 @@ function ChatPanel({
               flex-1 px-4 py-2.5 rounded-lg resize-none
               bg-slate-900/60 border border-slate-700/40
               text-slate-200 placeholder-slate-600 text-sm
-              focus:outline-none focus:border-teal-500/40 glow-teal
+              focus:outline-none focus:border-amber-500/40 focus:shadow-[0_0_8px_rgba(251,191,36,0.1)]
               disabled:opacity-40 disabled:cursor-not-allowed
               transition-all duration-200
             "
@@ -365,9 +431,9 @@ function ChatPanel({
               disabled={!input.trim()}
               className="
                 px-5 py-2.5 rounded-lg text-sm font-medium
-                bg-teal-500/10 border border-teal-500/30 text-teal-400
-                hover:bg-teal-500/20 hover:border-teal-500/50
-                focus:outline-none focus:glow-teal
+                bg-amber-500/10 border border-amber-500/30 text-amber-400
+                hover:bg-amber-500/20 hover:border-amber-500/50
+                focus:outline-none focus:shadow-[0_0_12px_rgba(251,191,36,0.15)]
                 disabled:opacity-30 disabled:cursor-not-allowed
                 transition-all duration-200
               "

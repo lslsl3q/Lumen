@@ -96,7 +96,7 @@ function CharacterSelector({
                   w-full px-4 py-2.5 flex items-center gap-3
                   transition-all duration-100
                   ${char.id === currentCharacterId
-                    ? 'bg-teal-500/10 text-teal-300'
+                    ? 'bg-amber-500/10 text-amber-300'
                     : 'text-slate-300 hover:bg-slate-800/60'
                   }
                 `}

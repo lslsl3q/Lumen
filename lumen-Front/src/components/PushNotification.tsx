@@ -20,7 +20,7 @@ function getLevelStyles(level: PushNotificationType['level']) {
     case 'success': return { border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-400' };
     case 'warning': return { border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-400' };
     case 'error':   return { border: 'border-red-500/40', bg: 'bg-red-500/10', text: 'text-red-400' };
-    default:        return { border: 'border-teal-500/40', bg: 'bg-teal-500/10', text: 'text-teal-400' };
+    default:        return { border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-400' };
   }
 }
 
