@@ -23,6 +23,10 @@ class CharacterCard(BaseModel):
     context_size: Optional[int] = None       # token 预算（None = 用全局默认）
     auto_compact: bool = False               # 自动 compact 开关
     compact_threshold: float = 0.7           # 触发阈值（0.5~0.95）
+    # 跨会话记忆
+    memory_enabled: bool = True              # 跨会话记忆开关
+    memory_token_budget: int = 300           # 记忆召回 token 上限
+    memory_auto_summarize: bool = False      # 超预算时自动总结（否则截断）
 
 
 class DynamicContext(TypedDict):

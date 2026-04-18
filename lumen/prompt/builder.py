@@ -6,73 +6,87 @@ Lumen - 提示词构建器
 from lumen.prompt.types import DynamicContext
 
 
-def build_system_prompt(character: dict, dynamic_context: list[DynamicContext] = None) -> str:
-    """把角色卡片 + 动态内容拼成系统提示词（三明治结构）
+def _build_parts(character: dict, dynamic_context: list[DynamicContext] = None) -> list[tuple[str, str]]:
+    """构建提示词各层，返回 [(层名称, 内容), ...]"""
+    layers = []
 
-    结构（从上到下）：
-    1. 角色设定（来自 character.system_prompt）
-    2. 工具说明（来自 registry.json，按角色 tools 字段过滤）
-    3. 动态内容（记忆、上下文等）
-    4. 角色保持指令（防止工具调用后掉角色）
-
-    character: load_character() 返回的角色卡片
-    dynamic_context: 动态内容列表，每项是一个字典：
-        {
-            "content": "内容文本",
-            "injection_point": "system" | "before_user" | "after_user"
-        }
-    """
-    # 第一层：角色元数据（自动组合，不需要用户在 system_prompt 里重复）
+    # 第一层：角色元数据
     parts = []
     if character.get("name"):
         parts.append(f"你的名字是{character['name']}。")
     if character.get("description"):
         parts.append(f"角色设定：{character['description']}。")
+    if parts:
+        layers.append(("角色元数据", "\n".join(parts)))
 
-    # 第二层：角色的 system_prompt 核心
+    # 第二层：角色核心 system_prompt
     if character.get("system_prompt"):
-        parts.append(character["system_prompt"])
+        layers.append(("角色核心", character["system_prompt"]))
 
-    # ★ 第 2.5 层：Persona 注入（用户身份信息，不受 token 裁剪）
-    # Persona 不走 dynamic_context，有独立的持久化和不受预算裁剪的语义
+    # 第 2.5 层：Persona
     try:
         from lumen.prompt.persona import get_active_persona_text
         persona_text = get_active_persona_text()
         if persona_text:
-            parts.append(persona_text)
+            layers.append(("Persona", persona_text))
     except Exception:
-        pass  # Persona 加载失败不影响正常对话
+        pass
 
-    # 第三层：工具注入（从角色配置读取 tools 字段，带自定义 tips）
-    has_tools = False
+    # 第三层：工具说明
     tools = character.get("tools", [])
     if tools:
         from lumen.prompt.tool_prompt import get_tool_prompt_from_registry
         tool_prompt = get_tool_prompt_from_registry(tools, character.get("tool_tips"))
         if tool_prompt:
-            parts.append(tool_prompt)
-            has_tools = True
+            layers.append(("工具说明", tool_prompt))
 
-    # 第四层：动态注入（只拼 injection_point == "system" 的，按 depth 和 order 排序）
+    # 第四层：动态注入
     if dynamic_context:
-        # 排序：先按 order（优先级），再按 depth（深度）
         system_items = sorted(
             [item for item in dynamic_context if item.get("injection_point", "system") == "system"],
             key=lambda x: (x.get("order", 0), x.get("depth", 4))
         )
         for item in system_items:
-            parts.append(item["content"])
+            layers.append(("动态注入", item["content"]))
 
-    # 第五层（兜底）：强制角色保持——放在最后，权重最高
+    # 第五层：角色保持
+    has_tools = bool(tools)
     if has_tools and character.get("system_prompt"):
-        parts.append(
+        layers.append(("角色保持指令",
             "【角色保持】\n"
             "无论你是在闲聊还是刚执行完工具调用，你对用户说的每一句话都必须符合你的角色设定。"
             "工具调用的 JSON 格式必须严格正确（不受角色影响），"
             "但最终呈现给用户的文字必须带有你独特的语气和性格。"
-        )
+        ))
 
-    return "\n\n".join(parts)
+    return layers
+
+
+def build_system_prompt(character: dict, dynamic_context: list[DynamicContext] = None) -> str:
+    """把角色卡片 + 动态内容拼成系统提示词（三明治结构）"""
+    layers = _build_parts(character, dynamic_context)
+    return "\n\n".join(content for _, content in layers)
+
+
+def build_system_prompt_with_layers(character: dict, dynamic_context: list[DynamicContext] = None) -> tuple[str, list[dict]]:
+    """构建系统提示词，同时返回分层信息（用于记忆调试 /tokens）
+
+    Returns:
+        (提示词文本, [{"name": 层名, "content": 内容, "tokens": 估算数}, ...])
+    """
+    layers = _build_parts(character, dynamic_context)
+    from lumen.services.context.token_estimator import estimate_text_tokens
+
+    layer_infos = []
+    for name, content in layers:
+        layer_infos.append({
+            "name": name,
+            "content": content,
+            "tokens": estimate_text_tokens(content),
+        })
+
+    prompt_text = "\n\n".join(content for _, content in layers)
+    return prompt_text, layer_infos
 
 
 def build_messages(character: dict, user_input: str, history: list, dynamic_context: list[DynamicContext] = None):

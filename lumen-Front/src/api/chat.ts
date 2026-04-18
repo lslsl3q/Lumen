@@ -46,7 +46,7 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
  * SSE 事件类型
  */
 export interface StreamEvent {
-  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'done' | 'error';
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'memory_debug' | 'done' | 'error';
   content?: string;
   status?: string;
   message?: string;
@@ -57,6 +57,10 @@ export interface StreamEvent {
   error?: string;
   exit_reason?: string;
   mode?: string;
+  // memory_debug 事件字段
+  layers?: { name: string; tokens: number; content: string }[];
+  total_tokens?: number;
+  context_size?: number;
 }
 
 /**
@@ -76,6 +80,7 @@ export async function sendMessageStream(
   onEvent?: (event: StreamEvent) => void,
   sessionId?: string,
   signal?: AbortSignal,
+  memoryDebugMode?: boolean,
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -83,7 +88,7 @@ export async function sendMessageStream(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, session_id: sessionId || 'default' }),
+      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false }),
       signal,
     });
 

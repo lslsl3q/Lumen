@@ -58,6 +58,9 @@ function CharacterEditor() {
     context_size: undefined,
     auto_compact: false,
     compact_threshold: 0.7,
+    memory_enabled: true,
+    memory_token_budget: 300,
+    memory_auto_summarize: false,
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -99,6 +102,9 @@ function CharacterEditor() {
           context_size: char.context_size || undefined,
           auto_compact: char.auto_compact || false,
           compact_threshold: char.compact_threshold || 0.7,
+          memory_enabled: char.memory_enabled ?? true,
+          memory_token_budget: char.memory_token_budget || 300,
+          memory_auto_summarize: char.memory_auto_summarize || false,
         });
         if (char.avatar) {
           setAvatarPreview(getAvatarUrl(char.avatar));
@@ -427,6 +433,80 @@ function CharacterEditor() {
                   <span>95%</span>
                 </div>
               </div>
+            )}
+          </section>
+
+          {/* 跨会话记忆 */}
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">跨会话记忆</h2>
+
+            {/* 记忆开关 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm text-slate-300">记忆召回</label>
+                <p className="text-xs text-slate-600">自动搜索历史对话，注入相关记忆</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, memory_enabled: !prev.memory_enabled }))}
+                className={`
+                  w-9 h-5 rounded-full transition-colors duration-200 relative
+                  ${form.memory_enabled !== false ? 'bg-teal-500' : 'bg-slate-700'}
+                `}
+              >
+                <div className={`
+                  absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm
+                  transition-transform duration-200
+                  ${form.memory_enabled !== false ? 'translate-x-4' : 'translate-x-0.5'}
+                `} />
+              </button>
+            </div>
+
+            {form.memory_enabled !== false && (
+              <>
+                {/* Token 上限 */}
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">召回 Token 上限</label>
+                  <input
+                    type="number"
+                    value={form.memory_token_budget || 300}
+                    onChange={(e) => setForm(prev => ({
+                      ...prev,
+                      memory_token_budget: Math.max(50, parseInt(e.target.value) || 300),
+                    }))}
+                    min={50}
+                    max={2000}
+                    className="
+                      w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
+                      px-3 py-2 text-sm text-slate-300 placeholder-slate-600
+                      focus:outline-none focus:border-teal-500/50
+                    "
+                  />
+                  <p className="text-xs text-slate-600 mt-1">每次对话最多花多少 token 召回历史（50~2000）</p>
+                </div>
+
+                {/* 超预算处理 */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-sm text-slate-300">超预算自动总结</label>
+                    <p className="text-xs text-slate-600">关闭则直接截断，开启则用摘要模型压缩</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm(prev => ({ ...prev, memory_auto_summarize: !prev.memory_auto_summarize }))}
+                    className={`
+                      w-9 h-5 rounded-full transition-colors duration-200 relative
+                      ${form.memory_auto_summarize ? 'bg-teal-500' : 'bg-slate-700'}
+                    `}
+                  >
+                    <div className={`
+                      absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm
+                      transition-transform duration-200
+                      ${form.memory_auto_summarize ? 'translate-x-4' : 'translate-x-0.5'}
+                    `} />
+                  </button>
+                </div>
+              </>
             )}
           </section>
 

@@ -13,6 +13,7 @@ from lumen.core.session import ChatSession
 from lumen.prompt.character import load_character
 from lumen.prompt.builder import build_system_prompt
 from lumen.services.context import trim_messages, fold_tool_calls, filter_for_ai
+from lumen.services.context.token_estimator import estimate_text_tokens, estimate_messages_tokens
 from lumen.services import history
 from lumen.services import memory
 from lumen.services.context.compact import should_compact, compact_session
@@ -156,6 +157,50 @@ def _inject_worldbook(messages: list[Message], character_id: str) -> list[Messag
     return result
 
 
+def _inject_relevant_memories(
+    messages: list[Message],
+    user_input: str,
+    character_id: str,
+    character_config: dict,
+) -> tuple[list[Message], list[dict]]:
+    """基于用户输入关键词搜索历史消息，注入相关记忆
+
+    只在第一轮迭代调用，返回 (注入后的消息列表, 召回记录)
+    """
+    from lumen.services.memory import get_relevant_memories
+
+    memory_enabled = character_config.get("memory_enabled", True)
+    if not memory_enabled:
+        return messages, []
+
+    token_budget = character_config.get("memory_token_budget", 300)
+    auto_summarize = character_config.get("memory_auto_summarize", False)
+
+    memory_text, recall_log = get_relevant_memories(
+        user_input, character_id,
+        token_budget=token_budget,
+        auto_summarize=auto_summarize,
+    )
+
+    if not memory_text:
+        return messages, recall_log
+
+    # 找到最后一条 user 消息之前插入
+    last_user_idx = -1
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i]["role"] == "user":
+            last_user_idx = i
+            break
+
+    if last_user_idx == -1:
+        return messages, recall_log
+
+    result = messages[:last_user_idx] + [
+        {"role": "system", "content": memory_text}
+    ] + messages[last_user_idx:]
+    return result, recall_log
+
+
 def validate_tool_call(tool_name: str, tool_params: dict) -> str:
     """验证 AI 的工具调用是否正确
 
@@ -194,6 +239,7 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
 
     trimmed = _prepare_messages(session.messages, session.character_id)
     trimmed = _inject_authors_note(trimmed, session.session_id)
+    trimmed, _ = _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -208,11 +254,14 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     return reply
 
 
-async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[SSEEvent, None]:
+async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool = False) -> AsyncGenerator[SSEEvent, None]:
     """流式对话（ReAct 循环）
 
+    Args:
+        memory_debug: 开启记忆调试模式，yield 分层 token 信息
+
     Yields:
-        SSEEvent — TypedDict 类型的事件（text/done/tool_start/tool_result/status）
+        SSEEvent — TypedDict 类型的事件（text/done/tool_start/tool_result/status/memory_debug）
     """
     session.messages.append({"role": "user", "content": user_input})
     history.save_message(session.session_id, "user", user_input)
@@ -243,7 +292,28 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
 
         trimmed = _prepare_messages(session.messages, session.character_id)
         trimmed = _inject_authors_note(trimmed, session.session_id)
-        trimmed = _inject_worldbook(trimmed, session.character_id)  # 世界书注入
+        trimmed = _inject_worldbook(trimmed, session.character_id)
+        if iteration == 0:
+            trimmed, _ = _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
+
+        # /tokens 记忆调试：yield 提示词分层信息
+        if memory_debug and iteration == 0:
+            from lumen.prompt.builder import build_system_prompt_with_layers
+            _, layer_infos = build_system_prompt_with_layers(
+                character_config,
+                session.dynamic_context if hasattr(session, 'dynamic_context') else None,
+            )
+            # 补充消息流中的注入层（世界书、记忆、Author's Note 在 trimmed 中以 system 消息存在）
+            for msg in trimmed:
+                if msg["role"] == "system" and msg["content"].startswith("<relevant_history>"):
+                    layer_infos.append({"name": "跨会话记忆", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+            yield {
+                "type": "memory_debug",
+                "layers": layer_infos,
+                "total_tokens": estimate_messages_tokens(trimmed),
+                "context_size": character_config.get("context_size") or 4096,
+            }
+
         response = await chat(trimmed, model, stream=True)
 
         buffer = ""
@@ -293,7 +363,9 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
                     "正确格式：{\"type\": \"tool_call\", \"tool\": \"工具名\", \"params\": {...}}"
                 )
                 session.messages.append({"role": "assistant", "content": full_text})
+                history.save_message(session.session_id, "assistant", full_text)
                 session.messages.append({"role": "user", "content": error_feedback})
+                history.save_message(session.session_id, "user", error_feedback)
                 continue
 
             if tool_iterations > 0:
@@ -313,6 +385,7 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
         logger.info(f"[ReAct 第{iteration + 1}轮] 检测到工具调用: {tool_call.get('mode')}")
 
         session.messages.append({"role": "assistant", "content": full_text})
+        history.save_message(session.session_id, "assistant", full_text)
 
         mode = tool_call.get("mode", "single")
 
@@ -330,6 +403,7 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
                     "请重新分析用户需求，选择正确的工具和参数。"
                 )
                 session.messages.append({"role": "user", "content": error_feedback})
+                history.save_message(session.session_id, "user", error_feedback)
                 continue
 
             yield {"type": "tool_start", "tool": tool_name, "params": tool_params}
@@ -355,6 +429,11 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
                     "folded": False,
                 },
             })
+            history.save_message(
+                session.session_id, "user",
+                format_result_for_ai(tool_result),
+                {"type": "tool_result", "tool_name": tool_name, "folded": False},
+            )
 
         # ========== 多个工具并行 ==========
         elif mode == "parallel":
@@ -375,6 +454,7 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
                     + "\n请重新分析用户需求，选择正确的工具和参数。"
                 )
                 session.messages.append({"role": "user", "content": error_feedback})
+                history.save_message(session.session_id, "user", error_feedback)
                 continue
 
             tool_names = [c.get("tool") for c in calls]
@@ -402,6 +482,11 @@ async def chat_stream(user_input: str, session: ChatSession) -> AsyncGenerator[S
                     "folded": False,
                 },
             })
+            history.save_message(
+                session.session_id, "user",
+                "\n".join(format_result_for_ai(r) for r in results),
+                {"type": "tool_result_parallel", "tool_count": len(results), "folded": False},
+            )
 
     # 达到最大迭代次数
     exit_reason = "max_iterations"

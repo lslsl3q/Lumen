@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-18（T5 世界书 MVP + 头像管理 + PersonaEditor 头像选择 + ID自动生成）
+**最后更新**：2026-04-19（跨会话记忆 + Token Inspector + 工具持久化修复）
 
 ---
 
@@ -43,26 +43,26 @@ Lumen/
 │   │   ├── llm.py                # LLM适配器（AsyncOpenAI）
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
-│   │   ├── history.py            # SQLite持久化（会话、消息、摘要）
-│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入）
+│   │   ├── history.py            # SQLite持久化（会话、消息、摘要、跨会话搜索）
+│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、跨会话关键词召回）
 │   │   ├── vector_store.py       # 【预留】向量存储
 │   │   ├── knowledge.py          # 【预留】知识图谱
 │   │   └── emotion.py            # 【预留】情感引擎
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
-│   │   ├── builder.py            # 系统提示词拼接（角色+Persona+工具+世界书+动态注入，三明治结构）
+│   │   ├── builder.py            # 系统提示词拼接（角色+Persona+工具+世界书+动态注入，三明治结构）+ 分层调试构建
 │   │   ├── tool_prompt.py        # 工具提示词生成（<tools> 格式，从注册表读取定义）
 │   │   ├── persona.py            # Persona 数据管理（JSON CRUD + 激活状态 + 注入文本生成）
 │   │   ├── authors_note.py       # Author's Note 数据管理（DB CRUD + 缓存 + 注入消息生成）
 │   │   ├── worldbook_store.py    # 世界书数据管理（JSON CRUD + 缓存 + 列表）
 │   │   ├── worldbook_matcher.py  # 世界书关键词匹配引擎（扫描消息→匹配关键词→返回注入内容）
 │   │   ├── character.py          # 角色卡片加载 + CRUD + 头像管理
-│   │   ├── types.py              # CharacterCard Pydantic 模型（含 model/context_size/auto_compact/compact_threshold）
+│   │   ├── types.py              # CharacterCard Pydantic 模型（含 model/context_size/auto_compact/compact_threshold/memory_*）
 │   │   └── template.py           # 模板变量系统（{{xxx}} 替换）
 │   │
 │   └── types/                    # 词汇 — 类型定义
 │       ├── messages.py           # 消息类型（TypedDict）+ 工厂函数
-│       ├── events.py             # SSE 事件类型
+│       ├── events.py             # SSE 事件类型（含 MemoryDebugEvent 记忆调试事件）
 │       ├── ws_events.py          # WebSocket 推送事件类型（TypedDict）
 │       ├── tools.py              # 工具协议类型（Pydantic）
 │       ├── persona.py            # Persona 类型（PersonaCard + ActivePersona Pydantic 模型）
@@ -72,7 +72,7 @@ Lumen/
 ├── api/                          # FastAPI HTTP接口
 │   ├── main.py                   # 应用入口、CORS、路由注册
 │   └── routes/
-│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage）
+│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel + memory_debug）
 │       ├── session.py            # 会话（new/load/list/delete/reset）
 │       ├── character.py          # 角色（list/get/switch/create/update/delete/upload-avatar）
 │       ├── persona.py            # Persona（list/get/active/create/update/delete/switch）
@@ -89,8 +89,8 @@ Lumen/
 │       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
 │       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook）
-│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
-│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, AvatarManager, ConfigList, ConfigEditor）
+│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
+│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector）
 │       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css）
 │

@@ -42,5 +42,20 @@ class StatusEvent(TypedDict, total=False):
     message: str       # 状态详情
 
 
+class MemoryDebugLayer(TypedDict):
+    """记忆调试信息的一层"""
+    name: str          # "角色元数据"、"世界书" 等
+    tokens: int        # 该层的 token 数
+    content: str       # 该层的完整内容
+
+
+class MemoryDebugEvent(TypedDict, total=False):
+    """记忆调试事件 — /tokens 命令开启后 yield"""
+    type: str          # "memory_debug"
+    layers: list       # list[MemoryDebugLayer]
+    total_tokens: int  # 总 token 数
+    context_size: int  # 角色的上下文窗口大小
+
+
 # chat_stream 的 yield 类型
-SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEvent]
+SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEvent, MemoryDebugEvent]

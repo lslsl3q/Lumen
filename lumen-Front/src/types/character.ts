@@ -28,6 +28,9 @@ export interface CharacterDetail {
   context_size?: number;
   auto_compact: boolean;
   compact_threshold: number;
+  memory_enabled?: boolean;
+  memory_token_budget?: number;
+  memory_auto_summarize?: boolean;
 }
 
 /** 创建/编辑角色的表单数据 */
@@ -42,4 +45,7 @@ export interface CharacterFormData {
   context_size?: number;
   auto_compact?: boolean;
   compact_threshold?: number;
+  memory_enabled?: boolean;
+  memory_token_budget?: number;
+  memory_auto_summarize?: boolean;
 }

@@ -237,6 +237,57 @@ def load_summaries(character_id: str, limit: int = 3) -> list:
     return [(row["session_id"], row["summary"]) for row in rows]
 
 
+def search_messages(keyword: str, character_id: str, limit: int = 10) -> list:
+    """跨会话搜索消息（关键词模糊匹配）
+
+    Args:
+        keyword: 搜索关键词
+        character_id: 限定角色的会话
+        limit: 最多返回条数
+
+    Returns:
+        [{"role": ..., "content": ..., "session_id": ..., "created_at": ...}, ...]
+    """
+    if not keyword or not keyword.strip():
+        return []
+
+    conn = _get_conn()
+    pattern = f"%{keyword}%"
+    rows = conn.execute(
+        """
+        SELECT m.role, m.content, m.session_id, m.created_at
+        FROM messages m
+        JOIN sessions s ON m.session_id = s.id
+        WHERE s.character_id = ?
+          AND m.role != 'system'
+          AND m.content LIKE ?
+        ORDER BY m.id DESC
+        LIMIT ?
+        """,
+        (character_id, pattern, limit),
+    ).fetchall()
+
+    results = []
+    for row in rows:
+        content = row["content"]
+        if not content or len(content) < 5:
+            continue
+        # 跳过工具调用/结果消息（避免注入无意义内容）
+        if any(marker in content for marker in [
+            '"type": "tool_call', '"type":"tool_call',
+            '{"success":', '{"error_code":',
+            '<tool_result', '<<<[TOOL_REQUEST]',
+        ]):
+            continue
+        results.append({
+            "role": row["role"],
+            "content": content,
+            "session_id": row["session_id"],
+            "created_at": row["created_at"],
+        })
+    return results
+
+
 # ========================================
 # Author's Note
 # ========================================

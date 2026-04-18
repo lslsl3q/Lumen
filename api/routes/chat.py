@@ -28,6 +28,7 @@ class StreamRequest(BaseModel):
     """流式聊天请求"""
     message: str
     session_id: str = "default"
+    memory_debug: bool = False  # /tokens 命令开启记忆调试
 
 
 class ChatResponse(BaseModel):
@@ -58,7 +59,7 @@ async def send_message(req: ChatRequest) -> ChatResponse:
         session = manager.get_or_create(req.session_id or "default")
 
         reply_parts = []
-        async for event in chat_stream(req.message, session):
+        async for event in chat_stream(req.message, session, memory_debug=req.memory_debug):
             if event.get("type") == "text":
                 reply_parts.append(event["content"])
 
@@ -83,6 +84,7 @@ async def stream_chat(req: StreamRequest):
     - data: {"type": "status", "status": "..."}    状态变化
     - data: {"type": "tool_start", "tool": "..."}  工具开始执行
     - data: {"type": "tool_result", "tool": "..."} 工具执行结果
+    - data: {"type": "memory_debug", ...}          记忆调试分层信息
     - data: {"type": "done", "exit_reason": "..."} 流式结束
     - data: [DONE]                                  连接关闭信号
 
@@ -100,7 +102,7 @@ async def stream_chat(req: StreamRequest):
     async def generate():
         """生成 SSE 事件流（chat_stream 本身已是异步生成器，无需线程池翻译）"""
         try:
-            async for event in chat_stream(req.message, session):
+            async for event in chat_stream(req.message, session, memory_debug=req.memory_debug):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"

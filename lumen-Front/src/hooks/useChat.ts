@@ -82,6 +82,18 @@ export interface ToolCall {
   error?: string;
 }
 
+/** Memory 调试数据 */
+export interface MemoryDebugLayer {
+  name: string;
+  tokens: number;
+  content: string;
+}
+export interface MemoryDebugData {
+  layers: MemoryDebugLayer[];
+  total_tokens: number;
+  context_size: number;
+}
+
 /** 消息 */
 export interface Message {
   id: string;
@@ -103,6 +115,8 @@ export function useChat() {
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [memoryDebugMode, setMemoryDebugMode] = useState(false);
+  const [memoryDebugInfo, setMemoryDebugInfo] = useState<MemoryDebugData | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /** 加载指定会话的历史消息 */
@@ -225,6 +239,14 @@ export function useChat() {
               case 'text_clear': {
                 return [...updated.slice(0, -1), { ...last, content: '' }];
               }
+              case 'memory_debug': {
+                setMemoryDebugInfo({
+                  layers: event.layers || [],
+                  total_tokens: event.total_tokens || 0,
+                  context_size: event.context_size || 4096,
+                });
+                return prev; // 不修改消息列表
+              }
               case 'done': {
                 return [...updated.slice(0, -1), { ...last, isStreaming: false }];
               }
@@ -235,7 +257,9 @@ export function useChat() {
         },
         // sessionId
         sessionId,
-        abortControllerRef.current.signal
+        abortControllerRef.current.signal,
+        // memoryDebugMode
+        memoryDebugMode,
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -270,12 +294,17 @@ export function useChat() {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [currentSessionId]);
+  }, [currentSessionId, memoryDebugMode]);
 
   /** 重置聊天（前端清空） */
   const resetChat = useCallback(() => {
     setMessages([]);
     setError(null);
+  }, []);
+
+  /** 切换 memory debug 模式 */
+  const toggleMemoryDebug = useCallback(() => {
+    setMemoryDebugMode(prev => !prev);
   }, []);
 
   /** 添加系统消息（命令结果等） */
@@ -318,5 +347,8 @@ export function useChat() {
     setCurrentSessionId,
     error,
     abort,
+    memoryDebugMode,
+    memoryDebugInfo,
+    toggleMemoryDebug,
   };
 }

@@ -9,6 +9,7 @@ import WorldBookEditor from './pages/WorldBookEditor';
 import AvatarManager from './pages/AvatarManager';
 import ConfigList from './pages/ConfigList';
 import ConfigEditor from './pages/ConfigEditor';
+import TokenInspector from './pages/TokenInspector';
 import PushNotification from './components/PushNotification';
 import { usePush } from './hooks/usePush';
 
@@ -41,6 +42,9 @@ function App() {
         {/* 配置管理页面 */}
         <Route path="/settings/config" element={<ConfigList />} />
         <Route path="/settings/config/:resource" element={<ConfigEditor />} />
+
+        {/* Token Inspector 页面 */}
+        <Route path="/settings/token-inspector" element={<TokenInspector />} />
       </Routes>
 
       {/* Overlay 挂载点 — 推送通知 + 未来动画特效系统 */}

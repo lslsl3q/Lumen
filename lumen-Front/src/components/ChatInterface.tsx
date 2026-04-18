@@ -15,6 +15,7 @@ import { CommandResult } from '../commands/registry';
 import { getTokenUsage } from '../api/chat';
 import ChatSidebar from './ChatSidebar';
 import ChatPanel from './ChatPanel';
+import { MEMORY_DEBUG_STORAGE_KEY } from '../pages/TokenInspector';
 
 function ChatInterface() {
   const chat = useChat();
@@ -42,6 +43,11 @@ function ChatInterface() {
 
   // 命令结果处理（显示为系统消息）
   const handleCommandResult = useCallback((result: CommandResult) => {
+    // /medebug 命令：切换 memory debug 模式
+    if (result.success && result.message === 'toggle_memory_debug') {
+      chat.toggleMemoryDebug();
+      return;
+    }
     chat.addSystemMessage(result.message);
     // 如果是 compact 命令，刷新 token 用量
     refreshTokenUsage();
@@ -68,6 +74,20 @@ function ChatInterface() {
       setTokenUsage(null);
     }
   }, [sessions.currentSessionId, refreshTokenUsage]);
+
+  // memoryDebugInfo 变化时保存到 localStorage（供 TokenInspector 页面读取）
+  useEffect(() => {
+    if (chat.memoryDebugInfo) {
+      try {
+        localStorage.setItem(MEMORY_DEBUG_STORAGE_KEY, JSON.stringify({
+          layers: chat.memoryDebugInfo.layers,
+          totalTokens: chat.memoryDebugInfo.total_tokens,
+          contextSize: chat.memoryDebugInfo.context_size,
+          timestamp: Date.now(),
+        }));
+      } catch { /* localStorage 写入失败忽略 */ }
+    }
+  }, [chat.memoryDebugInfo]);
 
   /** 新建会话 */
   const handleNewSession = async () => {
@@ -177,6 +197,12 @@ function ChatInterface() {
         onAbort={chat.abort}
         characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
         characterAvatar={characters.currentCharacter?.avatar}
+        memoryDebugMode={chat.memoryDebugMode}
+        memoryDebugInfo={chat.memoryDebugInfo ? {
+          layers: chat.memoryDebugInfo.layers,
+          totalTokens: chat.memoryDebugInfo.total_tokens,
+          contextSize: chat.memoryDebugInfo.context_size,
+        } : null}
       />
     </div>
   );

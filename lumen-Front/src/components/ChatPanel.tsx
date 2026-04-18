@@ -12,6 +12,7 @@ import { executeCommand } from '../commands/registry';
 import '../commands/builtin'; // 副作用：注册内置命令
 import { CommandResult } from '../commands/registry';
 import { getAvatarUrl } from '../api/character';
+import MemoryDebugPanel, { MemoryDebugInfo } from './PromptDebugPanel';
 
 /** AI 头像组件 */
 function Avatar({ src, name, className = '' }: { src?: string | null; name?: string; className?: string }) {
@@ -246,6 +247,8 @@ interface ChatPanelProps {
   onAbort?: () => void;
   characterName?: string;
   characterAvatar?: string | null;
+  memoryDebugMode?: boolean;
+  memoryDebugInfo?: MemoryDebugInfo | null;
 }
 
 function ChatPanel({
@@ -261,6 +264,8 @@ function ChatPanel({
   onAbort,
   characterName,
   characterAvatar,
+  memoryDebugMode,
+  memoryDebugInfo,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -379,6 +384,14 @@ function ChatPanel({
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
+
+      {/* Memory 调试面板（memoryDebugMode 开启时显示） */}
+      <MemoryDebugPanel
+        layers={memoryDebugInfo?.layers || []}
+        totalTokens={memoryDebugInfo?.totalTokens || 0}
+        contextSize={memoryDebugInfo?.contextSize || 0}
+        visible={!!memoryDebugMode && !!memoryDebugInfo}
+      />
 
       {/* 输入区域 */}
       <div className="px-6 py-4 border-t border-slate-800/60 relative">
