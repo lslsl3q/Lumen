@@ -46,21 +46,46 @@ def error_result(tool: str, code: str, message: str, detail: Optional[Dict[str, 
     return result.model_dump(exclude_none=True)
 
 
-def format_result_for_ai(result: Dict[str, Any]) -> str:
-    """将工具结果格式化为适合发送给 AI 的字符串
+def _format_data_readable(data: Any) -> str:
+    """将工具返回的 data 字段格式化为可读文本（递归处理常见结构）"""
+    if isinstance(data, str):
+        return data
+    if isinstance(data, list):
+        if not data:
+            return "(无结果)"
+        lines = []
+        for i, item in enumerate(data, 1):
+            if isinstance(item, dict):
+                parts = [f"{k}: {v}" for k, v in item.items()]
+                lines.append(f"{i}. {' | '.join(parts)}")
+            else:
+                lines.append(f"{i}. {item}")
+        return "\n".join(lines)
+    if isinstance(data, dict):
+        return "\n".join(f"{k}: {v}" for k, v in data.items())
+    # 复杂嵌套结构用缩进 JSON 兜底
+    return json.dumps(data, ensure_ascii=False, indent=2)
 
-    只包含关键信息，减少 token 消耗
+
+def format_result_for_ai(result: Dict[str, Any]) -> str:
+    """将工具结果格式化为 XML 格式发送给 AI
+
+    XML 包裹让 AI 明确区分工具返回与用户消息，减少 token 消耗
     """
     tool = result["tool"]
 
     if result["success"]:
-        data = result["data"]
-        if isinstance(data, str):
-            return f"[{tool}] {data}"
-        else:
-            return f"[{tool}] {json.dumps(data, ensure_ascii=False)}"
-    else:
-        return f"[{tool} 错误] {result['error_message']}"
+        content = _format_data_readable(result["data"])
+        return f'<tool_result tool="{tool}" status="success">\n{content}\n</tool_result>'
+
+    error_code = result.get("error_code", "")
+    error_msg = result.get("error_message", "未知错误")
+    detail = result.get("error_detail")
+    parts = [f"[{error_code}] {error_msg}"]
+    if detail:
+        parts.append(f"详情: {json.dumps(detail, ensure_ascii=False)}")
+    content = "\n".join(parts)
+    return f'<tool_result tool="{tool}" status="error">\n{content}\n</tool_result>'
 
 
 # ========================================

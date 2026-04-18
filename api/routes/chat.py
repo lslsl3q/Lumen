@@ -11,7 +11,7 @@ router = APIRouter()
 
 # 导入核心逻辑
 from lumen.core.session import get_session_manager
-from lumen.core.chat import chat_stream, ChatSession
+from lumen.core.chat import chat_stream, ChatSession, request_cancel
 
 
 # ========================================
@@ -118,6 +118,26 @@ async def stream_chat(req: StreamRequest):
     return StreamingResponse(generate(), media_type="text/event-stream", headers=headers)
 
 
+def _is_tool_message(msg: dict) -> bool:
+    """判断是否为工具调用/结果消息（不应展示给用户）"""
+    content = msg.get("content", "").strip()
+    if msg.get("role") == "assistant":
+        if 'type": "tool_call' in content or 'type":"tool_call' in content:
+            return True
+    if msg.get("role") == "user":
+        # 新格式：XML 包裹的工具结果
+        if content.startswith('<tool_result'):
+            return True
+        # 旧格式：JSON
+        if content.startswith('{"success"') or content.startswith('{"error_code"'):
+            return True
+        # metadata 标记的工具结果
+        meta = msg.get("metadata")
+        if isinstance(meta, dict) and meta.get("type") in ("tool_result", "tool_result_parallel"):
+            return True
+    return False
+
+
 @router.get("/history")
 async def get_history(session_id: str = "default"):
     """
@@ -130,7 +150,7 @@ async def get_history(session_id: str = "default"):
         session_id: 会话ID，默认为 "default"
 
     Returns:
-        消息列表（不含系统提示词）
+        消息列表（不含系统提示词和工具调用消息）
     """
     try:
         manager = get_session_manager()
@@ -144,14 +164,79 @@ async def get_history(session_id: str = "default"):
             from lumen.services import history as history_service
             messages = history_service.load_session(session_id)
 
-        # 过滤掉系统提示词，只返回用户和助手的对话
+        # 过滤掉系统提示词和工具调用消息，只返回用户和助手的对话
         result = [
             {"role": msg["role"], "content": msg["content"]}
             for msg in messages
-            if msg["role"] in ("user", "assistant")
+            if msg["role"] in ("user", "assistant") and not _is_tool_message(msg)
         ]
 
         return {"messages": result}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取历史失败: {str(e)}")
+
+
+# ========================================
+# Compact + Token 用量
+# ========================================
+
+class CompactRequest(BaseModel):
+    session_id: str
+
+
+class CancelRequest(BaseModel):
+    session_id: str
+
+
+@router.post("/cancel")
+async def cancel_chat(req: CancelRequest):
+    """中断指定会话的流式生成"""
+    request_cancel(req.session_id)
+    return {"cancelled": True}
+
+
+@router.post("/compact")
+async def api_compact(req: CompactRequest):
+    """手动触发上下文压缩"""
+    from lumen.services.context.compact import compact_session
+    from lumen.prompt.character import load_character
+    from lumen.config import get_context_size
+    from lumen.services.context import fold_tool_calls, filter_for_ai, estimate_messages_tokens
+
+    manager = get_session_manager()
+    session = manager.get_or_create(req.session_id)
+
+    result = await compact_session(session)
+    return result
+
+
+@router.get("/token-usage")
+async def api_token_usage(session_id: str = "default"):
+    """获取当前会话 token 使用情况"""
+    from lumen.prompt.character import load_character
+    from lumen.config import get_context_size
+    from lumen.services.context import fold_tool_calls, filter_for_ai, estimate_messages_tokens
+    from lumen.services.context.token_estimator import get_session_usage
+
+    manager = get_session_manager()
+    session = manager.get_or_create(session_id)
+
+    character_config = load_character(session.character_id)
+    context_size = get_context_size(character_config)
+
+    folded = fold_tool_calls(session.messages)
+    filtered = filter_for_ai(folded)
+    current_tokens = estimate_messages_tokens(filtered)
+
+    usage = get_session_usage(session_id)
+
+    return {
+        "current_tokens": current_tokens,
+        "context_size": context_size,
+        "usage_percent": round(current_tokens / context_size * 100, 1) if context_size > 0 else 0,
+        "threshold_percent": character_config.get("compact_threshold", 0.7) * 100,
+        "auto_compact": character_config.get("auto_compact", False),
+        "session_total_input": usage["input_tokens"],
+        "session_total_output": usage["output_tokens"],
+    }

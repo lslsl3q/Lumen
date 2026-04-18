@@ -17,8 +17,12 @@ class CharacterCard(BaseModel):
     greeting: Optional[str] = None
     tools: List[str] = []
     model: Optional[str] = None
-    avatar: Optional[str] = None           # 头像文件名（如 "default.png"）
-    tool_tips: Dict[str, str] = {}         # 用户自定义的工具提示（fallback 到 registry 的 usage_guide）
+    avatar: Optional[str] = None
+    tool_tips: Dict[str, str] = {}
+    # 上下文管理
+    context_size: Optional[int] = None       # token 预算（None = 用全局默认）
+    auto_compact: bool = False               # 自动 compact 开关
+    compact_threshold: float = 0.7           # 触发阈值（0.5~0.95）
 
 
 class DynamicContext(TypedDict):

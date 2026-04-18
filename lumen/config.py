@@ -68,6 +68,10 @@ client = AsyncOpenAI(
 # 默认模型（可以通过环境变量覆盖）
 DEFAULT_MODEL = os.getenv("MODEL", "glm-5.1")
 
+# 摘要模型（用于 compact 压缩、记忆摘要等，可以和聊天模型不同）
+# 留空则跟随角色/默认模型
+SUMMARY_MODEL = os.getenv("SUMMARY_MODEL", "")
+
 # LLM API 超时时间（秒）
 # 可以通过环境变量 LLM_TIMEOUT 覆盖
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
@@ -75,6 +79,9 @@ LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
 # ReAct 循环最大轮次（防止 AI 无限调用工具）
 # 可以通过环境变量 MAX_TOOL_ITERATIONS 覆盖
 MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
+
+# 默认上下文窗口大小（tokens），角色级 context_size 未设置时使用
+DEFAULT_CONTEXT_SIZE = int(os.getenv("DEFAULT_CONTEXT_SIZE", "8192"))
 
 # WebSocket 推送通道设置
 # 心跳间隔（秒），保持连接存活（应对休眠唤醒）
@@ -94,3 +101,33 @@ def get_model(character_config: dict = None) -> str:
     if character_config and "model" in character_config:
         return character_config["model"]
     return DEFAULT_MODEL
+
+
+def get_summary_model(character_config: dict = None) -> str:
+    """获取摘要/压缩时使用的模型
+
+    优先级：SUMMARY_MODEL 环境变量 > 角色配置的 model > DEFAULT_MODEL
+
+    Args:
+        character_config: 角色配置字典（可选）
+
+    Returns:
+        模型名称字符串
+    """
+    if SUMMARY_MODEL:
+        return SUMMARY_MODEL
+    return get_model(character_config)
+
+
+def get_context_size(character_config: dict = None) -> int:
+    """获取当前应该使用的上下文窗口大小
+
+    Args:
+        character_config: 角色配置字典（可选）
+
+    Returns:
+        上下文窗口大小（tokens）
+    """
+    if character_config and character_config.get("context_size"):
+        return character_config["context_size"]
+    return DEFAULT_CONTEXT_SIZE

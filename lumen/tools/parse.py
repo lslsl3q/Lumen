@@ -22,6 +22,11 @@ def parse_tool_call(text: str) -> Optional[Dict[str, Any]]:
     """
     text = text.strip()
 
+    # 容错：如果文本明显是残缺的 JSON（缺少开头的 {），尝试补上
+    # 例如模型输出: type": "tool_call", "tool": "web_fetch", ...}
+    if text.startswith('type"') or text.startswith('type":'):
+        text = '{"' + text
+
     def extract_json(text: str) -> Optional[dict]:
         """从文本中提取 JSON（支持嵌套花括号）"""
         try:

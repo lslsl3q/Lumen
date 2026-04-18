@@ -9,6 +9,70 @@ import { sendMessageStream, getHistory, StreamEvent } from '../api/chat';
 import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
 
+/** 判断消息是否应从历史显示中过滤（纯工具调用/结果） */
+function isToolMessage(msg: HistoryMessage): boolean {
+  const content = msg.content.trim();
+  if (!content) return false;
+  // AI 可能在 JSON 前加文字（如"让我读取文件..."），用 includes 而非 startsWith
+  if (content.includes('"type": "tool_call') || content.includes('"type":"tool_call')) return true;
+  if (content.includes('"type": "tool_call_parallel') || content.includes('"type":"tool_call_parallel')) return true;
+  if (content.includes('<tool_result')) return true;
+  if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
+  return false;
+}
+
+/** 从消息内容中提取工具调用信息（加载历史时用） */
+function extractToolCalls(content: string): ToolCall[] {
+  const calls: ToolCall[] = [];
+  // 匹配单个工具调用：{"type": "tool_call", "tool": "xxx", ...}
+  const singleRegex = /"type"\s*:\s*"tool_call"\s*,.*?"tool"\s*:\s*"([^"]+)"/g;
+  let m;
+  while ((m = singleRegex.exec(content)) !== null) {
+    calls.push({ name: m[1], status: 'done' });
+  }
+  // 匹配并行工具调用：{"type": "tool_call_parallel", "calls": [{"tool": "xxx", ...}, ...]}
+  const parallelRegex = /"type"\s*:\s*"tool_call_parallel"\s*,.*?"calls"\s*:\s*\[([\s\S]*?)\]/g;
+  while ((m = parallelRegex.exec(content)) !== null) {
+    const inner = /"tool"\s*:\s*"([^"]+)"/g;
+    let im;
+    while ((im = inner.exec(m[1])) !== null) {
+      calls.push({ name: im[1], status: 'done' });
+    }
+  }
+  return calls;
+}
+
+/** 剥离消息内容中嵌入的工具调用 JSON，保留前后的文字部分 */
+function stripToolJson(content: string): string {
+  let cleaned = content;
+  // 反复剥离 tool_call 和 tool_result JSON 块
+  for (const marker of ['{"type": "tool_call', '{"type":"tool_call', '{"type": "tool_call_parallel', '{"type":"tool_call_parallel', '{"success":', '{"error_code":']) {
+    while (true) {
+      const idx = cleaned.indexOf(marker);
+      if (idx === -1) break;
+      // 找到匹配的闭合花括号
+      let depth = 0;
+      let inStr = false;
+      let esc = false;
+      let end = -1;
+      for (let i = idx; i < cleaned.length; i++) {
+        const ch = cleaned[i];
+        if (esc) { esc = false; continue; }
+        if (ch === '\\') { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === '{') depth++;
+        else if (ch === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
+      }
+      if (end === -1) break;
+      cleaned = cleaned.slice(0, idx) + cleaned.slice(end);
+    }
+  }
+  // 剥离 XML 格式的工具结果
+  cleaned = cleaned.replace(/<tool_result[\s\S]*?<\/tool_result>/g, '');
+  return cleaned.trim();
+}
+
 /** 工具调用追踪 */
 export interface ToolCall {
   name: string;
@@ -21,7 +85,7 @@ export interface ToolCall {
 /** 消息 */
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   toolCalls?: ToolCall[];
   isStreaming?: boolean;
@@ -32,15 +96,9 @@ function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-/** 欢迎消息 */
-const WELCOME_MESSAGE: Message = {
-  id: 'msg_init',
-  role: 'assistant',
-  content: '你好！我是 Lumen AI，有什么可以帮你的吗？',
-};
 
 export function useChat() {
-  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +108,19 @@ export function useChat() {
   const loadHistory = useCallback(async (sessionId: string) => {
     try {
       const data = await getHistory(sessionId);
-      const historyMessages: Message[] = data.messages.map((msg: HistoryMessage, i: number) => ({
-        id: `hist_${sessionId}_${i}`,
-        role: msg.role,
-        content: msg.content,
-      }));
-      setMessages(historyMessages.length > 0 ? historyMessages : [WELCOME_MESSAGE]);
+      const historyMessages: Message[] = data.messages
+        .filter((msg: HistoryMessage) => !isToolMessage(msg))
+        .map((msg: HistoryMessage, i: number) => {
+          const toolCalls = extractToolCalls(msg.content);
+          return {
+            id: `hist_${sessionId}_${i}`,
+            role: msg.role,
+            content: stripToolJson(msg.content),
+            ...(toolCalls.length > 0 ? { toolCalls } : {}),
+          };
+        })
+        .filter((msg: Message) => msg.content.length > 0 || (msg.toolCalls && msg.toolCalls.length > 0));
+      setMessages(historyMessages.length > 0 ? historyMessages : []);
       setCurrentSessionId(sessionId);
       setError(null);
     } catch (err) {
@@ -66,7 +131,7 @@ export function useChat() {
 
   /** 清空前端消息（准备新会话），不调 API */
   const clearMessages = useCallback(() => {
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([]);
     setCurrentSessionId(null);
     setError(null);
   }, []);
@@ -153,6 +218,9 @@ export function useChat() {
                 }
                 return [...updated.slice(0, -1), { ...last, toolCalls: calls }];
               }
+              case 'text_clear': {
+                return [...updated.slice(0, -1), { ...last, content: '' }];
+              }
               case 'done': {
                 return [...updated.slice(0, -1), { ...last, isStreaming: false }];
               }
@@ -187,8 +255,18 @@ export function useChat() {
 
   /** 重置聊天（前端清空） */
   const resetChat = useCallback(() => {
-    setMessages([WELCOME_MESSAGE]);
+    setMessages([]);
     setError(null);
+  }, []);
+
+  /** 添加系统消息（命令结果等） */
+  const addSystemMessage = useCallback((text: string) => {
+    const msg: Message = {
+      id: generateMessageId(),
+      role: 'system',
+      content: text,
+    };
+    setMessages(prev => [...prev, msg]);
   }, []);
 
   return {
@@ -200,6 +278,7 @@ export function useChat() {
     resetChat,
     loadHistory,
     clearMessages,
+    addSystemMessage,
     currentSessionId,
     setCurrentSessionId,
     error,

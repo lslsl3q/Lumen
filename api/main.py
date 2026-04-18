@@ -41,7 +41,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona
+from api.routes import chat, session, character, config, ws, persona, authors_note, models
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -50,6 +50,8 @@ app.include_router(character.router, prefix="/characters", tags=["角色"])
 app.include_router(config.router, prefix="/config", tags=["配置"])
 app.include_router(ws.router, prefix="/ws", tags=["WebSocket推送"])
 app.include_router(persona.router, prefix="/personas", tags=["Persona"])
+app.include_router(authors_note.router, prefix="/authors-note", tags=["Author's Note"])
+app.include_router(models.router, prefix="/models", tags=["模型"])
 
 # 挂载头像静态文件目录
 avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"

@@ -58,6 +58,21 @@ def _migrate_add_metadata():
         logger.info("数据库迁移: 完成")
 
 
+def _migrate_add_authors_note():
+    """数据库迁移：给 sessions 表添加 authors_note 字段"""
+    conn = _get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(sessions)")
+    columns = [row["name"] for row in cursor.fetchall()]
+
+    if "authors_note" not in columns:
+        logger.info("数据库迁移: 添加 authors_note 字段到 sessions 表...")
+        cursor.execute("ALTER TABLE sessions ADD COLUMN authors_note TEXT DEFAULT NULL")
+        conn.commit()
+        logger.info("数据库迁移: 完成")
+
+
 def _init_db():
     """初始化数据库，创建表（只在第一次运行时执行）"""
     conn = _get_conn()
@@ -87,8 +102,9 @@ def _init_db():
         );
     """)
 
-    # 数据库迁移：给现有表添加 metadata 字段
+    # 数据库迁移
     _migrate_add_metadata()
+    _migrate_add_authors_note()
 
 
 # 程序启动时自动初始化数据库
@@ -219,3 +235,70 @@ def load_summaries(character_id: str, limit: int = 3) -> list:
         (character_id, limit),
     ).fetchall()
     return [(row["session_id"], row["summary"]) for row in rows]
+
+
+# ========================================
+# Author's Note
+# ========================================
+
+def get_authors_note(session_id: str) -> Optional[Dict[str, Any]]:
+    """读取会话的 Author's Note 配置
+
+    Returns:
+        解析后的 dict，或 None（无 note 或会话不存在）
+    """
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT authors_note FROM sessions WHERE id = ?",
+        (session_id,),
+    ).fetchone()
+
+    if row and row["authors_note"]:
+        try:
+            return json.loads(row["authors_note"])
+        except json.JSONDecodeError:
+            logger.warning(f"会话 {session_id} 的 authors_note JSON 解析失败")
+            return None
+    return None
+
+
+def save_authors_note(session_id: str, note_json: Optional[str]):
+    """写入或清除会话的 Author's Note
+
+    Args:
+        session_id: 会话 ID
+        note_json: JSON 字符串，或 None（清除 note）
+    """
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE sessions SET authors_note = ? WHERE id = ?",
+        (note_json, session_id),
+    )
+    conn.commit()
+
+
+# ========================================
+# Compact（原子消息替换）
+# ========================================
+
+def replace_session_messages(session_id: str, messages: list[Message]):
+    """原子替换会话的所有消息（compact 用）
+
+    在事务中：删除旧消息 → 插入新消息。保证不会丢数据。
+    """
+    now = datetime.now().isoformat()
+    conn = _get_conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+        for msg in messages:
+            metadata_json = json.dumps(msg.get("metadata"), ensure_ascii=False) if msg.get("metadata") else None
+            cursor.execute(
+                "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+                (session_id, msg["role"], msg["content"], metadata_json, now),
+            )
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"替换会话 {session_id} 消息失败: {e}")
+        raise

@@ -8,8 +8,10 @@
 import { SessionListItem } from '../types/session';
 import { CharacterListItem } from '../types/character';
 import { PersonaListItem } from '../types/persona';
+import { AuthorsNoteConfig } from '../types/authorNote';
 import CharacterSelector from './CharacterSelector';
 import PersonaPanel from './PersonaPanel';
+import AuthorNotePanel from './AuthorNotePanel';
 
 interface ChatSidebarProps {
   sessions: SessionListItem[];
@@ -32,6 +34,14 @@ interface ChatSidebarProps {
   activePersonaName: string | null;
   onSwitchPersona: (personaId: string | null) => void;
   onManagePersonas: () => void;
+  // Author's Note 相关
+  authorNoteConfig: AuthorsNoteConfig | null;
+  authorNoteLoading: boolean;
+  onAuthorNoteToggle: (enabled: boolean) => void;
+  onAuthorNoteSaveContent: (content: string) => void;
+  onAuthorNoteSetPosition: (position: 'before_user' | 'after_user') => void;
+  onAuthorNoteRemove: () => void;
+  onAuthorNoteCreate: () => void;
 }
 
 /** 单个会话条目 */
@@ -105,6 +115,13 @@ function ChatSidebar({
   activePersonaName,
   onSwitchPersona,
   onManagePersonas,
+  authorNoteConfig,
+  authorNoteLoading,
+  onAuthorNoteToggle,
+  onAuthorNoteSaveContent,
+  onAuthorNoteSetPosition,
+  onAuthorNoteRemove,
+  onAuthorNoteCreate,
 }: ChatSidebarProps) {
   return (
     <div className="w-64 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
@@ -173,7 +190,16 @@ function ChatSidebar({
         )}
       </div>
 
-      {/* 底部：Persona 切换 + 角色选择器 */}
+      {/* 底部：Author's Note + Persona 切换 + 角色选择器 */}
+      <AuthorNotePanel
+        config={authorNoteConfig}
+        isLoading={authorNoteLoading}
+        onToggle={onAuthorNoteToggle}
+        onSaveContent={onAuthorNoteSaveContent}
+        onSetPosition={onAuthorNoteSetPosition}
+        onRemove={onAuthorNoteRemove}
+        onCreate={onAuthorNoteCreate}
+      />
       <PersonaPanel
         personas={personas}
         activeId={activePersonaId}

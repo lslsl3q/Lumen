@@ -24,6 +24,10 @@ export interface CharacterDetail {
   avatar?: string;
   tools: string[];
   tool_tips?: Record<string, string>;
+  model?: string;
+  context_size?: number;
+  auto_compact: boolean;
+  compact_threshold: number;
 }
 
 /** 创建/编辑角色的表单数据 */
@@ -34,4 +38,8 @@ export interface CharacterFormData {
   greeting?: string;
   tools?: string[];
   tool_tips?: Record<string, string>;
+  model?: string;
+  context_size?: number;
+  auto_compact?: boolean;
+  compact_threshold?: number;
 }

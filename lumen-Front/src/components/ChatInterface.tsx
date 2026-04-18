@@ -4,12 +4,15 @@
  * 职责：组合 Sidebar + ChatPanel，协调 useSessions、useChat、useCharacters 三个 hook 的数据流
  * 这是整个聊天页面的顶层组件
  */
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { useSessions } from '../hooks/useSessions';
 import { useCharacters } from '../hooks/useCharacters';
 import { usePersona } from '../hooks/usePersona';
+import { useAuthorNote } from '../hooks/useAuthorNote';
+import { CommandResult } from '../commands/registry';
+import { getTokenUsage } from '../api/chat';
 import ChatSidebar from './ChatSidebar';
 import ChatPanel from './ChatPanel';
 
@@ -18,7 +21,37 @@ function ChatInterface() {
   const sessions = useSessions();
   const characters = useCharacters();
   const persona = usePersona();
+  const authorNote = useAuthorNote(sessions.currentSessionId);
   const navigate = useNavigate();
+  const [tokenUsage, setTokenUsage] = useState<{
+    current_tokens: number; context_size: number; usage_percent: number
+  } | null>(null);
+
+  // 刷新 token 用量
+  const refreshTokenUsage = useCallback(async () => {
+    if (!sessions.currentSessionId) return;
+    try {
+      const data = await getTokenUsage(sessions.currentSessionId);
+      setTokenUsage({
+        current_tokens: data.current_tokens,
+        context_size: data.context_size,
+        usage_percent: data.usage_percent,
+      });
+    } catch { /* 忽略 */ }
+  }, [sessions.currentSessionId]);
+
+  // 命令结果处理（显示为系统消息）
+  const handleCommandResult = useCallback((result: CommandResult) => {
+    chat.addSystemMessage(result.message);
+    // 如果是 compact 命令，刷新 token 用量
+    refreshTokenUsage();
+  }, [chat, refreshTokenUsage]);
+
+  // 消息发送后刷新 token 用量
+  const handleSendMessage = useCallback(async (msg: string) => {
+    await chat.sendMessage(msg);
+    refreshTokenUsage();
+  }, [chat, refreshTokenUsage]);
 
   // 初始化同步：sessions 加载完后，把第一个会话的历史加载到 chat
   useEffect(() => {
@@ -26,6 +59,15 @@ function ChatInterface() {
       chat.loadHistory(sessions.currentSessionId);
     }
   }, [sessions.isLoading, sessions.currentSessionId, chat.currentSessionId, chat.loadHistory]);
+
+  // 会话变化时获取 token 用量
+  useEffect(() => {
+    if (sessions.currentSessionId) {
+      refreshTokenUsage();
+    } else {
+      setTokenUsage(null);
+    }
+  }, [sessions.currentSessionId, refreshTokenUsage]);
 
   /** 新建会话 */
   const handleNewSession = async () => {
@@ -54,19 +96,6 @@ function ChatInterface() {
         chat.resetChat();
         chat.setCurrentSessionId(null);
       }
-    }
-  };
-
-  /** 重置当前会话（清空历史，但会话 ID 不变） */
-  const handleResetSession = async () => {
-    if (!sessions.currentSessionId) return;
-
-    try {
-      await sessions.resetSession(sessions.currentSessionId);
-      chat.resetChat();
-      // 不需要重新加载历史，因为重置后历史就是空的
-    } catch (err) {
-      console.error('重置会话失败:', err);
     }
   };
 
@@ -121,15 +150,26 @@ function ChatInterface() {
         activePersonaName={persona.activeName}
         onSwitchPersona={handleSwitchPersona}
         onManagePersonas={handleManagePersonas}
+        authorNoteConfig={authorNote.config}
+        authorNoteLoading={authorNote.isLoading}
+        onAuthorNoteToggle={authorNote.toggle}
+        onAuthorNoteSaveContent={authorNote.saveContent}
+        onAuthorNoteSetPosition={authorNote.setPosition}
+        onAuthorNoteRemove={authorNote.remove}
+        onAuthorNoteCreate={() => authorNote.save({ enabled: false, content: '', injection_position: 'before_user' })}
       />
       <ChatPanel
         messages={chat.messages}
         isLoading={chat.isLoading}
         input={chat.input}
         error={chat.error}
+        sessionId={sessions.currentSessionId}
+        tokenUsage={tokenUsage}
         onInputChange={chat.setInput}
-        onSendMessage={chat.sendMessage}
-        onResetSession={handleResetSession}
+        onSendMessage={handleSendMessage}
+        onCommandResult={handleCommandResult}
+        characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
+        characterAvatar={characters.currentCharacter?.avatar}
       />
     </div>
   );

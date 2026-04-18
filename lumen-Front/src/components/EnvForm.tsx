@@ -11,6 +11,7 @@ const FIELD_META: Record<string, { label: string; type: 'text' | 'password'; pla
   API_URL: { label: 'API 地址', type: 'text', placeholder: 'http://127.0.0.1:4000/v1' },
   API_KEY: { label: 'API 密钥', type: 'password', placeholder: 'sk-...' },
   MODEL: { label: '默认模型', type: 'text', placeholder: 'deepseek-chat' },
+  SUMMARY_MODEL: { label: '摘要模型', type: 'text', placeholder: '留空则跟随默认模型（用于上下文压缩）' },
   SEARCH_PROXY: { label: '搜索代理', type: 'text', placeholder: 'http://127.0.0.1:7897' },
   FETCH_PROXY: { label: '抓取代理', type: 'text', placeholder: 'http://127.0.0.1:7897' },
   LLM_TIMEOUT: { label: 'LLM 超时（秒）', type: 'text', placeholder: '60' },

@@ -22,12 +22,7 @@ from lumen.services import memory
 from lumen.types.messages import (
     MessageType,
     MessageMetadata,
-    create_message,
-    create_tool_result_message,
-    create_tool_result_parallel_message,
-    is_tool_call_message,
-    is_tool_result_message,
-    is_folded,
+    Message,
 )
 
 # 角色提示词（prompt/）
@@ -78,12 +73,7 @@ __all__ = [
     # 消息类型
     "MessageType",
     "MessageMetadata",
-    "create_message",
-    "create_tool_result_message",
-    "create_tool_result_parallel_message",
-    "is_tool_call_message",
-    "is_tool_result_message",
-    "is_folded",
+    "Message",
 
     # 角色提示词
     "list_characters",

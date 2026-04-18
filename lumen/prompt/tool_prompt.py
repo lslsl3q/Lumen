@@ -68,6 +68,8 @@ def get_tool_prompt_from_registry(tool_names: List[str] = None, tool_tips: Dict[
 - 不要在JSON前后加任何解释文字
 - 如果多个工具有依赖关系，请分步调用单个工具
 - type 字段必须包含，否则工具调用会被忽略
+
+工具调用后，系统会以 <tool_result> 标签返回结果，你基于结果回复用户。
 </tools>"""
 
 

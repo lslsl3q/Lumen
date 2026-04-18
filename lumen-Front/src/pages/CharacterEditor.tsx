@@ -14,6 +14,7 @@ import {
   getAvatarUrl,
 } from '../api/character';
 import { CharacterFormData } from '../types/character';
+import ModelSelect from '../components/ModelSelect';
 
 /** registry.json 中单个工具的信息 */
 interface ToolInfo {
@@ -53,6 +54,10 @@ function CharacterEditor() {
     greeting: '',
     tools: [],
     tool_tips: {},
+    model: '',
+    context_size: undefined,
+    auto_compact: false,
+    compact_threshold: 0.7,
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -90,6 +95,10 @@ function CharacterEditor() {
           greeting: char.greeting || '',
           tools: char.tools || [],
           tool_tips: char.tool_tips || {},
+          model: char.model || '',
+          context_size: char.context_size || undefined,
+          auto_compact: char.auto_compact || false,
+          compact_threshold: char.compact_threshold || 0.7,
         });
         if (char.avatar) {
           setAvatarPreview(getAvatarUrl(char.avatar));
@@ -362,6 +371,92 @@ function CharacterEditor() {
                 font-mono leading-relaxed
               "
             />
+          </section>
+
+          {/* 模型与上下文 */}
+          <section className="space-y-4">
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">模型与上下文</h2>
+
+            {/* 模型名称 */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">模型名称</label>
+              <ModelSelect
+                value={form.model || ''}
+                onChange={(v) => setForm(prev => ({ ...prev, model: v || undefined }))}
+                placeholder="留空使用全局默认"
+                allowEmpty={true}
+              />
+            </div>
+
+            {/* 上下文大小 */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">上下文大小 (tokens)</label>
+              <input
+                type="number"
+                value={form.context_size || ''}
+                onChange={(e) => setForm(prev => ({
+                  ...prev,
+                  context_size: e.target.value ? parseInt(e.target.value) : undefined,
+                }))}
+                placeholder="留空使用默认 8192"
+                className="
+                  w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
+                  px-3 py-2 text-sm text-slate-300 placeholder-slate-600
+                  focus:outline-none focus:border-teal-500/50
+                "
+              />
+              <p className="text-xs text-slate-600 mt-1">此模型的最大上下文窗口（tokens）</p>
+            </div>
+
+            {/* 自动 Compact 开关 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-sm text-slate-300">自动压缩</label>
+                <p className="text-xs text-slate-600">上下文达到阈值时自动摘要压缩</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, auto_compact: !prev.auto_compact }))}
+                className={`
+                  w-9 h-5 rounded-full transition-colors duration-200 relative
+                  ${form.auto_compact ? 'bg-teal-500' : 'bg-slate-700'}
+                `}
+              >
+                <div className={`
+                  absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm
+                  transition-transform duration-200
+                  ${form.auto_compact ? 'translate-x-4' : 'translate-x-0.5'}
+                `} />
+              </button>
+            </div>
+
+            {/* 阈值滑块（仅开启时显示） */}
+            {form.auto_compact && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-slate-500">触发阈值</label>
+                  <span className="text-xs text-teal-400 font-mono">
+                    {Math.round((form.compact_threshold || 0.7) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="0.95"
+                  step="0.05"
+                  value={form.compact_threshold || 0.7}
+                  onChange={(e) => setForm(prev => ({
+                    ...prev,
+                    compact_threshold: parseFloat(e.target.value),
+                  }))}
+                  className="w-full accent-teal-500"
+                />
+                <div className="flex justify-between text-xs text-slate-600">
+                  <span>50%</span>
+                  <span>95%</span>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* 工具配置 */}

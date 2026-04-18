@@ -10,8 +10,8 @@ from typing import List, Optional, Dict
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.prompt.character import (
-    load_character, list_characters,
+from lumen.prompt.character import load_character, list_characters
+from lumen.services.character import (
     create_character, update_character, delete_character, save_avatar
 )
 from lumen.prompt.builder import build_system_prompt
@@ -32,6 +32,10 @@ class CharacterInfo(BaseModel):
     avatar: Optional[str] = None
     tools: List[str] = []
     tool_tips: Optional[Dict[str, str]] = None
+    model: Optional[str] = None
+    context_size: Optional[int] = None
+    auto_compact: bool = False
+    compact_threshold: float = 0.7
 
 
 class SwitchCharacterResponse(BaseModel):
@@ -106,6 +110,10 @@ async def get_character(character_id: str) -> CharacterInfo:
             avatar=char.get("avatar"),
             tools=char.get("tools", []),
             tool_tips=char.get("tool_tips"),
+            model=char.get("model"),
+            context_size=char.get("context_size"),
+            auto_compact=char.get("auto_compact", False),
+            compact_threshold=char.get("compact_threshold", 0.7),
         )
 
     except FileNotFoundError:

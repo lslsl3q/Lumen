@@ -10,5 +10,8 @@
     "file_read",
     "file_write"
   ],
-  "tool_tips": {}
+  "model": "deepseek-chat",
+  "tool_tips": {},
+  "auto_compact": true,
+  "compact_threshold": 0.7
 }

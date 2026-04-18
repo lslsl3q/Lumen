@@ -32,8 +32,8 @@ async def generate_summary(messages: list[Message]) -> str:
 
     # 调 AI 生成摘要
     try:
-        from lumen.config import get_model
-        model = get_model()
+        from lumen.config import get_summary_model
+        model = get_summary_model()
 
         response = await chat(
             messages=[

@@ -46,7 +46,7 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
  * SSE 事件类型
  */
 export interface StreamEvent {
-  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'done' | 'error';
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'done' | 'error';
   content?: string;
   status?: string;
   message?: string;
@@ -74,7 +74,8 @@ export async function sendMessageStream(
   message: string,
   onText: (text: string) => void,
   onEvent?: (event: StreamEvent) => void,
-  sessionId?: string
+  sessionId?: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -83,6 +84,7 @@ export async function sendMessageStream(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ message, session_id: sessionId || 'default' }),
+      signal,
     });
 
     if (!response.ok) {
@@ -138,4 +140,54 @@ export async function getHistory(sessionId: string): Promise<{
   const res = await fetch(`${API_BASE_URL}/chat/history?session_id=${encodeURIComponent(sessionId)}`);
   if (!res.ok) throw new Error(`获取历史失败: ${res.status}`);
   return res.json();
+}
+
+/**
+ * 手动触发上下文压缩
+ */
+export async function compactSession(sessionId: string): Promise<{
+  compacted: boolean;
+  tokens_before: number;
+  tokens_after: number;
+  summary: string;
+  reason?: string;
+}> {
+  const res = await fetch(`${API_BASE_URL}/chat/compact`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `压缩失败: ${res.status}`);
+  }
+  return res.json();
+}
+
+/**
+ * 获取 token 使用情况
+ */
+export async function getTokenUsage(sessionId: string): Promise<{
+  current_tokens: number;
+  context_size: number;
+  usage_percent: number;
+  threshold_percent: number;
+  auto_compact: boolean;
+  session_total_input: number;
+  session_total_output: number;
+}> {
+  const res = await fetch(`${API_BASE_URL}/chat/token-usage?session_id=${encodeURIComponent(sessionId)}`);
+  if (!res.ok) throw new Error(`获取用量失败: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * 中断指定会话的流式生成
+ */
+export async function cancelChat(sessionId: string): Promise<void> {
+  await fetch(`${API_BASE_URL}/chat/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
 }
