@@ -2,7 +2,7 @@
  * 斜杠命令补全浮窗
  * 输入 / 时显示在输入框上方
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getAllCommands, parseCommand } from '../commands/registry';
 import type { SlashCommand } from '../commands/registry';
 

@@ -5,6 +5,7 @@ Lumen - 工具执行引擎
 
 import json
 import time
+import asyncio
 import importlib
 import logging
 from datetime import datetime
@@ -117,6 +118,39 @@ def _load_builtin_tools():
                 logger.warning(f"工具 '{tool_name}' 模块中没有 execute 函数，跳过")
         except ImportError as e:
             logger.warning(f"工具 '{tool_name}' 导入失败: {e}")
+
+    # 加载 MCP 外部工具
+    _load_mcp_tools()
+
+
+def _load_mcp_tools():
+    """发现并注册 MCP 外部工具（同步包装）"""
+    try:
+        from lumen.services.mcp_client import discover_all_tools, execute_mcp_tool_sync
+
+        loop = asyncio.new_event_loop()
+        try:
+            tools = loop.run_until_complete(discover_all_tools())
+        finally:
+            loop.close()
+
+        for prefixed_name, tool_def in tools.items():
+            # 注册执行函数（闭包捕获工具名）
+            register_handler(
+                prefixed_name,
+                lambda params, _name=prefixed_name: execute_mcp_tool_sync(_name, params),
+            )
+            # 注册到工具注册表（让 AI 能看到这个工具）
+            from lumen.tools.registry import get_registry
+            registry = get_registry()
+            registry.register(prefixed_name, {
+                "description": tool_def.get("description", ""),
+                "parameters": tool_def.get("parameters", {"type": "object", "properties": {}}),
+            })
+            logger.info(f"注册 MCP 工具: {prefixed_name}")
+
+    except Exception as e:
+        logger.warning(f"MCP 工具加载失败（跳过）: {e}")
 
 
 # ========================================

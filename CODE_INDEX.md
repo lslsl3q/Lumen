@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-19（右侧调试抽屉 DebugDrawer + 记忆召回详情 + 工具持久化修复）
+**最后更新**：2026-04-19（T4.5 工具调用UI增强 + Skills 系统 + MCP 集成 + bug 修复）
 
 ---
 
@@ -16,14 +16,15 @@ Lumen/
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
-│   ├── data/                     # 运行时数据（history.db、file_workspaces.json、active_persona.json）
+│   ├── skills/                   # Skills 数据（Markdown + YAML frontmatter，每个 Skill 一个 .md）
+│   ├── data/                     # 运行时数据（history.db、file_workspaces.json、active_persona.json、mcp_servers.json）
 │   │
 │   ├── core/                     # 大脑 — 决策循环、会话状态
 │   │   ├── chat.py               # ReAct 循环（异步生成器，SSE流式输出）
 │   │   └── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
 │   │
 │   ├── tools/                    # 双手 — 每个工具一个 .py
-│   │   ├── base.py               # 执行引擎、注册、并行调度、结果格式化
+│   │   ├── base.py               # 执行引擎、注册（内置+MCP）、并行调度、结果格式化
 │   │   ├── parse.py              # AI输出 → 工具调用 解析
 │   │   ├── registry.py           # 工具注册中心（CRUD、验证）
 │   │   ├── registry.json         # 工具定义数据（含 usage_guide 字段）
@@ -40,6 +41,7 @@ Lumen/
 │   │   │   ├── token_estimator.py # Token计数器（Protocol接口+tiktoken实现+API校准+用量追踪）
 │   │   │   └── compact.py        # Compact 服务（阈值检测+摘要压缩+消息替换）
 │   │   ├── ws_manager.py         # WebSocket连接管理器（单例、广播、心跳）
+│   │   ├── mcp_client.py         # MCP 客户端服务（连接外部MCP服务器、发现工具、调用工具）
 │   │   ├── llm.py                # LLM适配器（AsyncOpenAI）
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
@@ -50,14 +52,15 @@ Lumen/
 │   │   └── emotion.py            # 【预留】情感引擎
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
-│   │   ├── builder.py            # 系统提示词拼接（角色+Persona+工具+世界书+动态注入，三明治结构）+ 分层调试构建
+│   │   ├── builder.py            # 系统提示词拼接（角色+Persona+Skills+工具+世界书+动态注入，三明治结构）+ 分层调试构建
 │   │   ├── tool_prompt.py        # 工具提示词生成（<tools> 格式，从注册表读取定义）
+│   │   ├── skill_store.py        # Skills 数据管理（Markdown CRUD + 缓存 + 注入文本生成）
 │   │   ├── persona.py            # Persona 数据管理（JSON CRUD + 激活状态 + 注入文本生成）
 │   │   ├── authors_note.py       # Author's Note 数据管理（DB CRUD + 缓存 + 注入消息生成）
 │   │   ├── worldbook_store.py    # 世界书数据管理（JSON CRUD + 缓存 + 列表）
 │   │   ├── worldbook_matcher.py  # 世界书关键词匹配引擎（扫描消息→匹配关键词→返回注入内容）
 │   │   ├── character.py          # 角色卡片加载 + CRUD + 头像管理
-│   │   ├── types.py              # CharacterCard Pydantic 模型（含 model/context_size/auto_compact/compact_threshold/memory_*）
+│   │   ├── types.py              # CharacterCard Pydantic 模型（含 model/context_size/auto_compact/compact_threshold/memory_*/skills）
 │   │   └── template.py           # 模板变量系统（{{xxx}} 替换）
 │   │
 │   └── types/                    # 词汇 — 类型定义
@@ -67,7 +70,8 @@ Lumen/
 │       ├── tools.py              # 工具协议类型（Pydantic）
 │       ├── persona.py            # Persona 类型（PersonaCard + ActivePersona Pydantic 模型）
 │       ├── authors_note.py       # Author's Note 类型（AuthorsNoteConfig + UpdateRequest）
-│       └── worldbook.py          # 世界书类型（WorldBookEntry + WorldBookListItem Pydantic 模型）
+│       ├── worldbook.py          # 世界书类型（WorldBookEntry + WorldBookListItem Pydantic 模型）
+│       └── skills.py             # Skills 类型（SkillCard + SkillCreateRequest + SkillUpdateRequest Pydantic 模型）
 │
 ├── api/                          # FastAPI HTTP接口
 │   ├── main.py                   # 应用入口、CORS、路由注册
@@ -78,6 +82,7 @@ Lumen/
 │       ├── persona.py            # Persona（list/get/active/create/update/delete/switch）
 │       ├── authors_note.py       # Author's Note（get/save/delete，每会话独立）
 │       ├── worldbook.py          # 世界书（list/get/create/update/delete，文件存储）
+│       └── skills.py             # Skills（list/get/create/update/delete，Markdown 文件存储）
 │       ├── avatar.py             # 头像管理（upload/list/delete，文件存储到 characters/avatars/）
 │       ├── models.py             # 模型（list，从 LiteLLM 代理获取可用模型）
 │       ├── config.py             # 配置（list/read/update）
@@ -86,12 +91,12 @@ Lumen/
 ├── lumen-Front/                  # 前端（Tauri 2 桌面应用）
 │   └── src/
 │       ├── App.tsx               # 应用入口（HashRouter 路由 + Overlay 挂载点）
-│       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models）
+│       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
-│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook）
+│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills）
 │       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, DebugDrawer, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
-│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector）
-│       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push）
+│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector）
+│       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push, skills）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css）
 │
 ├── tests/                        # 测试
@@ -161,6 +166,11 @@ api/routes/chat.py ──→ lumen/core/chat.py（ReAct 主循环）
 | `POST` | `/worldbooks/create` | 创建世界书条目 |
 | `PUT` | `/worldbooks/{id}` | 更新世界书条目 |
 | `DELETE` | `/worldbooks/{id}` | 删除世界书条目 |
+| `GET` | `/skills/list` | Skills 列表 |
+| `GET` | `/skills/{id}` | Skill 详情 |
+| `POST` | `/skills/create` | 创建 Skill |
+| `PUT` | `/skills/{id}` | 更新 Skill |
+| `DELETE` | `/skills/{id}` | 删除 Skill |
 | `GET` | `/models/list` | 获取可用模型列表 |
 | `GET` | `/config/list` | 配置项列表 |
 | `GET` | `/config/{resource}` | 读取配置 |

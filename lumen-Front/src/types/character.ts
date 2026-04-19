@@ -31,6 +31,7 @@ export interface CharacterDetail {
   memory_enabled?: boolean;
   memory_token_budget?: number;
   memory_auto_summarize?: boolean;
+  skills?: string[];
 }
 
 /** 创建/编辑角色的表单数据 */
@@ -48,4 +49,5 @@ export interface CharacterFormData {
   memory_enabled?: boolean;
   memory_token_budget?: number;
   memory_auto_summarize?: boolean;
+  skills?: string[];
 }

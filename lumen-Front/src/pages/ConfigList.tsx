@@ -112,6 +112,23 @@ function ConfigList() {
               <h3 className="text-sm text-slate-500 mb-4">其他功能</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
+                  onClick={() => navigate('/settings/skills')}
+                  className="
+                    group p-4 rounded-xl cursor-pointer
+                    bg-slate-900/60 border border-slate-800/40
+                    hover:border-amber-500/30 hover:bg-slate-900/80
+                    transition-all duration-200
+                  "
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl text-amber-400">&#9889;</div>
+                    <div>
+                      <div className="text-base text-slate-200">Skills 管理</div>
+                      <div className="text-sm text-slate-500">定义 AI 的工作方式</div>
+                    </div>
+                  </div>
+                </div>
+                <div
                   onClick={() => navigate('/settings/avatars')}
                   className="
                     group p-4 rounded-xl cursor-pointer
@@ -121,7 +138,7 @@ function ConfigList() {
                   "
                 >
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">🖼️</div>
+                    <div className="text-2xl">&#128444;&#65039;</div>
                     <div>
                       <div className="text-base text-slate-200">头像管理</div>
                       <div className="text-sm text-slate-500">上传和管理头像</div>

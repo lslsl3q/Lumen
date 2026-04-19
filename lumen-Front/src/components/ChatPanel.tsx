@@ -26,21 +26,35 @@ function Avatar({ src, name, className = '' }: { src?: string | null; name?: str
   );
 }
 
+/** 格式化工具结果数据用于展示 */
+function formatResultData(data: unknown): string {
+  if (data === null || data === undefined) return '';
+  if (typeof data === 'string') return data;
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
+}
+
+/** 截断过长文本，保留前后部分 */
+function truncateResult(text: string, maxLen = 500): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + `\n... (共 ${text.length} 字符)`;
+}
+
 /** 工具调用独立气泡 — 极简线条风格 + 渐进式信息 */
 function ToolCallBlock({ call }: { call: ToolCall }) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const isRunning = call.status === 'running';
   const isDone = call.status === 'done';
   const isError = isDone && call.success === false;
-  const isSuccess = isDone && call.success !== false;
 
-  // 状态颜色（低饱和度，符合极简风格）
-  const statusColor = isRunning ? 'slate' : isError ? 'red' : 'emerald';
   const bgColor = isRunning ? 'bg-slate-800/40' : isError ? 'bg-red-950/20' : 'bg-emerald-950/20';
   const textColor = isRunning ? 'text-slate-400' : isError ? 'text-red-400' : 'text-emerald-400';
   const borderColor = isRunning ? 'border-slate-700/40' : isError ? 'border-red-900/40' : 'border-emerald-900/40';
 
-  // 计算参数摘要（取前两个参数）
+  // 参数摘要（折叠时显示）
   const paramsSummary = call.params
     ? Object.entries(call.params)
         .slice(0, 2)
@@ -48,46 +62,46 @@ function ToolCallBlock({ call }: { call: ToolCall }) {
         .join(', ')
     : null;
 
+  const resultText = isDone ? formatResultData(call.data) : '';
+
   return (
     <div className="flex justify-start pl-10 mb-2">
       <div
         className={`
           w-full max-w-[600px] rounded border ${borderColor} ${bgColor}
           transition-all duration-200 ease-out
-          ${isExpanded ? 'py-3' : 'py-2'}
+          ${isRunning ? 'border-l-2 border-l-slate-500/60' : ''}
         `}
       >
-        {/* 折叠状态：工具名 + 状态 */}
+        {/* 折叠/展开状态显示 */}
         <div
-          className={`
-            flex items-center justify-between px-3 cursor-pointer select-none
-            ${isExpanded ? 'mb-2' : ''}
-          `}
+          className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          <div className="flex items-center gap-2">
-            {/* 状态指示器 — 极简几何形状 */}
+          <div className="flex items-center gap-2 min-w-0">
+            {/* 状态指示器 */}
             {isRunning ? (
-              <div className="w-2 h-2 rounded-full border border-slate-500 border-t-transparent animate-spin" />
+              <div className="w-3 h-3 rounded-full border-2 border-slate-500 border-t-transparent animate-spin flex-shrink-0" />
             ) : isError ? (
-              <div className="w-2 h-2 rounded-full bg-red-400" />
+              <svg className="w-3 h-3 text-red-400 flex-shrink-0" fill="currentColor" viewBox="0 0 12 12">
+                <circle cx="6" cy="6" r="5" />
+              </svg>
             ) : (
-              <div className="w-2 h-2 rounded-full border-2 border-emerald-400" />
+              <svg className="w-3 h-3 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 12 12">
+                <circle cx="6" cy="6" r="4" />
+              </svg>
             )}
 
-            {/* 工具名 — 等宽字体 */}
-            <span className={`text-xs font-mono ${textColor}`}>
+            {/* 工具名 + 参数摘要 */}
+            <span className={`text-xs font-mono ${textColor} truncate`}>
               {call.name}
+              {paramsSummary && !isExpanded && (
+                <span className="text-slate-600"> {paramsSummary}</span>
+              )}
             </span>
           </div>
 
-          {/* 展开/折叠指示器 */}
-          <div
-            className={`
-              text-xs text-slate-600 transition-transform duration-200
-              ${isExpanded ? 'rotate-90' : ''}
-            `}
-          >
+          <div className={`text-xs text-slate-600 transition-transform duration-200 flex-shrink-0 ml-2 ${isExpanded ? 'rotate-90' : ''}`}>
             ▶
           </div>
         </div>
@@ -99,14 +113,28 @@ function ToolCallBlock({ call }: { call: ToolCall }) {
             {call.params && Object.keys(call.params).length > 0 && (
               <div>
                 <div className="text-xs text-slate-600 mb-1 font-medium">参数</div>
-                <pre className="text-xs text-slate-400 font-mono bg-black/20 rounded p-2 overflow-x-auto">
+                <pre className="text-xs text-slate-400 font-mono bg-black/20 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all">
                   {JSON.stringify(call.params, null, 2)}
                 </pre>
               </div>
             )}
 
-            {/* 错误信息 */}
-            {isError && call.error && (
+            {/* 执行结果 */}
+            {resultText && (
+              <div>
+                <div className="text-xs text-slate-600 mb-1 font-medium">
+                  {isError ? '错误详情' : '返回结果'}
+                </div>
+                <pre className={`text-xs font-mono rounded p-2 overflow-x-auto whitespace-pre-wrap break-all ${
+                  isError ? 'text-red-400 bg-red-950/30' : 'text-slate-400 bg-black/20'
+                }`}>
+                  {truncateResult(resultText)}
+                </pre>
+              </div>
+            )}
+
+            {/* 错误信息（简短版） */}
+            {isError && call.error && !resultText && (
               <div>
                 <div className="text-xs text-red-600 mb-1 font-medium">错误</div>
                 <div className="text-xs text-red-400 font-mono bg-red-950/30 rounded p-2">

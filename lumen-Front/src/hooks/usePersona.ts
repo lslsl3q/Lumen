@@ -3,7 +3,7 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import * as api from '../api/persona';
-import type { PersonaListItem, PersonaCard } from '../types/persona';
+import type { PersonaListItem } from '../types/persona';
 
 export function usePersona() {
   const [personas, setPersonas] = useState<PersonaListItem[]>([]);

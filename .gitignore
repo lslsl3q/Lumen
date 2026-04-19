@@ -44,12 +44,13 @@ env/
 data/
 
 # ========================================
-# 用户个人数据（Persona / 世界书 / 角色，只追踪 default 模板）
+# 用户个人数据（Persona / 世界书 / 角色 / Skills，只追踪 default 模板）
 # ========================================
 lumen/personas/*.json
 lumen/worldbooks/*.json
 lumen/characters/*.json
 lumen/characters/avatars/
+lumen/skills/*.md
 
 # 前端公共资源（头像上传目录，运行时生成）
 lumen-Front/public/avatars/

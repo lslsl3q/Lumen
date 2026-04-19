@@ -80,6 +80,7 @@ export interface ToolCall {
   success?: boolean;
   params?: Record<string, unknown>;
   error?: string;
+  data?: unknown;
 }
 
 /** Memory 调试数据 */
@@ -246,7 +247,7 @@ export function useChat() {
                 const calls = [...(last.toolCalls || [])];
                 const idx = calls.findIndex(c => c.name === event.tool && c.status === 'running');
                 if (idx !== -1) {
-                  calls[idx] = { ...calls[idx], status: 'done', success: event.success, error: event.error };
+                  calls[idx] = { ...calls[idx], status: 'done', success: event.success, error: event.error, data: event.data };
                 }
                 return [...updated.slice(0, -1), { ...last, toolCalls: calls }];
               }

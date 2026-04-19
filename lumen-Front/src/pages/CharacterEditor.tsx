@@ -14,6 +14,7 @@ import {
   getAvatarUrl,
 } from '../api/character';
 import { CharacterFormData } from '../types/character';
+import { useSkills } from '../hooks/useSkills';
 import ModelSelect from '../components/ModelSelect';
 
 /** registry.json 中单个工具的信息 */
@@ -61,11 +62,22 @@ function CharacterEditor() {
     memory_enabled: true,
     memory_token_budget: 300,
     memory_auto_summarize: false,
+    skills: [],
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const { skills: availableSkills } = useSkills();
+
+  const toggleSkill = useCallback((skillId: string) => {
+    setForm(prev => ({
+      ...prev,
+      skills: prev.skills?.includes(skillId)
+        ? prev.skills.filter(s => s !== skillId)
+        : [...(prev.skills || []), skillId],
+    }));
+  }, []);
 
   // UI 状态
   const [isSaving, setIsSaving] = useState(false);
@@ -90,7 +102,6 @@ function CharacterEditor() {
       try {
         setIsLoading(true);
         const char = await getCharacter(id);
-        setCharacterId(id);
         setForm({
           name: char.name,
           description: char.description || '',
@@ -105,6 +116,7 @@ function CharacterEditor() {
           memory_enabled: char.memory_enabled ?? true,
           memory_token_budget: char.memory_token_budget || 300,
           memory_auto_summarize: char.memory_auto_summarize || false,
+          skills: char.skills || [],
         });
         if (char.avatar) {
           setAvatarPreview(getAvatarUrl(char.avatar));
@@ -666,6 +678,65 @@ function CharacterEditor() {
                   );
                 })()}
               </>
+            )}
+          </section>
+
+          {/* Skills 配置 */}
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">Skills 配置</h2>
+            <div className="text-[10px] text-slate-600">
+              Skills 定义 AI 的工作方式。勾选要装备到这个角色的 Skill。
+            </div>
+
+            {availableSkills.length === 0 ? (
+              <div className="text-xs text-slate-600">
+                暂无可用 Skill。
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings/skills')}
+                  className="text-amber-400 hover:underline ml-1"
+                >
+                  去创建
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {availableSkills.map(skill => {
+                  const isActive = form.skills?.includes(skill.id) ?? false;
+                  return (
+                    <div
+                      key={skill.id}
+                      onClick={() => toggleSkill(skill.id)}
+                      className={`
+                        flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-all
+                        ${isActive
+                          ? 'border-amber-500/30 bg-amber-500/5'
+                          : 'border-slate-700/40 bg-slate-800/20 hover:border-slate-600/40'}
+                      `}
+                    >
+                      <div className={`
+                        w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0
+                        ${isActive ? 'border-amber-400 bg-amber-400/20' : 'border-slate-600'}
+                      `}>
+                        {isActive && <span className="text-amber-400 text-xs">&#10003;</span>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm ${isActive ? 'text-amber-300' : 'text-slate-300'}`}>
+                            {skill.name}
+                          </span>
+                          {!skill.enabled && (
+                            <span className="text-xs text-slate-600">(已禁用)</span>
+                          )}
+                        </div>
+                        {skill.description && (
+                          <div className="text-xs text-slate-500 truncate">{skill.description}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </section>
 

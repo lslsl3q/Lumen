@@ -32,6 +32,16 @@ def _build_parts(character: dict, dynamic_context: list[DynamicContext] = None) 
     except Exception:
         pass
 
+    # 第 2.6 层：Skills
+    if character.get("skills"):
+        try:
+            from lumen.prompt.skill_store import get_skills_content
+            skills_text = get_skills_content(character["skills"])
+            if skills_text:
+                layers.append(("Skills", skills_text))
+        except Exception:
+            pass
+
     # 第三层：工具说明
     tools = character.get("tools", [])
     if tools:

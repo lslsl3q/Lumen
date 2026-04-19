@@ -9,6 +9,7 @@ export interface PersonaCard {
   name: string;
   description: string;
   traits: string[];
+  avatar?: string;
 }
 
 /** 创建请求 */
@@ -24,6 +25,7 @@ export interface PersonaUpdatePayload {
   name?: string;
   description?: string;
   traits?: string[];
+  avatar?: string;
 }
 
 /** 切换请求 */

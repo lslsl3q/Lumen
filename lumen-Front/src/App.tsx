@@ -6,6 +6,8 @@ import PersonaList from './pages/PersonaList';
 import PersonaEditor from './pages/PersonaEditor';
 import WorldBookList from './pages/WorldBookList';
 import WorldBookEditor from './pages/WorldBookEditor';
+import SkillList from './pages/SkillList';
+import SkillEditor from './pages/SkillEditor';
 import AvatarManager from './pages/AvatarManager';
 import ConfigList from './pages/ConfigList';
 import ConfigEditor from './pages/ConfigEditor';
@@ -35,6 +37,10 @@ function App() {
         {/* 世界书管理页面 */}
         <Route path="/settings/worldbooks" element={<WorldBookList />} />
         <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
+
+        {/* Skills 管理页面 */}
+        <Route path="/settings/skills" element={<SkillList />} />
+        <Route path="/settings/skills/:id" element={<SkillEditor />} />
 
         {/* 头像管理页面 */}
         <Route path="/settings/avatars" element={<AvatarManager />} />

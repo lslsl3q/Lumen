@@ -27,6 +27,8 @@ class CharacterCard(BaseModel):
     memory_enabled: bool = True              # 跨会话记忆开关
     memory_token_budget: int = 300           # 记忆召回 token 上限
     memory_auto_summarize: bool = False      # 超预算时自动总结（否则截断）
+    # Skills
+    skills: List[str] = []                   # 绑定的 Skill ID 列表
 
 
 class DynamicContext(TypedDict):

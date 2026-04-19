@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getPushClient } from '../api/ws';
-import { PushEvent, AIMessageEvent, NotificationEvent } from '../types/push';
+import { AIMessageEvent, NotificationEvent } from '../types/push';
 
 /** 推送通知条目 */
 export interface PushNotification {
