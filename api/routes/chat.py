@@ -106,6 +106,10 @@ async def stream_chat(req: StreamRequest):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            # 清理可能残留的取消标志，防止下次对话被误判为已取消
+            from lumen.core.chat import _clear_cancel
+            _clear_cancel(session.session_id)
 
         # SSE 连接关闭信号
         yield "data: [DONE]\n\n"

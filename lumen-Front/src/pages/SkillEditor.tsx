@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as api from '../api/skills';
-import type { SkillCard } from '../types/skills';
 
 function SkillEditor() {
   const { id } = useParams<{ id: string }>();

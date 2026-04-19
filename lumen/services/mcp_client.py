@@ -117,13 +117,14 @@ def execute_mcp_tool_sync(tool_name: str, params: dict) -> dict:
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # 已经在异步上下文中，用新线程跑
+            # 已在异步上下文 — 开一个独立线程跑自己的事件循环
             import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                result = pool.submit(
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(
                     asyncio.run,
                     call_mcp_tool(server_name, original_name, params)
-                ).result(timeout=60)
+                )
+                result = future.result(timeout=60)
         else:
             result = loop.run_until_complete(
                 call_mcp_tool(server_name, original_name, params)

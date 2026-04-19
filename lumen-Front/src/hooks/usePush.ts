@@ -5,7 +5,7 @@
  * 数据流：hook → api/ws.ts（不直接操作 DOM 或 WebSocket）
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getPushClient } from '../api/ws';
 import { AIMessageEvent, NotificationEvent } from '../types/push';
 
@@ -23,6 +23,7 @@ export interface PushNotification {
 export function usePush() {
   const [notifications, setNotifications] = useState<PushNotification[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // 连接 WebSocket 并注册事件处理器
   useEffect(() => {
@@ -67,6 +68,8 @@ export function usePush() {
       unsubAI();
       unsubNotif();
       client.disconnect();
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
       setConnectionStatus('disconnected');
     };
   }, []);
@@ -79,10 +82,11 @@ export function usePush() {
     };
     setNotifications(prev => [...prev, notification]);
 
-    // 5 秒后自动移除
-    setTimeout(() => {
+    // 5 秒后自动移除（保存引用，卸载时清理）
+    const timer = setTimeout(() => {
       setNotifications(prev => prev.filter(item => item.id !== notification.id));
     }, 5000);
+    timersRef.current.push(timer);
   }, []);
 
   /** 手动关闭通知 */

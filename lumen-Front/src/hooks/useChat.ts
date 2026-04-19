@@ -205,7 +205,8 @@ export function useChat() {
     setIsLoading(true);
     setError(null);
 
-    // 创建新的 AbortController
+    // 创建新的 AbortController（先 abort 旧的，防止竞态）
+    abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
     try {

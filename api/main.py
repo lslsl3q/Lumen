@@ -72,6 +72,13 @@ async def root():
     }
 
 
+@app.on_event("shutdown")
+async def shutdown():
+    """程序退出时关闭数据库连接"""
+    from lumen.services import history
+    history.close_conn()
+
+
 # 启动服务
 if __name__ == "__main__":
     print("""

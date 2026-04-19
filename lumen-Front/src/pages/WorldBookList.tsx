@@ -1,7 +1,6 @@
 /**
  * 世界书列表页
  */
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorldBook } from '../hooks/useWorldBook';
 
@@ -28,6 +27,14 @@ function WorldBookList() {
         keywords: [],
         content: '',
         enabled: true,
+        case_sensitive: false,
+        whole_word: true,
+        position: 'before_user',
+        depth: 4,
+        order: 0,
+        scan_depth: 10,
+        character_ids: [],
+        comment: '',
       });
       // 使用后端返回的 ID 导航
       navigate(`/settings/worldbooks/${result.id}`);

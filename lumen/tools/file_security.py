@@ -58,6 +58,13 @@ _SYSTEM_BLACKLIST = _build_blacklist()
 # 敏感文件名（不管在哪个目录都禁止）
 _SENSITIVE_FILENAMES = {".env", "credentials.json", "id_rsa", "id_ed25519"}
 
+# Windows 保留设备名（访问会导致系统异常）
+_WINDOWS_DEVICE_NAMES = {
+    "con", "prn", "aux", "nul",
+    "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+    "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+}
+
 
 # ========================================
 # 工作区管理
@@ -148,9 +155,11 @@ def is_in_blacklist(real_path: str) -> bool:
 
 
 def is_sensitive_filename(path: str) -> bool:
-    """检查文件名是否敏感（.env、密钥文件等）"""
+    """检查文件名是否敏感（.env、密钥文件、Windows 设备名等）"""
     filename = os.path.basename(path).lower()
-    return filename in _SENSITIVE_FILENAMES
+    # 去掉扩展名后再检查设备名（con.txt → con）
+    stem = os.path.splitext(filename)[0]
+    return filename in _SENSITIVE_FILENAMES or stem in _WINDOWS_DEVICE_NAMES
 
 
 def is_in_workspace(real_path: str) -> bool:
@@ -180,7 +189,15 @@ def validate_path(path: str, require_write: bool = False) -> PathValidationResul
             "reason": str | None,  # 拒绝原因
         }
     """
-    # 1. 解析真实路径
+    # 1. 拒绝 UNC 路径（\\server\share）
+    if len(path) >= 2 and path[0:2] == "\\\\":
+        return {
+            "allowed": False,
+            "real_path": path,
+            "reason": "UNC 路径禁止访问",
+        }
+
+    # 2. 解析真实路径
     try:
         real_path = resolve_path(path)
     except Exception as e:
@@ -190,7 +207,17 @@ def validate_path(path: str, require_write: bool = False) -> PathValidationResul
             "reason": f"路径解析失败: {e}",
         }
 
-    # 2. 检查系统黑名单
+    # 3. 符号链接防护：解析后的真实路径也必须通过黑名单检查
+    #     （防止工作区内创建指向系统目录的符号链接）
+    if real_path != os.path.normpath(os.path.abspath(path)):
+        if is_in_blacklist(real_path):
+            return {
+                "allowed": False,
+                "real_path": real_path,
+                "reason": f"符号链接指向系统敏感目录，禁止访问: {real_path}",
+            }
+
+    # 4. 检查系统黑名单
     if is_in_blacklist(real_path):
         return {
             "allowed": False,
@@ -198,7 +225,7 @@ def validate_path(path: str, require_write: bool = False) -> PathValidationResul
             "reason": f"系统敏感目录，禁止访问: {real_path}",
         }
 
-    # 3. 检查敏感文件名
+    # 5. 检查敏感文件名
     if is_sensitive_filename(real_path):
         return {
             "allowed": False,
@@ -206,9 +233,8 @@ def validate_path(path: str, require_write: bool = False) -> PathValidationResul
             "reason": f"敏感文件，禁止访问: {os.path.basename(real_path)}",
         }
 
-    # 4. 检查工作区白名单
+    # 6. 检查工作区白名单
     if is_in_workspace(real_path):
-        # 在工作区内 — 检查写入权限
         if require_write and is_readonly_mode():
             return {
                 "allowed": False,
@@ -221,7 +247,7 @@ def validate_path(path: str, require_write: bool = False) -> PathValidationResul
             "reason": None,
         }
 
-    # 5. 不在工作区内 — 拒绝并提示
+    # 7. 不在工作区内 — 拒绝并提示
     workspace_dirs = get_workspace_dirs()
     if workspace_dirs:
         dirs_hint = "、".join(workspace_dirs)

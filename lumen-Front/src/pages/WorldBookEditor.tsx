@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as api from '../api/worldbook';
-import type { WorldBookEntry } from '../types/worldbook';
 
 function WorldBookEditor() {
   const { id } = useParams<{ id: string }>();

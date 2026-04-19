@@ -8,6 +8,7 @@ import sqlite3
 import os
 import json
 import logging
+import threading
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -20,26 +21,26 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 
-# 模块级单例连接，整个进程复用同一个
-_conn: Optional[sqlite3.Connection] = None
+# 线程局部存储：每个线程独立连接，避免多线程并发写冲突
+_local = threading.local()
+# 写操作锁：确保同一时刻只有一个线程在写
+_write_lock = threading.Lock()
 
 
 def _get_conn():
-    """获取数据库连接（单例复用，进程内只建立一个连接）"""
-    global _conn
-    if _conn is None:
+    """获取数据库连接（每个线程独立连接，避免 SQLite 线程安全问题）"""
+    if not hasattr(_local, "conn") or _local.conn is None:
         os.makedirs(DATA_DIR, exist_ok=True)
-        _conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        _conn.row_factory = sqlite3.Row
-    return _conn
+        _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True)
+        _local.conn.row_factory = sqlite3.Row
+    return _local.conn
 
 
 def close_conn():
-    """关闭数据库连接（程序退出时调用）"""
-    global _conn
-    if _conn is not None:
-        _conn.close()
-        _conn = None
+    """关闭当前线程的数据库连接（程序退出时调用）"""
+    if hasattr(_local, "conn") and _local.conn is not None:
+        _local.conn.close()
+        _local.conn = None
 
 
 def _migrate_add_metadata():
@@ -115,12 +116,13 @@ def new_session(character_id: str = "default") -> str:
     """创建新会话，返回会话ID"""
     session_id = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     now = datetime.now().isoformat()
-    conn = _get_conn()
-    conn.execute(
-        "INSERT INTO sessions (id, character_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
-        (session_id, character_id, now, now),
-    )
-    conn.commit()
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            "INSERT INTO sessions (id, character_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (session_id, character_id, now, now),
+        )
+        conn.commit()
     return session_id
 
 
@@ -136,17 +138,17 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
     now = datetime.now().isoformat()
     metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
 
-    conn = _get_conn()
-    conn.execute(
-        "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
-        (session_id, role, content, metadata_json, now),
-    )
-    # 更新会话的最后活跃时间
-    conn.execute(
-        "UPDATE sessions SET updated_at = ? WHERE id = ?",
-        (now, session_id),
-    )
-    conn.commit()
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+            (session_id, role, content, metadata_json, now),
+        )
+        conn.execute(
+            "UPDATE sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
+        conn.commit()
 
 
 def load_session(session_id: str) -> list[Message]:
@@ -207,22 +209,24 @@ def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
 
 def delete_session(session_id: str):
     """删除一个会话及其所有消息和摘要"""
-    conn = _get_conn()
-    conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
-    conn.execute("DELETE FROM summaries WHERE session_id = ?", (session_id,))
-    conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-    conn.commit()
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM summaries WHERE session_id = ?", (session_id,))
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.commit()
 
 
 def save_summary(session_id: str, character_id: str, summary: str):
     """保存会话摘要"""
     now = datetime.now().isoformat()
-    conn = _get_conn()
-    conn.execute(
-        "INSERT INTO summaries (session_id, character_id, summary, created_at) VALUES (?, ?, ?, ?)",
-        (session_id, character_id, summary, now),
-    )
-    conn.commit()
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            "INSERT INTO summaries (session_id, character_id, summary, created_at) VALUES (?, ?, ?, ?)",
+            (session_id, character_id, summary, now),
+        )
+        conn.commit()
 
 
 def load_summaries(character_id: str, limit: int = 3) -> list:
@@ -314,18 +318,14 @@ def get_authors_note(session_id: str) -> Optional[Dict[str, Any]]:
 
 
 def save_authors_note(session_id: str, note_json: Optional[str]):
-    """写入或清除会话的 Author's Note
-
-    Args:
-        session_id: 会话 ID
-        note_json: JSON 字符串，或 None（清除 note）
-    """
-    conn = _get_conn()
-    conn.execute(
-        "UPDATE sessions SET authors_note = ? WHERE id = ?",
-        (note_json, session_id),
-    )
-    conn.commit()
+    """写入或清除会话的 Author's Note"""
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            "UPDATE sessions SET authors_note = ? WHERE id = ?",
+            (note_json, session_id),
+        )
+        conn.commit()
 
 
 # ========================================
@@ -335,21 +335,23 @@ def save_authors_note(session_id: str, note_json: Optional[str]):
 def replace_session_messages(session_id: str, messages: list[Message]):
     """原子替换会话的所有消息（compact 用）
 
-    在事务中：删除旧消息 → 插入新消息。保证不会丢数据。
+    在显式事务中：删除旧消息 → 插入新消息。保证不会丢数据。
     """
     now = datetime.now().isoformat()
-    conn = _get_conn()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
-        for msg in messages:
-            metadata_json = json.dumps(msg.get("metadata"), ensure_ascii=False) if msg.get("metadata") else None
-            cursor.execute(
-                "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
-                (session_id, msg["role"], msg["content"], metadata_json, now),
-            )
-        conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"替换会话 {session_id} 消息失败: {e}")
-        raise
+    with _write_lock:
+        conn = _get_conn()
+        cursor = conn.cursor()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            cursor.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            for msg in messages:
+                metadata_json = json.dumps(msg.get("metadata"), ensure_ascii=False) if msg.get("metadata") else None
+                cursor.execute(
+                    "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+                    (session_id, msg["role"], msg["content"], metadata_json, now),
+                )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"替换会话 {session_id} 消息失败: {e}")
+            raise

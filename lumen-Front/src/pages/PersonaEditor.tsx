@@ -104,7 +104,7 @@ function PersonaEditor() {
           name: trimmedName,
           description: description.trim(),
           traits,
-          avatar,
+          avatar: avatar ?? undefined,
         });
       } else {
         const trimmedId = personaId.trim();
@@ -117,7 +117,6 @@ function PersonaEditor() {
           name: trimmedName,
           description: description.trim(),
           traits,
-          avatar,
         });
       }
 

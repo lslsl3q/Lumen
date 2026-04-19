@@ -115,15 +115,22 @@ class ChatSession:
 
 
 class SessionManager:
-    """全局会话管理器（单例）"""
+    """全局会话管理器（单例，带最大容量限制）"""
 
     _instance: Optional["SessionManager"] = None
     _sessions: Dict[str, ChatSession] = {}
+    MAX_SESSIONS = 50
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
+    def _evict_if_needed(self):
+        """超过最大容量时淘汰最早的会话"""
+        while len(self._sessions) > self.MAX_SESSIONS:
+            oldest_key = next(iter(self._sessions))
+            del self._sessions[oldest_key]
 
     def get_or_create(self, session_id: str = "default") -> ChatSession:
         """获取或创建会话
@@ -131,40 +138,25 @@ class SessionManager:
         优先从内存获取，若不在内存则查数据库：
         - 数据库存在 → 加载已有会话（带历史消息）
         - 数据库不存在 → 创建新会话
-
-        Args:
-            session_id: 会话ID
-
-        Returns:
-            ChatSession 实例
         """
         if session_id not in self._sessions:
             from lumen.services import history as history_service
             info = history_service.get_session_info(session_id)
             if info:
-                # 数据库中存在，加载已有会话（触发 _initialize_existing）
                 self._sessions[session_id] = ChatSession(
                     character_id=info["character_id"],
                     session_id=session_id,
                 )
             else:
-                # 数据库中也不存在，创建新会话
                 self._sessions[session_id] = ChatSession(character_id="default")
+            self._evict_if_needed()
         return self._sessions[session_id]
 
     def create_new(self, character_id: str = "default") -> ChatSession:
-        """创建新会话（生成新 ID）
-
-        Args:
-            character_id: 角色ID
-
-        Returns:
-            新创建的 ChatSession 实例
-        """
+        """创建新会话（生成新 ID）"""
         session = ChatSession(character_id=character_id)
-        # 用 _initialize_new() 生成的实际 session_id（datetime 格式）作为字典 key
-        # 之前用 uuid 做 key 导致 key 和 session.session_id 不一致，API 无法通过返回的 id 找到会话
         self._sessions[session.session_id] = session
+        self._evict_if_needed()
         return session
 
     def get(self, session_id: str) -> Optional[ChatSession]:
