@@ -5,6 +5,7 @@ Lumen - 记忆系统
 """
 
 import logging
+import os
 
 from lumen.services import history
 from lumen.services.llm import chat
@@ -13,25 +14,22 @@ from lumen.types.messages import Message
 
 logger = logging.getLogger(__name__)
 
-# 中英文停用词（高频但无语义价值的词）
+# 停用词：jieba 的 POS 过滤已经去掉了大部分虚词，这里兜底
 _STOP_WORDS = {
-    # 中文
     "的", "了", "是", "在", "我", "你", "他", "她", "它", "这", "那",
     "吗", "呢", "吧", "啊", "哦", "嗯", "好", "好的", "对", "不",
-    "有", "和", "就", "也", "都", "要", "会", "可以", "能", "但",
     "什么", "怎么", "为什么", "一个", "一些", "这个", "那个",
-    # 英文
-    "the", "a", "an", "is", "are", "was", "were", "be", "been",
-    "have", "has", "had", "do", "does", "did", "will", "would",
-    "can", "could", "should", "may", "might", "must",
-    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
-    "my", "your", "his", "its", "our", "their",
-    "and", "or", "but", "if", "then", "so", "no", "not",
-    "this", "that", "these", "those", "what", "which", "who",
-    "how", "when", "where", "why",
-    "yes", "yeah", "ok", "okay", "well", "just", "like", "really",
-    "very", "too", "also", "still", "already",
 }
+
+# jieba TF-IDF 只保留这些词性的词
+_MEANINGFUL_POS = ('n', 'nr', 'ns', 'nt', 'nz', 'v', 'vn', 'eng')
+
+# 自定义词典路径
+_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+_USER_DICT_PATH = os.path.join(_DATA_DIR, "user_dict.txt")
+
+# 词典加载状态（只加载一次，除非显式 reload）
+_dict_loaded = False
 
 
 async def generate_summary(messages: list[Message]) -> str:
@@ -109,43 +107,80 @@ def get_memory_context(character_id: str) -> str:
     return memory_text
 
 
-# 单字虚词 — 包含这些字的 bigram 优先级低（不大可能是实义词）
-_FUNC_CHARS = set("的了过得地是在有和就也都要会能但吗呢吧啊哦嗯我你他她这那")
+def reload_user_dict() -> int:
+    """加载自定义词典（角色名 + 世界书关键词 + 用户词典）
+
+    首次调用时加载，后续调用跳过（除非强制重新加载）。
+    返回加载的词数。
+    """
+    global _dict_loaded
+    if _dict_loaded:
+        return 0
+
+    count = 0
+    import jieba
+
+    # 1. 加载用户词典文件
+    if os.path.exists(_USER_DICT_PATH):
+        try:
+            jieba.load_userdict(_USER_DICT_PATH)
+            with open(_USER_DICT_PATH, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        count += 1
+        except Exception as e:
+            logger.warning(f"加载用户词典失败: {e}")
+
+    # 2. 角色名 → 人名词典
+    try:
+        from lumen.prompt.character import CHARACTERS_DIR
+        if os.path.exists(CHARACTERS_DIR):
+            for filename in os.listdir(CHARACTERS_DIR):
+                if filename.endswith(".json"):
+                    char_id = filename[:-5]  # 去掉 .json
+                    jieba.add_word(char_id, freq=100, tag="nr")
+                    count += 1
+    except Exception:
+        pass
+
+    # 3. 世界书关键词 → 专有名词词典
+    try:
+        from lumen.prompt.worldbook_store import list_worldbooks
+        for entry in list_worldbooks():
+            for kw in entry.get("keywords", []):
+                if kw and len(kw) >= 2:
+                    jieba.add_word(kw, freq=100, tag="nz")
+                    count += 1
+    except Exception:
+        pass
+
+    _dict_loaded = True
+    if count > 0:
+        logger.info(f"jieba 自定义词典已加载: {count} 个词")
+    return count
 
 
 def _extract_keywords(text: str, max_keywords: int = 8) -> list[str]:
-    """从用户输入中提取搜索关键词（滑动窗口 bigram，不依赖分词库）
-
-    中文没有空格分隔词语，贪婪正则会把整句当一个"词"。
-    用 2 字滑动窗口（bigram）拆分，过滤停用词后取最可能有意义的词。
-    含虚词字符的 bigram 排到后面，让实义词优先。
-    """
-    import re
-
-    # 英文单词（3+字母，按空格自然分隔）
-    en_words = re.findall(r'[a-zA-Z]{3,}', text)
-    candidates = [(w.lower(), False) for w in en_words]
-
-    # 中文 bigram：提取连续汉字段，每段做 2 字滑动窗口
-    cn_segments = re.findall(r'[\u4e00-\u9fff]{2,}', text)
-    for seg in cn_segments:
-        for i in range(len(seg) - 1):
-            pair = seg[i:i + 2]
-            # 标记是否含虚词字符
-            has_func = pair[0] in _FUNC_CHARS or pair[1] in _FUNC_CHARS
-            candidates.append((pair, has_func))
-
-    # 排序：不含虚词的优先，同优先级内保持原顺序
-    seen = set()
-    keywords = []
-    for w, _ in sorted(candidates, key=lambda x: (x[1], candidates.index(x))):
-        if w not in _STOP_WORDS and w not in seen:
-            seen.add(w)
-            keywords.append(w)
-            if len(keywords) >= max_keywords:
-                break
-
-    return keywords
+    """从用户输入中提取搜索关键词（jieba TF-IDF + 词性过滤）"""
+    import jieba
+    jieba.setLogLevel(logging.WARNING)
+    try:
+        import jieba.analyse
+        keywords = jieba.analyse.extract_tags(
+            text,
+            topK=max_keywords,
+            allowPOS=_MEANINGFUL_POS,
+        )
+        # 过滤停用词和过短的词
+        return [kw for kw in keywords if kw not in _STOP_WORDS and len(kw) >= 2]
+    except Exception as e:
+        logger.warning(f"jieba TF-IDF 提取失败，回退到基础分词: {e}")
+        try:
+            import jieba
+            return [w for w in jieba.cut(text) if w not in _STOP_WORDS and len(w) >= 2][:max_keywords]
+        except Exception:
+            return []
 
 
 def get_relevant_memories(
@@ -166,6 +201,7 @@ def get_relevant_memories(
         (注入文本, 召回记录列表)
         召回记录: [{"keyword": ..., "source": "sqlite", "results": N, "tokens": N}, ...]
     """
+    reload_user_dict()
     keywords = _extract_keywords(user_input)
     recall_log = []
 
