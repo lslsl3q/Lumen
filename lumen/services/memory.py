@@ -29,6 +29,19 @@ _STOP_WORDS = {
 # jieba TF-IDF 只保留这些词性的词
 _MEANINGFUL_POS = ('n', 'nr', 'ns', 'nt', 'nz', 'v', 'vn', 'eng')
 
+# 消息过滤：低信息量模式（不需要存向量）
+_DENIAL_PATTERNS = (
+    "没有", "没聊过", "没问过", "没说过", "没讨论过", "没提到",
+    "不知道", "不记得", "不确定", "不清楚",
+    "好的", "是的", "对的", "没问题", "收到", "明白", "了解",
+    "嗯", "嗯嗯", "哦", "哈哈", "谢谢",
+    "这是第一次", "第一次聊", "第一次说",
+    "确实没有", "确实没", "当然没有", "并没有",
+)
+_USER_NOISE_PATTERNS = (
+    "你好", "在吗", "在不在", "哈喽", "hello", "hi",
+)
+
 # 自定义词典路径
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 _USER_DICT_PATH = os.path.join(_DATA_DIR, "user_dict.txt")
@@ -188,9 +201,114 @@ def _extract_keywords(text: str, max_keywords: int = 8) -> list[str]:
             return []
 
 
+def _is_worth_indexing(content: str, role: str) -> bool:
+    """判断消息是否值得存入向量库
+
+    过滤掉低信息量的废话：否认、确认、寒暄、纯短句。
+    这些消息会严重污染语义搜索，让"没聊过XX"的噪音淹没真正有用的信息。
+    """
+    text = content.strip()
+
+    # 太短 — 没有实质内容（用户 10 字以上，AI 15 字以上）
+    min_len = 10 if role == "user" else 15
+    if len(text) < min_len:
+        return False
+
+    # AI 回复：检查否认/确认模式
+    if role == "assistant":
+        first_sentence = text.split("。")[0].split("，")[0].strip()
+        for pattern in _DENIAL_PATTERNS:
+            if first_sentence.startswith(pattern):
+                return False
+
+    # 用户消息：检查纯寒暄
+    if role == "user":
+        for pattern in _USER_NOISE_PATTERNS:
+            if text.lower().startswith(pattern):
+                return False
+
+    return True
+
+
+def _format_context_block(hit: dict, msg_id: int | None, window: int = 2) -> str:
+    """把命中消息扩展成上下文片段
+
+    格式：[会话 X 回忆片段]
+         用户: ...
+         AI: ... (命中)
+         用户: ...
+    """
+    session_id = hit.get("session_id", "")
+    lines = [f"[会话 {session_id} 回忆片段]"]
+
+    # 如果有 message_id，查上下文
+    if msg_id:
+        try:
+            ctx = history.get_message_context(session_id, msg_id, window=window)
+            if ctx:
+                for msg in ctx:
+                    role_label = "用户" if msg["role"] == "user" else "AI"
+                    lines.append(f"{role_label}: {msg['content'][:200]}")
+                return "\n".join(lines)
+        except Exception:
+            pass
+
+    # 回退：只显示命中消息本身
+    role_label = "用户" if hit["role"] == "user" else "AI"
+    lines.append(f"{role_label}: {hit['content'][:200]}")
+    return "\n".join(lines)
+
+
+def _rrf_merge(
+    vector_hits: list[dict],
+    bm25_hits: list[dict],
+    k: int = 60,
+    vector_weight: float = 0.6,
+    bm25_weight: float = 0.4,
+) -> list[dict]:
+    """RRF (Reciprocal Rank Fusion) 融合向量搜索和 BM25 结果
+
+    每条结果的 RRF 分数 = Σ(权重 / (k + 排名))
+    k=60 是标准值，用于平滑排名差异。
+
+    Args:
+        vector_hits: 向量搜索结果（按 score 排序）
+        bm25_hits: BM25 搜索结果（按 bm25_score 排序）
+        k: RRF 平滑常数
+        vector_weight: 向量搜索权重
+        bm25_weight: BM25 搜索权重
+
+    Returns:
+        合并后的结果列表（按 rrf_score 降序）
+    """
+    # key = (session_id, content前100字) 用于去重
+    scores: dict[tuple, dict] = {}
+
+    # 向量搜索排名
+    for rank, hit in enumerate(vector_hits):
+        key = (hit.get("session_id", ""), hit.get("content", "")[:100])
+        rrf = vector_weight / (k + rank + 1)
+        if key not in scores:
+            scores[key] = {**hit, "rrf_score": 0.0}
+        scores[key]["rrf_score"] += rrf
+
+    # BM25 排名
+    for rank, hit in enumerate(bm25_hits):
+        key = (hit.get("session_id", ""), hit.get("content", "")[:100])
+        rrf = bm25_weight / (k + rank + 1)
+        if key not in scores:
+            scores[key] = {**hit, "rrf_score": 0.0}
+        scores[key]["rrf_score"] += rrf
+
+    # 按融合分数排序
+    return sorted(scores.values(), key=lambda x: x["rrf_score"], reverse=True)
+
+
 async def vectorize_message(message_id: int, content: str, role: str,
                             session_id: str, character_id: str, created_at: str = ""):
     """异步计算消息向量并存入 TriviumDB（不阻塞对话流）"""
+    if not _is_worth_indexing(content, role):
+        return
     try:
         from lumen.services import embedding
         vector = await embedding.encode(content)
@@ -208,6 +326,7 @@ async def get_relevant_memories(
     character_id: str,
     token_budget: int = 300,
     auto_summarize: bool = False,
+    session_id: str = "",
 ) -> tuple[str, list[dict]]:
     """跨会话记忆召回（向量语义搜索优先，jieba 关键词回退）
 
@@ -216,6 +335,7 @@ async def get_relevant_memories(
         character_id: 角色ID
         token_budget: 记忆注入的 token 上限
         auto_summarize: 超预算时是否自动总结（默认截断）
+        session_id: 当前会话ID（排除自身消息）
 
     Returns:
         (注入文本, 召回记录列表)
@@ -231,11 +351,21 @@ async def get_relevant_memories(
         query_vector = await embedding.encode(user_input)
         if query_vector:
             from lumen.services import vector_store
-            hits = vector_store.search_similar(query_vector, character_id)
+            vector_hits = vector_store.search_similar(query_vector, character_id, exclude_session_id=session_id)
+
+            # 提取关键词做 FTS5 BM25 搜索
+            reload_user_dict()
+            keywords = _extract_keywords(user_input)
+            bm25_hits = []
+            if keywords:
+                bm25_hits = history.search_messages_bm25(keywords, character_id, limit=10, exclude_session_id=session_id)
+
+            # RRF 融合：向量 + BM25
+            hits = _rrf_merge(vector_hits, bm25_hits)
 
             recall_log = [{
-                "keyword": "(语义搜索)",
-                "source": "sqlite",
+                "keyword": f"(混合检索: 向量{len(vector_hits)}条 + BM25{len(bm25_hits)}条)",
+                "source": "hybrid",
                 "results": len(hits),
                 "tokens": 0,
                 "messages": [{
@@ -260,18 +390,19 @@ async def get_relevant_memories(
                     return fallback, recall_log
                 return "", recall_log
 
-            # 按 token 预算裁剪
-            sorted_hits = sorted(hits, key=lambda h: h.get("created_at", ""), reverse=True)
+            # 按 RRF 分数排序，token 预算裁剪（带上下文窗口）
+            sorted_hits = sorted(hits, key=lambda h: h.get("rrf_score", 0), reverse=True)
             selected = []
             used_tokens = 0
             for hit in sorted_hits:
-                role_label = "用户" if hit["role"] == "user" else "AI"
-                line = f"[会话 {hit['session_id']}] {role_label}: {hit['content'][:200]}"
-                line_tokens = estimate_text_tokens(line)
-                if used_tokens + line_tokens > token_budget:
+                # 获取上下文窗口（命中消息前后各 2 条）
+                msg_id = hit.get("message_id") or hit.get("id")
+                context_block = _format_context_block(hit, msg_id)
+                block_tokens = estimate_text_tokens(context_block)
+                if used_tokens + block_tokens > token_budget:
                     break
-                selected.append(line)
-                used_tokens += line_tokens
+                selected.append(context_block)
+                used_tokens += block_tokens
 
             if not selected:
                 return "", recall_log
@@ -281,7 +412,7 @@ async def get_relevant_memories(
             return output, recall_log
 
     # 回退：jieba 关键词搜索
-    return _get_relevant_memories_jieba(user_input, character_id, token_budget, auto_summarize)
+    return _get_relevant_memories_jieba(user_input, character_id, token_budget, auto_summarize, session_id=session_id)
 
 
 def _get_relevant_memories_jieba(
@@ -289,6 +420,7 @@ def _get_relevant_memories_jieba(
     character_id: str,
     token_budget: int = 300,
     auto_summarize: bool = False,
+    session_id: str = "",
 ) -> tuple[str, list[dict]]:
     """基于关键词搜索历史消息，返回格式化的记忆文本
 
@@ -322,7 +454,7 @@ def _get_relevant_memories_jieba(
     # 搜索每个关键词
     all_hits = {}  # (session_id, content[:100]) -> hit dict，去重用
     for kw in keywords:
-        hits = history.search_messages(kw, character_id, limit=5)
+        hits = history.search_messages(kw, character_id, limit=5, exclude_session_id=session_id)
         kw_messages = []
         kw_result_count = 0
         for hit in hits:
@@ -353,15 +485,15 @@ def _get_relevant_memories_jieba(
     used_tokens = 0
 
     for hit in sorted_hits:
-        role_label = "用户" if hit["role"] == "user" else "AI"
-        line = f"[会话 {hit['session_id']}] {role_label}: {hit['content'][:200]}"
-        line_tokens = estimate_text_tokens(line)
+        msg_id = hit.get("id")
+        context_block = _format_context_block(hit, msg_id)
+        block_tokens = estimate_text_tokens(context_block)
 
-        if used_tokens + line_tokens > token_budget:
+        if used_tokens + block_tokens > token_budget:
             break
 
-        selected.append(line)
-        used_tokens += line_tokens
+        selected.append(context_block)
+        used_tokens += block_tokens
 
     if not selected:
         return "", recall_log

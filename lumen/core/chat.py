@@ -168,6 +168,7 @@ async def _inject_relevant_memories(
     user_input: str,
     character_id: str,
     character_config: dict,
+    session_id: str = "",
 ) -> tuple[list[Message], list[dict]]:
     """基于用户输入搜索历史消息，注入相关记忆（语义优先，关键词回退）
 
@@ -186,6 +187,7 @@ async def _inject_relevant_memories(
         user_input, character_id,
         token_budget=token_budget,
         auto_summarize=auto_summarize,
+        session_id=session_id,
     )
 
     if not memory_text:
@@ -239,7 +241,7 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
 
     trimmed = _prepare_messages(session.messages, session.character_id)
     trimmed = _inject_authors_note(trimmed, session.session_id)
-    trimmed, _ = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
+    trimmed, _ = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
 
     response = await chat(trimmed, model, stream=False)
 
@@ -295,7 +297,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         trimmed = _inject_authors_note(trimmed, session.session_id)
         trimmed = _inject_worldbook(trimmed, session.character_id)
         if iteration == 0:
-            trimmed, recall_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
+            trimmed, recall_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
 
         # /tokens 记忆调试：yield 提示词分层信息
         if memory_debug and iteration == 0:

@@ -64,6 +64,7 @@ def search_similar(
     character_id: str,
     top_k: int = 10,
     min_score: float = 0.4,
+    exclude_session_id: str = "",
 ) -> list[dict]:
     """向量语义搜索
 
@@ -72,6 +73,7 @@ def search_similar(
         character_id: 角色ID（用于过滤）
         top_k: 返回前 K 个结果
         min_score: 最低相似度阈值
+        exclude_session_id: 排除当前会话的消息
 
     Returns:
         [{"role", "content", "session_id", "created_at", "score"}, ...]
@@ -86,6 +88,9 @@ def search_similar(
         # 过滤：只保留同角色的结果
         if payload.get("character_id") != character_id:
             continue
+        # 排除当前会话的消息
+        if exclude_session_id and payload.get("session_id") == exclude_session_id:
+            continue
         # 去重
         key = (payload.get("session_id", ""), payload.get("content", "")[:100])
         if key in seen:
@@ -97,6 +102,7 @@ def search_similar(
             "content": payload.get("content", ""),
             "session_id": payload.get("session_id", ""),
             "created_at": payload.get("created_at", ""),
+            "message_id": payload.get("message_id", 0),
             "score": hit.score if hasattr(hit, "score") else 0.0,
         })
         if len(hits) >= top_k:

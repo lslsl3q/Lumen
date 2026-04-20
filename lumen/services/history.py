@@ -74,6 +74,118 @@ def _migrate_add_authors_note():
         logger.info("数据库迁移: 完成")
 
 
+def _init_fts5(conn):
+    """初始化 FTS5 全文索引（unicode61 + jieba 分词，支持中文 BM25）"""
+    cursor = conn.cursor()
+
+    # 检查 FTS5 表是否已存在
+    existing = cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='messages_fts'"
+    ).fetchone()
+
+    if not existing:
+        logger.info("初始化 FTS5 全文索引（unicode61 + jieba 分词）...")
+        cursor.execute("""
+            CREATE VIRTUAL TABLE messages_fts USING fts5(
+                content,
+                tokenize='unicode61'
+            )
+        """)
+        # 用现有数据填充索引（jieba 分词后存入）
+        _rebuild_fts5_index(cursor)
+        conn.commit()
+        logger.info("FTS5 全文索引初始化完成")
+
+
+def _rebuild_fts5_index(cursor):
+    """重建 FTS5 索引：对每条消息做 jieba 分词后存入"""
+    import jieba
+    rows = cursor.execute("SELECT id, content FROM messages WHERE role != 'system'").fetchall()
+    for row in rows:
+        msg_id = row["id"]
+        content = row["content"]
+        if not content or len(content) < 5:
+            continue
+        # jieba 分词，空格连接
+        tokens = " ".join(jieba.cut(content))
+        cursor.execute("INSERT INTO messages_fts(rowid, content) VALUES(?, ?)", (msg_id, tokens))
+
+
+def _sync_fts5_insert(message_id: int, content: str):
+    """消息插入后同步 FTS5 索引"""
+    try:
+        conn = _get_conn()
+        conn.execute("INSERT INTO messages_fts(rowid, content) VALUES(?, ?)", (message_id, content))
+        conn.commit()
+    except Exception as e:
+        logger.debug(f"FTS5 同步失败: {e}")
+
+
+def search_messages_bm25(
+    keywords: list[str],
+    character_id: str,
+    limit: int = 10,
+    exclude_session_id: str = "",
+) -> list[dict]:
+    """FTS5 BM25 全文搜索（trigram 分词，支持中文）
+
+    Args:
+        keywords: 搜索关键词列表（jieba 提取的）
+        character_id: 限定角色
+        limit: 最多返回条数
+        exclude_session_id: 排除当前会话的消息
+
+    Returns:
+        [{"role", "content", "session_id", "created_at", "bm25_score"}, ...]
+    """
+    if not keywords:
+        return []
+
+    # trigram 模式下，用 OR 连接每个关键词
+    # 每个关键词用双引号包裹，作为短语匹配
+    query = " OR ".join(f'"{kw}"' for kw in keywords)
+
+    conn = _get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT m.id, m.role, m.content, m.session_id, m.created_at,
+                   bm25(messages_fts) AS score
+            FROM messages_fts f
+            JOIN messages m ON m.id = f.rowid
+            JOIN sessions s ON m.session_id = s.id
+            WHERE messages_fts MATCH ?
+              AND s.character_id = ?
+              AND m.role != 'system'
+              AND (? = '' OR m.session_id != ?)
+            ORDER BY score
+            LIMIT ?
+        """, (query, character_id, exclude_session_id, exclude_session_id, limit)).fetchall()
+    except Exception as e:
+        logger.warning(f"FTS5 搜索失败，回退 LIKE: {e}")
+        return []
+
+    results = []
+    for row in rows:
+        content = row["content"]
+        if not content or len(content) < 5:
+            continue
+        if any(marker in content for marker in [
+            '"type": "tool_call', '"type":"tool_call',
+            '{"success":', '{"error_code":',
+            '<tool_result', '<<<[TOOL_REQUEST]',
+        ]):
+            continue
+        results.append({
+            "id": row["id"],
+            "role": row["role"],
+            "content": content,
+            "session_id": row["session_id"],
+            "created_at": row["created_at"],
+            "bm25_score": -row["score"],  # bm25() 返回负值，取反变正
+        })
+    return results
+
+
 def _init_db():
     """初始化数据库，创建表（只在第一次运行时执行）"""
     conn = _get_conn()
@@ -106,6 +218,7 @@ def _init_db():
     # 数据库迁移
     _migrate_add_metadata()
     _migrate_add_authors_note()
+    _init_fts5(conn)
 
 
 # 程序启动时自动初始化数据库
@@ -152,7 +265,20 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
             (now, session_id),
         )
         conn.commit()
-        return cursor.lastrowid
+        msg_id = cursor.lastrowid or 0
+        # 同步 FTS5 索引（jieba 分词后存入）
+        if role != "system" and content and len(content) >= 5:
+            try:
+                import jieba
+                tokens = " ".join(jieba.cut(content))
+                conn.execute(
+                    "INSERT INTO messages_fts(rowid, content) VALUES(?, ?)",
+                    (msg_id, tokens),
+                )
+                conn.commit()
+            except Exception:
+                pass
+        return msg_id
 
 
 def load_session(session_id: str) -> list[Message]:
@@ -245,13 +371,14 @@ def load_summaries(character_id: str, limit: int = 3) -> list:
     return [(row["session_id"], row["summary"]) for row in rows]
 
 
-def search_messages(keyword: str, character_id: str, limit: int = 10) -> list:
+def search_messages(keyword: str, character_id: str, limit: int = 10, exclude_session_id: str = "") -> list:
     """跨会话搜索消息（关键词模糊匹配）
 
     Args:
         keyword: 搜索关键词
         character_id: 限定角色的会话
         limit: 最多返回条数
+        exclude_session_id: 排除当前会话的消息
 
     Returns:
         [{"role": ..., "content": ..., "session_id": ..., "created_at": ...}, ...]
@@ -265,16 +392,17 @@ def search_messages(keyword: str, character_id: str, limit: int = 10) -> list:
     pattern = f"%{escaped}%"
     rows = conn.execute(
         """
-        SELECT m.role, m.content, m.session_id, m.created_at
+        SELECT m.id, m.role, m.content, m.session_id, m.created_at
         FROM messages m
         JOIN sessions s ON m.session_id = s.id
         WHERE s.character_id = ?
           AND m.role != 'system'
           AND m.content LIKE ? ESCAPE '\\'
+          AND (? = '' OR m.session_id != ?)
         ORDER BY m.id DESC
         LIMIT ?
         """,
-        (character_id, pattern, limit),
+        (character_id, pattern, exclude_session_id, exclude_session_id, limit),
     ).fetchall()
 
     results = []
@@ -290,6 +418,7 @@ def search_messages(keyword: str, character_id: str, limit: int = 10) -> list:
         ]):
             continue
         results.append({
+            "id": row["id"],
             "role": row["role"],
             "content": content,
             "session_id": row["session_id"],
@@ -361,3 +490,26 @@ def replace_session_messages(session_id: str, messages: list[Message]):
             conn.rollback()
             logger.error(f"替换会话 {session_id} 消息失败: {e}")
             raise
+
+
+def get_message_context(session_id: str, center_id: int, window: int = 2) -> list[dict[str, str]]:
+    """获取某条消息的前后上下文
+
+    Args:
+        session_id: 会话 ID
+        center_id: 中心消息 ID
+        window: 前后各取几条（默认 2）
+
+    Returns:
+        [{"role", "content"}, ...] 上下文消息列表
+    """
+    conn = _get_conn()
+    rows = conn.execute("""
+        SELECT role, content FROM messages
+        WHERE session_id = ?
+          AND role != 'system'
+          AND id BETWEEN ? AND ?
+        ORDER BY id
+    """, (session_id, center_id - window, center_id + window)).fetchall()
+
+    return [{"role": row["role"], "content": row["content"]} for row in rows]
