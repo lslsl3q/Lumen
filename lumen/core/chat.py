@@ -5,7 +5,8 @@ Lumen - 对话核心模块
 
 import json
 import logging
-from typing import AsyncGenerator
+import asyncio
+from typing import Any, AsyncGenerator
 
 import jsonschema
 
@@ -30,21 +31,49 @@ from lumen.types.events import SSEEvent
 
 logger = logging.getLogger(__name__)
 
-# 会话级取消标志：{session_id: True}
-_cancel_flags: dict[str, bool] = {}
+
+async def _save_and_vectorize(session_id: str, role: str, content: str,
+                              character_id: str, metadata: dict[str, Any] | None = None) -> int:
+    """保存消息并异步计算向量（仅 user/assistant 真实对话内容）"""
+    msg_id = history.save_message(session_id, role, content, metadata)
+    if role in ("user", "assistant") and content and len(content) >= 5:
+        from lumen.services.memory import vectorize_message
+        asyncio.create_task(vectorize_message(msg_id, content, role, session_id, character_id))
+    return msg_id
+
+# 会话级取消标志：{session_id: timestamp}
+# 值存时间戳，用于清理超时的废弃 key
+_cancel_flags: dict[str, float] = {}
+_CANCEL_TTL = 300  # 5 分钟超时，超过则视为废弃
 
 
 def request_cancel(session_id: str):
     """外部调用来请求取消某个会话的流式生成"""
-    _cancel_flags[session_id] = True
+    import time
+    _cancel_flags[session_id] = time.time()
 
 
 def _is_cancelled(session_id: str) -> bool:
-    return _cancel_flags.get(session_id, False)
+    return session_id in _cancel_flags
 
 
 def _clear_cancel(session_id: str):
     _cancel_flags.pop(session_id, None)
+    # 顺便清理超时的废弃 key（防御性）
+    if len(_cancel_flags) > 20:
+        import time
+        now = time.time()
+        expired = [k for k, t in _cancel_flags.items() if now - t > _CANCEL_TTL]
+        for k in expired:
+            _cancel_flags.pop(k, None)
+
+
+def _find_last_user_index(messages: list[Message]) -> int:
+    """从后往前找最后一条 user 消息的索引，没找到返回 -1"""
+    for i in range(len(messages) - 1, -1, -1):
+        if messages[i]["role"] == "user":
+            return i
+    return -1
 
 
 def _prepare_messages(messages: list[Message], character_id: str = "default") -> list[Message]:
@@ -69,13 +98,7 @@ def _inject_authors_note(messages: list[Message], session_id: str) -> list[Messa
     if not config or not config.enabled or not config.content.strip():
         return messages
 
-    # 找最后一条 user 消息的位置（从后往前找）
-    last_user_idx = -1
-    for i in range(len(messages) - 1, -1, -1):
-        if messages[i]["role"] == "user":
-            last_user_idx = i
-            break
-
+    last_user_idx = _find_last_user_index(messages)
     if last_user_idx == -1:
         return messages
 
@@ -94,76 +117,59 @@ def _inject_worldbook(messages: list[Message], character_id: str) -> list[Messag
     """
     from lumen.prompt.worldbook_matcher import get_injection_context
 
-    # 获取世界书动态上下文
-    worldbook_contexts = get_injection_context(
-        messages,
-        character_id
-    )
-
+    worldbook_contexts = get_injection_context(messages, character_id)
     if not worldbook_contexts:
         return messages
 
-    # 找到最后一条 user 消息的位置
-    last_user_idx = -1
-    for i in range(len(messages) - 1, -1, -1):
-        if messages[i]["role"] == "user":
-            last_user_idx = i
-            break
-
+    last_user_idx = _find_last_user_index(messages)
     if last_user_idx == -1:
-        # 没有 user 消息，注入到末尾
+        result = list(messages)
         for ctx in worldbook_contexts:
-            messages.append({"role": "system", "content": ctx["content"]})
-        return messages
-
-    # 按 injection_point 分组注入
-    before_sys_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "before_sys"]
-    after_sys_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "after_sys"]
-    before_user_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "before_user"]
-    after_user_msgs = [ctx for ctx in worldbook_contexts if ctx["injection_point"] == "after_user"]
-
-    # 构建新消息列表
-    result = []
-
-    # before_sys: 插入到第一条消息之前（系统提示词前）
-    if before_sys_msgs:
-        for ctx in before_sys_msgs:
             result.append({"role": "system", "content": ctx["content"]})
+        return result
 
-    # 原有消息
-    result.extend(messages)
+    # 按注入点分组
+    before_sys = [c for c in worldbook_contexts if c["injection_point"] == "before_sys"]
+    after_sys = [c for c in worldbook_contexts if c["injection_point"] == "after_sys"]
+    before_user = [c for c in worldbook_contexts if c["injection_point"] == "before_user"]
+    after_user = [c for c in worldbook_contexts if c["injection_point"] == "after_user"]
 
-    # after_sys: 插入到第一条消息之后（系统提示词后）
-    if after_sys_msgs:
-        # 找第一条消息的插入位置
-        insert_idx = 1 if len(messages) > 0 else 0
-        for ctx in reversed(after_sys_msgs):  # 倒序插入，保持顺序
-            result.insert(insert_idx, {"role": "system", "content": ctx["content"]})
-
-    # before_user: 插入到最后一条 user 消息之前
-    if before_user_msgs:
-        insert_idx = last_user_idx
-        for ctx in before_user_msgs:
-            result.insert(insert_idx, {"role": "system", "content": ctx["content"]})
-            insert_idx += 1
-
-    # after_user: 插入到最后一条 user 消息之后
-    if after_user_msgs:
-        insert_idx = last_user_idx + 1
-        for ctx in after_user_msgs:
-            result.insert(insert_idx, {"role": "system", "content": ctx["content"]})
-            insert_idx += 1
+    # 顺序构建，避免索引偏移 bug
+    result = []
+    # before_sys: 第一条消息之前
+    for ctx in before_sys:
+        result.append({"role": "system", "content": ctx["content"]})
+    # 第一条消息（system prompt）
+    if messages:
+        result.append(messages[0])
+    # after_sys: 系统提示词之后
+    for ctx in after_sys:
+        result.append({"role": "system", "content": ctx["content"]})
+    # 中间消息（从第 2 条到 last_user_idx 之前）
+    for msg in messages[1:last_user_idx]:
+        result.append(msg)
+    # before_user: 最后一条 user 消息之前
+    for ctx in before_user:
+        result.append({"role": "system", "content": ctx["content"]})
+    # 最后一条 user 消息
+    result.append(messages[last_user_idx])
+    # after_user: 最后一条 user 消息之后
+    for ctx in after_user:
+        result.append({"role": "system", "content": ctx["content"]})
+    # 剩余消息
+    for msg in messages[last_user_idx + 1:]:
+        result.append(msg)
 
     return result
 
 
-def _inject_relevant_memories(
+async def _inject_relevant_memories(
     messages: list[Message],
     user_input: str,
     character_id: str,
     character_config: dict,
 ) -> tuple[list[Message], list[dict]]:
-    """基于用户输入关键词搜索历史消息，注入相关记忆
+    """基于用户输入搜索历史消息，注入相关记忆（语义优先，关键词回退）
 
     只在第一轮迭代调用，返回 (注入后的消息列表, 召回记录)
     """
@@ -176,7 +182,7 @@ def _inject_relevant_memories(
     token_budget = character_config.get("memory_token_budget", 300)
     auto_summarize = character_config.get("memory_auto_summarize", False)
 
-    memory_text, recall_log = get_relevant_memories(
+    memory_text, recall_log = await get_relevant_memories(
         user_input, character_id,
         token_budget=token_budget,
         auto_summarize=auto_summarize,
@@ -185,13 +191,7 @@ def _inject_relevant_memories(
     if not memory_text:
         return messages, recall_log
 
-    # 找到最后一条 user 消息之前插入
-    last_user_idx = -1
-    for i in range(len(messages) - 1, -1, -1):
-        if messages[i]["role"] == "user":
-            last_user_idx = i
-            break
-
+    last_user_idx = _find_last_user_index(messages)
     if last_user_idx == -1:
         return messages, recall_log
 
@@ -201,7 +201,7 @@ def _inject_relevant_memories(
     return result, recall_log
 
 
-def validate_tool_call(tool_name: str, tool_params: dict) -> str:
+def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
     """验证 AI 的工具调用是否正确
 
     Returns:
@@ -227,7 +227,7 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str:
 async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     """非流式：等AI想完了再一次性返回"""
     session.messages.append({"role": "user", "content": user_input})
-    history.save_message(session.session_id, "user", user_input)
+    await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
 
     # 加载角色配置（模型 + compact）
     character_config = load_character(session.character_id)
@@ -239,7 +239,7 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
 
     trimmed = _prepare_messages(session.messages, session.character_id)
     trimmed = _inject_authors_note(trimmed, session.session_id)
-    trimmed, _ = _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
+    trimmed, _ = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -248,9 +248,9 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     if usage:
         record_usage(session.session_id, usage["input_tokens"], usage["output_tokens"])
 
-    reply = response.choices[0].message.content
+    reply = response.choices[0].message.content or ""
     session.messages.append({"role": "assistant", "content": reply})
-    history.save_message(session.session_id, "assistant", reply)
+    await _save_and_vectorize(session.session_id or "default", "assistant", reply, session.character_id)
     return reply
 
 
@@ -264,7 +264,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         SSEEvent — TypedDict 类型的事件（text/done/tool_start/tool_result/status/memory_debug）
     """
     session.messages.append({"role": "user", "content": user_input})
-    history.save_message(session.session_id, "user", user_input)
+    await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
 
     _clear_cancel(session.session_id)
 
@@ -283,6 +283,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
 
     exit_reason = "completed"
     tool_iterations = 0
+    recall_log = []
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         if _is_cancelled(session.session_id):
@@ -294,7 +295,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         trimmed = _inject_authors_note(trimmed, session.session_id)
         trimmed = _inject_worldbook(trimmed, session.character_id)
         if iteration == 0:
-            trimmed, recall_log = _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
+            trimmed, recall_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config)
 
         # /tokens 记忆调试：yield 提示词分层信息
         if memory_debug and iteration == 0:
@@ -322,6 +323,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         full_text = ""
 
         async for chunk in response:
+            if not chunk.choices:
+                continue
             content = chunk.choices[0].delta.content
             if not content:
                 continue
@@ -372,7 +375,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             if tool_iterations > 0:
                 exit_reason = "completed_after_tools"
             session.messages.append({"role": "assistant", "content": full_text})
-            history.save_message(session.session_id, "assistant", full_text)
+            await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
             logger.info(f"[ReAct] 循环结束: {exit_reason}，共 {tool_iterations} 轮工具调用")
             yield {"type": "done", "exit_reason": exit_reason}
             return
@@ -386,7 +389,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         logger.info(f"[ReAct 第{iteration + 1}轮] 检测到工具调用: {tool_call.get('mode')}")
 
         session.messages.append({"role": "assistant", "content": full_text})
-        history.save_message(session.session_id, "assistant", full_text)
+        await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
 
         mode = tool_call.get("mode", "single")
 
@@ -509,11 +512,13 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
 
     final_reply = ""
     async for chunk in response:
+        if not chunk.choices:
+            continue
         content = chunk.choices[0].delta.content
         if content:
             final_reply += content
             yield {"type": "text", "content": content}
 
     session.messages.append({"role": "assistant", "content": final_reply})
-    history.save_message(session.session_id, "assistant", final_reply)
+    await _save_and_vectorize(session.session_id or "default", "assistant", final_reply, session.character_id)
     yield {"type": "done", "exit_reason": exit_reason}

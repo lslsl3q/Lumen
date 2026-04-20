@@ -15,6 +15,10 @@ function SkillEditor() {
     description: '',
     content: '',
     enabled: true,
+    when_to_use: '',
+    argument_hint: '',
+    priority: 0,
+    script: '',
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -27,7 +31,16 @@ function SkillEditor() {
       try {
         setIsLoading(true);
         const data = await api.getSkill(id);
-        setForm({ name: data.name, description: data.description, content: data.content, enabled: data.enabled });
+        setForm({
+          name: data.name,
+          description: data.description,
+          content: data.content,
+          enabled: data.enabled,
+          when_to_use: data.when_to_use || '',
+          argument_hint: data.argument_hint || '',
+          priority: data.priority || 0,
+          script: data.script || '',
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败');
       } finally {
@@ -96,6 +109,56 @@ function SkillEditor() {
               placeholder="一句话说明这个 Skill 做什么"
             />
           </div>
+
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">使用时机 <span className="text-slate-600">(帮助 AI 判断何时使用)</span></label>
+            <input
+              value={form.when_to_use}
+              onChange={(e) => setForm(f => ({ ...f, when_to_use: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              placeholder="如：当用户需要写作帮助、创意灵感时"
+            />
+            <p className="text-xs text-slate-600 mt-1">AI 会根据这段描述自主判断是否使用此 Skill</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">优先级</label>
+              <input
+                type="number"
+                value={form.priority}
+                onChange={(e) => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+                placeholder="0"
+              />
+              <p className="text-xs text-slate-600 mt-1">数字越大，越优先注入</p>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">参数提示 <span className="text-slate-600">(可选)</span></label>
+              <input
+                value={form.argument_hint}
+                onChange={(e) => setForm(f => ({ ...f, argument_hint: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+                placeholder="[主题或需求]"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* 脚本配置 */}
+        <section className="space-y-4">
+          <h2 className="text-sm font-medium text-slate-500 uppercase tracking-wide">脚本配置 <span className="text-slate-600 normal-case">(可选)</span></h2>
+          <div>
+            <input
+              value={form.script}
+              onChange={(e) => setForm(f => ({ ...f, script: e.target.value }))}
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all font-mono text-sm"
+              placeholder="scripts/run.py"
+            />
+            <p className="text-xs text-slate-600 mt-1">
+              脚本路径（相对于 skill 目录），调用时自动执行并注入输出。脚本可通过 lumen_skill_api 调用 Lumen 工具。
+            </p>
+          </div>
         </section>
 
         {/* 提示词内容 */}
@@ -107,10 +170,10 @@ function SkillEditor() {
               onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))}
               rows={10}
               className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all font-mono text-sm resize-y"
-              placeholder="定义 AI 在使用这个 Skill 时应该遵循的工作流程...&#10;&#10;例如：&#10;1. 先了解用户的目标&#10;2. 按步骤提供建议&#10;3. 保持专业但友好的语气"
+              placeholder={`定义 AI 在使用这个 Skill 时应该遵循的工作流程...\n\n建议格式：\n## Goal\n目标描述\n\n## 原则\n1. 原则一\n2. 原则二`}
             />
             <p className="text-xs text-slate-600 mt-1">
-              这段文字会作为系统提示词注入，告诉 AI 按什么方式工作
+              建议 Goal + 原则/步骤 的结构化格式，帮助 AI 理解工作流程
             </p>
           </div>
         </section>
@@ -118,7 +181,10 @@ function SkillEditor() {
         {/* 启用开关 */}
         <section>
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">启用此 Skill</span>
+            <div>
+              <span className="text-sm text-slate-400">启用此 Skill</span>
+              <p className="text-xs text-slate-600">关闭后不注入提示词，但仍可通过命令调用</p>
+            </div>
             <button
               onClick={() => setForm(f => ({ ...f, enabled: !f.enabled }))}
               className={`w-10 h-5 rounded-full transition-colors ${form.enabled ? 'bg-emerald-500/40' : 'bg-slate-700/40'}`}

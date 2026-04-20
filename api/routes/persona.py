@@ -5,7 +5,7 @@ Persona 管理 API 接口
 
 from fastapi import APIRouter, HTTPException
 
-from lumen.types.persona import PersonaCreateRequest, PersonaUpdateRequest
+from lumen.types.persona import PersonaCreateRequest, PersonaUpdateRequest, SwitchPersonaRequest
 
 router = APIRouter()
 
@@ -58,9 +58,9 @@ async def api_create_persona(req: PersonaCreateRequest):
 
 
 @router.post("/switch")
-async def api_switch_persona(payload: dict):
+async def api_switch_persona(req: SwitchPersonaRequest):
     """切换激活的 Persona，同时刷新所有内存中会话的 system prompt"""
-    persona_id = payload.get("persona_id")
+    persona_id = req.persona_id
 
     try:
         set_active_persona(persona_id)
@@ -71,8 +71,7 @@ async def api_switch_persona(payload: dict):
 
     # 刷新所有内存中会话的 system prompt
     manager = get_session_manager()
-    for session_id, session in manager._sessions.items():
-        session.reload_system_prompt()
+    manager.reload_all_system_prompts()
 
     return {
         "message": f"已切换 Persona: {persona_id or '(无)'}",

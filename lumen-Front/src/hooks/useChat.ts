@@ -28,7 +28,7 @@ function extractToolCalls(content: string): ToolCall[] {
   const singleRegex = /"type"\s*:\s*"tool_call"\s*,.*?"tool"\s*:\s*"([^"]+)"/g;
   let m;
   while ((m = singleRegex.exec(content)) !== null) {
-    calls.push({ name: m[1], status: 'done' });
+    calls.push({ callId: _nextCallId++, name: m[1], status: 'done' });
   }
   // 匹配并行工具调用：{"type": "tool_call_parallel", "calls": [{"tool": "xxx", ...}, ...]}
   const parallelRegex = /"type"\s*:\s*"tool_call_parallel"\s*,.*?"calls"\s*:\s*\[([\s\S]*?)\]/g;
@@ -36,7 +36,7 @@ function extractToolCalls(content: string): ToolCall[] {
     const inner = /"tool"\s*:\s*"([^"]+)"/g;
     let im;
     while ((im = inner.exec(m[1])) !== null) {
-      calls.push({ name: im[1], status: 'done' });
+      calls.push({ callId: _nextCallId++, name: im[1], status: 'done' });
     }
   }
   return calls;
@@ -75,6 +75,7 @@ function stripToolJson(content: string): string {
 
 /** 工具调用追踪 */
 export interface ToolCall {
+  callId: number;   // 唯一标识，用于匹配 tool_result
   name: string;
   status: 'running' | 'done';
   success?: boolean;
@@ -122,6 +123,9 @@ export interface Message {
 function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
+
+/** 工具调用自增 ID（解决同名并行工具匹配问题） */
+let _nextCallId = 0;
 
 
 export function useChat() {
@@ -235,6 +239,7 @@ export function useChat() {
                 const raw = event.tool;
                 const toolNames = (Array.isArray(raw) ? raw : [raw]).filter((n): n is string => typeof n === 'string');
                 const newCalls: ToolCall[] = toolNames.map(name => ({
+                  callId: _nextCallId++,
                   name,
                   status: 'running' as const,
                   params: event.params,

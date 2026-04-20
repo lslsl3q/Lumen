@@ -47,3 +47,17 @@ export async function deleteSkill(id: string): Promise<void> {
   const res = await fetch(`${API_BASE_URL}/skills/${encodeURIComponent(id)}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`删除失败: ${res.status}`);
 }
+
+export async function uploadSkill(file: File): Promise<{ imported: SkillCard[] }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE_URL}/skills/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `上传失败: ${res.status}`);
+  }
+  return res.json();
+}

@@ -1,0 +1,3 @@
+[submodule "vendor/TriviumDB"]
+	path = vendor/TriviumDB
+	url = https://github.com/YoKONCy/TriviumDB.git

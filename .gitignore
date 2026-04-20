@@ -50,7 +50,8 @@ lumen/personas/*.json
 lumen/worldbooks/*.json
 lumen/characters/*.json
 lumen/characters/avatars/
-lumen/skills/*.md
+lumen/skills/*
+!lumen/skills/README.md
 
 # 前端公共资源（头像上传目录，运行时生成）
 lumen-Front/public/avatars/
@@ -95,6 +96,8 @@ pip-wheel-metadata/
 # 临时文件
 # ========================================
 *.tmp
+*.tdb.*
+*.tdb
 *.bak
 *.swp
 *~.nib

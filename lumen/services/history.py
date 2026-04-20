@@ -126,7 +126,7 @@ def new_session(character_id: str = "default") -> str:
     return session_id
 
 
-def save_message(session_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None):
+def save_message(session_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> int:
     """保存一条消息到数据库
 
     Args:
@@ -134,13 +134,16 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
         role: 消息角色（user/assistant/system）
         content: 消息内容
         metadata: 消息元数据（可选），会转换为 JSON 存储
+
+    Returns:
+        消息 ID（用于后续向量存储）
     """
     now = datetime.now().isoformat()
     metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
 
     with _write_lock:
         conn = _get_conn()
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
             (session_id, role, content, metadata_json, now),
         )
@@ -149,6 +152,7 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
             (now, session_id),
         )
         conn.commit()
+        return cursor.lastrowid
 
 
 def load_session(session_id: str) -> list[Message]:
@@ -256,7 +260,9 @@ def search_messages(keyword: str, character_id: str, limit: int = 10) -> list:
         return []
 
     conn = _get_conn()
-    pattern = f"%{keyword}%"
+    # 转义 LIKE 通配符，防止改变匹配语义
+    escaped = keyword.replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
     rows = conn.execute(
         """
         SELECT m.role, m.content, m.session_id, m.created_at
@@ -264,7 +270,7 @@ def search_messages(keyword: str, character_id: str, limit: int = 10) -> list:
         JOIN sessions s ON m.session_id = s.id
         WHERE s.character_id = ?
           AND m.role != 'system'
-          AND m.content LIKE ?
+          AND m.content LIKE ? ESCAPE '\\'
         ORDER BY m.id DESC
         LIMIT ?
         """,

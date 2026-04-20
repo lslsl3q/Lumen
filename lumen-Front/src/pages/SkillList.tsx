@@ -3,10 +3,11 @@
  */
 import { useNavigate } from 'react-router-dom';
 import { useSkills } from '../hooks/useSkills';
+import * as api from '../api/skills';
 
 function SkillList() {
   const navigate = useNavigate();
-  const { skills, isLoading, create, remove } = useSkills();
+  const { skills, isLoading, create, remove, refresh } = useSkills();
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`确定删除 Skill「${name}」吗？`)) return;
@@ -29,6 +30,24 @@ function SkillList() {
     }
   };
 
+  const handleImport = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.md,.zip';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const result = await api.uploadSkill(file);
+        alert(`成功导入 ${result.imported.length} 个 Skill`);
+        refresh();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : '导入失败');
+      }
+    };
+    input.click();
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       {/* 顶栏 */}
@@ -42,12 +61,20 @@ function SkillList() {
           </button>
           <h1 className="text-2xl font-bold">Skills 管理</h1>
         </div>
-        <button
-          onClick={handleCreate}
-          className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all"
-        >
-          + 新建 Skill
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleImport}
+            className="px-4 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-400 hover:bg-slate-800/60 transition-all"
+          >
+            导入
+          </button>
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all"
+          >
+            + 新建 Skill
+          </button>
+        </div>
       </div>
 
       {/* 说明 */}
@@ -94,6 +121,9 @@ function SkillList() {
                 </div>
                 {skill.description && (
                   <p className="text-sm text-slate-500 line-clamp-2">{skill.description}</p>
+                )}
+                {skill.when_to_use && (
+                  <p className="text-xs text-slate-600 mt-1 line-clamp-1">触发: {skill.when_to_use}</p>
                 )}
               </div>
             ))}

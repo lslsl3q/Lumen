@@ -6,19 +6,36 @@ Lumen - 世界书匹配引擎
 import re
 import logging
 from typing import List, Dict, Optional
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
 
+def _contains_cjk(text: str) -> bool:
+    """检查文本是否包含 CJK 字符（中日韩统一表意文字）"""
+    for ch in text:
+        if '\u4e00' <= ch <= '\u9fff' or '\u3400' <= ch <= '\u4dbf' or '\uf900' <= ch <= '\ufaff':
+            return True
+    return False
+
+
 def compile_keyword_pattern(keyword: str, case_sensitive: bool, whole_word: bool) -> re.Pattern:
-    """编译关键词匹配模式"""
+    """编译关键词匹配模式
+
+    全词匹配策略：
+    - 纯 ASCII 关键词：使用 \\b 单词边界
+    - 含 CJK 字符：\\b 对中文无效，改用前后不允许 CJK 字符的断言
+    """
     flags = 0 if case_sensitive else re.IGNORECASE
 
     if whole_word:
-        # 全词匹配：使用单词边界
-        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if _contains_cjk(keyword):
+            # CJK 全词匹配：前后不能是 CJK 字符（\b 对中文无效）
+            cjk_range = '\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff'
+            pattern = f'(?<![{cjk_range}])' + re.escape(keyword) + f'(?![{cjk_range}])'
+        else:
+            pattern = r'\b' + re.escape(keyword) + r'\b'
     else:
-        # 部分匹配
         pattern = re.escape(keyword)
 
     return re.compile(pattern, flags)
@@ -62,7 +79,7 @@ def match_worldbooks(
         case_sensitive = entry.get("case_sensitive", False)
         whole_word = entry.get("whole_word", True)
 
-        # 检查是否匹配
+        # 检查主关键词是否匹配
         is_matched = False
         for keyword in keywords:
             pattern = compile_keyword_pattern(keyword, case_sensitive, whole_word)
@@ -74,8 +91,31 @@ def match_worldbooks(
             if is_matched:
                 break
 
-        if is_matched:
-            matched.append(entry)
+        if not is_matched:
+            continue
+
+        # 次关键词条件检查
+        if entry.get("selective", False):
+            secondary_keywords = entry.get("secondary_keywords", [])
+            logic = entry.get("selective_logic", "and")
+
+            if secondary_keywords:
+                secondary_matched = False
+                for kw in secondary_keywords:
+                    pattern = compile_keyword_pattern(kw, case_sensitive, whole_word)
+                    for msg in recent_messages:
+                        if pattern.search(msg.get("content", "")):
+                            secondary_matched = True
+                            break
+                    if secondary_matched:
+                        break
+
+                if logic == "and" and not secondary_matched:
+                    continue  # AND 模式：次关键词没命中 → 跳过
+                elif logic == "not" and secondary_matched:
+                    continue  # NOT 模式：次关键词命中了 → 跳过
+
+        matched.append(entry)
 
     # 按 order（优先级）和 depth（深度）排序
     matched.sort(key=lambda x: (x.get("order", 0), x.get("depth", 4)))

@@ -20,6 +20,9 @@ class WorldBookEntry(BaseModel):
 
     # === 触发条件 ===
     keywords: List[str] = Field(..., description="触发关键词列表")
+    secondary_keywords: List[str] = Field(default_factory=list, description="次关键词列表（配合 selective 使用）")
+    selective: bool = Field(default=False, description="是否启用次关键词条件")
+    selective_logic: Literal["and", "not"] = Field(default="and", description="and=次关键词也必须命中 / not=次关键词不能命中")
     case_sensitive: bool = Field(default=False, description="是否区分大小写")
     whole_word: bool = Field(default=True, description="是否全词匹配")
 
@@ -49,6 +52,9 @@ class WorldBookCreateRequest(BaseModel):
     keywords: List[str]
     content: str
     enabled: bool = True
+    secondary_keywords: List[str] = []
+    selective: bool = False
+    selective_logic: Literal["and", "not"] = "and"
     case_sensitive: bool = False
     whole_word: bool = True
     position: Literal["before_sys", "after_sys", "before_user", "after_user"] = "before_user"
@@ -65,6 +71,9 @@ class WorldBookUpdateRequest(BaseModel):
     enabled: Optional[bool] = None
     keywords: Optional[List[str]] = None
     content: Optional[str] = None
+    secondary_keywords: Optional[List[str]] = None
+    selective: Optional[bool] = None
+    selective_logic: Optional[Literal["and", "not"]] = None
     case_sensitive: Optional[bool] = None
     whole_word: Optional[bool] = None
     position: Optional[Literal["before_sys", "after_sys", "before_user", "after_user"]] = None

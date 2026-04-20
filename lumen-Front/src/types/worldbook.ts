@@ -7,6 +7,9 @@ export interface WorldBookEntry {
   name: string;
   enabled: boolean;
   keywords: string[];
+  secondary_keywords: string[];
+  selective: boolean;
+  selective_logic: 'and' | 'not';
   content: string;
   case_sensitive: boolean;
   whole_word: boolean;

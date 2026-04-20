@@ -16,6 +16,10 @@ PyPDF2>=3.0.0
 # 中文分词
 jieba>=0.42
 
+# 语义搜索
+sentence-transformers
+triviumdb
+
 # API 服务
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0

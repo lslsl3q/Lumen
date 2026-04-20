@@ -118,12 +118,12 @@ class SessionManager:
     """全局会话管理器（单例，带最大容量限制）"""
 
     _instance: Optional["SessionManager"] = None
-    _sessions: Dict[str, ChatSession] = {}
-    MAX_SESSIONS = 50
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance._sessions: Dict[str, ChatSession] = {}
+            cls._instance.MAX_SESSIONS = 50
         return cls._instance
 
     def _evict_if_needed(self):
@@ -178,6 +178,11 @@ class SessionManager:
         """
         if session_id in self._sessions:
             del self._sessions[session_id]
+
+    def reload_all_system_prompts(self):
+        """重载所有内存中会话的系统提示词（Persona 切换后调用）"""
+        for session in self._sessions.values():
+            session.reload_system_prompt()
 
 
 # 全局单例

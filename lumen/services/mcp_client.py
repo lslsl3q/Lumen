@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import threading
 from typing import Any
 
 from mcp import ClientSession
@@ -21,6 +22,37 @@ MCP_CONFIG_PATH = os.path.join(
 
 # 缓存：{server_name: {"tools": [...], "config": {...}}}
 _discovered: dict[str, dict] = {}
+
+# 持久事件循环线程（复用，避免每次调用都 asyncio.run）
+_loop: asyncio.AbstractEventLoop | None = None
+_loop_thread: threading.Thread | None = None
+_loop_ready = threading.Event()
+
+
+def _ensure_loop():
+    """确保后台事件循环线程已启动"""
+    global _loop, _loop_thread
+    if _loop is not None and _loop.is_running():
+        return
+
+    def _run_loop():
+        global _loop
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+        _loop_ready.set()
+        _loop.run_forever()
+
+    _loop_ready.clear()
+    _loop_thread = threading.Thread(target=_run_loop, daemon=True, name="mcp-loop")
+    _loop_thread.start()
+    _loop_ready.wait(timeout=5)
+
+
+def _run_async(coro):
+    """在持久事件循环中运行异步协程并等待结果"""
+    _ensure_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, _loop)
+    return future.result(timeout=60)
 
 
 def load_mcp_config() -> list[dict]:
@@ -103,6 +135,7 @@ def execute_mcp_tool_sync(tool_name: str, params: dict) -> dict:
     """同步包装器：供 tools/base.py 的 execute_tool 调用
 
     解析工具名格式 mcp__{server}__{tool}，调用对应 MCP 服务器
+    使用持久事件循环线程，避免每次调用都创建新的事件循环
     """
     from lumen.tools.types import ErrorCode
     from lumen.tools.base import success_result, error_result
@@ -115,21 +148,7 @@ def execute_mcp_tool_sync(tool_name: str, params: dict) -> dict:
     original_name = parts[2]
 
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # 已在异步上下文 — 开一个独立线程跑自己的事件循环
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(
-                    asyncio.run,
-                    call_mcp_tool(server_name, original_name, params)
-                )
-                result = future.result(timeout=60)
-        else:
-            result = loop.run_until_complete(
-                call_mcp_tool(server_name, original_name, params)
-            )
-
+        result = _run_async(call_mcp_tool(server_name, original_name, params))
         return success_result(tool_name, str(result))
     except Exception as e:
         return error_result(tool_name, ErrorCode.EXEC_FAILED, f"MCP 工具调用失败: {e}")

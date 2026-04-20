@@ -36,3 +36,8 @@ class PersonaUpdateRequest(BaseModel):
     description: Optional[str] = None
     traits: Optional[List[str]] = None
     avatar: Optional[str] = None        # 头像 URL
+
+
+class SwitchPersonaRequest(BaseModel):
+    """API 切换激活 Persona 请求"""
+    persona_id: Optional[str] = None

@@ -32,11 +32,11 @@ def _build_parts(character: dict, dynamic_context: list[DynamicContext] = None) 
     except Exception:
         pass
 
-    # 第 2.6 层：Skills
+    # 第 2.6 层：Skills（渐进式披露：清单始终注入 + 完整内容受 token 预算控制）
     if character.get("skills"):
         try:
             from lumen.prompt.skill_store import get_skills_content
-            skills_text = get_skills_content(character["skills"])
+            skills_text = get_skills_content(character["skills"], token_budget=800)
             if skills_text:
                 layers.append(("Skills", skills_text))
         except Exception:

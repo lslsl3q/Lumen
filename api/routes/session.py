@@ -132,8 +132,8 @@ async def delete_session(session_id: str) -> dict:
     """
     try:
         manager = get_session_manager()
-        manager.remove(session_id)  # 从内存中移除
-        history.delete_session(session_id)  # 从数据库中删除
+        history.delete_session(session_id)  # 先从数据库删除
+        manager.remove(session_id)  # 再从内存中移除
 
         return {"message": f"已删除会话：{session_id}"}
 

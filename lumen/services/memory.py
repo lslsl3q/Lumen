@@ -1,11 +1,16 @@
 """
 Lumen - 记忆系统
 会话结束时生成摘要，新会话开始时注入记忆
-跨会话关键词搜索召回
+跨会话语义搜索（向量优先，jieba 关键词回退）
 """
 
 import logging
 import os
+
+import jieba
+import jieba.analyse
+
+jieba.setLogLevel(logging.WARNING)
 
 from lumen.services import history
 from lumen.services.llm import chat
@@ -44,11 +49,16 @@ async def generate_summary(messages: list[Message]) -> str:
     if not chat_msgs:
         return ""
 
-    # 把对话拼成文本，让 AI 做摘要
+    # 把对话拼成文本，让 AI 做摘要（限制长度，防止超出模型上下文）
     conversation_text = ""
+    MAX_SUMMARY_CHARS = 8000
     for msg in chat_msgs:
         role_name = "用户" if msg["role"] == "user" else "AI"
-        conversation_text += f"{role_name}: {msg['content']}\n"
+        line = f"{role_name}: {msg['content']}\n"
+        if len(conversation_text) + len(line) > MAX_SUMMARY_CHARS:
+            conversation_text += f"{role_name}: ...(已截断)\n"
+            break
+        conversation_text += line
 
     # 调 AI 生成摘要
     try:
@@ -163,27 +173,118 @@ def reload_user_dict() -> int:
 
 def _extract_keywords(text: str, max_keywords: int = 8) -> list[str]:
     """从用户输入中提取搜索关键词（jieba TF-IDF + 词性过滤）"""
-    import jieba
-    jieba.setLogLevel(logging.WARNING)
     try:
-        import jieba.analyse
         keywords = jieba.analyse.extract_tags(
             text,
             topK=max_keywords,
             allowPOS=_MEANINGFUL_POS,
         )
-        # 过滤停用词和过短的词
         return [kw for kw in keywords if kw not in _STOP_WORDS and len(kw) >= 2]
     except Exception as e:
         logger.warning(f"jieba TF-IDF 提取失败，回退到基础分词: {e}")
         try:
-            import jieba
             return [w for w in jieba.cut(text) if w not in _STOP_WORDS and len(w) >= 2][:max_keywords]
         except Exception:
             return []
 
 
-def get_relevant_memories(
+async def vectorize_message(message_id: int, content: str, role: str,
+                            session_id: str, character_id: str, created_at: str = ""):
+    """异步计算消息向量并存入 TriviumDB（不阻塞对话流）"""
+    try:
+        from lumen.services import embedding
+        vector = await embedding.encode(content)
+        if vector:
+            from lumen.services import vector_store
+            vector_store.insert_vector(
+                vector, role, content, session_id, character_id, message_id, created_at,
+            )
+    except Exception as e:
+        logger.debug(f"向量计算跳过 (msg {message_id}): {e}")
+
+
+async def get_relevant_memories(
+    user_input: str,
+    character_id: str,
+    token_budget: int = 300,
+    auto_summarize: bool = False,
+) -> tuple[str, list[dict]]:
+    """跨会话记忆召回（向量语义搜索优先，jieba 关键词回退）
+
+    Args:
+        user_input: 当前用户输入
+        character_id: 角色ID
+        token_budget: 记忆注入的 token 上限
+        auto_summarize: 超预算时是否自动总结（默认截断）
+
+    Returns:
+        (注入文本, 召回记录列表)
+    """
+    from lumen.services import embedding
+
+    # 尝试加载模型
+    if not embedding.is_available() and not embedding._failed:
+        await embedding.ensure_loaded()
+
+    # 向量语义搜索
+    if embedding.is_available():
+        query_vector = await embedding.encode(user_input)
+        if query_vector:
+            from lumen.services import vector_store
+            hits = vector_store.search_similar(query_vector, character_id)
+
+            recall_log = [{
+                "keyword": "(语义搜索)",
+                "source": "sqlite",
+                "results": len(hits),
+                "tokens": 0,
+                "messages": [{
+                    "role": h["role"],
+                    "content": h["content"][:500],
+                    "session_id": h["session_id"],
+                    "created_at": h.get("created_at", ""),
+                } for h in hits],
+            }]
+
+            if not hits:
+                fallback = get_memory_context(character_id)
+                if fallback:
+                    fallback_tokens = estimate_text_tokens(fallback)
+                    recall_log.append({
+                        "keyword": "(fallback: 最近摘要)",
+                        "source": "summary",
+                        "results": 1,
+                        "tokens": fallback_tokens,
+                        "messages": [],
+                    })
+                    return fallback, recall_log
+                return "", recall_log
+
+            # 按 token 预算裁剪
+            sorted_hits = sorted(hits, key=lambda h: h.get("created_at", ""), reverse=True)
+            selected = []
+            used_tokens = 0
+            for hit in sorted_hits:
+                role_label = "用户" if hit["role"] == "user" else "AI"
+                line = f"[会话 {hit['session_id']}] {role_label}: {hit['content'][:200]}"
+                line_tokens = estimate_text_tokens(line)
+                if used_tokens + line_tokens > token_budget:
+                    break
+                selected.append(line)
+                used_tokens += line_tokens
+
+            if not selected:
+                return "", recall_log
+
+            recall_log[0]["tokens"] = used_tokens
+            output = "<relevant_history>\n" + "\n".join(selected) + "\n</relevant_history>"
+            return output, recall_log
+
+    # 回退：jieba 关键词搜索
+    return _get_relevant_memories_jieba(user_input, character_id, token_budget, auto_summarize)
+
+
+def _get_relevant_memories_jieba(
     user_input: str,
     character_id: str,
     token_budget: int = 300,

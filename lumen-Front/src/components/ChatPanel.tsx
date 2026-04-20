@@ -390,7 +390,7 @@ function ChatPanel({
           <React.Fragment key={message.id}>
             <MessageBubble message={message} characterName={characterName} characterAvatar={characterAvatar} />
             {message.toolCalls?.map((call, i) => (
-              <ToolCallBlock key={`${call.name}-${i}`} call={call} />
+              <ToolCallBlock key={call.callId} call={call} />
             ))}
           </React.Fragment>
         ))}
