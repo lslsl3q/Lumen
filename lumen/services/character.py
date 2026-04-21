@@ -100,7 +100,7 @@ def delete_character(char_id: str) -> None:
     """删除角色
 
     禁止删除 default 角色
-    同时清理对应的头像文件
+    级联清理：会话 + 向量 + 头像 + 角色文件
     """
     if char_id == "default":
         raise ValueError("不能删除默认角色")
@@ -109,6 +109,17 @@ def delete_character(char_id: str) -> None:
     filepath = os.path.join(CHARACTERS_DIR, f"{char_id}.json")
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"角色不存在: {char_id}")
+
+    # 级联删除：该角色的所有会话（含 FTS5 + 向量）
+    try:
+        from lumen.services import history
+        sessions = history.list_sessions(limit=999)
+        for sess in sessions:
+            if sess.get("character_id") == char_id:
+                history.delete_session(sess["id"])
+                logger.info("级联删除会话: %s", sess["id"])
+    except Exception as e:
+        logger.warning("角色会话级联清理失败: %s", e)
 
     with open(filepath, "r", encoding="utf-8") as f:
         data = json.load(f)

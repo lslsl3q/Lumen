@@ -111,6 +111,32 @@ def search_similar(
     return hits
 
 
+def delete_by_session(session_id: str) -> int:
+    """删除指定会话的所有向量，返回删除数量"""
+    db = _get_db()
+    nodes = db.filter_where({"session_id": session_id})
+    count = 0
+    for node in nodes:
+        db.delete(node.id)
+        count += 1
+    if count:
+        db.flush()
+    return count
+
+
+def delete_by_character(character_id: str) -> int:
+    """删除指定角色的所有向量，返回删除数量"""
+    db = _get_db()
+    nodes = db.filter_where({"character_id": character_id})
+    count = 0
+    for node in nodes:
+        db.delete(node.id)
+        count += 1
+    if count:
+        db.flush()
+    return count
+
+
 def flush():
     """持久化数据到磁盘"""
     global _db

@@ -172,7 +172,9 @@ def search_messages_bm25(
         if not content or len(content) < 5:
             continue
         if any(marker in content for marker in [
+            '"tool":', '"tool" :',
             '"type": "tool_call', '"type":"tool_call',
+            '"calls":', '"calls" :',
             '{"success":', '{"error_code":',
             '<tool_result', '<<<[TOOL_REQUEST]',
         ]):
@@ -346,7 +348,7 @@ def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
 
 
 def delete_session(session_id: str):
-    """删除一个会话及其所有消息、摘要和 FTS5 索引"""
+    """删除一个会话及其所有消息、摘要、FTS5 索引和向量"""
     with _write_lock:
         conn = _get_conn()
         # 收集消息 ID 并批量删除 FTS5 索引
@@ -366,6 +368,15 @@ def delete_session(session_id: str):
         conn.execute("DELETE FROM summaries WHERE session_id = ?", (session_id,))
         conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         conn.commit()
+
+    # 清理 TriviumDB 向量（失败不影响主流程）
+    try:
+        from lumen.services import vector_store
+        count = vector_store.delete_by_session(session_id)
+        if count:
+            logger.info(f"已删除会话 {session_id} 的 {count} 条向量")
+    except Exception as e:
+        logger.warning(f"向量清理失败（不影响已删除的会话）: {e}")
 
 
 def save_summary(session_id: str, character_id: str, summary: str):
@@ -433,7 +444,9 @@ def search_messages(keyword: str, character_id: str, limit: int = 10, exclude_se
             continue
         # 跳过工具调用/结果消息（避免注入无意义内容）
         if any(marker in content for marker in [
+            '"tool":', '"tool" :',
             '"type": "tool_call', '"type":"tool_call',
+            '"calls":', '"calls" :',
             '{"success":', '{"error_code":',
             '<tool_result', '<<<[TOOL_REQUEST]',
         ]):

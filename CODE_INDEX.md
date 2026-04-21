@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-22（T10 工具调用协议改进：软静默流式检测 + JSON修复层 + Think标签事件流）
+**最后更新**：2026-04-22（T9.3 向量库清理 + T9.4 日志系统：级联删除 + RotatingFileHandler）
 
 ---
 
@@ -12,7 +12,7 @@
 ```
 Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
-│   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、SUMMARY_MODEL）
+│   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、日志系统 setup_logging）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
 │   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
@@ -47,9 +47,9 @@ Lumen/
 │   │   ├── llm.py                # LLM适配器（AsyncOpenAI）
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
-│   │   ├── history.py            # SQLite持久化（会话、消息、摘要、跨会话搜索）
-│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25混合检索、噪音过滤、去重）
-│   │   ├── vector_store.py       # 向量存储（TriviumDB 嵌入式向量+图+文档数据库，语义记忆搜索）
+│   │   ├── history.py            # SQLite持久化（会话、消息、摘要、FTS5全文索引、向量级联删除）
+│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25 RRF混合检索、噪音过滤、去重）
+│   │   ├── vector_store.py       # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除）
 │   │   ├── embedding.py          # 文本嵌入（gte-small-zh，sentence-transformers 单例）
 │   │   ├── knowledge.py          # 【预留】知识图谱
 │   │   └── emotion.py            # 【预留】情感引擎

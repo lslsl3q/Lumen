@@ -136,3 +136,46 @@ def get_context_size(character_config: dict = None) -> int:
     if character_config and character_config.get("context_size"):
         return character_config["context_size"]
     return DEFAULT_CONTEXT_SIZE
+
+
+# ── 日志配置 ──
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_DIR = os.path.join(os.path.dirname(__file__), "data", "logs")
+LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", "5242880"))    # 默认 5MB
+LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "3"))   # 保留 3 个轮转文件
+
+
+def setup_logging():
+    """初始化日志系统（控制台 + 文件双输出，按大小轮转）
+
+    在 api/main.py 启动时调用一次。
+    已有的 33 个 logger = logging.getLogger(__name__) 零改动。
+    """
+    import logging.handlers
+
+    os.makedirs(LOG_DIR, exist_ok=True)
+
+    # 格式：时间 | 级别 | 模块 | 消息
+    file_fmt = logging.Formatter(
+        "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    # 控制台（简洁，不带时间戳）
+    console = logging.StreamHandler()
+    console.setFormatter(logging.Formatter("[%(name)s] %(message)s"))
+
+    # 文件（完整，按大小轮转）
+    file_handler = logging.handlers.RotatingFileHandler(
+        os.path.join(LOG_DIR, "lumen.log"),
+        maxBytes=LOG_MAX_BYTES,
+        backupCount=LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(file_fmt)
+
+    # 配置根 logger
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    root.addHandler(console)
+    root.addHandler(file_handler)

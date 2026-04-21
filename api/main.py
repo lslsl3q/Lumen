@@ -9,16 +9,14 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-# 配置日志级别（让 lumen 模块的 logger.info() 能显示出来）
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(name)s] %(message)s"
-)
-
 # 添加项目根目录到 Python 路径
 # 这样可以导入 lumen、api 等模块
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+
+# 初始化日志系统（控制台 + 文件双输出，按大小轮转）
+from lumen.config import setup_logging
+setup_logging()
 
 logger = logging.getLogger("lumen.startup")
 
@@ -56,8 +54,9 @@ async def lifespan(app):
     yield  # 应用运行中...
 
     # 退出清理
-    from lumen.services import history
+    from lumen.services import history, vector_store
     history.close_conn()
+    vector_store.close()
 
 
 from fastapi import FastAPI
