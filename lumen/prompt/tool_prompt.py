@@ -9,8 +9,8 @@ from typing import List, Dict
 def get_tool_prompt_from_registry(tool_names: List[str] = None, tool_tips: Dict[str, str] = None) -> str:
     """从工具注册表生成工具提示词
 
-    每个工具的描述、参数、使用指南绑定在一起输出，
-    避免工具多时描述和使用规则距离过远导致注意力衰减。
+    工具描述和使用指南用中文（服务角色场景），格式规则用英文（模型遵循度更高）。
+    每个工具的描述、参数、使用指南绑定在一起输出，避免注意力衰减。
 
     tool_tips: 角色自定义的工具提示 {tool_name: custom_tip}
               优先使用自定义提示，fallback 到 registry 的 usage_guide
@@ -48,28 +48,31 @@ def get_tool_prompt_from_registry(tool_names: List[str] = None, tool_tips: Dict[
     tools_text = "\n\n".join(tool_blocks)
 
     return f"""<tools>
-你可以使用以下工具来帮助用户：
+你可以使用以下工具：
 
 {tools_text}
 
-调用格式：
+How to call tools — output ONLY the JSON, no other text:
 
-【单个工具调用】：
-{{"type": "tool_call", "tool": "工具名", "params": {{"参数名": "参数值"}}}}
+[Example: single search]
+{{"tool": "web_search", "params": {{"query": "天气"}}}}
 
-【多个工具并行】（多个工具互不依赖时）：
-{{"type": "tool_call_parallel", "calls": [
-  {{"tool": "工具名1", "params": {{...}}}},
-  {{"tool": "工具名2", "params": {{...}}}}
+[Example: calculate]
+{{"tool": "calculate", "params": {{"expression": "100*0.85"}}}}
+
+[Example: TWO or more tools at once — MUST use "calls" array]
+{{"calls": [
+  {{"tool": "web_search", "params": {{"query": "北京天气"}}}},
+  {{"tool": "web_search", "params": {{"query": "上海天气"}}}}
 ]}}
 
-规则：
-- 只有确实需要使用工具时才输出JSON，普通对话正常回复文字
-- 不要在JSON前后加任何解释文字
-- 如果多个工具有依赖关系，请分步调用单个工具
-- type 字段必须包含，否则工具调用会被忽略
+Rules:
+- When calling tools: output ONLY the JSON, nothing else
+- When NOT calling tools: reply normally in text
+- For multiple independent calls: use the "calls" array format (NOT two separate JSONs)
+- Use double quotes for all strings
 
-工具调用后，系统会以 <tool_result> 标签返回结果，你基于结果回复用户。
+Results come back in <tool_result> tags. Respond based on results.
 </tools>"""
 
 

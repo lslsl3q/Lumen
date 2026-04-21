@@ -46,7 +46,7 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
  * SSE 事件类型
  */
 export interface StreamEvent {
-  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'memory_debug' | 'react_trace' | 'done' | 'error';
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'done' | 'error';
   content?: string;
   status?: string;
   message?: string;

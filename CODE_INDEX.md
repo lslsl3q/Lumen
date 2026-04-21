@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-21（P0 重构：tool.py / query.py / types/prompt.py 提到根目录 + ErrorCode 统一到 types/）
+**最后更新**：2026-04-22（T10 工具调用协议改进：软静默流式检测 + JSON修复层 + Think标签事件流）
 
 ---
 
@@ -14,7 +14,7 @@ Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、SUMMARY_MODEL）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
-│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式）— 对标 CC query.ts
+│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
@@ -25,7 +25,7 @@ Lumen/
 │   │   └── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
 │   │
 │   ├── tools/                    # 双手 — 每个工具一个 .py（基类在根目录 tool.py）
-│   │   ├── parse.py              # AI输出 → 工具调用 解析
+│   │   ├── parse.py              # AI输出 → 工具调用 解析（JSON修复层 + 结构检测 + 花括号提取）
 │   │   ├── registry.py           # 工具注册中心（CRUD、验证）
 │   │   ├── registry.json         # 工具定义数据（含 usage_guide 字段）
 │   │   ├── types.py              # 兼容层：从 lumen.types.tools 导入 ErrorCode/ToolDefinition
@@ -56,7 +56,7 @@ Lumen/
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
 │   │   ├── builder.py            # 系统提示词拼接（角色+Persona+Skills+工具+世界书+动态注入，三明治结构）+ 分层调试构建
-│   │   ├── tool_prompt.py        # 工具提示词生成（<tools> 格式，从注册表读取定义）
+│   │   ├── tool_prompt.py        # 工具提示词生成（<tools> 格式，例子驱动 + 英文规则）
 │   │   ├── skill_store.py        # Skills 数据管理（目录结构 CRUD + 富 frontmatter + 渐进式注入 + 脚本调用）
 │   │   ├── persona.py            # Persona 数据管理（JSON CRUD + 激活状态 + 注入文本生成）
 │   │   ├── authors_note.py       # Author's Note 数据管理（DB CRUD + 缓存 + 注入消息生成）
@@ -79,7 +79,7 @@ Lumen/
 ├── api/                          # FastAPI HTTP接口
 │   ├── main.py                   # 应用入口、CORS、路由注册
 │   └── routes/
-│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel + memory_debug）
+│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel + memory_debug + Think事件）
 │       ├── session.py            # 会话（new/load/list/delete/reset）
 │       ├── character.py          # 角色（list/get/switch/create/update/delete/upload-avatar）
 │       ├── persona.py            # Persona（list/get/active/create/update/delete/switch）

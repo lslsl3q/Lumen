@@ -43,6 +43,57 @@ function truncateResult(text: string, maxLen = 500): string {
   return text.slice(0, maxLen) + `\n... (共 ${text.length} 字符)`;
 }
 
+/** 思维链折叠气泡 — 暗色极简风格，与 ToolCallBlock 一致 */
+function ThinkingBubble({ content, done }: { content: string; done: boolean }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  if (!content) return null;
+
+  return (
+    <div className="flex justify-start pl-10 mb-2">
+      <div
+        className={`
+          w-full max-w-[600px] rounded border border-amber-900/30 bg-amber-950/15
+          transition-all duration-200 ease-out
+        `}
+      >
+        <div
+          className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {done ? (
+              <svg className="w-3 h-3 text-amber-400/70 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 12 12">
+                <circle cx="6" cy="6" r="4" />
+              </svg>
+            ) : (
+              <div className="w-3 h-3 rounded-full border-2 border-amber-500/60 border-t-transparent animate-spin flex-shrink-0" />
+            )}
+            <span className="text-xs text-amber-400/60 truncate">
+              {done ? '思维过程' : '思考中...'}
+            </span>
+            {!done && content && (
+              <span className="text-xs text-amber-500/40">{content.length}字</span>
+            )}
+          </div>
+          <svg
+            className={`w-3 h-3 text-amber-500/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 12 12"
+          >
+            <path d="M3 5l3 3 3-3" />
+          </svg>
+        </div>
+        {isExpanded && (
+          <div className="px-3 pb-2 border-t border-amber-900/20">
+            <pre className="text-xs text-amber-300/50 whitespace-pre-wrap break-words mt-2 max-h-60 overflow-y-auto">
+              {content}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** 工具调用独立气泡 — 极简线条风格 + 渐进式信息 */
 function ToolCallBlock({ call }: { call: ToolCall }) {
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -404,6 +455,9 @@ function ChatPanel({
             {messages.map((message) => (
               <React.Fragment key={message.id}>
                 <MessageBubble message={message} characterName={characterName} characterAvatar={characterAvatar} />
+                {message.thinkingContent && (
+                  <ThinkingBubble content={message.thinkingContent} done={!!message.thinkingDone} />
+                )}
                 {message.toolCalls?.map((call, i) => (
                   <ToolCallBlock key={call.callId} call={call} />
                 ))}

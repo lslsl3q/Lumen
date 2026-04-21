@@ -77,6 +77,71 @@ def _find_last_user_index(messages: list[Message]) -> int:
     return -1
 
 
+# JSON 工具调用模式前缀 — 用于流式软静默检测
+_TOOL_JSON_PREFIXES = (
+    '{"type": "tool_call"',
+    '{"type":"tool_call"',
+    '{"type": "tool_call_parallel"',
+    '{"type":"tool_call_parallel"',
+    '{"tool":',
+    '{"tool" :',
+    '{"calls":',
+    '{"calls" :',
+)
+
+
+def _should_start_silence(buffer: str, new_chunk_len: int) -> bool:
+    """判断是否应进入 JSON 静默模式
+
+    策略：在已输出文字中检测 `{` + 工具调用前缀模式。
+    不是二选一判断，只是"先暂停显示"。
+
+    Args:
+        buffer: 已发送文字 + 当前 chunk 的拼接
+        new_chunk_len: 当前 chunk 的长度（用于判断增量）
+    """
+    # 找最后一个 { 的位置（可能是工具调用 JSON 的起点）
+    brace_idx = buffer.rfind('{')
+    if brace_idx < 0:
+        return False
+
+    from_brace = buffer[brace_idx:]
+
+    # 检查从 { 开始的内容是否匹配工具调用模式
+    for prefix in _TOOL_JSON_PREFIXES:
+        if from_brace.startswith(prefix):
+            return True
+
+    # { 开头但内容还不够长 → 检查关键词片段
+    if len(from_brace) < 40 and from_brace.startswith('{'):
+        if '"tool"' in from_brace or '"calls"' in from_brace or '"type"' in from_brace:
+            return True
+
+    return False
+
+
+def _should_hold_brace(text_emitted: str, content: str) -> bool:
+    """判断是否应暂缓发送当前 chunk（{ 可能是工具调用 JSON 的开头）
+
+    策略：如果 text_emitted 以 { 结尾且内容很短（可能是刚输出的 JSON 起始花括号），
+    暂缓一个 chunk，等更多信息确认是工具调用还是普通文字。
+    """
+    if not text_emitted:
+        return False
+    # text_emitted 以 { 结尾，且整体很短（说明是刚输出的 JSON 开头）
+    if text_emitted == '{':
+        return True
+    # text_emitted 以 { 结尾且前面是文字（如 "好的，{ "）
+    stripped = text_emitted.rstrip()
+    if stripped.endswith('{') and len(stripped) >= 1:
+        # 检查 { 前面是否有足够多的文字（如果是，说明可能只是文字中夹了一个花括号）
+        before_brace = stripped[:-1]
+        # 只有 { 前面的文字很短时才暂缓（很可能是纯工具调用开头）
+        if len(before_brace) <= 3:
+            return True
+    return False
+
+
 def _prepare_messages(messages: list[Message], character_id: str = "default") -> list[Message]:
     """预处理消息：折叠工具调用 → 裁剪上下文 → 过滤已折叠 → 模板变量替换
 
@@ -325,9 +390,13 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         llm_start = time.perf_counter()
         response = await chat(trimmed, model, stream=True)
 
-        buffer = ""
-        is_tool_call = None
         full_text = ""
+        in_think = False  # <think...</think 标签状态
+        think_sent_start = False
+        text_emitted = ""  # 已发送给前端的文字（用于 text_set 回退）
+        json_silenced = False  # 进入 JSON 静默模式（不再发送 text 事件）
+        pre_json_text = ""  # JSON 出现前的文字
+        holding_brace = False  # 正在暂缓 { 的发送（等下一个 chunk 确认）
 
         async for chunk in response:
             if not chunk.choices:
@@ -336,20 +405,101 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             if not content:
                 continue
 
-            buffer += content
             full_text += content
 
-            if is_tool_call is None:
-                stripped = buffer.strip()
-                if stripped:
-                    if stripped[0] == '{':
-                        is_tool_call = True
+            # ---- Think 标签 → 事件流 ----
+            if in_think:
+                if '</think' in content:
+                    close_idx = content.find('</think')
+                    gt_idx = content.find('>', close_idx)
+                    if gt_idx >= 0:
+                        think_content = content[:close_idx]
+                        if think_content:
+                            yield {"type": "think_content", "content": think_content}
+                        yield {"type": "think_end"}
+                        in_think = False
+                        think_sent_start = False
+                        remaining = content[gt_idx + 1:]
+                        if remaining and not json_silenced:
+                            text_emitted += remaining
+                            yield {"type": "text", "content": remaining}
                     else:
-                        is_tool_call = False
-                        yield {"type": "text", "content": buffer}
-                        buffer = ""
-            elif not is_tool_call:
+                        yield {"type": "think_content", "content": content}
+                else:
+                    yield {"type": "think_content", "content": content}
+                continue
+
+            # 检查 <think 开标签
+            if '<think' in content:
+                tag_start = content.find('<think')
+                gt_idx = content.find('>', tag_start)
+                if gt_idx >= 0:
+                    before = content[:tag_start]
+                    after = content[gt_idx + 1:]
+                    if before and not json_silenced:
+                        text_emitted += before
+                        yield {"type": "text", "content": before}
+                    yield {"type": "think_start"}
+                    think_sent_start = True
+                    in_think = True
+                    if after:
+                        if '</think' in after:
+                            close_idx = after.find('</think')
+                            close_gt = after.find('>', close_idx)
+                            if close_gt >= 0:
+                                think_text = after[:close_idx]
+                                if think_text:
+                                    yield {"type": "think_content", "content": think_text}
+                                yield {"type": "think_end"}
+                                in_think = False
+                                remaining = after[close_gt + 1:]
+                                if remaining and not json_silenced:
+                                    text_emitted += remaining
+                                    yield {"type": "text", "content": remaining}
+                        else:
+                            yield {"type": "think_content", "content": after}
+                    continue
+                else:
+                    # 不完整标签，先缓冲
+                    continue
+
+            # ---- 软静默策略：检测 JSON 工具调用模式 ----
+            if not json_silenced:
+                # 检查当前内容是否触发了 JSON 静默
+                check_text = text_emitted + content
+                if _should_start_silence(check_text, len(content)):
+                    json_silenced = True
+                    pre_json_text = text_emitted
+                    # 不发送这段 content，静默收集
+                    continue
+
+                # 花括号暂缓：如果 text_emitted 末尾有 { 且可能是 JSON 开头
+                if holding_brace:
+                    # 上一个 chunk 暂缓了一个 {，现在有更多信息了
+                    check_with_held = text_emitted + content
+                    if _should_start_silence(check_with_held, len(content)):
+                        json_silenced = True
+                        pre_json_text = text_emitted
+                        continue
+                    # 不是工具调用 → 发出暂缓的 { 和当前内容
+                    holding_brace = False
+                    text_emitted += content
+                    yield {"type": "text", "content": content}
+                    continue
+
+                # 正常流式发送
+                text_emitted += content
                 yield {"type": "text", "content": content}
+
+                # 检查是否需要暂缓这个 chunk 里的 {
+                if _should_hold_brace(text_emitted, content):
+                    holding_brace = True
+            # json_silenced=True 时：只收集 full_text，不发送 text 事件
+
+        # 流结束后：如果还暂缓着 { ，补发出去
+        if holding_brace and not json_silenced:
+            yield {"type": "text", "content": text_emitted[-1]}  # 补发最后的 {
+            holding_brace = False
 
         # 流式结束后检查取消
         thinking_ms = round((time.perf_counter() - llm_start) * 1000)
@@ -361,11 +511,15 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             return
 
         # ---- 处理本轮结果 ----
-        # 无论回复开头是不是 {，都尝试从完整文本中解析工具调用
-        # 原因：有些模型会在 JSON 前加解释文字（如"让我读取文件..."）
-        tool_call = parse_tool_call(full_text) if full_text.strip() else None
+        tool_call, parse_error = parse_tool_call(full_text) if full_text.strip() else (None, "empty response")
 
         if not tool_call:
+            # 如果之前进入了静默模式，但最终不是工具调用 → 补发被静默的内容
+            if json_silenced:
+                silenced_part = full_text[len(text_emitted):]
+                if silenced_part:
+                    yield {"type": "text", "content": silenced_part}
+
             if trace_enabled:
                 yield {
                     "type": "react_trace",
@@ -374,17 +528,30 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                     "duration_ms": thinking_ms,
                     "exit_reason": "completed_after_tools" if tool_iterations > 0 else "completed",
                 }
-            # 检查是否是格式错误的工具调用（包含 tool_call 关键词但解析失败）
-            if '"tool_call"' in full_text or '"tool":' in full_text:
-                logger.warning(f"[ReAct] 检测到疑似工具调用但格式错误: {full_text[:200]}")
+            # 检查是否是格式错误的工具调用（包含工具调用关键词但解析失败）
+            _tool_keywords = ('"tool_call"', '"tool":', '"tool" :', "'tool'", '"calls":')
+            if any(kw in full_text for kw in _tool_keywords):
+                logger.warning(f"[ReAct] suspected tool call with parse error: {full_text[:200]}")
                 if trace_enabled:
-                    yield {"type": "react_trace", "iteration": iteration, "action": "error", "error": "工具调用 JSON 格式错误", "duration_ms": thinking_ms}
-                yield {"type": "text_clear"}
+                    yield {"type": "react_trace", "iteration": iteration, "action": "error", "error": f"tool call parse failed: {parse_error}", "duration_ms": thinking_ms}
+                # 保留思考文字，清除 JSON 碎片
+                import re as _re
+                _thinking = _re.sub(r'\{.*', '', full_text, flags=_re.DOTALL).strip()
+                _thinking = _re.sub(r'<think\b.*?</think\b[>\s]*', '', _thinking, flags=_re.DOTALL).strip()
+                yield {"type": "text_set", "content": _thinking}
                 yield {"type": "status", "status": "tool_error", "message": "工具调用格式错误"}
+                preview = full_text[:200] + ("..." if len(full_text) > 200 else "")
                 error_feedback = (
-                    "[系统提示] 你的工具调用 JSON 格式有误，无法解析。"
-                    "请确保输出完整的 JSON 格式，以 { 开头。"
-                    "正确格式：{\"type\": \"tool_call\", \"tool\": \"工具名\", \"params\": {...}}"
+                    f"[System] Tool call parsing failed.\n"
+                    f"Error: {parse_error}\n"
+                    f"Your output: {preview}\n\n"
+                    f"Correct format:\n"
+                    f'{{"tool": "tool_name", "params": {{"param": "value"}}}}\n\n'
+                    f"Rules:\n"
+                    f"- Start with {{ and end with }}\n"
+                    f"- Use double quotes for strings\n"
+                    f"- No trailing commas\n"
+                    f"- No explanatory text before or after the JSON"
                 )
                 session.messages.append({"role": "assistant", "content": full_text})
                 history.save_message(session.session_id, "assistant", full_text)
@@ -400,9 +567,12 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             yield {"type": "done", "exit_reason": exit_reason}
             return
 
-        # 工具调用解析成功，如果文本已被流式发送，清除前端显示
-        if not is_tool_call:
-            yield {"type": "text_clear"}
+        # 工具调用解析成功 — 用 text_set 替换前端内容为纯文字（去掉 JSON）
+        # 提取思考文字（JSON 之前的内容，不含 think 标签）
+        import re as _re
+        thinking_text = full_text[:full_text.find('{')].strip() if '{' in full_text else ""
+        thinking_text = _re.sub(r'<think\b.*?</think\b[>\s]*', '', thinking_text, flags=_re.DOTALL).strip()
+        yield {"type": "text_set", "content": thinking_text}
 
         # --- 有工具调用，进入 ReAct 循环 ---
         tool_iterations += 1

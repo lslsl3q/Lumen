@@ -129,6 +129,8 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   toolCalls?: ToolCall[];
+  thinkingContent?: string;   // 思维链内容
+  thinkingDone?: boolean;     // 思维链是否完成
   isStreaming?: boolean;
 }
 
@@ -280,6 +282,19 @@ export function useChat() {
               }
               case 'text_clear': {
                 return [...updated.slice(0, -1), { ...last, content: '' }];
+              }
+              case 'text_set': {
+                return [...updated.slice(0, -1), { ...last, content: event.content || '' }];
+              }
+              case 'think_start': {
+                return [...updated.slice(0, -1), { ...last, thinkingContent: '', thinkingDone: false }];
+              }
+              case 'think_content': {
+                const thinking = (last.thinkingContent || '') + (event.content || '');
+                return [...updated.slice(0, -1), { ...last, thinkingContent: thinking }];
+              }
+              case 'think_end': {
+                return [...updated.slice(0, -1), { ...last, thinkingDone: true }];
               }
               case 'memory_debug': {
                 setMemoryDebugInfo({

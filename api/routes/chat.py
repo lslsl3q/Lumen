@@ -60,7 +60,7 @@ async def send_message(req: ChatRequest) -> ChatResponse:
         session = manager.get_or_create(req.session_id or "default")
 
         reply_parts = []
-        async for event in chat_stream(req.message, session, memory_debug=req.memory_debug):
+        async for event in chat_stream(req.message, session, memory_debug=False):
             if event.get("type") == "text":
                 reply_parts.append(event["content"])
 
