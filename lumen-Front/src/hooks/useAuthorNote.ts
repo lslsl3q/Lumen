@@ -42,42 +42,25 @@ export function useAuthorNote(sessionId: string | null) {
     }
   }, [sessionId]);
 
-  /** 开关切换 */
-  const toggle = useCallback((enabled: boolean) => {
-    save({ enabled });
-  }, [save]);
-
-  /** 内容变更（debounced 500ms） */
+  /** 内容变更（debounced 500ms，首次输入自动启用） */
   const saveContent = useCallback((content: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      save({ content });
+      // 无配置时创建新配置并自动启用
+      save(config ? { content } : { content, enabled: true });
     }, 500);
-  }, [save]);
+  }, [save, config]);
 
   /** 位置切换 */
   const setPosition = useCallback((position: 'before_user' | 'after_user') => {
     save({ injection_position: position });
   }, [save]);
 
-  /** 删除整个 note */
-  const remove = useCallback(async () => {
-    if (!sessionId) return;
-    try {
-      await api.deleteAuthorsNote(sessionId);
-      setConfig(null);
-    } catch (err) {
-      console.error("删除 Author's Note 失败:", err);
-    }
-  }, [sessionId]);
-
   return {
     config,
     isLoading,
-    toggle,
     saveContent,
     setPosition,
-    remove,
     save,
   };
 }

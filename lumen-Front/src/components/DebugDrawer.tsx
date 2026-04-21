@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import type { MemoryDebugLayer } from './PromptDebugPanel';
-import type { RecallLogEntry } from '../hooks/useChat';
+import type { RecallLogEntry, ReactTraceStep } from '../hooks/useChat';
 
 interface DebugDrawerProps {
   open: boolean;
@@ -15,6 +15,7 @@ interface DebugDrawerProps {
   totalTokens: number;
   contextSize: number;
   recallLog: RecallLogEntry[] | null;
+  reactTrace: ReactTraceStep[];
 }
 
 function getBarColor(percent: number): string {
@@ -189,9 +190,102 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
   );
 }
 
-type TabKey = 'token' | 'recall';
+/** 标签页：ReAct 追踪 */
+function TraceTab({ trace }: { trace: ReactTraceStep[] }) {
+  if (trace.length === 0) {
+    return (
+      <div className="p-4 text-center text-slate-600 text-sm">
+        发送消息后显示 AI 的思考过程
+      </div>
+    );
+  }
 
-export default function DebugDrawer({ open, onClose, layers, totalTokens, contextSize, recallLog }: DebugDrawerProps) {
+  // 按迭代分组
+  const iterations = new Map<number, ReactTraceStep[]>();
+  for (const step of trace) {
+    const list = iterations.get(step.iteration) || [];
+    list.push(step);
+    iterations.set(step.iteration, list);
+  }
+
+  function actionLabel(action: string): string {
+    const map: Record<string, string> = {
+      thinking: '思考中',
+      tool_call: '调用工具',
+      tool_result: '工具结果',
+      response: '最终回复',
+      error: '错误',
+      cancelled: '已取消',
+    };
+    return map[action] || action;
+  }
+
+  function actionColor(action: string): string {
+    const map: Record<string, string> = {
+      tool_call: 'bg-blue-500/10 text-blue-400',
+      tool_result: 'bg-emerald-500/10 text-emerald-400',
+      response: 'bg-teal-500/10 text-teal-400',
+      error: 'bg-red-500/10 text-red-400',
+      cancelled: 'bg-amber-500/10 text-amber-400',
+    };
+    return map[action] || 'bg-slate-500/10 text-slate-400';
+  }
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-slate-500">ReAct 循环追踪</span>
+        <span className="font-mono text-slate-400">{trace.length} 步</span>
+      </div>
+
+      {[...iterations.entries()].map(([iter, steps]) => (
+        <div key={iter} className="space-y-1">
+          <div className="text-[10px] text-slate-600 font-mono px-1">
+            ── 第 {iter + 1} 轮 ──
+          </div>
+          {steps.map((step, idx) => (
+            <div key={idx} className="rounded border border-slate-800/60 overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-1.5 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${actionColor(step.action)}`}>
+                    {actionLabel(step.action)}
+                  </span>
+                  {step.tool && (
+                    <span className="font-mono text-slate-300">{step.tool}</span>
+                  )}
+                  {step.error && (
+                    <span className="text-red-400 truncate max-w-40">{step.error}</span>
+                  )}
+                </div>
+                {step.duration_ms != null && (
+                  <span className={`font-mono ${step.duration_ms > 5000 ? 'text-red-400' : step.duration_ms > 1000 ? 'text-amber-400' : 'text-slate-500'}`}>
+                    {step.duration_ms >= 1000 ? `${(step.duration_ms / 1000).toFixed(1)}s` : `${Math.round(step.duration_ms)}ms`}
+                  </span>
+                )}
+              </div>
+              {step.thinking && (
+                <div className="px-3 py-1.5 text-xs text-slate-500 bg-slate-950/50 border-t border-slate-800/40 italic truncate">
+                  {step.thinking}
+                </div>
+              )}
+              {step.action === 'tool_result' && step.success != null && (
+                <div className="px-3 py-1 text-[10px] border-t border-slate-800/30">
+                  <span className={step.success ? 'text-emerald-500' : 'text-red-400'}>
+                    {step.success ? '成功' : '失败'}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type TabKey = 'token' | 'recall' | 'trace';
+
+export default function DebugDrawer({ open, onClose, layers, totalTokens, contextSize, recallLog, reactTrace }: DebugDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('token');
 
   if (!open) return null;
@@ -214,6 +308,7 @@ export default function DebugDrawer({ open, onClose, layers, totalTokens, contex
         {([
           { key: 'token' as TabKey, label: 'Token 分析' },
           { key: 'recall' as TabKey, label: '记忆召回' },
+          { key: 'trace' as TabKey, label: 'ReAct 追踪' },
         ]).map(tab => (
           <button
             key={tab.key}
@@ -233,8 +328,10 @@ export default function DebugDrawer({ open, onClose, layers, totalTokens, contex
       <div className="flex-1 overflow-y-auto scrollbar-lumen">
         {activeTab === 'token' ? (
           <TokenTab layers={layers} totalTokens={totalTokens} contextSize={contextSize} />
-        ) : (
+        ) : activeTab === 'recall' ? (
           <RecallTab recallLog={recallLog} />
+        ) : (
+          <TraceTab trace={reactTrace} />
         )}
       </div>
     </div>

@@ -80,20 +80,6 @@ export async function deleteCharacter(id: string): Promise<{ message: string }> 
   return res.json();
 }
 
-/** POST /characters/switch — 切换当前会话角色 */
-export async function switchCharacter(
-  characterId: string,
-  sessionId: string,
-): Promise<{ message: string; character_id: string; session_id: string }> {
-  const res = await fetch(`${API_BASE_URL}/characters/switch`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ character_id: characterId, session_id: sessionId }),
-  });
-  if (!res.ok) throw new Error(`切换角色失败: ${res.status}`);
-  return res.json();
-}
-
 /** 获取头像 URL */
 export function getAvatarUrl(avatar?: string | null): string | null {
   if (!avatar) return null;

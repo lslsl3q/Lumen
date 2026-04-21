@@ -2,6 +2,7 @@
 会话管理 API 接口
 """
 
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
@@ -92,18 +93,22 @@ async def load_session(req: SessionRequest) -> dict:
 
 
 @router.get("/list")
-async def list_sessions(limit: int = 20) -> List[SessionListItem]:
+async def list_sessions(
+    limit: int = 20,
+    character_id: Optional[str] = None  # 新增：可选的角色过滤参数
+) -> List[SessionListItem]:
     """
     获取会话列表
 
     Args:
         limit: 最多返回多少条，默认 20
+        character_id: 角色ID（可选），如果提供则只返回该角色的会话
 
     Returns:
-        会话列表
+        会话列表（按最后更新时间倒序）
     """
     try:
-        sessions = history.list_sessions(limit=limit)
+        sessions = await asyncio.to_thread(history.list_sessions, limit, character_id)
 
         return [
             SessionListItem(
@@ -132,7 +137,7 @@ async def delete_session(session_id: str) -> dict:
     """
     try:
         manager = get_session_manager()
-        history.delete_session(session_id)  # 先从数据库删除
+        await asyncio.to_thread(history.delete_session, session_id)  # 先从数据库删除
         manager.remove(session_id)  # 再从内存中移除
 
         return {"message": f"已删除会话：{session_id}"}

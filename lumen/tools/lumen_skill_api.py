@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def _call_tool(name: str, params: dict) -> str:
     """调用 Lumen 工具，返回 data 字符串"""
-    from lumen.tools.base import execute_tool
+    from lumen.tool import execute_tool
     result = execute_tool(name, params)
     if not result.get("success"):
         raise RuntimeError(f"工具 {name} 执行失败: {result.get('error_message', '未知错误')}")

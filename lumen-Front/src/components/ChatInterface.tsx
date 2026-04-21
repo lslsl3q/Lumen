@@ -60,10 +60,11 @@ function ChatInterface() {
     refreshTokenUsage();
   }, [chat, refreshTokenUsage]);
 
-  // 初始化同步：sessions 加载完后，把第一个会话的历史加载到 chat
+  // 初始化同步：sessions 加载完后，加载当前会话的历史
   useEffect(() => {
     if (!sessions.isLoading && sessions.currentSessionId && !chat.currentSessionId) {
-      chat.loadHistory(sessions.currentSessionId);
+      const lastCharId = localStorage.getItem('lastCharacterId') || undefined;
+      chat.loadHistory(sessions.currentSessionId, lastCharId);
     }
   }, [sessions.isLoading, sessions.currentSessionId, chat.currentSessionId, chat.loadHistory]);
 
@@ -93,7 +94,7 @@ function ChatInterface() {
 
   /** 新建会话 */
   const handleNewSession = async () => {
-    const newId = await sessions.createNewSession();
+    const newId = await sessions.createNewSession(characters.currentCharacterId);
     chat.resetChat();
     chat.setCurrentSessionId(newId);
   };
@@ -108,29 +109,37 @@ function ChatInterface() {
 
   /** 删除会话 */
   const handleDeleteSession = async (sessionId: string) => {
-    const wasCurrent = sessionId === sessions.currentSessionId;
-    await sessions.deleteSession(sessionId);
+    const newSessionId = await sessions.deleteSession(sessionId);
 
-    if (wasCurrent) {
-      if (sessions.currentSessionId) {
-        await chat.loadHistory(sessions.currentSessionId);
-      } else {
-        chat.resetChat();
-        chat.setCurrentSessionId(null);
-      }
+    if (newSessionId) {
+      const charId = characters.currentCharacterId;
+      await chat.loadHistory(newSessionId, charId);
+    } else {
+      chat.resetChat();
+      chat.setCurrentSessionId(null);
     }
   };
 
-  /** 切换角色 */
+  /** 切换角色：切换到该角色的会话列表，不创建/不篡改现有会话 */
   const handleSwitchCharacter = useCallback(async (characterId: string) => {
-    if (sessions.currentSessionId) {
-      await characters.switchCharacter(characterId, sessions.currentSessionId);
-      // 切换角色后重新加载历史（新角色可能有不同的开场白）
-      await chat.loadHistory(sessions.currentSessionId);
+    characters.setCurrentCharacterId(characterId);
+    const list = await sessions.setCharacterFilter(characterId);
+
+    if (list.length > 0) {
+      // 优先恢复上次使用的会话，否则选最新的
+      const lastSessionId = localStorage.getItem(`lastSession_${characterId}`);
+      const targetId = (lastSessionId && list.some(s => s.session_id === lastSessionId))
+        ? lastSessionId
+        : list[0].session_id;
+      sessions.setCurrentSessionId(targetId);
+      await chat.loadHistory(targetId, characterId);
     } else {
-      characters.setCurrentCharacterId(characterId);
+      // 该角色没有会话 → 空状态，让用户手动点 +
+      sessions.setCurrentSessionId(null);
+      chat.resetChat();
+      chat.setCurrentSessionId(null);
     }
-  }, [sessions.currentSessionId, characters, chat]);
+  }, [sessions, characters, chat]);
 
   /** 跳转到角色管理页 */
   const handleManageCharacters = useCallback(() => {
@@ -180,11 +189,8 @@ function ChatInterface() {
         onManageWorldBooks={handleManageWorldBooks}
         authorNoteConfig={authorNote.config}
         authorNoteLoading={authorNote.isLoading}
-        onAuthorNoteToggle={authorNote.toggle}
         onAuthorNoteSaveContent={authorNote.saveContent}
         onAuthorNoteSetPosition={authorNote.setPosition}
-        onAuthorNoteRemove={authorNote.remove}
-        onAuthorNoteCreate={() => authorNote.save({ enabled: false, content: '', injection_position: 'before_user' })}
       />
       <ChatPanel
         messages={chat.messages}
@@ -207,6 +213,7 @@ function ChatInterface() {
         totalTokens={chat.memoryDebugInfo?.total_tokens || 0}
         contextSize={chat.memoryDebugInfo?.context_size || 0}
         recallLog={chat.memoryDebugInfo?.recall_log || null}
+        reactTrace={chat.reactTrace}
       />
     </div>
   );

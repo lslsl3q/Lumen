@@ -4,7 +4,7 @@ AI 调用这个工具来获取指定 URL 的网页正文内容
 """
 
 import logging
-from lumen.tools.base import success_result, error_result, ErrorCode
+from lumen.tool import success_result, error_result, ErrorCode
 from lumen.services.fetch import fetch_url, DEFAULT_MAX_LENGTH, MAX_LENGTH_LIMIT
 
 logger = logging.getLogger(__name__)

@@ -38,8 +38,15 @@ export async function loadSession(sessionId: string): Promise<{
 }
 
 /** GET /sessions/list — 获取会话列表 */
-export async function listSessions(limit = 20): Promise<SessionListItem[]> {
-  const res = await fetch(`${API_BASE_URL}/sessions/list?limit=${limit}`);
+export async function listSessions(
+  limit = 20,
+  characterId?: string  // 新增：可选的角色ID过滤参数
+): Promise<SessionListItem[]> {
+  const url = characterId 
+    ? `${API_BASE_URL}/sessions/list?limit=${limit}&character_id=${encodeURIComponent(characterId)}`
+    : `${API_BASE_URL}/sessions/list?limit=${limit}`;
+  
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`获取会话列表失败: ${res.status}`);
   return res.json();
 }

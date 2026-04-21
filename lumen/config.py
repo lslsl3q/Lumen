@@ -98,12 +98,12 @@ def get_model(character_config: dict = None) -> str:
 
     Args:
         character_config: 角色配置字典（可选）
-                         如果角色配置里有 model 字段，就用角色的
+                         如果角色配置里有 model 字段且非空，就用角色的
 
     Returns:
         模型名称字符串
     """
-    if character_config and "model" in character_config:
+    if character_config and character_config.get("model"):
         return character_config["model"]
     return DEFAULT_MODEL
 

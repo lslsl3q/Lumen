@@ -2,7 +2,7 @@
 工具：数学计算器
 """
 
-from lumen.tools.base import success_result, error_result, ErrorCode
+from lumen.tool import success_result, error_result, ErrorCode
 
 
 def execute(params: dict) -> dict:

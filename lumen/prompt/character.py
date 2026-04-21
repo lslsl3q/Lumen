@@ -10,7 +10,7 @@ import os
 import re
 import logging
 
-from lumen.prompt.types import CharacterCard
+from lumen.types.prompt import CharacterCard
 
 logger = logging.getLogger(__name__)
 

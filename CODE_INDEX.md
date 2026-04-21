@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-20（T8 向量语义记忆 + Skills 富 frontmatter + 上传导入 + 脚本执行 + 工具 API）
+**最后更新**：2026-04-21（P0 重构：tool.py / query.py / types/prompt.py 提到根目录 + ErrorCode 统一到 types/）
 
 ---
 
@@ -13,22 +13,22 @@
 Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、SUMMARY_MODEL）
+│   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
+│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
 │   ├── skills/                   # Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter，含 README.md 开发指南）
 │   ├── data/                     # 运行时数据（history.db、file_workspaces.json、active_persona.json、mcp_servers.json）
 │   │
-│   ├── core/                     # 大脑 — 决策循环、会话状态
-│   │   ├── chat.py               # ReAct 循环（异步生成器，SSE流式输出）
+│   ├── core/                     # 大脑 — 会话状态
 │   │   └── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
 │   │
-│   ├── tools/                    # 双手 — 每个工具一个 .py
-│   │   ├── base.py               # 执行引擎、注册（内置+MCP）、并行调度、结果格式化
+│   ├── tools/                    # 双手 — 每个工具一个 .py（基类在根目录 tool.py）
 │   │   ├── parse.py              # AI输出 → 工具调用 解析
 │   │   ├── registry.py           # 工具注册中心（CRUD、验证）
 │   │   ├── registry.json         # 工具定义数据（含 usage_guide 字段）
-│   │   ├── types.py              # 模块级类型（ErrorCode 常量、ToolDefinition TypedDict）
+│   │   ├── types.py              # 兼容层：从 lumen.types.tools 导入 ErrorCode/ToolDefinition
 │   │   ├── file_security.py      # 文件安全层（工作区白名单+系统黑名单+路径验证）
 │   │   ├── calculate.py          # 计算器
 │   │   ├── web_search.py         # 网页搜索（→ services/search.py）
@@ -48,7 +48,7 @@ Lumen/
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
 │   │   ├── history.py            # SQLite持久化（会话、消息、摘要、跨会话搜索）
-│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、跨会话关键词召回）
+│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25混合检索、噪音过滤、去重）
 │   │   ├── vector_store.py       # 向量存储（TriviumDB 嵌入式向量+图+文档数据库，语义记忆搜索）
 │   │   ├── embedding.py          # 文本嵌入（gte-small-zh，sentence-transformers 单例）
 │   │   ├── knowledge.py          # 【预留】知识图谱
@@ -63,14 +63,14 @@ Lumen/
 │   │   ├── worldbook_store.py    # 世界书数据管理（JSON CRUD + 缓存 + 列表）
 │   │   ├── worldbook_matcher.py  # 世界书关键词匹配引擎（扫描消息→匹配关键词→返回注入内容）
 │   │   ├── character.py          # 角色卡片加载 + CRUD + 头像管理
-│   │   ├── types.py              # CharacterCard Pydantic 模型（含 model/context_size/auto_compact/compact_threshold/memory_*/skills）
 │   │   └── template.py           # 模板变量系统（{{xxx}} 替换）
 │   │
 │   └── types/                    # 词汇 — 类型定义
 │       ├── messages.py           # 消息类型（TypedDict）+ 工厂函数
 │       ├── events.py             # SSE 事件类型（含 MemoryDebugEvent + RecallLogEntry 召回详情）
 │       ├── ws_events.py          # WebSocket 推送事件类型（TypedDict）
-│       ├── tools.py              # 工具协议类型（Pydantic）
+│       ├── tools.py              # 工具协议类型（Pydantic）+ ErrorCode 常量 + ToolDefinition TypedDict
+│       ├── prompt.py             # 提示词类型（CharacterCard Pydantic + DynamicContext TypedDict）
 │       ├── persona.py            # Persona 类型（PersonaCard + ActivePersona Pydantic 模型）
 │       ├── authors_note.py       # Author's Note 类型（AuthorsNoteConfig + UpdateRequest）
 │       ├── worldbook.py          # 世界书类型（WorldBookEntry + WorldBookListItem Pydantic 模型）
@@ -96,7 +96,7 @@ Lumen/
 │       ├── App.tsx               # 应用入口（HashRouter 路由 + Overlay 挂载点）
 │       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
-│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills）
+│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills）— localStorage 持久化（角色/会话恢复）
 │       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, DebugDrawer, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
 │       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector）
 │       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push, skills）
@@ -112,13 +112,13 @@ Lumen/
 ## 核心依赖链
 
 ```
-api/routes/chat.py ──→ lumen/core/chat.py（ReAct 主循环）
+api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
                           ├── core/session.py（会话状态 + reload_system_prompt）
                           ├── services/context/（token计数+折叠+裁剪+compact）
                           ├── services/llm.py（LLM调用）
                           ├── services/history.py（持久化）
                           ├── services/memory.py（记忆注入）
-                          ├── tools/base.py（工具执行）
+                          ├── tool.py（工具执行引擎）
                           ├── tools/parse.py（工具解析）
                           ├── tools/registry.py（工具验证）
                           ├── prompt/builder.py（提示词拼接）

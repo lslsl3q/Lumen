@@ -2,9 +2,12 @@
 Lumen - LLM 适配器层
 统一不同厂商的调用格式，方便扩展支持多种模型
 """
+import logging
 
 from lumen.config import client, LLM_TIMEOUT
 from lumen.types.messages import Message
+
+logger = logging.getLogger(__name__)
 
 
 async def chat(messages: list[Message], model: str, stream: bool = False):
@@ -45,9 +48,21 @@ async def _openai_chat(messages: list[Message], model: str, stream: bool = False
     超时设置：
         默认 60 秒，可通过环境变量 LLM_TIMEOUT 调整
     """
-    return await client.chat.completions.create(
-        model=model,
-        messages=messages,
-        stream=stream,
-        timeout=LLM_TIMEOUT,
-    )
+    logger.info(f"[LLM] 调用 API: model={model}, stream={stream}, messages_count={len(messages)}")
+    
+    try:
+        return await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=stream,
+            timeout=LLM_TIMEOUT,
+        )
+    except Exception as e:
+        logger.error(f"[LLM ERROR] API 调用失败: {type(e).__name__}: {str(e)}")
+        logger.error(f"[LLM ERROR] 请求参数: model={model}, stream={stream}")
+        # 打印第一条消息的内容预览（避免日志过长）
+        if messages:
+            first_msg = messages[0]
+            content_preview = str(first_msg.get('content', ''))[:200].replace('\n', '\\n')
+            logger.error(f"[LLM ERROR] 第一条消息: role={first_msg.get('role')}, content={content_preview}...")
+        raise

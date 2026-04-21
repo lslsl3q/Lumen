@@ -4,8 +4,10 @@ Lumen API 服务
 """
 
 import sys
+import asyncio
 import logging
 from pathlib import Path
+from contextlib import asynccontextmanager
 
 # 配置日志级别（让 lumen 模块的 logger.info() 能显示出来）
 logging.basicConfig(
@@ -18,6 +20,46 @@ logging.basicConfig(
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+logger = logging.getLogger("lumen.startup")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    """应用生命周期：启动时后台预加载重资源，退出时清理"""
+    import threading
+
+    def _preload():
+        """后台预加载 jieba + embedding 模型（不阻塞事件循环）"""
+        # 1. 预加载 jieba（首次 import 要加载词典，~2-3秒）
+        try:
+            import jieba
+            jieba.initialize()
+            logger.info("jieba 分词器预加载完成")
+        except Exception as e:
+            logger.warning(f"jieba 预加载失败: {e}")
+
+        # 2. 预加载嵌入模型（~5-10秒，后续聊天时不再等待）
+        try:
+            from lumen.services import embedding
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(embedding.ensure_loaded())
+            finally:
+                loop.close()
+            logger.info("嵌入模型预加载完成")
+        except Exception as e:
+            logger.warning(f"嵌入模型预加载失败: {e}")
+
+    t = threading.Thread(target=_preload, daemon=True, name="preload")
+    t.start()
+
+    yield  # 应用运行中...
+
+    # 退出清理
+    from lumen.services import history
+    history.close_conn()
+
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -28,7 +70,8 @@ import uvicorn
 app = FastAPI(
     title="Lumen AI API",
     description="Lumen AI 的后端接口服务",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # 配置 CORS（允许前端跨域访问）
@@ -70,13 +113,6 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs"
     }
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    """程序退出时关闭数据库连接"""
-    from lumen.services import history
-    history.close_conn()
 
 
 # 启动服务

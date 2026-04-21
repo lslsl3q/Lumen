@@ -37,9 +37,24 @@ _DENIAL_PATTERNS = (
     "嗯", "嗯嗯", "哦", "哈哈", "谢谢",
     "这是第一次", "第一次聊", "第一次说",
     "确实没有", "确实没", "当然没有", "并没有",
+    # AI 免责式否认
+    "抱歉", "对不起", "很抱歉",
+    "没法知道", "没有办法知道", "无法获取", "无法访问",
+    "我无法", "我没法", "我没办法",
+    "不过如果", "或者需要",
 )
 _USER_NOISE_PATTERNS = (
     "你好", "在吗", "在不在", "哈喽", "hello", "hi",
+)
+
+# 长句强否认词（出现在前 80 字内即过滤）
+_STRONG_DENIAL = (
+    "没法知道", "没有办法知道", "无法获取", "无法访问",
+    "我无法", "我没法", "我没办法",
+    "确实没有", "当然没有", "并没有",
+    "抱歉", "对不起",
+    "没有确切的记录", "没有这方面的", "没有这方面的记录",
+    "没有确切", "没有相关",
 )
 
 # 自定义词典路径
@@ -214,12 +229,21 @@ def _is_worth_indexing(content: str, role: str) -> bool:
     if len(text) < min_len:
         return False
 
-    # AI 回复：检查否认/确认模式
+    # AI 回复：检查否认/免责模式
     if role == "assistant":
-        first_sentence = text.split("。")[0].split("，")[0].strip()
-        for pattern in _DENIAL_PATTERNS:
-            if first_sentence.startswith(pattern):
-                return False
+        # 检查第一句（句号分隔）
+        first_sentence = text.split("。")[0]
+        # 短句直接匹配开头（纯否认/确认，通常很短）
+        if len(first_sentence) <= 20:
+            for pattern in _DENIAL_PATTERNS:
+                if first_sentence.startswith(pattern):
+                    return False
+        else:
+            # 长句：强否认词出现在前 80 字内即过滤
+            head = first_sentence[:80]
+            for pattern in _STRONG_DENIAL:
+                if pattern in head:
+                    return False
 
     # 用户消息：检查纯寒暄
     if role == "user":
@@ -230,15 +254,15 @@ def _is_worth_indexing(content: str, role: str) -> bool:
     return True
 
 
-def _format_context_block(hit: dict, msg_id: int | None, window: int = 2) -> str:
-    """把命中消息扩展成上下文片段
+def _format_context_block(hit: dict, msg_id: int | None, window: int = 1) -> str:
+    """把命中消息扩展成上下文片段（前后各 1 条，过滤噪音）
 
     格式：[会话 X 回忆片段]
          用户: ...
          AI: ... (命中)
-         用户: ...
     """
     session_id = hit.get("session_id", "")
+    hit_content = hit.get("content", "")
     lines = [f"[会话 {session_id} 回忆片段]"]
 
     # 如果有 message_id，查上下文
@@ -247,16 +271,48 @@ def _format_context_block(hit: dict, msg_id: int | None, window: int = 2) -> str
             ctx = history.get_message_context(session_id, msg_id, window=window)
             if ctx:
                 for msg in ctx:
+                    content = msg["content"]
+                    # 上下文消息也过滤噪音（否认/确认/寒暄）
+                    if not _is_context_worth_including(content, msg["role"]):
+                        continue
                     role_label = "用户" if msg["role"] == "user" else "AI"
-                    lines.append(f"{role_label}: {msg['content'][:200]}")
+                    lines.append(f"{role_label}: {content[:200]}")
                 return "\n".join(lines)
         except Exception:
             pass
 
     # 回退：只显示命中消息本身
     role_label = "用户" if hit["role"] == "user" else "AI"
-    lines.append(f"{role_label}: {hit['content'][:200]}")
+    lines.append(f"{role_label}: {hit_content[:200]}")
     return "\n".join(lines)
+
+
+def _is_context_worth_including(content: str, role: str) -> bool:
+    """上下文窗口内的消息是否值得展示（轻量过滤）"""
+    text = content.strip()
+    if len(text) < 8:
+        return False
+    # 过滤否认模式（"没聊过""不知道"等）
+    if role == "assistant":
+        first_sentence = text.split("。")[0]
+        if len(first_sentence) <= 20:
+            for pattern in _DENIAL_PATTERNS:
+                if first_sentence.startswith(pattern):
+                    return False
+        else:
+            head = first_sentence[:80]
+            for pattern in _STRONG_DENIAL:
+                if pattern in head:
+                    return False
+    return True
+
+
+def _is_question(text: str) -> bool:
+    """判断是否为纯问句（问句对回忆无价值，需要的是陈述和回答）"""
+    t = text.strip()
+    if not t:
+        return False
+    return t.endswith(("？", "?")) and len(t) < 30
 
 
 def _rrf_merge(
@@ -363,6 +419,12 @@ async def get_relevant_memories(
             # RRF 融合：向量 + BM25
             hits = _rrf_merge(vector_hits, bm25_hits)
 
+            # 过滤搜索结果中的噪音（否认/确认/寒暄）
+            hits = [h for h in hits if _is_worth_indexing(h.get("content", ""), h.get("role", "assistant"))]
+
+            # 过滤纯问句（问句对回忆无价值，我们需要的是陈述和回答）
+            hits = [h for h in hits if not _is_question(h.get("content", ""))]
+
             recall_log = [{
                 "keyword": f"(混合检索: 向量{len(vector_hits)}条 + BM25{len(bm25_hits)}条)",
                 "source": "hybrid",
@@ -394,8 +456,12 @@ async def get_relevant_memories(
             sorted_hits = sorted(hits, key=lambda h: h.get("rrf_score", 0), reverse=True)
             selected = []
             used_tokens = 0
+            seen_sessions: set[str] = set()  # 同会话只取第一个片段，避免重复
             for hit in sorted_hits:
-                # 获取上下文窗口（命中消息前后各 2 条）
+                sid = hit.get("session_id", "")
+                if sid in seen_sessions:
+                    continue
+                seen_sessions.add(sid)
                 msg_id = hit.get("message_id") or hit.get("id")
                 context_block = _format_context_block(hit, msg_id)
                 block_tokens = estimate_text_tokens(context_block)

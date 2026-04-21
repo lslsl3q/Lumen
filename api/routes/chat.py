@@ -2,16 +2,17 @@
 聊天相关 API 接口
 """
 
+import asyncio
+import json
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-import json
 
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.core.session import get_session_manager
-from lumen.core.chat import chat_stream, ChatSession, request_cancel
+from lumen.core.session import get_session_manager, ChatSession
+from lumen.query import chat_stream, request_cancel
 
 
 # ========================================
@@ -108,7 +109,7 @@ async def stream_chat(req: StreamRequest):
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
         finally:
             # 清理可能残留的取消标志，防止下次对话被误判为已取消
-            from lumen.core.chat import _clear_cancel
+            from lumen.query import _clear_cancel
             _clear_cancel(session.session_id)
 
         # SSE 连接关闭信号
@@ -166,9 +167,9 @@ async def get_history(session_id: str = "default"):
             # 会话在内存中，直接用内存数据
             messages = session.messages
         else:
-            # 会话不在内存（后端重启或从未加载），从数据库读取
+            # 会话不在内存（后端重启或从未加载），从数据库读取（async 不阻塞事件循环）
             from lumen.services import history as history_service
-            messages = history_service.load_session(session_id)
+            messages = await asyncio.to_thread(history_service.load_session, session_id)
 
         # 过滤掉系统提示词和工具调用消息，只返回用户和助手的对话
         result = [

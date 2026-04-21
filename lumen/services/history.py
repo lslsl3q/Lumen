@@ -2,6 +2,8 @@
 Lumen - 对话历史存储
 用 SQLite 存储聊天记录，重启不丢失
 以后记忆系统可以从这里搜索历史对话
+
+纯同步层 — API 路由通过 asyncio.to_thread() 调用，避免阻塞事件循环
 """
 
 import sqlite3
@@ -312,13 +314,19 @@ def load_session(session_id: str) -> list[Message]:
     return messages
 
 
-def list_sessions(limit: int = 20) -> list[SessionInfo]:
+def list_sessions(limit: int = 20, character_id: str | None = None) -> list[SessionInfo]:
     """列出最近的会话，返回 [(会话ID, 角色名, 创建时间), ...]"""
     conn = _get_conn()
-    rows = conn.execute(
-        "SELECT id, character_id, created_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
+    if character_id:
+        rows = conn.execute(
+            "SELECT id, character_id, created_at FROM sessions WHERE character_id = ? ORDER BY updated_at DESC LIMIT ?",
+            (character_id, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id, character_id, created_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
     return [
         {"session_id": row["id"], "character_id": row["character_id"], "created_at": row["created_at"]}
         for row in rows
@@ -338,9 +346,22 @@ def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
 
 
 def delete_session(session_id: str):
-    """删除一个会话及其所有消息和摘要"""
+    """删除一个会话及其所有消息、摘要和 FTS5 索引"""
     with _write_lock:
         conn = _get_conn()
+        # 收集消息 ID 并批量删除 FTS5 索引
+        msg_ids = conn.execute(
+            "SELECT id FROM messages WHERE session_id = ?", (session_id,)
+        ).fetchall()
+        if msg_ids:
+            placeholders = ",".join("?" * len(msg_ids))
+            try:
+                conn.execute(
+                    f"DELETE FROM messages_fts WHERE rowid IN ({placeholders})",
+                    [row["id"] for row in msg_ids],
+                )
+            except Exception:
+                pass
         conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
         conn.execute("DELETE FROM summaries WHERE session_id = ?", (session_id,))
         conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))

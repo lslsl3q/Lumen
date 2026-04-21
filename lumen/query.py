@@ -1,11 +1,12 @@
 """
-Lumen - 对话核心模块
-所有对话逻辑都在这，不管是终端还是网页都调用这里
+Lumen - 查询引擎
+核心决策循环，对标 Claude Code query.ts
 """
 
 import json
 import logging
 import asyncio
+import time
 from typing import Any, AsyncGenerator
 
 import jsonschema
@@ -19,7 +20,7 @@ from lumen.services import history
 from lumen.services import memory
 from lumen.services.context.compact import should_compact, compact_session
 from lumen.services.context.token_estimator import extract_usage, record_usage
-from lumen.tools.base import execute_tool, execute_tools_parallel, format_result_for_ai
+from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_ai
 from lumen.tools.parse import parse_tool_call
 from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat
@@ -286,10 +287,13 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
     exit_reason = "completed"
     tool_iterations = 0
     recall_log = []
+    trace_enabled = memory_debug  # 跟随 /tokens 调试模式
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         if _is_cancelled(session.session_id):
             _clear_cancel(session.session_id)
+            if trace_enabled:
+                yield {"type": "react_trace", "iteration": iteration, "action": "cancelled"}
             yield {"type": "done", "exit_reason": "cancelled"}
             return
 
@@ -318,6 +322,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 "recall_log": recall_log,
             }
 
+        llm_start = time.perf_counter()
         response = await chat(trimmed, model, stream=True)
 
         buffer = ""
@@ -347,8 +352,11 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 yield {"type": "text", "content": content}
 
         # 流式结束后检查取消
+        thinking_ms = round((time.perf_counter() - llm_start) * 1000)
         if _is_cancelled(session.session_id):
             _clear_cancel(session.session_id)
+            if trace_enabled:
+                yield {"type": "react_trace", "iteration": iteration, "action": "cancelled", "duration_ms": thinking_ms}
             yield {"type": "done", "exit_reason": "cancelled"}
             return
 
@@ -358,9 +366,19 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         tool_call = parse_tool_call(full_text) if full_text.strip() else None
 
         if not tool_call:
+            if trace_enabled:
+                yield {
+                    "type": "react_trace",
+                    "iteration": iteration,
+                    "action": "response",
+                    "duration_ms": thinking_ms,
+                    "exit_reason": "completed_after_tools" if tool_iterations > 0 else "completed",
+                }
             # 检查是否是格式错误的工具调用（包含 tool_call 关键词但解析失败）
             if '"tool_call"' in full_text or '"tool":' in full_text:
                 logger.warning(f"[ReAct] 检测到疑似工具调用但格式错误: {full_text[:200]}")
+                if trace_enabled:
+                    yield {"type": "react_trace", "iteration": iteration, "action": "error", "error": "工具调用 JSON 格式错误", "duration_ms": thinking_ms}
                 yield {"type": "text_clear"}
                 yield {"type": "status", "status": "tool_error", "message": "工具调用格式错误"}
                 error_feedback = (
@@ -390,6 +408,22 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         tool_iterations += 1
         logger.info(f"[ReAct 第{iteration + 1}轮] 检测到工具调用: {tool_call.get('mode')}")
 
+        # 提取 AI 在工具调用前的思考文字（JSON 之前的内容）
+        thinking_text = full_text[:full_text.find('{')].strip() if '{' in full_text else ""
+
+        # 追踪：工具调用决策
+        if trace_enabled:
+            _tool_name = tool_call.get("tool", tool_call.get("calls", [{}])[0].get("tool", ""))
+            yield {
+                "type": "react_trace",
+                "iteration": iteration,
+                "action": "tool_call",
+                "tool": _tool_name,
+                "params": tool_call.get("params"),
+                "duration_ms": thinking_ms,
+                "thinking": thinking_text[:200] if thinking_text else "",
+            }
+
         session.messages.append({"role": "assistant", "content": full_text})
         await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
 
@@ -413,7 +447,9 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 continue
 
             yield {"type": "tool_start", "tool": tool_name, "params": tool_params}
+            tool_exec_start = time.perf_counter()
             tool_result = execute_tool(tool_name, tool_params)
+            tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
             logger.info(
                 f"工具调用: {tool_name}({tool_params}) → "
                 f"{'✅' if tool_result['success'] else '❌'}"
@@ -425,6 +461,15 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 "data": tool_result.get("data"),
                 "error": tool_result.get("error_message"),
             }
+            if trace_enabled:
+                yield {
+                    "type": "react_trace",
+                    "iteration": iteration,
+                    "action": "tool_result",
+                    "tool": tool_name,
+                    "success": tool_result["success"],
+                    "duration_ms": tool_exec_ms,
+                }
 
             session.messages.append({
                 "role": "user",
@@ -466,7 +511,9 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             tool_names = [c.get("tool") for c in calls]
             yield {"type": "tool_start", "tool": tool_names, "mode": "parallel"}
             logger.info(f"并行执行 {len(calls)} 个工具...")
+            tool_exec_start = time.perf_counter()
             results = execute_tools_parallel(calls)
+            tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
 
             for r in results:
                 status = "✅" if r["success"] else "❌"
@@ -478,6 +525,17 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                     "data": r.get("data"),
                     "error": r.get("error_message"),
                 }
+
+            if trace_enabled:
+                for r in results:
+                    yield {
+                        "type": "react_trace",
+                        "iteration": iteration,
+                        "action": "tool_result",
+                        "tool": r["tool"],
+                        "success": r["success"],
+                        "duration_ms": tool_exec_ms,
+                    }
 
             session.messages.append({
                 "role": "user",
@@ -499,6 +557,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
     logger.warning(
         f"[ReAct] 达到最大工具调用次数限制 ({MAX_TOOL_ITERATIONS})，强制输出回答"
     )
+    if trace_enabled:
+        yield {"type": "react_trace", "iteration": MAX_TOOL_ITERATIONS, "action": "error", "error": f"达到最大迭代次数 ({MAX_TOOL_ITERATIONS})"}
     yield {"type": "status", "status": "max_iterations"}
 
     session.messages.append({

@@ -14,7 +14,7 @@ import time
 import random
 import string
 
-from lumen.prompt.types import CharacterCard
+from lumen.types.prompt import CharacterCard
 
 logger = logging.getLogger(__name__)
 

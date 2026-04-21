@@ -2,7 +2,7 @@
 Lumen 工具系统 — 对外统一接口
 """
 
-from lumen.tools.base import (
+from lumen.tool import (
     ErrorCode,
     success_result,
     error_result,

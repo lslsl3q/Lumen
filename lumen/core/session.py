@@ -70,22 +70,6 @@ class ChatSession:
         old_messages = history.load_session(self.session_id)
         self.messages = [{"role": "system", "content": system_prompt}] + old_messages
 
-    async def switch_character(self, new_character_id: str):
-        """切换角色（创建新会话）"""
-        from lumen.services import memory
-
-        # 给当前会话生成摘要
-        if self.session_id:
-            chat_msgs = [m for m in self.messages if m["role"] != "system"]
-            if len(chat_msgs) > 1:
-                await memory.summarize_session(self.session_id, self.character_id, self.messages)
-
-        # 重置为新角色
-        self.character_id = new_character_id
-        self.session_id = None
-        self.messages = []
-        self._initialize_new()
-
     def reset(self):
         """清空历史，用当前角色创建新会话"""
         current_char = self.character_id

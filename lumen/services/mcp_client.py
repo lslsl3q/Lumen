@@ -138,7 +138,7 @@ def execute_mcp_tool_sync(tool_name: str, params: dict) -> dict:
     使用持久事件循环线程，避免每次调用都创建新的事件循环
     """
     from lumen.tools.types import ErrorCode
-    from lumen.tools.base import success_result, error_result
+    from lumen.tool import success_result, error_result
 
     parts = tool_name.split("__", 2)
     if len(parts) != 3 or parts[0] != "mcp":

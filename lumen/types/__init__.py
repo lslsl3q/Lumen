@@ -1,5 +1,5 @@
 """
-Lumen 类型定义 — 消息类型、事件、工具协议
+Lumen 类型定义 — 消息类型、事件、工具协议、提示词类型
 """
 
 from lumen.types.messages import (
@@ -22,4 +22,9 @@ from lumen.types.tools import (
     SingleToolCall,
     ParallelToolCall,
     ParsedToolCall,
+)
+
+from lumen.types.prompt import (
+    CharacterCard,
+    DynamicContext,
 )

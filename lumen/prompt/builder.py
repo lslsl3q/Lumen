@@ -3,7 +3,7 @@ Lumen - 提示词构建器
 把角色卡片 + 动态内容拼成发给AI的提示词
 """
 
-from lumen.prompt.types import DynamicContext
+from lumen.types.prompt import DynamicContext
 
 
 def _build_parts(character: dict, dynamic_context: list[DynamicContext] = None) -> list[tuple[str, str]]:

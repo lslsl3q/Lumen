@@ -110,6 +110,19 @@ export interface MemoryDebugData {
   recall_log: RecallLogEntry[];
 }
 
+/** ReAct 追踪步骤 */
+export interface ReactTraceStep {
+  iteration: number;
+  action: 'thinking' | 'tool_call' | 'tool_result' | 'response' | 'error' | 'cancelled';
+  tool?: string;
+  params?: Record<string, unknown>;
+  success?: boolean;
+  duration_ms?: number;
+  thinking?: string;
+  error?: string;
+  exit_reason?: string;
+}
+
 /** 消息 */
 export interface Message {
   id: string;
@@ -136,10 +149,11 @@ export function useChat() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [memoryDebugMode, setMemoryDebugMode] = useState(false);
   const [memoryDebugInfo, setMemoryDebugInfo] = useState<MemoryDebugData | null>(null);
+  const [reactTrace, setReactTrace] = useState<ReactTraceStep[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /** 加载指定会话的历史消息 */
-  const loadHistory = useCallback(async (sessionId: string) => {
+  const loadHistory = useCallback(async (sessionId: string, characterId?: string) => {
     try {
       const data = await getHistory(sessionId);
       const historyMessages: Message[] = data.messages
@@ -156,6 +170,12 @@ export function useChat() {
         .filter((msg: Message) => msg.content.length > 0 || (msg.toolCalls && msg.toolCalls.length > 0));
       setMessages(historyMessages.length > 0 ? historyMessages : []);
       setCurrentSessionId(sessionId);
+      
+      // 记录该角色的最后会话（用于下次恢复）
+      if (characterId) {
+        localStorage.setItem(`lastSession_${characterId}`, sessionId);
+      }
+      
       setError(null);
     } catch (err) {
       console.error('加载历史失败:', err);
@@ -208,6 +228,7 @@ export function useChat() {
     setInput('');
     setIsLoading(true);
     setError(null);
+    setReactTrace([]);
 
     // 创建新的 AbortController（先 abort 旧的，防止竞态）
     abortControllerRef.current?.abort();
@@ -268,6 +289,28 @@ export function useChat() {
                   recall_log: event.recall_log || [],
                 });
                 return prev; // 不修改消息列表
+              }
+              case 'react_trace': {
+                const toolVal = event.tool;
+                const newStep: ReactTraceStep = {
+                  iteration: event.iteration ?? 0,
+                  action: event.action as ReactTraceStep['action'],
+                  tool: Array.isArray(toolVal) ? toolVal.join(', ') : toolVal,
+                  params: event.params,
+                  success: event.success,
+                  duration_ms: event.duration_ms,
+                  thinking: event.thinking,
+                  error: event.error,
+                  exit_reason: event.exit_reason,
+                };
+                setReactTrace(prev => {
+                  const last = prev[prev.length - 1];
+                  if (last && last.iteration === newStep.iteration && last.action === newStep.action && last.tool === newStep.tool && last.duration_ms === newStep.duration_ms) {
+                    return prev;
+                  }
+                  return [...prev, newStep];
+                });
+                return prev;
               }
               case 'done': {
                 return [...updated.slice(0, -1), { ...last, isStreaming: false }];
@@ -371,6 +414,7 @@ export function useChat() {
     abort,
     memoryDebugMode,
     memoryDebugInfo,
+    reactTrace,
     toggleMemoryDebug,
   };
 }

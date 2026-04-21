@@ -15,7 +15,6 @@ from lumen.services.character import (
     create_character, update_character, delete_character, save_avatar
 )
 from lumen.prompt.builder import build_system_prompt
-from lumen.core.session import get_session_manager
 
 
 # ========================================
@@ -36,19 +35,6 @@ class CharacterInfo(BaseModel):
     context_size: Optional[int] = None
     auto_compact: bool = False
     compact_threshold: float = 0.7
-
-
-class SwitchCharacterResponse(BaseModel):
-    """切换角色响应"""
-    message: str
-    character_id: str
-    session_id: str
-
-
-class SwitchCharacterRequest(BaseModel):
-    """切换角色请求"""
-    character_id: str
-    session_id: str = "default"
 
 
 # ========================================
@@ -120,30 +106,6 @@ async def get_character(character_id: str) -> CharacterInfo:
         raise HTTPException(status_code=404, detail=f"角色不存在: {character_id}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取角色信息失败: {str(e)}")
-
-
-@router.post("/switch")
-async def switch_character(req: SwitchCharacterRequest) -> SwitchCharacterResponse:
-    """
-    切换角色
-    """
-    try:
-        manager = get_session_manager()
-        session = manager.get(req.session_id)
-
-        if not session:
-            session = manager.create_new(req.character_id)
-        else:
-            await session.switch_character(req.character_id)
-
-        return SwitchCharacterResponse(
-            message=f"已切换到角色：{req.character_id}",
-            character_id=req.character_id,
-            session_id=session.session_id
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"切换角色失败: {str(e)}")
 
 
 @router.post("/create")

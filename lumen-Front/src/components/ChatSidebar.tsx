@@ -40,11 +40,8 @@ interface ChatSidebarProps {
   // Author's Note 相关
   authorNoteConfig: AuthorsNoteConfig | null;
   authorNoteLoading: boolean;
-  onAuthorNoteToggle: (enabled: boolean) => void;
   onAuthorNoteSaveContent: (content: string) => void;
   onAuthorNoteSetPosition: (position: 'before_user' | 'after_user') => void;
-  onAuthorNoteRemove: () => void;
-  onAuthorNoteCreate: () => void;
 }
 
 /** 单个会话条目 */
@@ -54,12 +51,14 @@ function SessionItem({
   onSelect,
   onDelete,
   formatLabel,
+  characterName,
 }: {
   session: SessionListItem;
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
   formatLabel: (sessionId: string) => string;
+  characterName: string;
 }) {
   return (
     <div
@@ -78,7 +77,7 @@ function SessionItem({
       </div>
       {/* 角色名 */}
       <div className="text-xs text-slate-500 mt-0.5">
-        {session.character_id}
+        {characterName}
       </div>
       {/* 删除按钮 — hover 时显示 */}
       <button
@@ -121,11 +120,8 @@ function ChatSidebar({
   onManageWorldBooks,
   authorNoteConfig,
   authorNoteLoading,
-  onAuthorNoteToggle,
   onAuthorNoteSaveContent,
   onAuthorNoteSetPosition,
-  onAuthorNoteRemove,
-  onAuthorNoteCreate,
 }: ChatSidebarProps) {
   return (
     <div className="w-64 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
@@ -181,29 +177,33 @@ function ChatSidebar({
             暂无会话
           </div>
         ) : (
-          sessions.map((session) => (
-            <SessionItem
-              key={session.session_id}
-              session={session}
-              isActive={session.session_id === currentSessionId}
-              onSelect={() => onSelectSession(session.session_id)}
-              onDelete={() => onDeleteSession(session.session_id)}
-              formatLabel={formatLabel}
-            />
-          ))
+          sessions.map((session) => {
+            const char = characters.find(c => c.id === session.character_id);
+            return (
+              <SessionItem
+                key={session.session_id}
+                session={session}
+                isActive={session.session_id === currentSessionId}
+                onSelect={() => onSelectSession(session.session_id)}
+                onDelete={() => onDeleteSession(session.session_id)}
+                formatLabel={formatLabel}
+                characterName={char?.display_name || char?.name || session.character_id}
+              />
+            );
+          })
         )}
       </div>
 
       {/* 底部：Author's Note + Persona 切换 + 角色选择器 */}
-      <AuthorNotePanel
-        config={authorNoteConfig}
-        isLoading={authorNoteLoading}
-        onToggle={onAuthorNoteToggle}
-        onSaveContent={onAuthorNoteSaveContent}
-        onSetPosition={onAuthorNoteSetPosition}
-        onRemove={onAuthorNoteRemove}
-        onCreate={onAuthorNoteCreate}
-      />
+      {/* 只有在有会话时才显示 Author's Note（因为它是会话级别的配置） */}
+      {currentSessionId && (
+        <AuthorNotePanel
+          config={authorNoteConfig}
+          isLoading={authorNoteLoading}
+          onSaveContent={onAuthorNoteSaveContent}
+          onSetPosition={onAuthorNoteSetPosition}
+        />
+      )}
       <PersonaPanel
         personas={personas}
         activeId={activePersonaId}

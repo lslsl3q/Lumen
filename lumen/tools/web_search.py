@@ -4,7 +4,7 @@ AI 调用这个工具来搜索互联网信息
 """
 
 import logging
-from lumen.tools.base import success_result, error_result, ErrorCode
+from lumen.tool import success_result, error_result, ErrorCode
 from lumen.services.search import search
 
 logger = logging.getLogger(__name__)

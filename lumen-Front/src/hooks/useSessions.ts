@@ -38,35 +38,49 @@ export function useSessions() {
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [filterCharacterId, setFilterCharacterId] = useState<string>('default'); // 新增：当前过滤的角色ID
 
-  /** 刷新会话列表 */
-  const refreshSessions = useCallback(async () => {
+  /** 刷新会话列表（按角色过滤） */
+  const refreshSessions = useCallback(async (characterId?: string) => {
     try {
-      const list = await listSessions();
-      setSessions(list);
-      return list;
+      const charId = characterId || filterCharacterId;
+      const filteredSessions = await listSessions(20, charId);
+      setSessions(filteredSessions);
+      return filteredSessions;
     } catch (err) {
       console.error('刷新会话列表失败:', err);
       return [];
     }
-  }, []);
+  }, [filterCharacterId]);
 
-  /** 初始化：加载会话列表，自动选中第一个 */
+  /** 设置过滤角色并刷新，返回该角色的会话列表 */
+  const setCharacterFilter = useCallback(async (characterId: string) => {
+    setFilterCharacterId(characterId);
+    return await refreshSessions(characterId);
+  }, [refreshSessions]);
+
+  /** 初始化：加载当前角色的会话列表，恢复上次会话 */
   useEffect(() => {
     (async () => {
       setIsLoading(true);
-      const list = await refreshSessions();
-      if (list.length > 0) {
+      const lastCharId = localStorage.getItem('lastCharacterId') || 'default';
+      setFilterCharacterId(lastCharId);
+      const list = await refreshSessions(lastCharId);
+      // 从 localStorage 恢复上次会话
+      const lastSessionId = localStorage.getItem(`lastSession_${lastCharId}`);
+      if (lastSessionId && list.some(s => s.session_id === lastSessionId)) {
+        setCurrentSessionId(lastSessionId);
+      } else if (list.length > 0) {
         setCurrentSessionId(list[0].session_id);
       }
       setIsLoading(false);
     })();
-  }, [refreshSessions]);
+  }, []); // 只执行一次
 
   /** 创建新会话，返回新 session_id */
-  const createNewSession = useCallback(async (): Promise<string> => {
-    const data = await createSession();
-    await refreshSessions();
+  const createNewSession = useCallback(async (characterId: string): Promise<string> => {
+    const data = await createSession(characterId);
+    await refreshSessions(characterId);
     setCurrentSessionId(data.session_id);
     return data.session_id;
   }, [refreshSessions]);
@@ -76,16 +90,21 @@ export function useSessions() {
     setCurrentSessionId(sessionId);
   }, []);
 
-  /** 删除会话，如果删的是当前会话则自动切换 */
-  const handleDeleteSession = useCallback(async (sessionId: string) => {
+  /** 删除会话，如果删的是当前会话则自动切换，返回新的 currentSessionId */
+  const handleDeleteSession = useCallback(async (sessionId: string): Promise<string | null> => {
     await apiDeleteSession(sessionId);
-    const list = await refreshSessions();
+    const list = await refreshSessions(filterCharacterId);
 
-    // 如果删的是当前会话，自动切到列表第一个或清空
+    let newId: string | null = null;
+    // 如果删的是当前会话
     if (sessionId === currentSessionId) {
-      setCurrentSessionId(list.length > 0 ? list[0].session_id : null);
+      newId = list.length > 0 ? list[0].session_id : null;
+      setCurrentSessionId(newId);
+    } else {
+      newId = currentSessionId;
     }
-  }, [currentSessionId, refreshSessions]);
+    return newId;
+  }, [currentSessionId, filterCharacterId, refreshSessions]);
 
   /** 重置会话（清空历史，但会话 ID 不变） */
   const resetSession = useCallback(async (sessionId: string) => {
@@ -97,11 +116,13 @@ export function useSessions() {
     currentSessionId,
     setCurrentSessionId,
     isLoading,
+    filterCharacterId,  // 新增
     createNewSession,
     switchSession,
     deleteSession: handleDeleteSession,
     resetSession,
     refreshSessions,
+    setCharacterFilter,  // 新增
     formatSessionLabel,
   };
 }

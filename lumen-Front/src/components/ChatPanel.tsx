@@ -386,17 +386,34 @@ function ChatPanel({
 
       {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-lumen">
-        {messages.map((message) => (
-          <React.Fragment key={message.id}>
-            <MessageBubble message={message} characterName={characterName} characterAvatar={characterAvatar} />
-            {message.toolCalls?.map((call, i) => (
-              <ToolCallBlock key={call.callId} call={call} />
+        {messages.length === 0 && !sessionId ? (
+          // 空状态提示
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800/50 flex items-center justify-center">
+                <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9 8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              <p className="text-slate-500 text-sm mb-2">暂无会话</p>
+              <p className="text-slate-600 text-xs">点击左侧 "+" 按钮新建会话</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {messages.map((message) => (
+              <React.Fragment key={message.id}>
+                <MessageBubble message={message} characterName={characterName} characterAvatar={characterAvatar} />
+                {message.toolCalls?.map((call, i) => (
+                  <ToolCallBlock key={call.callId} call={call} />
+                ))}
+              </React.Fragment>
             ))}
-          </React.Fragment>
-        ))}
-        {/* 呼吸像素思考动画 */}
-        {isThinking && (
-          <ThinkingIndicator characterName={characterName} characterAvatar={characterAvatar} />
+            {/* 呼吸像素思考动画 */}
+            {isThinking && (
+              <ThinkingIndicator characterName={characterName} characterAvatar={characterAvatar} />
+            )}
+          </>
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -410,66 +427,75 @@ function ChatPanel({
 
       {/* 输入区域 */}
       <div className="px-6 py-4 border-t border-slate-800/60 relative">
-        <CommandPalette
-          input={input}
-          visible={showPalette}
-          onSelect={(name) => {
-            onInputChange(`/${name} `);
-            setShowPalette(false);
-          }}
-        />
-        <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => {
-              handleInput(e);
-              setShowPalette(e.target.value.startsWith('/'));
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="说点什么...  (输入 / 查看命令)"
-            disabled={isLoading}
-            rows={1}
-            className="
-              flex-1 px-4 py-2.5 rounded-lg resize-none
-              bg-slate-900/60 border border-slate-700/40
-              text-slate-200 placeholder-slate-600 text-sm
-              focus:outline-none focus:border-amber-500/40 focus:shadow-[0_0_8px_rgba(251,191,36,0.1)]
-              disabled:opacity-40 disabled:cursor-not-allowed
-              transition-all duration-200
-            "
-          />
-          {isLoading ? (
-            <button
-              type="button"
-              onClick={onAbort}
-              className="
-                px-5 py-2.5 rounded-lg text-sm font-medium
-                bg-red-500/10 border border-red-500/30 text-red-400
-                hover:bg-red-500/20 hover:border-red-500/50
-                focus:outline-none
-                transition-all duration-200
-              "
-            >
-              停止
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="
-                px-5 py-2.5 rounded-lg text-sm font-medium
-                bg-amber-500/10 border border-amber-500/30 text-amber-400
-                hover:bg-amber-500/20 hover:border-amber-500/50
-                focus:outline-none focus:shadow-[0_0_12px_rgba(251,191,36,0.15)]
-                disabled:opacity-30 disabled:cursor-not-allowed
-                transition-all duration-200
-              "
-            >
-              发送
-            </button>
-          )}
-        </form>
+        {!sessionId ? (
+          // 无会话时的禁用提示
+          <div className="text-center py-3">
+            <p className="text-slate-600 text-xs">请先新建会话才能开始对话</p>
+          </div>
+        ) : (
+          <>
+            <CommandPalette
+              input={input}
+              visible={showPalette}
+              onSelect={(name) => {
+                onInputChange(`/${name} `);
+                setShowPalette(false);
+              }}
+            />
+            <form onSubmit={handleSubmit} className="flex items-center gap-3">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  handleInput(e);
+                  setShowPalette(e.target.value.startsWith('/'));
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="说点什么...  (输入 / 查看命令)"
+                disabled={isLoading || !sessionId}
+                rows={1}
+                className="
+                  flex-1 px-4 py-2.5 rounded-lg resize-none
+                  bg-slate-900/60 border border-slate-700/40
+                  text-slate-200 placeholder-slate-600 text-sm
+                  focus:outline-none focus:border-amber-500/40 focus:shadow-[0_0_8px_rgba(251,191,36,0.1)]
+                  disabled:opacity-40 disabled:cursor-not-allowed
+                  transition-all duration-200
+                "
+              />
+              {isLoading ? (
+                <button
+                  type="button"
+                  onClick={onAbort}
+                  className="
+                    px-5 py-2.5 rounded-lg text-sm font-medium
+                    bg-red-500/10 border border-red-500/30 text-red-400
+                    hover:bg-red-500/20 hover:border-red-500/50
+                    focus:outline-none
+                    transition-all duration-200
+                  "
+                >
+                  停止
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim() || !sessionId}
+                  className="
+                    px-5 py-2.5 rounded-lg text-sm font-medium
+                    bg-amber-500/10 border border-amber-500/30 text-amber-400
+                    hover:bg-amber-500/20 hover:border-amber-500/50
+                    focus:outline-none focus:shadow-[0_0_12px_rgba(251,191,36,0.15)]
+                    disabled:opacity-30 disabled:cursor-not-allowed
+                    transition-all duration-200
+                  "
+                >
+                  发送
+                </button>
+              )}
+            </form>
+          </>
+        )}
       </div>
     </div>
   );

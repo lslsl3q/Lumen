@@ -75,5 +75,19 @@ class MemoryDebugEvent(TypedDict, total=False):
     recall_log: list   # list[RecallLogEntry]
 
 
+class ReactTraceStep(TypedDict, total=False):
+    """ReAct 循环单步追踪"""
+    type: str          # "react_trace"
+    iteration: int     # 第几轮（0-based）
+    action: str        # "thinking" | "tool_call" | "tool_result" | "response" | "error" | "cancelled"
+    tool: str          # 工具名（action=tool_call/tool_result 时）
+    params: dict       # 工具参数（action=tool_call 时）
+    success: bool      # 执行结果（action=tool_result 时）
+    duration_ms: float # 耗时（毫秒，action=tool_call/tool_result/thinking 时）
+    thinking: str      # AI 在工具调用前的文字（action=tool_call 时）
+    error: str         # 错误信息（action=error 时）
+    exit_reason: str   # 结束原因（action=response 时）
+
+
 # chat_stream 的 yield 类型
-SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEvent, MemoryDebugEvent]
+SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEvent, MemoryDebugEvent, ReactTraceStep]

@@ -12,8 +12,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from lumen.tools.types import ErrorCode  # 保留此导入：calculate.py 和 web_search.py 通过 base.py 间接导入 ErrorCode
-from lumen.types.tools import ToolResult
+from lumen.types.tools import ToolResult, ErrorCode
 
 logger = logging.getLogger(__name__)
 
@@ -124,30 +123,36 @@ def _load_builtin_tools():
 
 
 def _load_mcp_tools():
-    """发现并注册 MCP 外部工具（同步包装）"""
+    """发现并注册 MCP 外部工具（后台线程加载，不阻塞事件循环）"""
     try:
         from lumen.services.mcp_client import discover_all_tools, execute_mcp_tool_sync
 
-        loop = asyncio.new_event_loop()
-        try:
-            tools = loop.run_until_complete(discover_all_tools())
-        finally:
-            loop.close()
+        async def _discover_and_register():
+            tools = await discover_all_tools()
+            for prefixed_name, tool_def in tools.items():
+                register_handler(
+                    prefixed_name,
+                    lambda params, _name=prefixed_name: execute_mcp_tool_sync(_name, params),
+                )
+                from lumen.tools.registry import get_registry
+                registry = get_registry()
+                registry.register(prefixed_name, {
+                    "description": tool_def.get("description", ""),
+                    "parameters": tool_def.get("parameters", {"type": "object", "properties": {}}),
+                })
+                logger.info(f"注册 MCP 工具: {prefixed_name}")
 
-        for prefixed_name, tool_def in tools.items():
-            # 注册执行函数（闭包捕获工具名）
-            register_handler(
-                prefixed_name,
-                lambda params, _name=prefixed_name: execute_mcp_tool_sync(_name, params),
-            )
-            # 注册到工具注册表（让 AI 能看到这个工具）
-            from lumen.tools.registry import get_registry
-            registry = get_registry()
-            registry.register(prefixed_name, {
-                "description": tool_def.get("description", ""),
-                "parameters": tool_def.get("parameters", {"type": "object", "properties": {}}),
-            })
-            logger.info(f"注册 MCP 工具: {prefixed_name}")
+        def _run():
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(_discover_and_register())
+            except Exception as e:
+                logger.warning(f"MCP 后台发现失败: {e}")
+            finally:
+                loop.close()
+
+        import threading
+        threading.Thread(target=_run, daemon=True, name="mcp-discovery").start()
 
     except Exception as e:
         logger.warning(f"MCP 工具加载失败（跳过）: {e}")

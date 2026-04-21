@@ -5,13 +5,22 @@
  * 遵循单向依赖：hook → api/character.ts
  */
 import { useState, useCallback, useEffect } from 'react';
-import { listCharacters as apiListCharacters, switchCharacter as apiSwitchCharacter } from '../api/character';
+import { listCharacters as apiListCharacters } from '../api/character';
 import { CharacterListItem } from '../types/character';
 
 export function useCharacters() {
   const [characters, setCharacters] = useState<CharacterListItem[]>([]);
-  const [currentCharacterId, setCurrentCharacterId] = useState<string>('default');
+  // 从 localStorage 读取上次选择的角色，默认为 'default'
+  const [currentCharacterId, setCurrentCharacterIdRaw] = useState<string>(() => {
+    return localStorage.getItem('lastCharacterId') || 'default';
+  });
   const [isLoading, setIsLoading] = useState(true);
+
+  /** 切换角色时保存到 localStorage */
+  const setCurrentCharacterId = useCallback((characterId: string) => {
+    setCurrentCharacterIdRaw(characterId);
+    localStorage.setItem('lastCharacterId', characterId);
+  }, []);
 
   /** 刷新角色列表 */
   const refreshCharacters = useCallback(async () => {
@@ -34,12 +43,6 @@ export function useCharacters() {
     })();
   }, [refreshCharacters]);
 
-  /** 切换角色（切换当前会话的角色） */
-  const handleSwitchCharacter = useCallback(async (characterId: string, sessionId: string) => {
-    await apiSwitchCharacter(characterId, sessionId);
-    setCurrentCharacterId(characterId);
-  }, []);
-
   /** 获取当前角色信息 */
   const currentCharacter = characters.find(c => c.id === currentCharacterId) ?? null;
 
@@ -49,7 +52,6 @@ export function useCharacters() {
     currentCharacter,
     setCurrentCharacterId,
     isLoading,
-    switchCharacter: handleSwitchCharacter,
     refreshCharacters,
   };
 }
