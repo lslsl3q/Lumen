@@ -64,9 +64,9 @@ function SessionItem({
     <div
       onClick={onSelect}
       className={`
-        group relative px-4 py-3 cursor-pointer transition-all duration-150
+        group relative px-4 py-3 cursor-pointer transition-all duration-150 mx-2 rounded-[10px]
         ${isActive
-          ? 'bg-amber-500/10'
+          ? 'bg-amber-500/10 soft-item'
           : 'hover:bg-slate-800/40'
         }
       `}
@@ -124,7 +124,7 @@ function ChatSidebar({
   onAuthorNoteSetPosition,
 }: ChatSidebarProps) {
   return (
-    <div className="w-45 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
+    <div className="w-45 flex flex-col bg-slate-950/80 border-r border-slate-800/40 soft-panel">
       {/* 顶栏 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/40">
         <div className="flex items-center gap-2">

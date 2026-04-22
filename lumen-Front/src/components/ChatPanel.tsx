@@ -8,7 +8,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Message, ToolCall } from '../hooks/useChat';
 import MarkdownContent from './MarkdownContent';
 import CommandPalette from './CommandPalette';
-import { executeCommand } from '../commands/registry';
+import { executeCommand, getAllCommands, parseCommand } from '../commands/registry';
 import '../commands/builtin'; // 副作用：注册内置命令
 import { CommandResult } from '../commands/registry';
 import { getAvatarUrl } from '../api/character';
@@ -357,6 +357,7 @@ function ChatPanel({
   }, [isLoading]);
 
   const [showPalette, setShowPalette] = useState(false);
+  const [paletteIndex, setPaletteIndex] = useState(0);
 
   // 是否正在思考（isLoading + 最后一条是空的 assistant）
   const lastMsg = messages[messages.length - 1];
@@ -389,8 +390,57 @@ function ChatPanel({
     doSend();
   };
 
-  // Enter 发送，Shift+Enter 换行
+  // Enter 发送，Shift+Enter 换行；palette 打开时拦截方向键/Enter/Escape
+  const getFilteredCommands = () => {
+    const commands = getAllCommands();
+    const parsed = parseCommand(input);
+    return parsed
+      ? commands.filter((c) => c.name.startsWith(parsed!.name))
+      : commands;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showPalette) {
+      const filtered = getFilteredCommands();
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setPaletteIndex((prev) => (prev + 1) % filtered.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setPaletteIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (filtered.length > 0) {
+          const cmd = filtered[Math.min(paletteIndex, filtered.length - 1)];
+          // 无参数命令直接执行，有参数的插入到输入框让用户补参数
+          if (!cmd.usage) {
+            onInputChange('');
+            setShowPalette(false);
+            setPaletteIndex(0);
+            executeCommand(`/${cmd.name}`, { sessionId }).then((result) => {
+              if (result && onCommandResult) onCommandResult(result);
+            });
+          } else {
+            onInputChange(`/${cmd.name} `);
+            setShowPalette(false);
+            setPaletteIndex(0);
+          }
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowPalette(false);
+        setPaletteIndex(0);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       doSend();
@@ -491,10 +541,22 @@ function ChatPanel({
             <CommandPalette
               input={input}
               visible={showPalette}
-              onSelect={(name) => {
-                onInputChange(`/${name} `);
-                setShowPalette(false);
+              selectedIndex={paletteIndex}
+              onSelect={(cmd) => {
+                if (!cmd.usage) {
+                  onInputChange('');
+                  setShowPalette(false);
+                  setPaletteIndex(0);
+                  executeCommand(`/${cmd.name}`, { sessionId }).then((result) => {
+                    if (result && onCommandResult) onCommandResult(result);
+                  });
+                } else {
+                  onInputChange(`/${cmd.name} `);
+                  setShowPalette(false);
+                  setPaletteIndex(0);
+                }
               }}
+              onHover={(idx) => setPaletteIndex(idx)}
             />
             <form onSubmit={handleSubmit} className="flex items-center gap-3">
               <textarea
@@ -502,7 +564,9 @@ function ChatPanel({
                 value={input}
                 onChange={(e) => {
                   handleInput(e);
-                  setShowPalette(e.target.value.startsWith('/'));
+                  const isSlash = e.target.value.startsWith('/');
+                  setShowPalette(isSlash);
+                  if (isSlash) setPaletteIndex(0);
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="说点什么...  (输入 / 查看命令)"

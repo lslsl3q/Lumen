@@ -110,3 +110,44 @@
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+/* === 硅胶质感工具类（Soft UI / Neumorphism） ===
+ *
+ * 原理：双层阴影（暗影 + 亮边）+ 顶部高光 + 按压内凹
+ * 在暖灰底色上产生类似磨砂硅胶的立体感
+ */
+
+/* 面板级质感 — 用于侧边栏、卡片容器 */
+.soft-panel {
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.35),
+    -3px -3px 8px rgba(60, 58, 55, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* 条目级质感 — 用于会话条目、卡片 */
+.soft-item {
+  box-shadow:
+    3px 3px 6px rgba(0, 0, 0, 0.25),
+    -2px -2px 4px rgba(55, 53, 50, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+}
+
+/* 按钮级质感 */
+.soft-btn {
+  box-shadow:
+    2px 2px 5px rgba(0, 0, 0, 0.3),
+    -1px -1px 3px rgba(55, 53, 50, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+/* 按下效果 — 内凹 */
+.soft-pressed {
+  box-shadow:
+    inset 2px 2px 5px rgba(0, 0, 0, 0.3),
+    inset -1px -1px 3px rgba(55, 53, 50, 0.12);
+  transform: translateY(1px);
+  border-color: rgba(0, 0, 0, 0.15);
+}
