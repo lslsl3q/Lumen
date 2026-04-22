@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-22（知识库 P1-a 导入+分块+向量化+搜索 + P1-b 对话注入）
+**最后更新**：2026-04-22（知识库 P1-c 占位符解析器 + system prompt 内检索替换）
 
 ---
 
@@ -14,7 +14,7 @@ Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、日志系统 setup_logging）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
-│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流、知识库注入）— 对标 CC query.ts
+│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流、知识库注入+占位符解析）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
@@ -53,6 +53,7 @@ Lumen/
 │   │   ├── embedding.py          # 文本嵌入（gte-small-zh，sentence-transformers 单例）
 │   │   ├── knowledge.py          # 知识库存储（TriviumDB 单例、文件导入/切分/向量化/语义搜索/删除，独立 knowledge.tdb）
 │   │   ├── chunker.py            # 文本分块器（句子边界感知，支持重叠，用于知识库向量化）
+│   │   ├── knowledge_resolver.py # 知识库占位符解析器（正则匹配 {{}}/[[]]，RAG/全文检索，替换注入 system prompt）
 │   │   └── emotion.py            # 【预留】情感引擎
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
