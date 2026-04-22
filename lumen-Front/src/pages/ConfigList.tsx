@@ -112,6 +112,23 @@ function ConfigList() {
               <h3 className="text-sm text-slate-500 mb-4">其他功能</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
+                  onClick={() => navigate('/settings/knowledge')}
+                  className="
+                    group p-4 rounded-xl cursor-pointer
+                    bg-slate-900/60 border border-slate-800/40
+                    hover:border-amber-500/30 hover:bg-slate-900/80
+                    transition-all duration-200
+                  "
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl text-amber-400">&#128218;</div>
+                    <div>
+                      <div className="text-base text-slate-200">知识库</div>
+                      <div className="text-sm text-slate-500">导入文档，语义检索注入对话</div>
+                    </div>
+                  </div>
+                </div>
+                <div
                   onClick={() => navigate('/settings/skills')}
                   className="
                     group p-4 rounded-xl cursor-pointer

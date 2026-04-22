@@ -124,7 +124,7 @@ function ChatSidebar({
   onAuthorNoteSetPosition,
 }: ChatSidebarProps) {
   return (
-    <div className="w-64 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
+    <div className="w-45 flex flex-col bg-slate-950/80 border-r border-slate-800/40">
       {/* 顶栏 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/40">
         <div className="flex items-center gap-2">

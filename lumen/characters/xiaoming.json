@@ -7,7 +7,7 @@
     "web_search",
     "web_fetch"
   ],
-  "model": "",
+  "model": "deepseek-reasoner",
   "tool_tips": {},
   "auto_compact": false,
   "compact_threshold": 0.7,

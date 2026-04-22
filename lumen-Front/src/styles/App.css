@@ -1,9 +1,9 @@
-/* === Lumen 暗色主题基础 === */
+/* === Lumen 暗色主题基础 — 暖灰配色 === */
 
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: #000;
+  background: #141413;
 }
 
 /* === 流式光标闪烁 === */
@@ -21,12 +21,12 @@ html, body, #root {
 
 .glow-teal {
   box-shadow: 0 0 12px var(--glow-primary),
-              inset 0 0 8px rgba(20, 184, 166, 0.06);
+              inset 0 0 8px rgba(204, 124, 94, 0.06);
 }
 
 .glow-amber {
-  box-shadow: 0 0 12px var(--glow-accent),
-              inset 0 0 8px rgba(245, 158, 11, 0.06);
+  box-shadow: 0 0 12px var(--glow-primary),
+              inset 0 0 8px rgba(204, 124, 94, 0.06);
 }
 
 /* === 自定义滚动条 === */
@@ -40,12 +40,12 @@ html, body, #root {
 }
 
 .scrollbar-lumen::-webkit-scrollbar-thumb {
-  background: rgba(20, 184, 166, 0.2);
+  background: rgba(204, 124, 94, 0.2);
   border-radius: 3px;
 }
 
 .scrollbar-lumen::-webkit-scrollbar-thumb:hover {
-  background: rgba(20, 184, 166, 0.4);
+  background: rgba(204, 124, 94, 0.4);
 }
 
 /* === 工具旋转动画 === */

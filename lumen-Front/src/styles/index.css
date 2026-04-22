@@ -2,19 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-/* === Lumen 设计令牌 — 暗室里的台灯 ===
+/* === Lumen 设计令牌 — 暖室台灯（Claude Desktop 风格） ===
  *
- * 核心理念：单一琥珀色光源划破黑暗，温暖而专注
+ * 核心理念：暖灰色底色 + 橙棕 accent，温暖专注
  * 所有颜色集中定义在这里，组件通过 CSS 变量或 Tailwind 语义名引用。
  *
  * 将来做主题系统时，只需切换这套变量即可全局换色。
  */
 :root {
-  /* === 主色 — 琥珀色系列（暖光） === */
-  --color-primary: #fbbf24;         /* amber-400 — 主光源 */
-  --color-primary-dim: #f59e0b;     /* amber-500 — 深琥珀 */
-  --color-primary-deep: #d97706;    /* amber-600 — 更深 */
-  --color-primary-subtle: rgba(251, 191, 36, 0.08);  /* 极淡琥珀背景 */
+  /* === 主色 — 橙棕色系列（暖光） === */
+  --color-primary: #CC7C5E;         /* amber-400 — 暖棕 accent */
+  --color-primary-dim: #B86A4A;     /* amber-500 — 深暖棕 */
+  --color-primary-deep: #A05838;    /* amber-600 — 更深 */
+  --color-primary-subtle: rgba(204, 124, 94, 0.08);  /* 极淡暖棕背景 */
 
   /* 状态色 — 保持简洁 */
   --color-success: #10b981;         /* emerald-500 */
@@ -22,25 +22,25 @@
   --color-error: #ef4444;           /* red-500 */
   --color-error-light: #f87171;     /* red-400 */
 
-  /* 背景色 — slate 系列（暗室） */
-  --color-bg-deep: #020617;         /* slate-950 */
-  --color-bg-base: #0f172a;         /* slate-900 */
-  --color-bg-surface: #1e293b;      /* slate-800 */
-  --color-bg-elevated: #334155;     /* slate-700 */
+  /* 背景色 — 暖灰系列 */
+  --color-bg-deep: #141413;         /* slate-950 */
+  --color-bg-base: #1F1F1E;         /* slate-900 */
+  --color-bg-surface: #333230;      /* slate-800 */
+  --color-bg-elevated: #4A4744;     /* slate-700 */
 
   /* 文字色 */
-  --color-text-primary: #e2e8f0;    /* slate-200 */
-  --color-text-secondary: #94a3b8;  /* slate-400 */
-  --color-text-muted: #64748b;      /* slate-500 */
-  --color-text-dim: #475569;        /* slate-600 */
+  --color-text-primary: #E8E7E3;    /* slate-200 */
+  --color-text-secondary: #ABA499;  /* slate-400 */
+  --color-text-muted: #8A8478;      /* slate-500 */
+  --color-text-dim: #6A655C;        /* slate-600 */
 
   /* 边框 */
-  --color-border: rgba(30, 41, 59, 0.6);      /* slate-800/60 */
-  --color-border-subtle: rgba(30, 41, 59, 0.4); /* slate-800/40 */
+  --color-border: rgba(74, 71, 68, 0.6);      /* slate-700/60 */
+  --color-border-subtle: rgba(74, 71, 68, 0.4); /* slate-700/40 */
 
-  /* 发光效果 — 琥珀色暖光 */
-  --glow-primary: rgba(251, 191, 36, 0.15);
-  --glow-subtle: rgba(251, 191, 36, 0.08);
+  /* 发光效果 — 暖棕 accent */
+  --glow-primary: rgba(204, 124, 94, 0.15);
+  --glow-subtle: rgba(204, 124, 94, 0.08);
 }
 
 /* === 自定义动画 === */

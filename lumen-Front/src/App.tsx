@@ -12,6 +12,7 @@ import AvatarManager from './pages/AvatarManager';
 import ConfigList from './pages/ConfigList';
 import ConfigEditor from './pages/ConfigEditor';
 import TokenInspector from './pages/TokenInspector';
+import KnowledgeList from './pages/KnowledgeList';
 import PushNotification from './components/PushNotification';
 import { usePush } from './hooks/usePush';
 
@@ -51,6 +52,9 @@ function App() {
 
         {/* Token Inspector 页面 */}
         <Route path="/settings/token-inspector" element={<TokenInspector />} />
+
+        {/* 知识库管理页面 */}
+        <Route path="/settings/knowledge" element={<KnowledgeList />} />
       </Routes>
 
       {/* Overlay 挂载点 — 推送通知 + 未来动画特效系统 */}

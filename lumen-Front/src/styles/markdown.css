@@ -1,4 +1,4 @@
-/* === Lumen Markdown 暗色主题 === */
+/* === Lumen Markdown 暗色主题 — 暖灰配色 === */
 
 .markdown-body {
   line-height: 1.7;
@@ -13,14 +13,14 @@
   margin-top: 1em;
   margin-bottom: 0.4em;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #E8E7E3;
   letter-spacing: 0.02em;
 }
 
 .markdown-body h1 { font-size: 1.4em; }
-.markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid rgba(20, 184, 166, 0.15); padding-bottom: 0.3em; }
+.markdown-body h2 { font-size: 1.2em; border-bottom: 1px solid rgba(204, 124, 94, 0.15); padding-bottom: 0.3em; }
 .markdown-body h3 { font-size: 1.1em; }
-.markdown-body h4 { font-size: 1em; color: #94a3b8; }
+.markdown-body h4 { font-size: 1em; color: #ABA499; }
 
 /* 段落 */
 .markdown-body p {
@@ -29,20 +29,20 @@
 
 /* 链接 */
 .markdown-body a {
-  color: #fbbf24;
+  color: #CC7C5E;
   text-decoration: underline;
-  text-decoration-color: rgba(251, 191, 36, 0.3);
+  text-decoration-color: rgba(204, 124, 94, 0.3);
   text-underline-offset: 2px;
 }
 .markdown-body a:hover {
-  color: #fcd34d;
-  text-decoration-color: rgba(252, 211, 77, 0.5);
+  color: #E8A48C;
+  text-decoration-color: rgba(232, 164, 140, 0.5);
 }
 
 /* 行内代码 */
 .markdown-body .markdown-inline-code {
-  background: rgba(251, 191, 36, 0.1);
-  color: #fcd34d;
+  background: rgba(204, 124, 94, 0.1);
+  color: #E8A48C;
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.9em;
@@ -53,7 +53,7 @@
 .markdown-body .markdown-code-block {
   margin: 0.6em 0;
   border-radius: 8px;
-  border: 1px solid rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(204, 124, 94, 0.15);
   font-size: 0.88em;
 }
 
@@ -79,7 +79,7 @@
   content: '·';
   position: absolute;
   left: -1em;
-  color: #fbbf24;
+  color: #CC7C5E;
   font-weight: bold;
 }
 
@@ -95,25 +95,25 @@
   content: counter(md-ol) '.';
   position: absolute;
   left: -1.6em;
-  color: #fbbf24;
+  color: #CC7C5E;
   font-weight: 500;
   font-size: 0.85em;
 }
 
 /* 任务列表 */
 .markdown-body input[type="checkbox"] {
-  accent-color: #14b8a6;
+  accent-color: #CC7C5E;
   margin-right: 0.4em;
   transform: scale(1.1);
 }
 
-/* 引用 — 琥珀色背景替代左边框 */
+/* 引用 — 暖棕背景替代左边框 */
 .markdown-body blockquote {
   margin: 0.5em 0;
   padding: 0.6em 1em;
-  border: 1px solid rgba(251, 191, 36, 0.2);
-  background: rgba(251, 191, 36, 0.05);
-  color: #94a3b8;
+  border: 1px solid rgba(204, 124, 94, 0.2);
+  background: rgba(204, 124, 94, 0.05);
+  color: #ABA499;
   border-radius: 4px;
 }
 .markdown-body blockquote p {
@@ -130,34 +130,34 @@
 .markdown-body th,
 .markdown-body td {
   padding: 0.5em 0.8em;
-  border: 1px solid rgba(100, 116, 139, 0.2);
+  border: 1px solid rgba(138, 132, 120, 0.2);
   text-align: left;
 }
 .markdown-body th {
-  background: rgba(251, 191, 36, 0.1);
-  color: #e2e8f0;
+  background: rgba(204, 124, 94, 0.1);
+  color: #E8E7E3;
   font-weight: 600;
 }
 .markdown-body tr:nth-child(even) {
-  background: rgba(15, 23, 42, 0.3);
+  background: rgba(31, 31, 30, 0.3);
 }
 
 /* 分割线 */
 .markdown-body hr {
   border: none;
-  border-top: 1px solid rgba(100, 116, 139, 0.2);
+  border-top: 1px solid rgba(138, 132, 120, 0.2);
   margin: 1em 0;
 }
 
 /* 加粗 */
 .markdown-body strong {
-  color: #f1f5f9;
+  color: #F3F3F0;
   font-weight: 600;
 }
 
 /* 删除线 */
 .markdown-body del {
-  color: #64748b;
+  color: #8A8478;
 }
 
 /* 图片 */
