@@ -8,6 +8,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Message, ToolCall } from '../hooks/useChat';
 import MarkdownContent from './MarkdownContent';
 import CommandPalette from './CommandPalette';
+import TokenRing from './TokenRing';
 import { executeCommand, getAllCommands, parseCommand } from '../commands/registry';
 import '../commands/builtin'; // 副作用：注册内置命令
 import { CommandResult } from '../commands/registry';
@@ -325,6 +326,7 @@ interface ChatPanelProps {
   onAbort?: () => void;
   characterName?: string;
   characterAvatar?: string | null;
+  currentModel?: string;
 }
 
 function ChatPanel({
@@ -340,6 +342,7 @@ function ChatPanel({
   onAbort,
   characterName,
   characterAvatar,
+  currentModel,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -358,6 +361,7 @@ function ChatPanel({
 
   const [showPalette, setShowPalette] = useState(false);
   const [paletteIndex, setPaletteIndex] = useState(0);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
 
   // 是否正在思考（isLoading + 最后一条是空的 assistant）
   const lastMsg = messages[messages.length - 1];
@@ -452,39 +456,11 @@ function ChatPanel({
     onInputChange(e.target.value);
     const ta = e.target;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 5 * 24 + 20) + 'px';
+    ta.style.height = Math.min(ta.scrollHeight, 8 * 24 + 20) + 'px';
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[radial-gradient(ellipse_at_center,#0f172a_0%,#000_100%)]">
-      {/* 顶栏 */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-slate-800/60">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-primary-light shadow-[0_0_8px_rgba(20,184,166,0.5)]" />
-          <h1 className="text-lg font-light tracking-widest text-slate-300 uppercase">
-            Lumen
-          </h1>
-        </div>
-        {/* Token 用量 */}
-        {tokenUsage && (
-          <div className="flex items-center gap-2 ml-3">
-            <div className="w-16 h-1 rounded-full bg-slate-800 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  tokenUsage.usage_percent > 80 ? 'bg-red-500' :
-                  tokenUsage.usage_percent > 50 ? 'bg-amber-500' :
-                  'bg-teal-500'
-                }`}
-                style={{ width: `${Math.min(tokenUsage.usage_percent, 100)}%` }}
-              />
-            </div>
-            <span className="text-xs text-slate-600 font-mono">
-              {tokenUsage.usage_percent}%
-            </span>
-          </div>
-        )}
-      </header>
-
+    <div className="flex-1 flex flex-col bg-slate-950">
       {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-lumen">
         {messages.length === 0 && !sessionId ? (
@@ -493,7 +469,7 @@ function ChatPanel({
             <div className="text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800/50 flex items-center justify-center">
                 <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9 8s9 3.582 9 8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
               </div>
               <p className="text-slate-500 text-sm mb-2">暂无会话</p>
@@ -530,7 +506,7 @@ function ChatPanel({
       )}
 
       {/* 输入区域 */}
-      <div className="px-6 py-4 border-t border-slate-800/60 relative">
+      <div className="px-4 pb-4 pt-3 relative">
         {!sessionId ? (
           // 无会话时的禁用提示
           <div className="text-center py-3">
@@ -558,60 +534,138 @@ function ChatPanel({
               }}
               onHover={(idx) => setPaletteIndex(idx)}
             />
-            <form onSubmit={handleSubmit} className="flex items-center gap-3">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => {
-                  handleInput(e);
-                  const isSlash = e.target.value.startsWith('/');
-                  setShowPalette(isSlash);
-                  if (isSlash) setPaletteIndex(0);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="说点什么...  (输入 / 查看命令)"
-                disabled={isLoading || !sessionId}
-                rows={1}
-                className="
-                  flex-1 px-4 py-2.5 rounded-lg resize-none
-                  bg-slate-900/60 border border-slate-700/40
-                  text-slate-200 placeholder-slate-600 text-sm
-                  focus:outline-hidden focus:border-amber-500/40 focus:shadow-[0_0_8px_rgba(204,124,94,0.1)]
-                  disabled:opacity-40 disabled:cursor-not-allowed
-                  transition-all duration-200
-                "
-              />
-              {isLoading ? (
+            <div className="rounded-xl bg-slate-900/60 border border-slate-700/40 overflow-hidden
+              focus-within:border-amber-500/30 focus-within:bg-slate-900/80
+              focus-within:shadow-[0_0_12px_rgba(204,124,94,0.08)]
+              transition-all duration-200">
+              <form onSubmit={handleSubmit}>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => {
+                    handleInput(e);
+                    const isSlash = e.target.value.startsWith('/');
+                    setShowPalette(isSlash);
+                    if (isSlash) setPaletteIndex(0);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="说点什么..."
+                  disabled={isLoading || !sessionId}
+                  rows={2}
+                  className="
+                    w-full px-4 py-3 resize-none bg-transparent border-none
+                    text-slate-200 placeholder-slate-600 text-sm leading-relaxed
+                    focus:outline-hidden focus:shadow-[0_0_8px_rgba(204,124,94,0.1)]
+                    disabled:opacity-40 disabled:cursor-not-allowed
+                    transition-all duration-200
+                  "
+                />
+              </form>
+              {/* 工具栏分割线 */}
+              <div className="h-px bg-slate-700/40 mx-3" />
+              {/* 工具栏 */}
+              <div className="flex items-center gap-1 px-3 py-1.5">
+                {/* 附件 */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachMenu(!showAttachMenu)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center
+                      text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
+                      active:bg-slate-800/40
+                      focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40
+                      transition-all duration-150"
+                    title="附件"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+                  {showAttachMenu && (
+                    <div className="absolute bottom-full left-0 mb-1 py-1 rounded-lg bg-slate-900 border border-slate-700/60 shadow-lg min-w-[140px] z-50">
+                      <button
+                        type="button"
+                        onClick={() => setShowAttachMenu(false)}
+                        className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 text-left"
+                      >
+                        上传文件（开发中）
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* 斜杠命令 */}
                 <button
                   type="button"
-                  onClick={onAbort}
-                  className="
-                    px-5 py-2.5 rounded-lg text-sm font-medium
-                    bg-red-500/10 border border-red-500/30 text-red-400
-                    hover:bg-red-500/20 hover:border-red-500/50
-                    focus:outline-hidden
-                    transition-all duration-200
-                  "
+                  onClick={() => {
+                    if (!showPalette) {
+                      onInputChange('/');
+                      setShowPalette(true);
+                      setPaletteIndex(0);
+                      inputRef.current?.focus();
+                    } else {
+                      setShowPalette(false);
+                    }
+                  }}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center
+                    text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
+                    active:bg-slate-800/40
+                    focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40
+                    transition-all duration-150"
+                  title="斜杠命令"
                 >
-                  停止
+                  <span className="text-sm font-mono font-bold">/</span>
                 </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={!input.trim() || !sessionId}
-                  className="
-                    px-5 py-2.5 rounded-lg text-sm font-medium
-                    bg-amber-500/10 border border-amber-500/30 text-amber-400
-                    hover:bg-amber-500/20 hover:border-amber-500/50
-                    focus:outline-hidden focus:shadow-[0_0_12px_rgba(204,124,94,0.15)]
-                    disabled:opacity-30 disabled:cursor-not-allowed
-                    transition-all duration-200
-                  "
-                >
-                  发送
-                </button>
-              )}
-            </form>
+                <div className="flex-1" />
+                {/* 模型指示 */}
+                {currentModel && (
+                  <span className="text-[10px] text-slate-600 font-mono truncate max-w-24 px-1">
+                    {currentModel}
+                  </span>
+                )}
+                {/* Token 进度 */}
+                {tokenUsage && (
+                  <TokenRing
+                    percent={tokenUsage.usage_percent}
+                    current={tokenUsage.current_tokens}
+                    total={tokenUsage.context_size}
+                  />
+                )}
+                {/* 发送 / 停止 */}
+                {isLoading ? (
+                  <button
+                    type="button"
+                    onClick={onAbort}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center
+                      bg-red-500/15 border border-red-500/30 text-red-400
+                      hover:bg-red-500/25 hover:border-red-500/50
+                      focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-red-500/40
+                      transition-all duration-200"
+                    title="停止"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                      <rect x="3" y="3" width="10" height="10" rx="2" />
+                    </svg>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => doSend()}
+                    disabled={!input.trim() || !sessionId}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center
+                      bg-amber-500/15 border border-amber-500/30 text-amber-400
+                      hover:bg-amber-500/25 hover:border-amber-500/50
+                      disabled:opacity-30 disabled:cursor-not-allowed
+                      focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40
+                      transition-all duration-200"
+                    title="发送"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700&display=swap');
 @import "tailwindcss";
 
 /* === Tailwind CSS v4 主题配置 ===
@@ -52,6 +53,11 @@
   /* === 自定义边框颜色 === */
   --border-color-theme: var(--color-border);
   --border-color-theme-subtle: var(--color-border-subtle);
+
+  /* === 字体家族 === */
+  --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
 }
 
 /* === Lumen 设计令牌 — 暖室台灯（Claude Desktop 风格） ===
@@ -62,6 +68,9 @@
  * 将来做主题系统时，只需切换这套变量即可全局换色。
  */
 :root {
+  /* === 全局字体 === */
+  font-family: var(--font-body);
+
   /* === 主色 — 橙棕色系列（暖光） === */
   --color-primary: #CC7C5E;         /* amber-400 — 暖棕 accent */
   --color-primary-dim: #B86A4A;     /* amber-500 — 深暖棕 */

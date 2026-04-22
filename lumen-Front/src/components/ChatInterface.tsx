@@ -13,8 +13,9 @@ import { usePersona } from '../hooks/usePersona';
 import { useAuthorNote } from '../hooks/useAuthorNote';
 import { CommandResult } from '../commands/registry';
 import { getTokenUsage } from '../api/chat';
-import ChatSidebar from './ChatSidebar';
+import NavRail from './NavRail';
 import ChatPanel from './ChatPanel';
+import RightRail from './RightRail';
 import DebugDrawer from './DebugDrawer';
 import { MEMORY_DEBUG_STORAGE_KEY } from '../pages/TokenInspector';
 
@@ -167,8 +168,8 @@ function ChatInterface() {
   }, [navigate]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <ChatSidebar
+    <div className="flex h-screen overflow-hidden relative">
+      <NavRail
         sessions={sessions.sessions}
         currentSessionId={sessions.currentSessionId}
         isLoading={sessions.isLoading}
@@ -205,6 +206,12 @@ function ChatInterface() {
         onAbort={chat.abort}
         characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
         characterAvatar={characters.currentCharacter?.avatar}
+        currentModel=""
+      />
+      <RightRail
+        onToggleDebug={() => chat.toggleMemoryDebug()}
+        isDebugOpen={chat.memoryDebugMode}
+        onManageWorldBooks={handleManageWorldBooks}
       />
       <DebugDrawer
         open={chat.memoryDebugMode}

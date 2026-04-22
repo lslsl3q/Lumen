@@ -19,20 +19,15 @@ html, body, #root {
 
 /* === 发光效果 === */
 
-.glow-teal {
-  box-shadow: 0 0 12px var(--glow-primary),
-              inset 0 0 8px rgba(204, 124, 94, 0.06);
-}
-
 .glow-amber {
   box-shadow: 0 0 12px var(--glow-primary),
               inset 0 0 8px rgba(204, 124, 94, 0.06);
 }
 
-/* === 自定义滚动条 === */
+/* === 自定义滚动条 — 默认隐藏，hover 时显示 === */
 
 .scrollbar-lumen::-webkit-scrollbar {
-  width: 5px;
+  width: 4px;
 }
 
 .scrollbar-lumen::-webkit-scrollbar-track {
@@ -40,12 +35,16 @@ html, body, #root {
 }
 
 .scrollbar-lumen::-webkit-scrollbar-thumb {
-  background: rgba(204, 124, 94, 0.2);
-  border-radius: 3px;
+  background: transparent;
+  border-radius: 2px;
 }
 
-.scrollbar-lumen::-webkit-scrollbar-thumb:hover {
-  background: rgba(204, 124, 94, 0.4);
+.scrollbar-lumen:hover::-webkit-scrollbar-thumb {
+  background: rgba(138, 132, 120, 0.25);
+}
+
+.scrollbar-lumen:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 132, 120, 0.4);
 }
 
 /* === 工具旋转动画 === */

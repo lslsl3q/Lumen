@@ -291,10 +291,10 @@ export default function DebugDrawer({ open, onClose, layers, totalTokens, contex
   if (!open) return null;
 
   return (
-    <div className="w-96 flex-shrink-0 flex flex-col bg-slate-950/95 border-l border-slate-800/40 animate-slide-in">
+    <div className="absolute right-10 top-0 bottom-0 w-96 flex flex-col bg-slate-950/95 backdrop-blur-sm border-l border-slate-800/40 shadow-[-8px_0_16px_rgba(0,0,0,0.3)] z-40 animate-slide-in">
       {/* 头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/40">
-        <span className="text-sm font-medium text-slate-300">调试面板</span>
+        <span className="text-sm font-medium text-slate-300 font-display">调试面板</span>
         <button
           onClick={onClose}
           className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
