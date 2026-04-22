@@ -92,6 +92,18 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh")
 EMBEDDING_ENABLED = os.getenv("EMBEDDING_ENABLED", "True").lower() in ("true", "1", "yes")
 EMBEDDING_DIMENSIONS = 512  # gte-small-zh 固定输出维度
 
+# 知识库配置
+KNOWLEDGE_DB_PATH = os.getenv(
+    "KNOWLEDGE_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "data", "knowledge.tdb"),
+)
+KNOWLEDGE_SOURCE_DIR = os.getenv(
+    "KNOWLEDGE_SOURCE_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "knowledge"),
+)
+KNOWLEDGE_CHUNK_SIZE = int(os.getenv("KNOWLEDGE_CHUNK_SIZE", "300"))
+KNOWLEDGE_CHUNK_OVERLAP = int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP", "60"))
+
 
 def get_model(character_config: dict = None) -> str:
     """获取当前应该使用的模型

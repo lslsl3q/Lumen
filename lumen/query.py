@@ -269,6 +269,74 @@ async def _inject_relevant_memories(
     return result, recall_log
 
 
+async def _inject_knowledge(
+    messages: list[Message],
+    user_input: str,
+    character_config: dict,
+) -> tuple[list[Message], list[dict]]:
+    """基于用户输入搜索知识库，注入参考资料（独立于记忆系统）
+
+    和 _inject_relevant_memories 的区别：
+    - Memory: <relevant_history> — "之前聊过什么"（回忆）
+    - Knowledge: <knowledge_base> — "参考资料"（检索）
+    注入位置在 memory 之后（更靠近 user message），因为知识是针对当前查询搜索的。
+    """
+    from lumen.services.knowledge import search as knowledge_search
+    from lumen.services.context.token_estimator import estimate_text_tokens
+
+    knowledge_enabled = character_config.get("knowledge_enabled", True)
+    if not knowledge_enabled:
+        return messages, []
+
+    top_k = character_config.get("knowledge_top_k", 3)
+    min_score = character_config.get("knowledge_min_score", 0.3)
+    token_budget = character_config.get("knowledge_token_budget", 500)
+
+    results = await knowledge_search(user_input, top_k=top_k, min_score=min_score)
+    if not results:
+        return messages, []
+
+    # Token 预算控制
+    parts = []
+    used_tokens = 0
+    header_tokens = 60  # 标签头尾开销
+
+    for hit in results:
+        filename = hit.get("filename", "未知来源")
+        content = hit.get("content", "")
+        score = hit.get("score", 0)
+
+        entry = f"[来源: {filename}，相关度: {score:.2f}]\n{content}"
+        entry_tokens = estimate_text_tokens(entry)
+
+        if used_tokens + entry_tokens + header_tokens > token_budget:
+            break
+        parts.append(entry)
+        used_tokens += entry_tokens
+
+    if not parts:
+        return messages, []
+
+    knowledge_text = (
+        "<knowledge_base>\n"
+        "以下是从知识库中检索到的参考资料，请据此回答用户问题。"
+        "如果参考资料与问题无关，可以忽略。\n\n"
+        + "\n\n".join(parts)
+        + "\n</knowledge_base>"
+    )
+
+    last_user_idx = _find_last_user_index(messages)
+    if last_user_idx == -1:
+        return messages, []
+
+    result = messages[:last_user_idx] + [
+        {"role": "system", "content": knowledge_text}
+    ] + messages[last_user_idx:]
+
+    kb_log = [{"source": "knowledge", "hits": len(parts), "tokens": used_tokens}]
+    return result, kb_log
+
+
 def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
     """验证 AI 的工具调用是否正确
 
@@ -308,6 +376,7 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     trimmed = _prepare_messages(session.messages, session.character_id)
     trimmed = _inject_authors_note(trimmed, session.session_id)
     trimmed, _ = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
+    trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -366,7 +435,9 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         trimmed = _inject_authors_note(trimmed, session.session_id)
         trimmed = _inject_worldbook(trimmed, session.character_id)
         if iteration == 0:
-            trimmed, recall_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
+            trimmed, mem_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
+            trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config)
+            recall_log = mem_log + kb_log
 
         # /tokens 记忆调试：yield 提示词分层信息
         if memory_debug and iteration == 0:
@@ -375,10 +446,13 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 character_config,
                 session.dynamic_context if hasattr(session, 'dynamic_context') else None,
             )
-            # 补充消息流中的注入层（世界书、记忆、Author's Note 在 trimmed 中以 system 消息存在）
+            # 补充消息流中的注入层（世界书、记忆、知识库、Author's Note 在 trimmed 中以 system 消息存在）
             for msg in trimmed:
-                if msg["role"] == "system" and msg["content"].startswith("<relevant_history>"):
-                    layer_infos.append({"name": "跨会话记忆", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+                if msg["role"] == "system":
+                    if msg["content"].startswith("<relevant_history>"):
+                        layer_infos.append({"name": "跨会话记忆", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+                    elif msg["content"].startswith("<knowledge_base>"):
+                        layer_infos.append({"name": "知识库检索", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
             yield {
                 "type": "memory_debug",
                 "layers": layer_infos,

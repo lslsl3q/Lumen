@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-22（T9.3 向量库清理 + T9.4 日志系统：级联删除 + RotatingFileHandler）
+**最后更新**：2026-04-22（知识库 P1-a 导入+分块+向量化+搜索 + P1-b 对话注入）
 
 ---
 
@@ -14,12 +14,12 @@ Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、日志系统 setup_logging）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
-│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流）— 对标 CC query.ts
+│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流、知识库注入）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
 │   ├── skills/                   # Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter，含 README.md 开发指南）
-│   ├── data/                     # 运行时数据（history.db、file_workspaces.json、active_persona.json、mcp_servers.json）
+│   ├── data/                     # 运行时数据（history.db、file_workspaces.json、active_persona.json、mcp_servers.json、knowledge.tdb、knowledge/）
 │   │
 │   ├── core/                     # 大脑 — 会话状态
 │   │   └── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
@@ -51,7 +51,8 @@ Lumen/
 │   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25 RRF混合检索、噪音过滤、去重）
 │   │   ├── vector_store.py       # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除）
 │   │   ├── embedding.py          # 文本嵌入（gte-small-zh，sentence-transformers 单例）
-│   │   ├── knowledge.py          # 【预留】知识图谱
+│   │   ├── knowledge.py          # 知识库存储（TriviumDB 单例、文件导入/切分/向量化/语义搜索/删除，独立 knowledge.tdb）
+│   │   ├── chunker.py            # 文本分块器（句子边界感知，支持重叠，用于知识库向量化）
 │   │   └── emotion.py            # 【预留】情感引擎
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
@@ -75,6 +76,7 @@ Lumen/
 │       ├── authors_note.py       # Author's Note 类型（AuthorsNoteConfig + UpdateRequest）
 │       ├── worldbook.py          # 世界书类型（WorldBookEntry + WorldBookListItem Pydantic 模型）
 │       └── skills.py             # Skills 类型（SkillCard + SkillCreateRequest + SkillUpdateRequest Pydantic 模型）
+│       └── knowledge.py          # 知识库类型（KnowledgeFileCard + KnowledgeSearchRequest + KnowledgeSearchResult Pydantic 模型）
 │
 ├── api/                          # FastAPI HTTP接口
 │   ├── main.py                   # 应用入口、CORS、路由注册
@@ -86,6 +88,7 @@ Lumen/
 │       ├── authors_note.py       # Author's Note（get/save/delete，每会话独立）
 │       ├── worldbook.py          # 世界书（list/get/create/update/delete，文件存储）
 │       └── skills.py             # Skills（list/get/create/update/delete/upload/invoke，Markdown 目录存储）
+│       ├── knowledge.py          # 知识库（list/get/upload/create/search/delete，文件切分+向量化+语义搜索）
 │       ├── avatar.py             # 头像管理（upload/list/delete，文件存储到 characters/avatars/）
 │       ├── models.py             # 模型（list，从 LiteLLM 代理获取可用模型）
 │       ├── config.py             # 配置（list/read/update）
@@ -118,6 +121,7 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
                           ├── services/llm.py（LLM调用）
                           ├── services/history.py（持久化）
                           ├── services/memory.py（记忆注入）
+                          ├── services/knowledge.py（知识库检索注入）
                           ├── tool.py（工具执行引擎）
                           ├── tools/parse.py（工具解析）
                           ├── tools/registry.py（工具验证）
@@ -176,6 +180,12 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
 | `DELETE` | `/skills/{id}` | 删除 Skill |
 | `POST` | `/skills/upload` | 上传导入 Skill（.md / .zip） |
 | `GET` | `/skills/invoke/{id}` | 懒加载调用 Skill（含脚本执行） |
+| `GET` | `/knowledge/list` | 知识库文件列表 |
+| `GET` | `/knowledge/{file_id}` | 知识库文件元数据 |
+| `POST` | `/knowledge/upload` | 上传文件并自动切分向量化 |
+| `POST` | `/knowledge/create` | 直接文本创建知识库条目 |
+| `POST` | `/knowledge/search` | 语义搜索知识库 |
+| `DELETE` | `/knowledge/{file_id}` | 删除知识库文件及向量 |
 | `GET` | `/models/list` | 获取可用模型列表 |
 | `GET` | `/config/list` | 配置项列表 |
 | `GET` | `/config/{resource}` | 读取配置 |
