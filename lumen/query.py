@@ -269,6 +269,39 @@ async def _inject_relevant_memories(
     return result, recall_log
 
 
+async def _resolve_knowledge_placeholders(
+    messages: list[Message],
+    user_input: str,
+    character_config: dict,
+) -> tuple[list[Message], bool]:
+    """解析 system prompt 中的知识库占位符（{{分类名}} / [[分类名]]）
+
+    有占位符 → 在 system prompt 内替换检索结果（VCP 方式，强 RP 权重）
+    无占位符 → 返回 has_placeholders=False，由调用方走自动注入
+    """
+    from lumen.prompt.knowledge_resolver import resolve
+
+    knowledge_enabled = character_config.get("knowledge_enabled", True)
+    if not knowledge_enabled:
+        return messages, False
+
+    # 找第一条 system 消息（system prompt）
+    for i, msg in enumerate(messages):
+        if msg["role"] == "system":
+            resolved_text, has_placeholders = await resolve(
+                msg["content"],
+                user_input,
+                token_budget=character_config.get("knowledge_token_budget", 800),
+            )
+            if has_placeholders:
+                result = list(messages)
+                result[i] = {**msg, "content": resolved_text}
+                return result, True
+            break
+
+    return messages, False
+
+
 async def _inject_knowledge(
     messages: list[Message],
     user_input: str,
@@ -376,7 +409,10 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     trimmed = _prepare_messages(session.messages, session.character_id)
     trimmed = _inject_authors_note(trimmed, session.session_id)
     trimmed, _ = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
-    trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config)
+    # 知识注入：占位符模式优先，无占位符走自动注入
+    trimmed, has_kb_placeholders = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
+    if not has_kb_placeholders:
+        trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -436,7 +472,12 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         trimmed = _inject_worldbook(trimmed, session.character_id)
         if iteration == 0:
             trimmed, mem_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
-            trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config)
+            # 知识注入：占位符模式优先，无占位符走自动注入
+            trimmed, has_kb_placeholders = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
+            if has_kb_placeholders:
+                kb_log = [{"source": "knowledge_placeholder", "hits": 0, "tokens": 0}]
+            else:
+                trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config)
             recall_log = mem_log + kb_log
 
         # /tokens 记忆调试：yield 提示词分层信息
