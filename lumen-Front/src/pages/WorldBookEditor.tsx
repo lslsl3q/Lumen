@@ -108,8 +108,8 @@ function WorldBookEditor() {
   }
 
   // 复用样式常量
-  const inputCls = "w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/40 transition-all";
-  const numInputCls = "w-24 px-3 py-1.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all";
+  const inputCls = "w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-hidden focus:border-amber-500/40 transition-all";
+  const numInputCls = "w-24 px-3 py-1.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all";
   const sectionTitleCls = "text-sm text-slate-400 mb-3";
   const tagCls = (color: string) => `px-3 py-1 rounded-full text-sm bg-${color}-500/10 text-${color}-400 border border-${color}-500/20 flex items-center gap-2`;
   const addBtnCls = (color: string) => `px-4 py-2.5 rounded-lg text-sm bg-${color}-500/10 border border-${color}-500/30 text-${color}-400 hover:bg-${color}-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all`;
@@ -183,7 +183,7 @@ function WorldBookEditor() {
                 <div className="space-y-3 pl-1 border-l-2 border-slate-800 ml-1">
                   <div>
                     <select value={form.selective_logic} onChange={e => setForm({ ...form, selective_logic: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all">
+                      className="w-full px-3 py-2 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all">
                       <option value="and">AND — 次关键词也必须命中才触发</option>
                       <option value="not">NOT — 次关键词命中时不触发</option>
                     </select>
@@ -234,7 +234,7 @@ function WorldBookEditor() {
             <div>
               <label className="block text-xs text-slate-500 mb-1">注入位置</label>
               <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value as any })}
-                className="w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all">
+                className="w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all">
                 <option value="before_sys">系统提示词之前</option>
                 <option value="after_sys">系统提示词之后</option>
                 <option value="before_user">用户消息之前</option>
@@ -272,7 +272,7 @@ function WorldBookEditor() {
           <textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
             placeholder="当关键词被触发时，这段内容会被注入到提示词中..."
             rows={10}
-            className="w-full px-4 py-3 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/40 transition-all resize-y" />
+            className="w-full px-4 py-3 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-hidden focus:border-amber-500/40 transition-all resize-y" />
         </section>
 
         {/* 底部操作栏 */}

@@ -98,7 +98,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
               flex-1 px-4 py-2.5 rounded-lg text-sm font-mono
               bg-slate-800/40 border border-slate-700/40
               text-slate-200 placeholder-slate-600
-              focus:outline-none focus:border-amber-500/40
+              focus:outline-hidden focus:border-amber-500/40
               transition-all duration-200
             "
           />
@@ -157,7 +157,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
               w-24 px-3 py-1.5 rounded-lg text-sm
               bg-slate-900/60 border border-slate-700/40
               text-slate-200
-              focus:outline-none focus:border-amber-500/40
+              focus:outline-hidden focus:border-amber-500/40
               transition-all duration-200
             "
           />

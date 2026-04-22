@@ -458,7 +458,7 @@ function ChatPanel({
                 {message.thinkingContent && (
                   <ThinkingBubble content={message.thinkingContent} done={!!message.thinkingDone} />
                 )}
-                {message.toolCalls?.map((call, i) => (
+                {message.toolCalls?.map((call) => (
                   <ToolCallBlock key={call.callId} call={call} />
                 ))}
               </React.Fragment>
@@ -512,7 +512,7 @@ function ChatPanel({
                   flex-1 px-4 py-2.5 rounded-lg resize-none
                   bg-slate-900/60 border border-slate-700/40
                   text-slate-200 placeholder-slate-600 text-sm
-                  focus:outline-none focus:border-amber-500/40 focus:shadow-[0_0_8px_rgba(251,191,36,0.1)]
+                  focus:outline-hidden focus:border-amber-500/40 focus:shadow-[0_0_8px_rgba(204,124,94,0.1)]
                   disabled:opacity-40 disabled:cursor-not-allowed
                   transition-all duration-200
                 "
@@ -525,7 +525,7 @@ function ChatPanel({
                     px-5 py-2.5 rounded-lg text-sm font-medium
                     bg-red-500/10 border border-red-500/30 text-red-400
                     hover:bg-red-500/20 hover:border-red-500/50
-                    focus:outline-none
+                    focus:outline-hidden
                     transition-all duration-200
                   "
                 >
@@ -539,7 +539,7 @@ function ChatPanel({
                     px-5 py-2.5 rounded-lg text-sm font-medium
                     bg-amber-500/10 border border-amber-500/30 text-amber-400
                     hover:bg-amber-500/20 hover:border-amber-500/50
-                    focus:outline-none focus:shadow-[0_0_12px_rgba(251,191,36,0.15)]
+                    focus:outline-hidden focus:shadow-[0_0_12px_rgba(204,124,94,0.15)]
                     disabled:opacity-30 disabled:cursor-not-allowed
                     transition-all duration-200
                   "

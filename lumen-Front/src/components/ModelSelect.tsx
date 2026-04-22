@@ -60,7 +60,7 @@ function ModelSelect({ value, onChange, placeholder = '选择或输入模型名'
           className="
             w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
             px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-            focus:outline-none focus:border-amber-500/50
+            focus:outline-hidden focus:border-amber-500/50
           "
         />
         <p className="text-xs text-amber-500/60 mt-1">无法获取模型列表，请手动输入</p>
@@ -93,7 +93,7 @@ function ModelSelect({ value, onChange, placeholder = '选择或输入模型名'
   const inputClass = `
     w-full bg-slate-900/60 border rounded-lg
     px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-    focus:outline-none focus:border-amber-500/50
+    focus:outline-hidden focus:border-amber-500/50
     ${isOpen ? 'border-amber-500/50' : 'border-slate-700/60'}
   `;
 

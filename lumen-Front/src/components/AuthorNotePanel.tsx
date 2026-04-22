@@ -74,7 +74,7 @@ function AuthorNotePanel({
             className="
               w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
               px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-              focus:outline-none focus:border-amber-500/50 resize-none
+              focus:outline-hidden focus:border-amber-500/50 resize-none
             "
           />
 

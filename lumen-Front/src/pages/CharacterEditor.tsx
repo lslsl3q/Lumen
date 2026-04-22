@@ -295,7 +295,7 @@ function CharacterEditor() {
                       w-full px-3 py-2 rounded-lg text-sm
                       bg-slate-800/40 border border-slate-700/40
                       text-slate-200 placeholder-slate-600
-                      focus:border-teal-500/40 focus:outline-none
+                      focus:border-teal-500/40 focus:outline-hidden
                       transition-all duration-150
                     "
                   />
@@ -315,7 +315,7 @@ function CharacterEditor() {
                   w-full px-3 py-2 rounded-lg text-sm
                   bg-slate-800/40 border border-slate-700/40
                   text-slate-200 placeholder-slate-600
-                  focus:border-teal-500/40 focus:outline-none
+                  focus:border-teal-500/40 focus:outline-hidden
                   transition-all duration-150
                 "
               />
@@ -333,7 +333,7 @@ function CharacterEditor() {
                   w-full px-3 py-2 rounded-lg text-sm
                   bg-slate-800/40 border border-slate-700/40
                   text-slate-200 placeholder-slate-600
-                  focus:border-teal-500/40 focus:outline-none
+                  focus:border-teal-500/40 focus:outline-hidden
                   transition-all duration-150
                 "
               />
@@ -355,7 +355,7 @@ function CharacterEditor() {
                 w-full px-4 py-3 rounded-lg text-sm
                 bg-slate-800/40 border border-slate-700/40
                 text-slate-200 placeholder-slate-600
-                focus:border-teal-500/40 focus:outline-none
+                focus:border-teal-500/40 focus:outline-hidden
                 transition-all duration-150 resize-y
                 font-mono leading-relaxed
               "
@@ -391,7 +391,7 @@ function CharacterEditor() {
                 className="
                   w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
                   px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-                  focus:outline-none focus:border-teal-500/50
+                  focus:outline-hidden focus:border-teal-500/50
                 "
               />
               <p className="text-xs text-slate-600 mt-1">此模型的最大上下文窗口（tokens）</p>
@@ -491,7 +491,7 @@ function CharacterEditor() {
                     className="
                       w-full bg-slate-900/60 border border-slate-700/60 rounded-lg
                       px-3 py-2 text-sm text-slate-300 placeholder-slate-600
-                      focus:outline-none focus:border-teal-500/50
+                      focus:outline-hidden focus:border-teal-500/50
                     "
                   />
                   <p className="text-xs text-slate-600 mt-1">每次对话最多花多少 token 召回历史（50~2000）</p>
@@ -623,7 +623,7 @@ function CharacterEditor() {
                                   w-full px-3 py-2 rounded-lg text-sm
                                   bg-slate-800/40 border border-slate-700/40
                                   text-slate-200 placeholder-slate-600
-                                  focus:border-teal-500/40 focus:outline-none
+                                  focus:border-teal-500/40 focus:outline-hidden
                                   transition-all duration-150 resize-y
                                 "
                               />

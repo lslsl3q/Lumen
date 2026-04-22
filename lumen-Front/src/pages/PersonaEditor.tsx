@@ -185,7 +185,7 @@ function PersonaEditor() {
                 w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                 border border-slate-700/60 text-slate-200
                 placeholder:text-slate-600 disabled:opacity-50
-                focus:border-indigo-500/40 focus:outline-none
+                focus:border-indigo-500/40 focus:outline-hidden
                 transition-all duration-150
               "
             />
@@ -202,7 +202,7 @@ function PersonaEditor() {
                 w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                 border border-slate-700/60 text-slate-200
                 placeholder:text-slate-600
-                focus:border-indigo-500/40 focus:outline-none
+                focus:border-indigo-500/40 focus:outline-hidden
                 transition-all duration-150
               "
             />
@@ -220,7 +220,7 @@ function PersonaEditor() {
                 w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                 border border-slate-700/60 text-slate-200
                 placeholder:text-slate-600 resize-y
-                focus:border-indigo-500/40 focus:outline-none
+                focus:border-indigo-500/40 focus:outline-hidden
                 transition-all duration-150
               "
             />
@@ -298,7 +298,7 @@ function PersonaEditor() {
                   flex-1 px-3 py-2 rounded-lg text-sm bg-slate-800/60
                   border border-slate-700/60 text-slate-200
                   placeholder:text-slate-600
-                  focus:border-indigo-500/40 focus:outline-none
+                  focus:border-indigo-500/40 focus:outline-hidden
                   transition-all duration-150
                 "
               />

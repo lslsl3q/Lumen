@@ -129,7 +129,7 @@ function KnowledgeList() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="语义搜索知识库..."
-              className="flex-1 px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition-colors text-sm"
+              className="flex-1 px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-amber-500/50 transition-colors text-sm"
             />
             <button
               onClick={handleSearch}
@@ -223,14 +223,14 @@ function KnowledgeList() {
                 value={createFilename}
                 onChange={(e) => setCreateFilename(e.target.value)}
                 placeholder="文件名（如 世界观.md）"
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-amber-500/50 text-sm"
               />
               <textarea
                 value={createContent}
                 onChange={(e) => setCreateContent(e.target.value)}
                 placeholder="内容..."
                 rows={10}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm resize-y"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-amber-500/50 text-sm resize-y"
               />
             </div>
 

@@ -1,6 +1,58 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* === Tailwind CSS v4 主题配置 ===
+ * 使用 @theme 指令定义自定义设计令牌
+ */
+@theme {
+  /* === 自定义颜色扩展 — 暖灰色调（slate 覆盖） === */
+  --color-slate-50: #FAFAF8;
+  --color-slate-100: #F3F3F0;
+  --color-slate-200: #E8E7E3;
+  --color-slate-300: #D1D0CC;
+  --color-slate-400: #ABA499;
+  --color-slate-500: #8A8478;
+  --color-slate-600: #6A655C;
+  --color-slate-700: #4A4744;
+  --color-slate-800: #333230;
+  --color-slate-900: #1F1F1E;
+  --color-slate-950: #141413;
+
+  /* === 自定义颜色扩展 — 琥珀色阶（amber 覆盖） === */
+  --color-amber-50: #FEF6F2;
+  --color-amber-100: #FDE8DF;
+  --color-amber-200: #F5CFC0;
+  --color-amber-300: #E8A48C;
+  --color-amber-400: #CC7C5E;
+  --color-amber-500: #B86A4A;
+  --color-amber-600: #A05838;
+  --color-amber-700: #86462C;
+  --color-amber-800: #6E3824;
+  --color-amber-900: #5C2F20;
+  --color-amber-950: #331610;
+
+  /* === 语义色（CSS 变量驱动） === */
+  --color-primary: var(--color-primary);
+  --color-primary-light: var(--color-primary-light);
+  --color-primary-dim: var(--color-primary-dim);
+
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+
+  --color-success: var(--color-success);
+  --color-success-light: var(--color-success-light);
+
+  --color-error: var(--color-error);
+  --color-error-light: var(--color-error-light);
+
+  --color-surface-deep: var(--color-bg-deep);
+  --color-surface-base: var(--color-bg-base);
+  --color-surface: var(--color-bg-surface);
+  --color-surface-elevated: var(--color-bg-elevated);
+
+  /* === 自定义边框颜色 === */
+  --border-color-theme: var(--color-border);
+  --border-color-theme-subtle: var(--color-border-subtle);
+}
 
 /* === Lumen 设计令牌 — 暖室台灯（Claude Desktop 风格） ===
  *

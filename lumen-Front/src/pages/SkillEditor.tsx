@@ -95,7 +95,7 @@ function SkillEditor() {
             <input
               value={form.name}
               onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
               placeholder="如：写作助手、代码审查"
             />
           </div>
@@ -105,7 +105,7 @@ function SkillEditor() {
             <input
               value={form.description}
               onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
               placeholder="一句话说明这个 Skill 做什么"
             />
           </div>
@@ -115,7 +115,7 @@ function SkillEditor() {
             <input
               value={form.when_to_use}
               onChange={(e) => setForm(f => ({ ...f, when_to_use: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
               placeholder="如：当用户需要写作帮助、创意灵感时"
             />
             <p className="text-xs text-slate-600 mt-1">AI 会根据这段描述自主判断是否使用此 Skill</p>
@@ -128,7 +128,7 @@ function SkillEditor() {
                 type="number"
                 value={form.priority}
                 onChange={(e) => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
                 placeholder="0"
               />
               <p className="text-xs text-slate-600 mt-1">数字越大，越优先注入</p>
@@ -138,7 +138,7 @@ function SkillEditor() {
               <input
                 value={form.argument_hint}
                 onChange={(e) => setForm(f => ({ ...f, argument_hint: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
                 placeholder="[主题或需求]"
               />
             </div>
@@ -152,7 +152,7 @@ function SkillEditor() {
             <input
               value={form.script}
               onChange={(e) => setForm(f => ({ ...f, script: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all font-mono text-sm"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all font-mono text-sm"
               placeholder="scripts/run.py"
             />
             <p className="text-xs text-slate-600 mt-1">
@@ -169,7 +169,7 @@ function SkillEditor() {
               value={form.content}
               onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))}
               rows={10}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all font-mono text-sm resize-y"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all font-mono text-sm resize-y"
               placeholder={`定义 AI 在使用这个 Skill 时应该遵循的工作流程...\n\n建议格式：\n## Goal\n目标描述\n\n## 原则\n1. 原则一\n2. 原则二`}
             />
             <p className="text-xs text-slate-600 mt-1">

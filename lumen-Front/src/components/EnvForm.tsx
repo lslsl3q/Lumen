@@ -102,7 +102,7 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
                   w-full px-4 py-2.5 rounded-lg text-sm
                   bg-slate-800/40 border border-slate-700/40
                   text-slate-200 placeholder-slate-600
-                  focus:outline-none focus:border-amber-500/40
+                  focus:outline-hidden focus:border-amber-500/40
                   transition-all duration-200
                 "
               />
