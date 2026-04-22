@@ -96,6 +96,7 @@ pip-wheel-metadata/
 # 临时文件
 # ========================================
 *.tmp
+test_*.png
 *.tdb.*
 *.tdb
 *.bak

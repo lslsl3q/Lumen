@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-22（知识库 P1-c 占位符解析器 + system prompt 内检索替换）
+**最后更新**：2026-04-22（暖灰配色迁移 + 知识库前端管理页面）
 
 ---
 
@@ -96,14 +96,15 @@ Lumen/
 │       └── ws.py                 # WebSocket 推送端点（/ws/push）
 │
 ├── lumen-Front/                  # 前端（Tauri 2 桌面应用）
+│   ├── tailwind.config.js        # Tailwind 配置（覆盖 slate/amber 色阶为暖灰色调）
 │   └── src/
 │       ├── App.tsx               # 应用入口（HashRouter 路由 + Overlay 挂载点）
-│       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills）
+│       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills, knowledge）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
-│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills）— localStorage 持久化（角色/会话恢复）
+│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useKnowledge）— localStorage 持久化（角色/会话恢复）
 │       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, DebugDrawer, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
-│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector）
-│       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push, skills）
+│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector, KnowledgeList）
+│       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push, skills, knowledge）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css）
 │
 ├── tests/                        # 测试
