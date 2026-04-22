@@ -2,13 +2,12 @@
 Lumen - 文本分块器
 句子边界感知，支持重叠，用于知识库向量化
 """
-import re
 import logging
 from typing import List
 
 logger = logging.getLogger(__name__)
 
-_SENTENCE_BREAKS = re.compile(r'[。！？；\n.!?\;]')
+_BREAK_CHARS = set('。！？；\n.!?;:')
 
 
 def chunk_text(
@@ -70,6 +69,6 @@ def _find_sentence_break(text: str, search_start: int, search_end: int) -> int:
     """在 [search_start, search_end) 范围内找最后一个句子边界"""
     best = -1
     for i in range(search_start, min(search_end, len(text))):
-        if _SENTENCE_BREAKS.match(text[i]):
+        if text[i] in _BREAK_CHARS:
             best = i + 1  # 包含标点
     return best if best > search_start else search_end

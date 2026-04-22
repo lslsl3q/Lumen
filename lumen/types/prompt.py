@@ -28,7 +28,8 @@ class CharacterCard(BaseModel):
     memory_token_budget: int = 300           # 记忆召回 token 上限
     memory_auto_summarize: bool = False      # 超预算时自动总结（否则截断）
     # 知识库检索
-    knowledge_enabled: bool = True           # 知识库检索开关
+    knowledge_enabled: bool = True           # 知识库检索总开关
+    knowledge_semantic_routing: bool = True  # 语义路由（自动判断查询涉及哪些分类，与占位符互补）
     knowledge_top_k: int = 3                 # 检索条数
     knowledge_min_score: float = 0.3         # 最低相似度阈值
     knowledge_token_budget: int = 500        # 知识注入 token 上限

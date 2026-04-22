@@ -273,22 +273,23 @@ async def _resolve_knowledge_placeholders(
     messages: list[Message],
     user_input: str,
     character_config: dict,
-) -> tuple[list[Message], bool]:
+) -> tuple[list[Message], bool, set[str]]:
     """解析 system prompt 中的知识库占位符（{{分类名}} / [[分类名]]）
 
     有占位符 → 在 system prompt 内替换检索结果（VCP 方式，强 RP 权重）
-    无占位符 → 返回 has_placeholders=False，由调用方走自动注入
+    无占位符 → 返回 has_placeholders=False，由语义路由补上
+    两层叠加不互斥：返回已覆盖的 file_id 集合供语义路由去重
     """
     from lumen.prompt.knowledge_resolver import resolve
 
     knowledge_enabled = character_config.get("knowledge_enabled", True)
     if not knowledge_enabled:
-        return messages, False
+        return messages, False, set()
 
     # 找第一条 system 消息（system prompt）
     for i, msg in enumerate(messages):
         if msg["role"] == "system":
-            resolved_text, has_placeholders = await resolve(
+            resolved_text, has_placeholders, covered_ids = await resolve(
                 msg["content"],
                 user_input,
                 token_budget=character_config.get("knowledge_token_budget", 800),
@@ -296,29 +297,29 @@ async def _resolve_knowledge_placeholders(
             if has_placeholders:
                 result = list(messages)
                 result[i] = {**msg, "content": resolved_text}
-                return result, True
+                return result, True, covered_ids
             break
 
-    return messages, False
+    return messages, False, set()
 
 
 async def _inject_knowledge(
     messages: list[Message],
     user_input: str,
     character_config: dict,
+    exclude_file_ids: set[str] = None,
 ) -> tuple[list[Message], list[dict]]:
-    """基于用户输入搜索知识库，注入参考资料（独立于记忆系统）
+    """语义路由：自动搜索知识库，注入未占位符覆盖的分类（与占位符互补）
 
-    和 _inject_relevant_memories 的区别：
-    - Memory: <relevant_history> — "之前聊过什么"（回忆）
-    - Knowledge: <knowledge_base> — "参考资料"（检索）
-    注入位置在 memory 之后（更靠近 user message），因为知识是针对当前查询搜索的。
+    当角色配置 knowledge_semantic_routing=True 时生效。
+    exclude_file_ids: 占位符已覆盖的 file_id 集合，这些文件的结果会被排除。
     """
     from lumen.services.knowledge import search as knowledge_search
     from lumen.services.context.token_estimator import estimate_text_tokens
 
     knowledge_enabled = character_config.get("knowledge_enabled", True)
-    if not knowledge_enabled:
+    semantic_routing = character_config.get("knowledge_semantic_routing", True)
+    if not knowledge_enabled or not semantic_routing:
         return messages, []
 
     top_k = character_config.get("knowledge_top_k", 3)
@@ -326,6 +327,12 @@ async def _inject_knowledge(
     token_budget = character_config.get("knowledge_token_budget", 500)
 
     results = await knowledge_search(user_input, top_k=top_k, min_score=min_score)
+    if not results:
+        return messages, []
+
+    # 去重：排除占位符已覆盖的文件
+    if exclude_file_ids:
+        results = [r for r in results if r.get("file_id", "") not in exclude_file_ids]
     if not results:
         return messages, []
 
@@ -409,10 +416,9 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     trimmed = _prepare_messages(session.messages, session.character_id)
     trimmed = _inject_authors_note(trimmed, session.session_id)
     trimmed, _ = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
-    # 知识注入：占位符模式优先，无占位符走自动注入
-    trimmed, has_kb_placeholders = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
-    if not has_kb_placeholders:
-        trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config)
+    # 知识注入：占位符（system prompt 内替换）+ 语义路由（自动兜底），两层叠加
+    trimmed, _, covered_ids = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
+    trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config, exclude_file_ids=covered_ids)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -472,12 +478,9 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         trimmed = _inject_worldbook(trimmed, session.character_id)
         if iteration == 0:
             trimmed, mem_log = await _inject_relevant_memories(trimmed, user_input, session.character_id, character_config, session.session_id or "")
-            # 知识注入：占位符模式优先，无占位符走自动注入
-            trimmed, has_kb_placeholders = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
-            if has_kb_placeholders:
-                kb_log = [{"source": "knowledge_placeholder", "hits": 0, "tokens": 0}]
-            else:
-                trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config)
+            # 知识注入：占位符（system prompt 内替换）+ 语义路由（自动兜底），两层叠加
+            trimmed, _, covered_ids = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
+            trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config, exclude_file_ids=covered_ids)
             recall_log = mem_log + kb_log
 
         # /tokens 记忆调试：yield 提示词分层信息

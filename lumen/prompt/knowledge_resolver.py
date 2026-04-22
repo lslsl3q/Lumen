@@ -59,15 +59,16 @@ def _match_files(name: str) -> list[dict]:
     return matched
 
 
-async def _resolve_fulltext(name: str, token_budget: int = 800) -> str:
-    """全文注入：加载匹配文件的所有内容"""
+async def _resolve_fulltext(name: str, token_budget: int = 800) -> tuple[str, set[str]]:
+    """全文注入：加载匹配文件的所有内容。返回 (结果文本, 已覆盖的 file_id 集合)"""
     from lumen.services.context.token_estimator import estimate_text_tokens
 
     matched = _match_files(name)
     if not matched:
         logger.debug(f"知识库占位符 {{ {name} }}: 无匹配文件")
-        return ""
+        return "", set()
 
+    covered_ids = set()
     parts = []
     used_tokens = 0
 
@@ -95,19 +96,21 @@ async def _resolve_fulltext(name: str, token_budget: int = 800) -> str:
             break
         parts.append(entry_text)
         used_tokens += entry_tokens
+        covered_ids.add(entry.get("id", ""))
 
     if not parts:
-        return ""
+        return "", set()
 
     return (
         f"[--- 知识库「{name}」全文内容 ---]\n"
         + "\n\n".join(parts)
-        + "\n[--- 全文内容结束 ---]"
+        + "\n[--- 全文内容结束 ---]",
+        covered_ids,
     )
 
 
-async def _resolve_rag(name: str, query: str, top_k: int = 5, token_budget: int = 500) -> str:
-    """RAG 检索：按名称过滤后语义搜索"""
+async def _resolve_rag(name: str, query: str, top_k: int = 5, token_budget: int = 500) -> tuple[str, set[str]]:
+    """RAG 检索：按名称过滤后语义搜索。返回 (结果文本, 已覆盖的 file_id 集合)"""
     from lumen.services.knowledge import search as knowledge_search
     from lumen.services.context.token_estimator import estimate_text_tokens
 
@@ -136,10 +139,11 @@ async def _resolve_rag(name: str, query: str, top_k: int = 5, token_budget: int 
 
     if not results:
         logger.debug(f"知识库占位符 [[{name}]]: 无检索结果")
-        return ""
+        return "", set()
 
     # Token 预算控制
     parts = []
+    covered_ids = set()
     used_tokens = 0
 
     for hit in results:
@@ -154,18 +158,20 @@ async def _resolve_rag(name: str, query: str, top_k: int = 5, token_budget: int 
             break
         parts.append(entry)
         used_tokens += entry_tokens
+        covered_ids.add(hit.get("file_id", ""))
 
     if not parts:
-        return ""
+        return "", set()
 
     return (
         f"[--- 知识库「{name}」检索结果 ---]\n"
         + "\n\n".join(parts)
-        + "\n[--- 检索结果结束 ---]"
+        + "\n[--- 检索结果结束 ---]",
+        covered_ids,
     )
 
 
-async def resolve(text: str, query: str, token_budget: int = 800) -> tuple[str, bool]:
+async def resolve(text: str, query: str, token_budget: int = 800) -> tuple[str, bool, set[str]]:
     """解析并替换文本中的所有知识库占位符
 
     Args:
@@ -174,32 +180,34 @@ async def resolve(text: str, query: str, token_budget: int = 800) -> tuple[str, 
         token_budget: 总 token 预算（所有占位符共享）
 
     Returns:
-        (替换后的文本, 是否有占位符被解析)
+        (替换后的文本, 是否有占位符被解析, 已覆盖的 file_id 集合)
     """
     placeholders = parse_placeholders(text)
     if not placeholders:
-        return text, False
+        return text, False, set()
 
     resolved = text
     remaining_budget = token_budget
+    covered_file_ids: set[str] = set()
 
     for ph in placeholders:
         name = ph["name"]
         mode = ph["mode"]
 
         if mode == "fulltext":
-            result = await _resolve_fulltext(name, token_budget=remaining_budget)
+            result, ids = await _resolve_fulltext(name, token_budget=remaining_budget)
         else:
-            result = await _resolve_rag(name, query, token_budget=remaining_budget)
+            result, ids = await _resolve_rag(name, query, token_budget=remaining_budget)
 
         if result:
             resolved = resolved.replace(ph["match"], result, 1)
             from lumen.services.context.token_estimator import estimate_text_tokens
             remaining_budget -= estimate_text_tokens(result)
             remaining_budget = max(remaining_budget, 0)
+            covered_file_ids.update(ids)
         else:
             # 无结果 → 移除占位符
             resolved = resolved.replace(ph["match"], "", 1)
 
     logger.info(f"知识库占位符解析: {len(placeholders)} 个，已替换")
-    return resolved, True
+    return resolved, True, covered_file_ids
