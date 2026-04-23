@@ -2,6 +2,8 @@
 Lumen - 向量存储
 基于 TriviumDB 的语义搜索，替代 jieba + SQLite LIKE
 单文件 .tdb 存储，自动管理向量索引
+
+维度从嵌入服务动态获取，不再硬编码。
 """
 
 import logging
@@ -9,8 +11,6 @@ import os
 from typing import Optional
 
 import triviumdb
-
-from lumen.config import EMBEDDING_DIMENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +20,41 @@ _DB_PATH = os.path.join(_DATA_DIR, "memory.tdb")
 _db: Optional[triviumdb.TriviumDB] = None
 
 
+def _get_dimensions() -> int:
+    """从嵌入服务获取维度（已初始化时），或用环境变量 fallback"""
+    from lumen.services.embedding import get_dimensions
+    dims = get_dimensions("memory")
+    if dims > 0:
+        return dims
+    # fallback：环境变量手动指定
+    from lumen.config import EMBEDDING_DIMENSIONS
+    if EMBEDDING_DIMENSIONS > 0:
+        return EMBEDDING_DIMENSIONS
+    return 512  # 最终 fallback
+
+
 def _get_db() -> triviumdb.TriviumDB:
     """获取 TriviumDB 实例（单例，首次调用时创建）"""
     global _db
     if _db is None:
         os.makedirs(_DATA_DIR, exist_ok=True)
-        _db = triviumdb.TriviumDB(_DB_PATH, dim=EMBEDDING_DIMENSIONS)
-        logger.info(f"TriviumDB 已打开: {_DB_PATH}")
+        dim = _get_dimensions()
+        _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
+        logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
     return _db
+
+
+def init_with_dimensions(dim: int):
+    """用指定维度初始化数据库（供外部精确控制时使用）
+
+    如果数据库已打开，此函数无效。
+    """
+    global _db
+    if _db is not None:
+        return
+    os.makedirs(_DATA_DIR, exist_ok=True)
+    _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
+    logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
 
 
 def insert_vector(

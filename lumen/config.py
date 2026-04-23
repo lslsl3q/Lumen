@@ -78,7 +78,7 @@ LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
 
 # ReAct 循环最大轮次（防止 AI 无限调用工具）
 # 可以通过环境变量 MAX_TOOL_ITERATIONS 覆盖
-MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
+MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "20"))
 
 # 默认上下文窗口大小（tokens），角色级 context_size 未设置时使用
 DEFAULT_CONTEXT_SIZE = int(os.getenv("DEFAULT_CONTEXT_SIZE", "8192"))
@@ -88,9 +88,28 @@ DEFAULT_CONTEXT_SIZE = int(os.getenv("DEFAULT_CONTEXT_SIZE", "8192"))
 WS_HEARTBEAT_INTERVAL = float(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
 
 # 嵌入模型配置（语义搜索）
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh")
 EMBEDDING_ENABLED = os.getenv("EMBEDDING_ENABLED", "True").lower() in ("true", "1", "yes")
-EMBEDDING_DIMENSIONS = 512  # gte-small-zh 固定输出维度
+
+# 默认后端类型：local（SentenceTransformer）| openai（OpenAI 兼容 API）| gemini（Google Gemini）
+EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "local")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh")  # local 模型名
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "0"))  # 0=自动检测
+
+# OpenAI 兼容 API 配置（覆盖大部分国内服务商：豆包/智谱/硅基流动/零一万物/阿里等）
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "")
+
+# ── 按服务覆盖（可选，不设则用默认值）──
+# MEMORY_EMBEDDING_BACKEND=local       # 消息记忆用本地小模型（快速）
+# KNOWLEDGE_EMBEDDING_BACKEND=openai   # 知识库用 API 大模型（精准）
+# THINKING_CLUSTERS_EMBEDDING_BACKEND=local  # 思维簇用本地小模型即可
+MEMORY_EMBEDDING_BACKEND = os.getenv("MEMORY_EMBEDDING_BACKEND", "")
+MEMORY_EMBEDDING_API_MODEL = os.getenv("MEMORY_EMBEDDING_API_MODEL", "")
+KNOWLEDGE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_EMBEDDING_BACKEND", "")
+KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "")
+TC_EMBEDDING_BACKEND = os.getenv("TC_EMBEDDING_BACKEND", "")
+TC_EMBEDDING_API_MODEL = os.getenv("TC_EMBEDDING_API_MODEL", "")
 
 # 知识库配置
 KNOWLEDGE_DB_PATH = os.getenv(
@@ -103,6 +122,16 @@ KNOWLEDGE_SOURCE_DIR = os.getenv(
 )
 KNOWLEDGE_CHUNK_SIZE = int(os.getenv("KNOWLEDGE_CHUNK_SIZE", "300"))
 KNOWLEDGE_CHUNK_OVERLAP = int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP", "60"))
+
+# 思维簇配置
+THINKING_CLUSTERS_DIR = os.getenv(
+    "THINKING_CLUSTERS_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "thinking_clusters"),
+)
+THINKING_CLUSTERS_DB_PATH = os.getenv(
+    "THINKING_CLUSTERS_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "data", "thinking_clusters.tdb"),
+)
 
 
 def get_model(character_config: dict = None) -> str:

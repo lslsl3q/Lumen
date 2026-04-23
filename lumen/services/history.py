@@ -76,6 +76,21 @@ def _migrate_add_authors_note():
         logger.info("数据库迁移: 完成")
 
 
+def _migrate_add_title():
+    """数据库迁移：给 sessions 表添加 title 字段"""
+    conn = _get_conn()
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(sessions)")
+    columns = [row["name"] for row in cursor.fetchall()]
+
+    if "title" not in columns:
+        logger.info("数据库迁移: 添加 title 字段到 sessions 表...")
+        cursor.execute("ALTER TABLE sessions ADD COLUMN title TEXT DEFAULT NULL")
+        conn.commit()
+        logger.info("数据库迁移: 完成")
+
+
 def _init_fts5(conn):
     """初始化 FTS5 全文索引（unicode61 + jieba 分词，支持中文 BM25）"""
     cursor = conn.cursor()
@@ -222,6 +237,7 @@ def _init_db():
     # 数据库迁移
     _migrate_add_metadata()
     _migrate_add_authors_note()
+    _migrate_add_title()
     _init_fts5(conn)
 
 
@@ -317,20 +333,20 @@ def load_session(session_id: str) -> list[Message]:
 
 
 def list_sessions(limit: int = 20, character_id: str | None = None) -> list[SessionInfo]:
-    """列出最近的会话，返回 [(会话ID, 角色名, 创建时间), ...]"""
+    """列出最近的会话，按最后更新时间倒序"""
     conn = _get_conn()
     if character_id:
         rows = conn.execute(
-            "SELECT id, character_id, created_at FROM sessions WHERE character_id = ? ORDER BY updated_at DESC LIMIT ?",
+            "SELECT id, character_id, created_at, title FROM sessions WHERE character_id = ? ORDER BY updated_at DESC LIMIT ?",
             (character_id, limit),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, character_id, created_at FROM sessions ORDER BY updated_at DESC LIMIT ?",
+            "SELECT id, character_id, created_at, title FROM sessions ORDER BY updated_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
     return [
-        {"session_id": row["id"], "character_id": row["character_id"], "created_at": row["created_at"]}
+        {"session_id": row["id"], "character_id": row["character_id"], "created_at": row["created_at"], "title": row["title"]}
         for row in rows
     ]
 
@@ -339,12 +355,21 @@ def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
     """获取单个会话的基本信息（从数据库查询，不依赖内存）"""
     conn = _get_conn()
     row = conn.execute(
-        "SELECT character_id FROM sessions WHERE id = ?",
+        "SELECT character_id, title FROM sessions WHERE id = ?",
         (session_id,),
     ).fetchone()
     if row:
-        return {"session_id": session_id, "character_id": row["character_id"]}
+        return {"session_id": session_id, "character_id": row["character_id"], "title": row["title"]}
     return None
+
+
+def update_session_title(session_id: str, title: str):
+    """更新会话标题"""
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (title, session_id))
+        conn.commit()
+    logger.info(f"会话标题已更新: {session_id} → {title}")
 
 
 def delete_session(session_id: str):

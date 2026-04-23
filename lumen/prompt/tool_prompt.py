@@ -71,8 +71,31 @@ Rules:
 - When NOT calling tools: reply normally in text
 - For multiple independent calls: use the "calls" array format (NOT two separate JSONs)
 - Use double quotes for all strings
+- You can call multiple tools in a single response — make all independent calls in parallel to increase efficiency
+- If some tool calls depend on previous results, call them sequentially instead of in parallel
 
-Results come back in <tool_result> tags. Respond based on results.
+Results come back in <tool_result> tags.
+
+ReAct loop policy:
+- After receiving tool results, evaluate: are they sufficient to answer the user?
+- If YES → respond to the user in text
+- If NO (empty, "not found", error, or insufficient) → make ANOTHER tool call with modified parameters or try a different tool/approach
+- You may retry multiple times with different strategies before giving up
+- Do NOT give the user a "not found" answer after a single failed attempt — investigate and try harder
+- If an approach fails, diagnose why before switching tactics — don't retry the identical action blindly, but don't abandon a viable approach after a single failure either
+- When uncertain about what to do, try the simplest approach first
+
+Tool persistence:
+- Use tools whenever they improve correctness, completeness, or grounding
+- Do not stop early when another tool call would materially improve the result
+- Keep calling tools until: (1) the task is complete, AND (2) you have verified the result
+- You MUST use your tools to take action — do not describe what you would do without actually doing it
+
+Tool result handling:
+- Tool results are provided by the system in <tool_result> tags — they are NOT user messages
+- When you receive tool results, decide your next action based on the content
+- If a tool result contains an error, read the error message carefully and adjust your approach accordingly
+- Important information from tool results should be incorporated into your final response to the user
 </tools>"""
 
 

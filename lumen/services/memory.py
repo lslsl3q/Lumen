@@ -399,7 +399,7 @@ async def get_relevant_memories(
     from lumen.services import embedding
 
     # 尝试加载模型
-    if not embedding.is_available() and not embedding._failed:
+    if not embedding.is_available():
         await embedding.ensure_loaded()
 
     # 向量语义搜索

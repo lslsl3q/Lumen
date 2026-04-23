@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-22（暖灰配色迁移 + 知识库前端管理页面）
+**最后更新**：2026-04-24（思维簇系统 + 嵌入模型多后端重构）
 
 ---
 
@@ -19,7 +19,7 @@ Lumen/
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
 │   ├── skills/                   # Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter，含 README.md 开发指南）
-│   ├── data/                     # 运行时数据（history.db、file_workspaces.json、active_persona.json、mcp_servers.json、knowledge.tdb、knowledge/）
+│   ├── data/                     # 运行时数据（history.db、knowledge.tdb、memory.tdb、thinking_clusters.tdb、thinking_clusters/）
 │   │
 │   ├── core/                     # 大脑 — 会话状态
 │   │   └── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
@@ -50,11 +50,13 @@ Lumen/
 │   │   ├── history.py            # SQLite持久化（会话、消息、摘要、FTS5全文索引、向量级联删除）
 │   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25 RRF混合检索、噪音过滤、去重）
 │   │   ├── vector_store.py       # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除）
-│   │   ├── embedding.py          # 文本嵌入（gte-small-zh，sentence-transformers 单例）
+│   │   ├── embedding.py          # 文本嵌入（多后端架构：LocalBackend/OpenAI/Gemini，每服务独立配置，向后兼容 API）
 │   │   ├── knowledge.py          # 知识库存储（TriviumDB 单例、文件导入/切分/向量化/语义搜索/删除，独立 knowledge.tdb）
+│   │   ├── thinking_clusters.py  # 思维簇引擎（VCP MetaThinkingManager 重实现：索引、链式检索、向量融合、降级模式、token 预算）
 │   │   ├── chunker.py            # 文本分块器（句子边界感知，支持重叠，用于知识库向量化）
 │   │   ├── knowledge_resolver.py # 知识库占位符解析器（正则匹配 {{}}/[[]]，RAG/全文检索，替换注入 system prompt）
 │   │   └── emotion.py            # 【预留】情感引擎
+│   │   └── thinking_clusters.py  # 思维簇引擎（VCP MetaThinkingManager 重实现：索引、链式检索、向量融合、降级模式）
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
 │   │   ├── builder.py            # 系统提示词拼接（角色+Persona+Skills+工具+世界书+动态注入，三明治结构）+ 分层调试构建
@@ -65,7 +67,8 @@ Lumen/
 │   │   ├── worldbook_store.py    # 世界书数据管理（JSON CRUD + 缓存 + 列表）
 │   │   ├── worldbook_matcher.py  # 世界书关键词匹配引擎（扫描消息→匹配关键词→返回注入内容）
 │   │   ├── character.py          # 角色卡片加载 + CRUD + 头像管理
-│   │   └── template.py           # 模板变量系统（{{xxx}} 替换）
+│   │   ├── template.py           # 模板变量系统（{{xxx}} 替换）
+│   │   └── thinking_injector.py  # 思维簇注入文本格式化（<thinking_modules> 标签，按簇分组+相似度排序）
 │   │
 │   └── types/                    # 词汇 — 类型定义
 │       ├── messages.py           # 消息类型（TypedDict）+ 工厂函数
@@ -78,6 +81,7 @@ Lumen/
 │       ├── worldbook.py          # 世界书类型（WorldBookEntry + WorldBookListItem Pydantic 模型）
 │       └── skills.py             # Skills 类型（SkillCard + SkillCreateRequest + SkillUpdateRequest Pydantic 模型）
 │       └── knowledge.py          # 知识库类型（KnowledgeFileCard + KnowledgeSearchRequest + KnowledgeSearchResult Pydantic 模型）
+│       └── thinking_clusters.py  # 思维簇类型（ChainStep/ChainConfig Pydantic + RetrievedModule/PipelineResult TypedDict）
 │
 ├── api/                          # FastAPI HTTP接口
 │   ├── main.py                   # 应用入口、CORS、路由注册
@@ -124,14 +128,17 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
                           ├── services/history.py（持久化）
                           ├── services/memory.py（记忆注入）
                           ├── services/knowledge.py（知识库检索注入）
+                          ├── services/thinking_clusters.py（思维簇注入）
+                          ├── services/embedding.py（多后端嵌入，每服务独立模型）
                           ├── tool.py（工具执行引擎）
                           ├── tools/parse.py（工具解析）
                           ├── tools/registry.py（工具验证）
                           ├── prompt/builder.py（提示词拼接）
                           │    ├── prompt/tool_prompt.py（工具提示词生成）
                           │    ├── prompt/persona.py（Persona 注入文本）
+                          │    ├── prompt/thinking_injector.py（思维簇注入文本）
                           │    └── prompt/authors_note.py（Author's Note 注入）
-                          └── config.py（模型配置）
+                          └── config.py（模型配置 + 每服务嵌入配置）
 ```
 
 ---

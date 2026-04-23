@@ -42,6 +42,8 @@ env/
 *.sqlite3
 *.log
 data/
+# 思维簇编写规范是公开文档，需要入库
+!lumen/data/thinking_clusters/SPECIFICATION.md
 
 # ========================================
 # 用户个人数据（Persona / 世界书 / 角色 / Skills，只追踪 default 模板）

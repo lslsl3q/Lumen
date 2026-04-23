@@ -16,13 +16,12 @@ from typing import Optional, List, Dict
 import triviumdb
 
 from lumen.config import (
-    EMBEDDING_DIMENSIONS,
     KNOWLEDGE_DB_PATH,
     KNOWLEDGE_CHUNK_SIZE,
     KNOWLEDGE_CHUNK_OVERLAP,
     KNOWLEDGE_SOURCE_DIR,
 )
-from lumen.services import embedding
+from lumen.services.embedding import get_service as get_embedding_service
 from lumen.services.chunker import chunk_text
 
 logger = logging.getLogger(__name__)
@@ -45,8 +44,12 @@ def _get_db() -> triviumdb.TriviumDB:
         with _db_lock:
             if _db is None:
                 os.makedirs(os.path.dirname(KNOWLEDGE_DB_PATH), exist_ok=True)
-                _db = triviumdb.TriviumDB(KNOWLEDGE_DB_PATH, dim=EMBEDDING_DIMENSIONS)
-                logger.info(f"知识库 TriviumDB 已打开: {KNOWLEDGE_DB_PATH}")
+                from lumen.services.embedding import get_dimensions
+                dim = get_dimensions("knowledge")
+                if dim == 0:
+                    dim = 512  # fallback
+                _db = triviumdb.TriviumDB(KNOWLEDGE_DB_PATH, dim=dim)
+                logger.info(f"知识库 TriviumDB 已打开: {KNOWLEDGE_DB_PATH} (维度: {dim})")
     return _db
 
 
@@ -150,7 +153,8 @@ async def import_file(
         return meta
 
     # 3. 批量嵌入
-    vectors = await embedding.encode_batch(chunks)
+    backend = await get_embedding_service("knowledge")
+    vectors = await backend.encode_batch(chunks) if backend else None
     if not vectors:
         raise RuntimeError("Embedding 服务不可用，无法向量化")
 
@@ -187,7 +191,8 @@ async def search(
     category: str = None,
 ) -> List[Dict]:
     """语义搜索: embed(query) → cosine search → 返回 top-K chunks"""
-    query_vector = await embedding.encode(query)
+    backend = await get_embedding_service("knowledge")
+    query_vector = await backend.encode(query) if backend else None
     if not query_vector:
         return []
 

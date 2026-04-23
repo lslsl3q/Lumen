@@ -377,6 +377,62 @@ async def _inject_knowledge(
     return result, kb_log
 
 
+async def _inject_thinking_clusters(
+    messages: list[Message],
+    user_input: str,
+    character_config: dict,
+) -> tuple[list[Message], list[dict]]:
+    """执行思维簇管道，注入检索到的思维模块
+
+    仅在角色配置 thinking_clusters_enabled=True 时激活。
+    管道：嵌入用户查询 → 按链配置依次检索各簇 → 向量融合 → token 预算裁剪 → 注入
+    """
+    if not character_config.get("thinking_clusters_enabled", False):
+        return messages, []
+
+    from lumen.services.thinking_clusters import run_chain, get_chain_config, ensure_indexed
+    from lumen.services.embedding import get_service
+
+    # 加载链配置
+    chain_name = character_config.get("thinking_clusters_chain", "default")
+    chain = get_chain_config(chain_name)
+    if not chain.steps:
+        return messages, []
+
+    # 确保模块已索引
+    await ensure_indexed()
+
+    # 编码用户查询（必须用 thinking_clusters 服务的后端，与索引一致）
+    backend = await get_service("thinking_clusters")
+    if not backend:
+        return messages, []
+    query_vector = await backend.encode(user_input)
+    if not query_vector:
+        return messages, []
+
+    # 运行管道
+    result = await run_chain(query_vector, chain, character_config)
+    if not result["injection_text"]:
+        return messages, []
+
+    # 注入到最后一条 user 消息之前（与记忆/知识注入一致）
+    last_user_idx = _find_last_user_index(messages)
+    if last_user_idx == -1:
+        return messages, []
+
+    injection_msg = {"role": "system", "content": result["injection_text"]}
+    result_messages = messages[:last_user_idx] + [injection_msg] + messages[last_user_idx:]
+
+    tc_log = [{
+        "source": "thinking_clusters",
+        "chain": chain_name,
+        "modules": len(result["modules"]),
+        "tokens": result["total_tokens"],
+        "degraded": result["degraded_clusters"],
+    }]
+    return result_messages, tc_log
+
+
 def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
     """验证 AI 的工具调用是否正确
 
@@ -400,10 +456,34 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
     return None
 
 
+async def _auto_title(session_id: str, user_input: str):
+    """后台 fire-and-forget：用 LLM 从第一条用户消息生成简短会话标题"""
+    try:
+        from lumen.config import DEFAULT_MODEL
+        resp = await chat(
+            messages=[
+                {"role": "system", "content": "根据用户的第一条消息，生成一个 3~8 字的简短会话标题。只输出标题本身，不要加引号、标点或解释。"},
+                {"role": "user", "content": user_input[:200]},
+            ],
+            model=DEFAULT_MODEL,
+            stream=False,
+        )
+        title = resp.choices[0].message.content.strip()[:30]
+        if title:
+            history.update_session_title(session_id, title)
+            logger.info(f"[自动命名] {session_id} → {title}")
+    except Exception as e:
+        logger.debug(f"自动命名失败（不影响聊天）: {e}")
+
+
 async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     """非流式：等AI想完了再一次性返回"""
     session.messages.append({"role": "user", "content": user_input})
     await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
+
+    # 自动命名：第一条用户消息时，后台用 LLM 生成简短标题
+    if len(session.messages) == 2:
+        asyncio.create_task(_auto_title(session.session_id, user_input))
 
     # 加载角色配置（模型 + compact）
     character_config = load_character(session.character_id)
@@ -419,6 +499,7 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     # 知识注入：占位符（system prompt 内替换）+ 语义路由（自动兜底），两层叠加
     trimmed, _, covered_ids = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
     trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config, exclude_file_ids=covered_ids)
+    trimmed, _ = await _inject_thinking_clusters(trimmed, user_input, character_config)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -444,6 +525,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
     """
     session.messages.append({"role": "user", "content": user_input})
     await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
+
+    # 自动命名：第一条用户消息时，后台用 LLM 生成简短标题
+    if len(session.messages) == 2:
+        asyncio.create_task(_auto_title(session.session_id, user_input))
 
     _clear_cancel(session.session_id)
 
@@ -481,7 +566,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             # 知识注入：占位符（system prompt 内替换）+ 语义路由（自动兜底），两层叠加
             trimmed, _, covered_ids = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
             trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config, exclude_file_ids=covered_ids)
-            recall_log = mem_log + kb_log
+            trimmed, tc_log = await _inject_thinking_clusters(trimmed, user_input, character_config)
+            recall_log = mem_log + kb_log + tc_log
 
         # /tokens 记忆调试：yield 提示词分层信息
         if memory_debug and iteration == 0:
@@ -497,6 +583,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                         layer_infos.append({"name": "跨会话记忆", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
                     elif msg["content"].startswith("<knowledge_base>"):
                         layer_infos.append({"name": "知识库检索", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+                    elif msg["content"].startswith("<thinking_modules>"):
+                        layer_infos.append({"name": "思维簇", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
             yield {
                 "type": "memory_debug",
                 "layers": layer_infos,
