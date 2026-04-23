@@ -1,0 +1,15 @@
+{
+  "chains": {
+    "default": {
+      "name": "default",
+      "steps": [
+        {"cluster": "task_context", "top_k": 2, "min_score": 0.25},
+        {"cluster": "reasoning_patterns", "top_k": 2, "min_score": 0.3},
+        {"cluster": "self_correction", "top_k": 1, "min_score": 0.35}
+      ],
+      "token_budget": 600,
+      "fusion_weight_query": 0.8,
+      "fusion_weight_results": 0.2
+    }
+  }
+}
