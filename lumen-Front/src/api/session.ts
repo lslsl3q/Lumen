@@ -75,3 +75,18 @@ export async function resetSession(sessionId = 'default'): Promise<{
   if (!res.ok) throw new Error(`重置会话失败: ${res.status}`);
   return res.json();
 }
+
+/** PATCH /sessions/rename — 重命名会话 */
+export async function renameSession(sessionId: string, title: string): Promise<{
+  message: string;
+  session_id: string;
+  title: string;
+}> {
+  const res = await fetch(`${API_BASE_URL}/sessions/rename`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, title }),
+  });
+  if (!res.ok) throw new Error(`重命名会话失败: ${res.status}`);
+  return res.json();
+}

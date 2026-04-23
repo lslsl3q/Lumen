@@ -1,11 +1,10 @@
 /**
  * 聊天界面布局容器
  *
- * 职责：组合 Sidebar + ChatPanel，协调 useSessions、useChat、useCharacters 三个 hook 的数据流
- * 这是整个聊天页面的顶层组件
+ * 职责：组合 NavRail + ChatPanel + RightRail + 浮动层，协调各 hook 数据流
+ * 浮动层系统：ContextPanel / SettingsOverlay / FloatingWindow
  */
 import { useEffect, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useChat } from '../hooks/useChat';
 import { useSessions } from '../hooks/useSessions';
 import { useCharacters } from '../hooks/useCharacters';
@@ -17,6 +16,9 @@ import NavRail from './NavRail';
 import ChatPanel from './ChatPanel';
 import RightRail from './RightRail';
 import DebugDrawer from './DebugDrawer';
+import ContextPanel from './floating/ContextPanel';
+import FloatingLayerHost from './floating/FloatingLayerHost';
+import { useFloatingLayers } from './floating/useFloatingLayers';
 import { MEMORY_DEBUG_STORAGE_KEY } from '../pages/TokenInspector';
 
 function ChatInterface() {
@@ -25,7 +27,7 @@ function ChatInterface() {
   const characters = useCharacters();
   const persona = usePersona();
   const authorNote = useAuthorNote(sessions.currentSessionId);
-  const navigate = useNavigate();
+  const floating = useFloatingLayers();
   const [tokenUsage, setTokenUsage] = useState<{
     current_tokens: number; context_size: number; usage_percent: number
   } | null>(null);
@@ -45,13 +47,11 @@ function ChatInterface() {
 
   // 命令结果处理（显示为系统消息）
   const handleCommandResult = useCallback((result: CommandResult) => {
-    // /medebug 命令：切换 memory debug 模式
     if (result.success && result.message === 'toggle_memory_debug') {
       chat.toggleMemoryDebug();
       return;
     }
     chat.addSystemMessage(result.message);
-    // 如果是 compact 命令，刷新 token 用量
     refreshTokenUsage();
   }, [chat, refreshTokenUsage]);
 
@@ -61,7 +61,7 @@ function ChatInterface() {
     refreshTokenUsage();
   }, [chat, refreshTokenUsage]);
 
-  // 初始化同步：sessions 加载完后，加载当前会话的历史
+  // 初始化同步
   useEffect(() => {
     if (!sessions.isLoading && sessions.currentSessionId && !chat.currentSessionId) {
       const lastCharId = localStorage.getItem('lastCharacterId') || undefined;
@@ -78,7 +78,7 @@ function ChatInterface() {
     }
   }, [sessions.currentSessionId, refreshTokenUsage]);
 
-  // memoryDebugInfo 变化时保存到 localStorage（供 TokenInspector 页面读取）
+  // memoryDebugInfo 保存到 localStorage
   useEffect(() => {
     if (chat.memoryDebugInfo) {
       try {
@@ -92,6 +92,24 @@ function ChatInterface() {
       } catch { /* localStorage 写入失败忽略 */ }
     }
   }, [chat.memoryDebugInfo]);
+
+  // Escape 键关闭浮动层
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        floating.closeTopLayer();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [floating]);
+
+  // TitleBar 设置按钮事件
+  useEffect(() => {
+    const handler = () => floating.openSettings('character-list');
+    window.addEventListener('lumen:open-settings', handler);
+    return () => window.removeEventListener('lumen:open-settings', handler);
+  }, [floating]);
 
   /** 新建会话 */
   const handleNewSession = async () => {
@@ -121,13 +139,21 @@ function ChatInterface() {
     }
   };
 
-  /** 切换角色：切换到该角色的会话列表，不创建/不篡改现有会话 */
+  /** 重命名会话 */
+  const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
+    try {
+      const { renameSession } = await import('../api/session');
+      await renameSession(sessionId, title);
+      sessions.refreshSessions();
+    } catch { /* 静默失败 */ }
+  }, [sessions]);
+
+  /** 切换角色 */
   const handleSwitchCharacter = useCallback(async (characterId: string) => {
     characters.setCurrentCharacterId(characterId);
     const list = await sessions.setCharacterFilter(characterId);
 
     if (list.length > 0) {
-      // 优先恢复上次使用的会话，否则选最新的
       const lastSessionId = localStorage.getItem(`lastSession_${characterId}`);
       const targetId = (lastSessionId && list.some(s => s.session_id === lastSessionId))
         ? lastSessionId
@@ -135,40 +161,30 @@ function ChatInterface() {
       sessions.setCurrentSessionId(targetId);
       await chat.loadHistory(targetId, characterId);
     } else {
-      // 该角色没有会话 → 空状态，让用户手动点 +
       sessions.setCurrentSessionId(null);
       chat.resetChat();
       chat.setCurrentSessionId(null);
     }
   }, [sessions, characters, chat]);
 
-  /** 跳转到角色管理页 */
-  const handleManageCharacters = useCallback(() => {
-    navigate('/settings/characters');
-  }, [navigate]);
-
-  /** 跳转到设置页 */
-  const handleOpenSettings = useCallback(() => {
-    navigate('/settings/config');
-  }, [navigate]);
-
   /** 切换 Persona */
   const handleSwitchPersona = useCallback(async (personaId: string | null) => {
     await persona.switchTo(personaId);
   }, [persona]);
 
-  /** 跳转到 Persona 管理页 */
-  const handleManagePersonas = useCallback(() => {
-    navigate('/settings/personas');
-  }, [navigate]);
+  // ContextPanel 和 DebugDrawer 互斥
+  const handleOpenContextPanel = useCallback((kind: Parameters<typeof floating.openContextPanel>[0]) => {
+    if (chat.memoryDebugMode) chat.toggleMemoryDebug();
+    floating.openContextPanel(kind);
+  }, [chat, floating]);
 
-  /** 跳转到世界书管理页 */
-  const handleManageWorldBooks = useCallback(() => {
-    navigate('/settings/worldbooks');
-  }, [navigate]);
+  const handleToggleDebug = useCallback(() => {
+    if (floating.state.contextPanel.open) floating.closeContextPanel();
+    chat.toggleMemoryDebug();
+  }, [chat, floating]);
 
   return (
-    <div className="flex h-screen overflow-hidden relative">
+    <div className="flex flex-1 overflow-hidden relative">
       <NavRail
         sessions={sessions.sessions}
         currentSessionId={sessions.currentSessionId}
@@ -179,19 +195,11 @@ function ChatInterface() {
         formatLabel={sessions.formatSessionLabel}
         characters={characters.characters}
         currentCharacterId={characters.currentCharacterId}
-        onSwitchCharacter={handleSwitchCharacter}
-        onManageCharacters={handleManageCharacters}
-        onOpenSettings={handleOpenSettings}
-        personas={persona.personas}
-        activePersonaId={persona.activeId}
         activePersonaName={persona.activeName}
-        onSwitchPersona={handleSwitchPersona}
-        onManagePersonas={handleManagePersonas}
-        onManageWorldBooks={handleManageWorldBooks}
         authorNoteConfig={authorNote.config}
-        authorNoteLoading={authorNote.isLoading}
-        onAuthorNoteSaveContent={authorNote.saveContent}
-        onAuthorNoteSetPosition={authorNote.setPosition}
+        onOpenContextPanel={handleOpenContextPanel}
+        onRenameSession={handleRenameSession}
+        onOpenSettings={() => {}}
       />
       <ChatPanel
         messages={chat.messages}
@@ -209,9 +217,9 @@ function ChatInterface() {
         currentModel=""
       />
       <RightRail
-        onToggleDebug={() => chat.toggleMemoryDebug()}
+        onToggleDebug={handleToggleDebug}
         isDebugOpen={chat.memoryDebugMode}
-        onManageWorldBooks={handleManageWorldBooks}
+        onManageWorldBooks={() => handleOpenContextPanel('worldbook')}
       />
       <DebugDrawer
         open={chat.memoryDebugMode}
@@ -222,6 +230,26 @@ function ChatInterface() {
         recallLog={chat.memoryDebugInfo?.recall_log || null}
         reactTrace={chat.reactTrace}
       />
+      <ContextPanel
+        open={floating.state.contextPanel.open}
+        kind={floating.state.contextPanel.kind}
+        onClose={floating.closeContextPanel}
+        characters={characters.characters}
+        currentCharacterId={characters.currentCharacterId}
+        onSwitchCharacter={handleSwitchCharacter}
+        onManageCharacters={() => { floating.closeContextPanel(); floating.openSettings('character-list'); }}
+        personas={persona.personas}
+        activePersonaId={persona.activeId}
+        activePersonaName={persona.activeName}
+        onSwitchPersona={handleSwitchPersona}
+        onManagePersonas={() => { floating.closeContextPanel(); floating.openSettings('persona-list'); }}
+        onManageWorldBooks={() => { floating.closeContextPanel(); floating.openSettings('worldbook-list'); }}
+        authorNoteConfig={authorNote.config}
+        authorNoteLoading={authorNote.isLoading}
+        onAuthorNoteSaveContent={authorNote.saveContent}
+        onAuthorNoteSetPosition={authorNote.setPosition}
+      />
+      <FloatingLayerHost floating={floating} />
     </div>
   );
 }

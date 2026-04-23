@@ -280,8 +280,14 @@ function MessageBubble({ message, characterName, characterAvatar }: {
     );
   }
 
-  // 没有文字内容就跳过（纯工具调用的消息）
-  if (!message.content) return null;
+  // 没有文字内容时：助手消息有工具调用 → 只显示头像（保持头像不消失）
+  // 用户消息/系统消息无内容 → 跳过
+  if (!message.content) {
+    if (!isUser && message.toolCalls && message.toolCalls.length > 0) {
+      return <Avatar src={characterAvatar} name={characterName} />;
+    }
+    return null;
+  }
 
   if (isUser) {
     return (

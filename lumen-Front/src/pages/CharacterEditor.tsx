@@ -14,6 +14,7 @@ import {
   getAvatarUrl,
 } from '../api/character';
 import { CharacterFormData } from '../types/character';
+import { SettingsPageProps } from '../types/settings';
 import { useSkills } from '../hooks/useSkills';
 import ModelSelect from '../components/ModelSelect';
 
@@ -41,10 +42,19 @@ async function fetchAvailableTools(): Promise<ToolInfo[]> {
   }
 }
 
-function CharacterEditor() {
-  const { id } = useParams<{ id: string }>();
+interface CharacterEditorProps extends SettingsPageProps {
+  characterId?: string;
+}
+
+function CharacterEditor({ characterId, onBack, onNavigate }: CharacterEditorProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = characterId || paramId;
   const navigate = useNavigate();
   const isEditMode = !!id;
+
+  // 导航辅助：优先用回调，回退到路由
+  const goBack = onBack ?? (() => goBack());
+  const goTo = onNavigate ?? ((page: string, _params?: { id?: string }) => navigate(`/settings/${page}`));
 
   // 表单状态
 
@@ -203,12 +213,12 @@ function CharacterEditor() {
 
       if (isEditMode) {
         await apiUpdate(id!, dataToSubmit, avatarFile || undefined);
-        navigate('/settings/characters');
+        goBack();
       } else {
         // 新建模式，不传 ID，让后端自动生成
         const result = await apiCreate(dataToSubmit, avatarFile || undefined);
         // 使用后端返回的 ID 导航
-        navigate(`/settings/characters/${result.character.id}`);
+        goTo('character-editor', { id: result.character.id });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
@@ -219,19 +229,19 @@ function CharacterEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface-deep flex items-center justify-center text-slate-600">
+      <div className="h-full bg-surface-deep flex items-center justify-center text-slate-600">
         加载中...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate('/settings/characters')}
+            onClick={() => goBack()}
             className="
               px-3 py-1.5 rounded-lg text-sm text-slate-400
               hover:text-slate-200 hover:bg-slate-800/60
@@ -693,7 +703,7 @@ function CharacterEditor() {
                 暂无可用 Skill。
                 <button
                   type="button"
-                  onClick={() => navigate('/settings/skills')}
+                  onClick={() => goTo('skill-list')}
                   className="text-amber-400 hover:underline ml-1"
                 >
                   去创建
@@ -744,7 +754,7 @@ function CharacterEditor() {
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/40">
             <button
               type="button"
-              onClick={() => navigate('/settings/characters')}
+              onClick={() => goBack()}
               className="
                 px-5 py-2.5 rounded-lg text-sm
                 text-slate-400 hover:text-slate-200

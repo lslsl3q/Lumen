@@ -120,6 +120,42 @@
   animation: slide-in 0.3s ease-out;
 }
 
+/* ContextPanel 退出 */
+@keyframes slide-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(100%); }
+}
+.animate-slide-out {
+  animation: slide-out 0.2s ease-in forwards;
+}
+
+/* SettingsOverlay 遮罩淡入 */
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-overlay-fade-in {
+  animation: overlay-fade-in 0.25s ease-out;
+}
+
+/* SettingsOverlay 内容入场 */
+@keyframes overlay-content-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-overlay-content-in {
+  animation: overlay-content-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* FloatingWindow 入场 */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-in {
+  animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* === 硅胶质感工具类（Soft UI / Neumorphism） ===
  *
  * 原理：双层阴影（暗影 + 亮边）+ 顶部高光 + 按压内凹

@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listConfigs } from '../api/config';
 import { ConfigItem } from '../types/config';
+import { SettingsPageProps } from '../types/settings';
 
 /** 配置类型的图标和颜色 */
 const TYPE_META: Record<string, { icon: string; color: string }> = {
@@ -14,8 +15,12 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
   json: { icon: '{ }', color: 'text-teal-400' },
 };
 
-function ConfigList() {
+interface ConfigListProps extends SettingsPageProps {}
+
+function ConfigList({ onBack, onNavigate }: ConfigListProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/'));
+  const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,13 +43,13 @@ function ConfigList() {
   }, [loadList]);
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => goBack()}
               className="
                 px-3 py-1.5 rounded-lg text-sm text-slate-400
                 hover:text-slate-200 hover:bg-slate-800/60
@@ -76,7 +81,7 @@ function ConfigList() {
                 return (
                   <div
                     key={config.name}
-                    onClick={() => navigate(`/settings/config/${config.name}`)}
+                    onClick={() => goTo('config-editor', { resource: config.name })}
                     className="
                       group relative p-5 rounded-xl cursor-pointer
                       bg-slate-900/60 border border-slate-800/40
@@ -112,7 +117,7 @@ function ConfigList() {
               <h3 className="text-sm text-slate-500 mb-4">其他功能</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
-                  onClick={() => navigate('/settings/knowledge')}
+                  onClick={() => goTo('knowledge-list')}
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-slate-900/60 border border-slate-800/40
@@ -129,7 +134,7 @@ function ConfigList() {
                   </div>
                 </div>
                 <div
-                  onClick={() => navigate('/settings/skills')}
+                  onClick={() => goTo('skill-list')}
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-slate-900/60 border border-slate-800/40
@@ -146,7 +151,7 @@ function ConfigList() {
                   </div>
                 </div>
                 <div
-                  onClick={() => navigate('/settings/avatars')}
+                  onClick={() => goTo('avatar-manager')}
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-slate-900/60 border border-slate-800/40

@@ -2,13 +2,21 @@
  * Skill 编辑器页
  */
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import * as api from '../api/skills';
+import { SettingsPageProps } from '../types/settings';
 
-function SkillEditor() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface SkillEditorProps extends SettingsPageProps {
+  skillId?: string;
+}
+
+function SkillEditor({ skillId, onBack }: SkillEditorProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = skillId || paramId;
   const isEditMode = !!id;
+
+  // 导航辅助：优先用回调，回退到路由
+  const goBack = onBack ?? (() => goBack());
 
   const [form, setForm] = useState({
     name: '',
@@ -61,7 +69,7 @@ function SkillEditor() {
       } else {
         await api.createSkill(form);
       }
-      navigate('/settings/skills');
+      goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -69,13 +77,13 @@ function SkillEditor() {
     }
   };
 
-  if (isLoading) return <div className="min-h-screen bg-slate-950 text-slate-600 flex items-center justify-center">加载中...</div>;
+  if (isLoading) return <div className="h-full bg-slate-950 text-slate-600 flex items-center justify-center">加载中...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center gap-4 mb-8 px-6 py-4">
-        <button onClick={() => navigate('/settings/skills')} className="text-slate-400 hover:text-slate-200 transition-colors">
+        <button onClick={() => goBack()} className="text-slate-400 hover:text-slate-200 transition-colors">
           ← 返回列表
         </button>
         <h1 className="text-2xl font-bold">{isEditMode ? '编辑 Skill' : '新建 Skill'}</h1>
@@ -197,7 +205,7 @@ function SkillEditor() {
         {/* 操作按钮 */}
         <div className="flex gap-3 pt-4">
           <button
-            onClick={() => navigate('/settings/skills')}
+            onClick={() => goBack()}
             className="px-5 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-400 hover:bg-slate-800/60 transition-all"
           >
             取消

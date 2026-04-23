@@ -11,9 +11,14 @@ import {
   getAvatarUrl,
 } from '../api/character';
 import { CharacterListItem } from '../types/character';
+import { SettingsPageProps } from '../types/settings';
 
-function CharacterList() {
+interface CharacterListProps extends SettingsPageProps {}
+
+function CharacterList({ onBack, onNavigate }: CharacterListProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/'));
+  const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const [characters, setCharacters] = useState<CharacterListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +57,13 @@ function CharacterList() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       {/* 顶栏 */}
       <div className="max-w-5xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => goBack()}
               className="
                 px-3 py-1.5 rounded-lg text-sm text-slate-400
                 hover:text-slate-200 hover:bg-slate-800/60
@@ -70,11 +75,11 @@ function CharacterList() {
             <h1 className="text-xl font-light tracking-wide">角色管理</h1>
           </div>
           <button
-            onClick={() => navigate('/settings/characters/new')}
+            onClick={() => goTo('character-editor')}
             className="
               px-4 py-2 rounded-lg text-sm
-              bg-teal-500/10 text-teal-400 border border-teal-500/20
-              hover:bg-teal-500/20 hover:border-teal-500/40
+              bg-amber-500/10 text-amber-400 border border-amber-500/20
+              hover:bg-amber-500/20 hover:border-amber-500/40
               transition-all duration-150
             "
           >
@@ -102,11 +107,11 @@ function CharacterList() {
             {characters.map(char => (
               <div
                 key={char.id}
-                onClick={() => navigate(`/settings/characters/${char.id}`)}
+                onClick={() => goTo('character-editor', { id: char.id })}
                 className="
                   group relative p-5 rounded-xl cursor-pointer
                   bg-slate-900/60 border border-slate-800/40
-                  hover:border-teal-500/30 hover:bg-slate-900/80
+                  hover:border-amber-500/30 hover:bg-slate-900/80
                   transition-all duration-200
                 "
               >
@@ -179,7 +184,7 @@ function CharacterList() {
                         key={tool}
                         className="
                           px-2 py-0.5 rounded text-[10px]
-                          bg-teal-500/10 text-teal-400/80 border border-teal-500/15
+                          bg-amber-500/10 text-amber-400/80 border border-amber-500/15
                         "
                       >
                         {tool}

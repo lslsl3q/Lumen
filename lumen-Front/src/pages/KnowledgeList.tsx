@@ -9,9 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import { useKnowledge } from '../hooks/useKnowledge';
 import { searchKnowledge } from '../api/knowledge';
 import type { KnowledgeSearchResult } from '../types/knowledge';
+import type { SettingsPageProps } from '../types/settings';
 
-function KnowledgeList() {
+interface KnowledgeListProps extends SettingsPageProps {}
+
+function KnowledgeList({ onBack }: KnowledgeListProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/'));
   const { files, isLoading, upload, create, remove } = useKnowledge();
 
   // 搜索状态
@@ -91,12 +95,12 @@ function KnowledgeList() {
   const formatScore = (score: number) => `${(score * 100).toFixed(0)}%`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-6 px-6 py-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={goBack}
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
             &larr; 返回聊天

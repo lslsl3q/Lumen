@@ -2,13 +2,21 @@
  * 世界书编辑器页
  */
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import * as api from '../api/worldbook';
+import { SettingsPageProps } from '../types/settings';
 
-function WorldBookEditor() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface WorldBookEditorProps extends SettingsPageProps {
+  worldBookId?: string;
+}
+
+function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = worldBookId || paramId;
   const isEditMode = !!id;
+
+  // 导航辅助：优先用回调，回退到路由
+  const goBack = onBack ?? (() => goBack());
 
   const [form, setForm] = useState({
     id: '',
@@ -95,7 +103,7 @@ function WorldBookEditor() {
       } else {
         await api.createWorldBook(form);
       }
-      navigate('/settings/worldbooks');
+      goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -104,7 +112,7 @@ function WorldBookEditor() {
   };
 
   if (isLoading) {
-    return <div className="min-h-screen bg-slate-950 text-slate-200 flex items-center justify-center">加载中...</div>;
+    return <div className="h-full bg-slate-950 text-slate-200 flex items-center justify-center">加载中...</div>;
   }
 
   // 复用样式常量
@@ -115,11 +123,11 @@ function WorldBookEditor() {
   const addBtnCls = (color: string) => `px-4 py-2.5 rounded-lg text-sm bg-${color}-500/10 border border-${color}-500/30 text-${color}-400 hover:bg-${color}-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-6 px-6 py-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/settings/worldbooks')} className="text-slate-400 hover:text-slate-200 transition-colors">
+          <button onClick={() => goBack()} className="text-slate-400 hover:text-slate-200 transition-colors">
             ← 返回
           </button>
           <h1 className="text-2xl font-bold">{isEditMode ? '编辑世界书' : '新建世界书'}</h1>
@@ -277,7 +285,7 @@ function WorldBookEditor() {
 
         {/* 底部操作栏 */}
         <div className="flex justify-end gap-3 pt-4 pb-8 border-t border-slate-800/40">
-          <button type="button" onClick={() => navigate('/settings/worldbooks')} className="px-5 py-2.5 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors">
+          <button type="button" onClick={() => goBack()} className="px-5 py-2.5 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors">
             取消
           </button>
           <button type="submit" disabled={isSaving}

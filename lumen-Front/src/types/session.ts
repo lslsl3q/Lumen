@@ -10,6 +10,7 @@ export interface SessionListItem {
   character_id: string;
   created_at: string;       // ISO 格式
   message_count: number;
+  title: string | null;
 }
 
 /** 历史消息 — GET /chat/history 返回 */

@@ -17,7 +17,7 @@ function RightRail({ onToggleDebug, isDebugOpen, onManageWorldBooks }: RightRail
 
   return (
     <div className="w-10 flex-shrink-0 flex flex-col items-center py-3 gap-2
-      bg-slate-950/60 border-l border-slate-800/30">
+      bg-slate-950/60 border-l border-slate-800/30 relative z-50">
       {/* 世界书 */}
       <button
         onClick={onManageWorldBooks}

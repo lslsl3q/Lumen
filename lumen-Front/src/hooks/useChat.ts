@@ -24,19 +24,52 @@ function isToolMessage(msg: HistoryMessage): boolean {
 /** 从消息内容中提取工具调用信息（加载历史时用） */
 function extractToolCalls(content: string): ToolCall[] {
   const calls: ToolCall[] = [];
-  // 匹配单个工具调用：{"type": "tool_call", "tool": "xxx", ...}
+  // 旧格式：{"type": "tool_call", "tool": "xxx", ...}
   const singleRegex = /"type"\s*:\s*"tool_call"\s*,.*?"tool"\s*:\s*"([^"]+)"/g;
   let m;
   while ((m = singleRegex.exec(content)) !== null) {
     calls.push({ callId: _nextCallId++, name: m[1], status: 'done' });
   }
-  // 匹配并行工具调用：{"type": "tool_call_parallel", "calls": [{"tool": "xxx", ...}, ...]}
+  // 旧格式并行：{"type": "tool_call_parallel", "calls": [{"tool": "xxx", ...}, ...]}
   const parallelRegex = /"type"\s*:\s*"tool_call_parallel"\s*,.*?"calls"\s*:\s*\[([\s\S]*?)\]/g;
   while ((m = parallelRegex.exec(content)) !== null) {
     const inner = /"tool"\s*:\s*"([^"]+)"/g;
     let im;
     while ((im = inner.exec(m[1])) !== null) {
       calls.push({ callId: _nextCallId++, name: im[1], status: 'done' });
+    }
+  }
+  // T10 新格式：{"calls": [{"tool": "xxx", "params": {...}}, ...]}
+  // 用花括号深度计数找 JSON 边界，然后解析拿到完整 params
+  const callsIdx = content.indexOf('{"calls"');
+  if (callsIdx !== -1) {
+    const sub = content.substring(callsIdx);
+    let depth = 0, inStr = false, esc = false, jsonEnd = -1;
+    for (let i = 0; i < sub.length; i++) {
+      const ch = sub[i];
+      if (esc) { esc = false; continue; }
+      if (ch === '\\') { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { jsonEnd = i + 1; break; } }
+    }
+    if (jsonEnd !== -1) {
+      try {
+        const parsed = JSON.parse(sub.substring(0, jsonEnd));
+        if (Array.isArray(parsed.calls)) {
+          for (const c of parsed.calls) {
+            if (c.tool) {
+              calls.push({
+                callId: _nextCallId++,
+                name: c.tool,
+                status: 'done',
+                params: c.params || {},
+              });
+            }
+          }
+        }
+      } catch { /* JSON 解析失败忽略 */ }
     }
   }
   return calls;
@@ -46,7 +79,7 @@ function extractToolCalls(content: string): ToolCall[] {
 function stripToolJson(content: string): string {
   let cleaned = content;
   // 反复剥离 tool_call 和 tool_result JSON 块
-  for (const marker of ['{"type": "tool_call', '{"type":"tool_call', '{"type": "tool_call_parallel', '{"type":"tool_call_parallel', '{"success":', '{"error_code":']) {
+  for (const marker of ['{"type": "tool_call', '{"type":"tool_call', '{"type": "tool_call_parallel', '{"type":"tool_call_parallel', '{"calls":', '{"calls" :', '{"success":', '{"error_code":']) {
     while (true) {
       const idx = cleaned.indexOf(marker);
       if (idx === -1) break;

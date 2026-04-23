@@ -7,9 +7,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '../api/avatar';
 import type { AvatarItem } from '../types/avatar';
+import type { SettingsPageProps } from '../types/settings';
 
-function AvatarManager() {
+interface AvatarManagerProps extends SettingsPageProps {}
+
+function AvatarManager({ onBack }: AvatarManagerProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/settings/config'));
   const [avatars, setAvatars] = useState<AvatarItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -63,11 +67,11 @@ function AvatarManager() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center gap-4 mb-8 px-6 py-4">
         <button
-          onClick={() => navigate('/settings/config')}
+          onClick={goBack}
           className="text-slate-400 hover:text-slate-200 transition-colors"
         >
           ← 返回设置

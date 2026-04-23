@@ -1,5 +1,7 @@
+import { Component, type ReactNode } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import ChatInterface from './components/ChatInterface';
+import TitleBar from './components/TitleBar';
 import CharacterList from './pages/CharacterList';
 import CharacterEditor from './pages/CharacterEditor';
 import PersonaList from './pages/PersonaList';
@@ -16,48 +18,74 @@ import KnowledgeList from './pages/KnowledgeList';
 import PushNotification from './components/PushNotification';
 import { usePush } from './hooks/usePush';
 
+interface EBProps { children: ReactNode }
+interface EBState { hasError: boolean; error: Error | null }
+
+class ErrorBoundary extends Component<EBProps, EBState> {
+  state: EBState = { hasError: false, error: null };
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full flex items-center justify-center bg-slate-950 text-slate-400 text-sm">
+          <div className="text-center space-y-2">
+            <p>组件加载失败</p>
+            <p className="text-xs text-slate-600 font-mono">{this.state.error?.message}</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   const { notifications, dismissNotification } = usePush();
 
   return (
     <HashRouter>
-      <Routes>
-        {/* 聊天主页面 */}
-        <Route path="/" element={<ChatInterface />} />
+      <div className="h-screen flex flex-col bg-slate-950">
+        <ErrorBoundary><TitleBar /></ErrorBoundary>
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <Routes>
+            {/* 聊天主页面 */}
+            <Route path="/" element={<ChatInterface />} />
 
-        {/* 角色管理页面 */}
-        <Route path="/settings/characters" element={<CharacterList />} />
-        <Route path="/settings/characters/new" element={<CharacterEditor />} />
-        <Route path="/settings/characters/:id" element={<CharacterEditor />} />
+            {/* 角色管理页面 */}
+            <Route path="/settings/characters" element={<CharacterList />} />
+            <Route path="/settings/characters/new" element={<CharacterEditor />} />
+            <Route path="/settings/characters/:id" element={<CharacterEditor />} />
 
-        {/* Persona 管理页面 */}
-        <Route path="/settings/personas" element={<PersonaList />} />
-        <Route path="/settings/personas/new" element={<PersonaEditor />} />
-        <Route path="/settings/personas/:id" element={<PersonaEditor />} />
+            {/* Persona 管理页面 */}
+            <Route path="/settings/personas" element={<PersonaList />} />
+            <Route path="/settings/personas/new" element={<PersonaEditor />} />
+            <Route path="/settings/personas/:id" element={<PersonaEditor />} />
 
-        {/* 世界书管理页面 */}
-        <Route path="/settings/worldbooks" element={<WorldBookList />} />
-        <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
+            {/* 世界书管理页面 */}
+            <Route path="/settings/worldbooks" element={<WorldBookList />} />
+            <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
 
-        {/* Skills 管理页面 */}
-        <Route path="/settings/skills" element={<SkillList />} />
-        <Route path="/settings/skills/:id" element={<SkillEditor />} />
+            {/* Skills 管理页面 */}
+            <Route path="/settings/skills" element={<SkillList />} />
+            <Route path="/settings/skills/:id" element={<SkillEditor />} />
 
-        {/* 头像管理页面 */}
-        <Route path="/settings/avatars" element={<AvatarManager />} />
+            {/* 头像管理页面 */}
+            <Route path="/settings/avatars" element={<AvatarManager />} />
 
-        {/* 配置管理页面 */}
-        <Route path="/settings/config" element={<ConfigList />} />
-        <Route path="/settings/config/:resource" element={<ConfigEditor />} />
+            {/* 配置管理页面 */}
+            <Route path="/settings/config" element={<ConfigList />} />
+            <Route path="/settings/config/:resource" element={<ConfigEditor />} />
 
-        {/* Token Inspector 页面 */}
-        <Route path="/settings/token-inspector" element={<TokenInspector />} />
+            {/* Token Inspector 页面 */}
+            <Route path="/settings/token-inspector" element={<TokenInspector />} />
 
-        {/* 知识库管理页面 */}
-        <Route path="/settings/knowledge" element={<KnowledgeList />} />
-      </Routes>
+            {/* 知识库管理页面 */}
+            <Route path="/settings/knowledge" element={<KnowledgeList />} />
+          </Routes>
+        </div>
+      </div>
 
-      {/* Overlay 挂载点 — 推送通知 + 未来动画特效系统 */}
+      {/* Overlay 挂载点 — 推送通知 + 浮动层 */}
       <div id="overlay-root" className="pointer-events-none fixed inset-0 z-50" />
       <PushNotification notifications={notifications} onDismiss={dismissNotification} />
     </HashRouter>

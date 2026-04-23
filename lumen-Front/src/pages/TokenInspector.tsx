@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MemoryDebugLayer } from '../components/PromptDebugPanel';
+import type { SettingsPageProps } from '../types/settings';
 
 /** localStorage 中存储 memoryDebugInfo 的 key */
 export const MEMORY_DEBUG_STORAGE_KEY = 'lumen_memory_debug';
@@ -74,8 +75,11 @@ function LayerRow({ layer }: { layer: MemoryDebugLayer }) {
   );
 }
 
-function TokenInspector() {
+interface TokenInspectorProps extends SettingsPageProps {}
+
+function TokenInspector({ onBack }: TokenInspectorProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate(-1));
   const [memoryDebugInfo, setMemoryDebugInfo] = useState<StoredMemoryDebugInfo | null>(null);
 
   useEffect(() => {
@@ -114,12 +118,12 @@ function TokenInspector() {
   );
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="
               px-3 py-1.5 rounded-lg text-sm text-slate-400
               hover:text-slate-200 hover:bg-slate-800/60
