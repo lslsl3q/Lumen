@@ -20,7 +20,7 @@ from lumen.services import history
 from lumen.services import memory
 from lumen.services.context.compact import should_compact, compact_session
 from lumen.services.context.token_estimator import extract_usage, record_usage
-from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_ai
+from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_ai, set_tool_context
 from lumen.tools.parse import parse_tool_call
 from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat
@@ -292,7 +292,7 @@ async def _resolve_knowledge_placeholders(
             resolved_text, has_placeholders, covered_ids = await resolve(
                 msg["content"],
                 user_input,
-                token_budget=character_config.get("knowledge_token_budget", 800),
+                token_budget=character_config.get("knowledge_token_budget", 0) or None,
             )
             if has_placeholders:
                 result = list(messages)
@@ -324,7 +324,11 @@ async def _inject_knowledge(
 
     top_k = character_config.get("knowledge_top_k", 3)
     min_score = character_config.get("knowledge_min_score", 0.3)
-    token_budget = character_config.get("knowledge_token_budget", 500)
+    if character_config.get("knowledge_token_budget"):
+        token_budget = character_config["knowledge_token_budget"]
+    else:
+        from lumen.config import KNOWLEDGE_SEMANTIC_BUDGET
+        token_budget = KNOWLEDGE_SEMANTIC_BUDGET
 
     results = await knowledge_search(user_input, top_k=top_k, min_score=min_score)
     if not results:
@@ -823,6 +827,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 continue
 
             yield {"type": "tool_start", "tool": tool_name, "params": tool_params}
+            set_tool_context(session.session_id or "", session.character_id or "")
             tool_exec_start = time.perf_counter()
             tool_result = execute_tool(tool_name, tool_params)
             tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
@@ -847,9 +852,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                     "duration_ms": tool_exec_ms,
                 }
 
+            caller_name = character_config.get("name", "")
             session.messages.append({
                 "role": "user",
-                "content": format_result_for_ai(tool_result),
+                "content": format_result_for_ai(tool_result, caller=caller_name),
                 "metadata": {
                     "type": "tool_result",
                     "tool_name": tool_name,
@@ -858,7 +864,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             })
             history.save_message(
                 session.session_id, "user",
-                format_result_for_ai(tool_result),
+                format_result_for_ai(tool_result, caller=caller_name),
                 {"type": "tool_result", "tool_name": tool_name, "folded": False},
             )
 
@@ -886,6 +892,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
 
             tool_names = [c.get("tool") for c in calls]
             yield {"type": "tool_start", "tool": tool_names, "mode": "parallel"}
+            set_tool_context(session.session_id or "", session.character_id or "")
             logger.info(f"并行执行 {len(calls)} 个工具...")
             tool_exec_start = time.perf_counter()
             results = execute_tools_parallel(calls)
@@ -913,9 +920,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                         "duration_ms": tool_exec_ms,
                     }
 
+            caller_name = character_config.get("name", "")
             session.messages.append({
                 "role": "user",
-                "content": "\n".join(format_result_for_ai(r) for r in results),
+                "content": "\n".join(format_result_for_ai(r, caller=caller_name) for r in results),
                 "metadata": {
                     "type": "tool_result_parallel",
                     "tool_count": len(results),
@@ -924,7 +932,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             })
             history.save_message(
                 session.session_id, "user",
-                "\n".join(format_result_for_ai(r) for r in results),
+                "\n".join(format_result_for_ai(r, caller=caller_name) for r in results),
                 {"type": "tool_result_parallel", "tool_count": len(results), "folded": False},
             )
 

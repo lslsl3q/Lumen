@@ -1,0 +1,8 @@
+{
+  "workspaces": [
+    "D:/",
+    "F:/"
+  ],
+  "readonly_mode": false,
+  "max_file_size_mb": 10
+}

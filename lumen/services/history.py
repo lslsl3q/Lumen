@@ -128,6 +128,204 @@ def _rebuild_fts5_index(cursor):
         cursor.execute("INSERT INTO messages_fts(rowid, content) VALUES(?, ?)", (msg_id, tokens))
 
 
+def _init_active_memories(conn):
+    """初始化主动记忆表 + FTS5 索引"""
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS active_memories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            memory_id TEXT UNIQUE NOT NULL,
+            character_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            content_display TEXT NOT NULL,
+            md_path TEXT,
+            tags TEXT DEFAULT '[]',
+            importance INTEGER DEFAULT 3,
+            category TEXT DEFAULT 'context',
+            session_id TEXT,
+            created_at TEXT NOT NULL
+        )
+    """)
+    existing = cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='active_memories_fts'"
+    ).fetchone()
+    if not existing:
+        cursor.execute("""
+            CREATE VIRTUAL TABLE active_memories_fts USING fts5(
+                content,
+                content_display,
+                tokenize='unicode61'
+            )
+        """)
+    conn.commit()
+
+
+def _init_knowledge_chunks(conn):
+    """初始化知识库 chunks 表 + FTS5 索引（用于知识库 BM25 搜索）"""
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS knowledge_chunks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id TEXT NOT NULL,
+            source_path TEXT,
+            filename TEXT,
+            category TEXT DEFAULT 'imports',
+            chunk_index INTEGER DEFAULT 0,
+            content TEXT NOT NULL
+        )
+    """)
+    existing = cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_chunks_fts'"
+    ).fetchone()
+    if not existing:
+        cursor.execute("""
+            CREATE VIRTUAL TABLE knowledge_chunks_fts USING fts5(
+                content,
+                tokenize='unicode61'
+            )
+        """)
+    conn.commit()
+
+
+def save_knowledge_chunk(
+    file_id: str,
+    source_path: str,
+    filename: str,
+    category: str,
+    chunk_index: int,
+    content: str,
+):
+    """保存知识库 chunk 到 SQLite + FTS5（jieba 分词）"""
+    import jieba
+    tokens = " ".join(jieba.cut(content))
+
+    with _write_lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """INSERT INTO knowledge_chunks
+               (file_id, source_path, filename, category, chunk_index, content)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (file_id, source_path, filename, category, chunk_index, content),
+        )
+        row_id = cursor.lastrowid
+        try:
+            conn.execute(
+                "INSERT INTO knowledge_chunks_fts(rowid, content) VALUES (?, ?)",
+                (row_id, tokens),
+            )
+        except Exception:
+            pass
+        conn.commit()
+
+
+def save_knowledge_chunks_batch(
+    file_id: str,
+    source_path: str,
+    filename: str,
+    category: str,
+    chunks: list[str],
+):
+    """批量保存知识库 chunks（一次锁，多次插入）"""
+    import jieba
+
+    with _write_lock:
+        conn = _get_conn()
+        for i, content in enumerate(chunks):
+            cursor = conn.execute(
+                """INSERT INTO knowledge_chunks
+                   (file_id, source_path, filename, category, chunk_index, content)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (file_id, source_path, filename, category, i, content),
+            )
+            row_id = cursor.lastrowid
+            try:
+                tokens = " ".join(jieba.cut(content))
+                conn.execute(
+                    "INSERT INTO knowledge_chunks_fts(rowid, content) VALUES (?, ?)",
+                    (row_id, tokens),
+                )
+            except Exception:
+                pass
+        conn.commit()
+
+
+def search_knowledge_bm25(
+    keywords: list[str],
+    category: str = "",
+    limit: int = 10,
+) -> list[dict]:
+    """FTS5 BM25 搜索知识库 chunks
+
+    Args:
+        keywords: jieba 提取的关键词列表
+        category: 按分类过滤（空不过滤）
+        limit: 最多返回条数
+
+    Returns:
+        [{"file_id", "source_path", "filename", "category", "chunk_index", "content", "bm25_score"}, ...]
+    """
+    if not keywords:
+        return []
+
+    query = " OR ".join(f'"{kw}"' for kw in keywords)
+    conn = _get_conn()
+
+    try:
+        sql = """
+            SELECT k.file_id, k.source_path, k.filename, k.category,
+                   k.chunk_index, k.content, -bm25(knowledge_chunks_fts) AS score
+            FROM knowledge_chunks_fts f
+            JOIN knowledge_chunks k ON k.id = f.rowid
+            WHERE knowledge_chunks_fts MATCH ?
+        """
+        params: list = [query]
+        if category:
+            sql += " AND k.category = ?"
+            params.append(category)
+        sql += " ORDER BY score DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(sql, params).fetchall()
+    except Exception as e:
+        logger.warning(f"知识库 FTS5 搜索失败: {e}")
+        return []
+
+    results = []
+    for row in rows:
+        results.append({
+            "file_id": row["file_id"],
+            "source_path": row["source_path"],
+            "filename": row["filename"],
+            "category": row["category"],
+            "chunk_index": row["chunk_index"],
+            "content": row["content"],
+            "bm25_score": row["score"],
+        })
+    return results
+
+
+def delete_knowledge_chunks(file_id: str) -> int:
+    """删除指定文件的所有 chunks + FTS5 索引，返回删除数量"""
+    with _write_lock:
+        conn = _get_conn()
+        rows = conn.execute(
+            "SELECT id FROM knowledge_chunks WHERE file_id = ?", (file_id,)
+        ).fetchall()
+        if not rows:
+            return 0
+        ids = [row["id"] for row in rows]
+        placeholders = ",".join("?" * len(ids))
+        try:
+            conn.execute(
+                f"DELETE FROM knowledge_chunks_fts WHERE rowid IN ({placeholders})", ids
+            )
+        except Exception:
+            pass
+        conn.execute("DELETE FROM knowledge_chunks WHERE file_id = ?", (file_id,))
+        conn.commit()
+        return len(ids)
+
+
 def _sync_fts5_insert(message_id: int, content: str):
     """消息插入后同步 FTS5 索引"""
     try:
@@ -239,6 +437,8 @@ def _init_db():
     _migrate_add_authors_note()
     _migrate_add_title()
     _init_fts5(conn)
+    _init_active_memories(conn)
+    _init_knowledge_chunks(conn)
 
 
 # 程序启动时自动初始化数据库
@@ -549,6 +749,187 @@ def replace_session_messages(session_id: str, messages: list[Message]):
             conn.rollback()
             logger.error(f"替换会话 {session_id} 消息失败: {e}")
             raise
+
+
+def save_active_memory(
+    memory_id: str,
+    character_id: str,
+    content: str,
+    content_display: str,
+    md_path: str = "",
+    tags: list[str] | None = None,
+    importance: int = 3,
+    category: str = "context",
+    session_id: str = "",
+) -> str:
+    """保存主动记忆到 SQLite + FTS5
+
+    Returns:
+        memory_id
+    """
+    now = datetime.now().isoformat()
+    tags_json = json.dumps(tags or [], ensure_ascii=False)
+
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            """INSERT INTO active_memories
+               (memory_id, character_id, content, content_display, md_path, tags, importance, category, session_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (memory_id, character_id, content, content_display, md_path, tags_json, importance, category, session_id, now),
+        )
+        try:
+            conn.execute(
+                "INSERT INTO active_memories_fts(rowid, content, content_display) VALUES (?, ?, ?)",
+                (conn.execute("SELECT last_insert_rowid()").fetchone()[0], content, content_display),
+            )
+        except Exception:
+            pass
+        conn.commit()
+    return memory_id
+
+
+def search_active_memories_bm25(
+    query: str,
+    character_id: str = "",
+    limit: int = 10,
+) -> list[dict]:
+    """BM25 搜索主动记忆（FTS5 优先，失败回退 LIKE）
+
+    Returns:
+        [{"memory_id", "content", "content_display", "category", "importance", "tags", "bm25_score"}, ...]
+    """
+    if not query or not query.strip():
+        return []
+
+    conn = _get_conn()
+    results = []
+
+    # FTS5 BM25 搜索
+    try:
+        sql = """
+            SELECT a.memory_id, a.content, a.content_display, a.category,
+                   a.importance, a.tags, -bm25(active_memories_fts) AS score
+            FROM active_memories_fts f
+            JOIN active_memories a ON a.id = f.rowid
+            WHERE active_memories_fts MATCH ?
+        """
+        params: list = [query]
+        if character_id:
+            sql += " AND a.character_id = ?"
+            params.append(character_id)
+        sql += " ORDER BY score DESC LIMIT ?"
+        params.append(limit)
+
+        rows = conn.execute(sql, params).fetchall()
+        for row in rows:
+            results.append({
+                "memory_id": row["memory_id"],
+                "content": row["content"],
+                "content_display": row["content_display"],
+                "category": row["category"],
+                "importance": row["importance"],
+                "tags": json.loads(row["tags"]) if row["tags"] else [],
+                "bm25_score": row["score"],
+                "source": "active",
+            })
+    except Exception as e:
+        logger.debug(f"主动记忆 FTS5 搜索失败，回退 LIKE: {e}")
+
+    # 回退：LIKE 模糊搜索
+    if not results:
+        sql = """
+            SELECT memory_id, content, content_display, category, importance, tags
+            FROM active_memories
+            WHERE content LIKE ? OR content_display LIKE ?
+        """
+        escaped = query.replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
+        params = [pattern, pattern]
+        if character_id:
+            sql += " AND character_id = ?"
+            params.append(character_id)
+        sql += " LIMIT ?"
+        params.append(limit)
+
+        try:
+            rows = conn.execute(sql, params).fetchall()
+            for row in rows:
+                results.append({
+                    "memory_id": row["memory_id"],
+                    "content": row["content"],
+                    "content_display": row["content_display"],
+                    "category": row["category"],
+                    "importance": row["importance"],
+                    "tags": json.loads(row["tags"]) if row["tags"] else [],
+                    "bm25_score": 0.5,
+                    "source": "active",
+                })
+        except Exception as e:
+            logger.warning(f"主动记忆搜索失败: {e}")
+
+    return results
+
+
+def list_active_memories(
+    character_id: str = "",
+    category: str = "",
+    limit: int = 50,
+) -> list[dict]:
+    """列出主动记忆（支持按角色和分类过滤）
+
+    Returns:
+        [{"memory_id", "content", "content_display", "category",
+          "importance", "tags", "md_path", "created_at"}, ...]
+    """
+    conn = _get_conn()
+    sql = """
+        SELECT memory_id, content, content_display, category,
+               importance, tags, md_path, created_at
+        FROM active_memories
+        WHERE 1=1
+    """
+    params: list = []
+    if character_id:
+        sql += " AND character_id = ?"
+        params.append(character_id)
+    if category:
+        sql += " AND category = ?"
+        params.append(category)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
+
+    rows = conn.execute(sql, params).fetchall()
+    results = []
+    for row in rows:
+        results.append({
+            "memory_id": row["memory_id"],
+            "content": row["content"],
+            "content_display": row["content_display"],
+            "category": row["category"],
+            "importance": row["importance"],
+            "tags": json.loads(row["tags"]) if row["tags"] else [],
+            "md_path": row["md_path"] or "",
+            "created_at": row["created_at"],
+        })
+    return results
+
+
+def delete_active_memory(memory_id: str) -> bool:
+    """删除主动记忆（SQLite + FTS5）"""
+    with _write_lock:
+        conn = _get_conn()
+        row = conn.execute("SELECT id FROM active_memories WHERE memory_id = ?", (memory_id,)).fetchone()
+        if not row:
+            return False
+        rid = row["id"]
+        conn.execute("DELETE FROM active_memories WHERE memory_id = ?", (memory_id,))
+        try:
+            conn.execute("DELETE FROM active_memories_fts WHERE rowid = ?", (rid,))
+        except Exception:
+            pass
+        conn.commit()
+    return True
 
 
 def get_message_context(session_id: str, center_id: int, window: int = 2) -> list[dict[str, str]]:

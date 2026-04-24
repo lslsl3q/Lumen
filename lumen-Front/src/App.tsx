@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from 'react';
+import { Component, type ReactNode, useEffect } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import ChatInterface from './components/ChatInterface';
 import TitleBar from './components/TitleBar';
@@ -17,6 +17,7 @@ import TokenInspector from './pages/TokenInspector';
 import KnowledgeList from './pages/KnowledgeList';
 import PushNotification from './components/PushNotification';
 import { usePush } from './hooks/usePush';
+import { TOAST_EVENT, type ToastLevel } from './utils/toast';
 
 interface EBProps { children: ReactNode }
 interface EBState { hasError: boolean; error: Error | null }
@@ -40,7 +41,30 @@ class ErrorBoundary extends Component<EBProps, EBState> {
 }
 
 function App() {
-  const { notifications, dismissNotification } = usePush();
+  const { notifications, addNotification, dismissNotification } = usePush();
+
+  // 全局禁用浏览器右键菜单
+  useEffect(() => {
+    const handler = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener('contextmenu', handler);
+    return () => document.removeEventListener('contextmenu', handler);
+  }, []);
+
+  // 监听全局 toast 事件 → 转为 PushNotification 显示
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { message, level } = (e as CustomEvent<{ message: string; level: ToastLevel }>).detail;
+      addNotification({
+        type: 'system',
+        title: level === 'error' ? '错误' : level === 'success' ? '成功' : '提示',
+        body: message,
+        level,
+        timestamp: new Date().toISOString(),
+      });
+    };
+    window.addEventListener(TOAST_EVENT, handler);
+    return () => window.removeEventListener(TOAST_EVENT, handler);
+  }, [addNotification]);
 
   return (
     <HashRouter>

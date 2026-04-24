@@ -1,0 +1,14 @@
+{
+  "kb000606mcf": {
+    "id": "kb000606mcf",
+    "source_path": "test/test_long.txt",
+    "filename": "test_long.txt",
+    "file_type": "txt",
+    "category": "test",
+    "chunk_count": 3,
+    "char_count": 614,
+    "tags": [],
+    "created_at": "2026-04-24T11:16:46",
+    "updated_at": "2026-04-24T11:16:46"
+  }
+}

@@ -407,7 +407,22 @@ async def get_relevant_memories(
         query_vector = await embedding.encode(user_input)
         if query_vector:
             from lumen.services import vector_store
+            from lumen.config import PRF_ENABLED, PRF_ALPHA, PRF_BETA
+
             vector_hits = vector_store.search_similar(query_vector, character_id, exclude_session_id=session_id)
+
+            # PRF 精炼：用 top-N 结果的向量修正查询，再搜一次
+            if PRF_ENABLED and vector_hits:
+                refined_vector = vector_store.prf_refine(
+                    query_vector, vector_hits, alpha=PRF_ALPHA, beta=PRF_BETA,
+                )
+                if refined_vector:
+                    refined_hits = vector_store.search_similar(
+                        refined_vector, character_id, exclude_session_id=session_id,
+                    )
+                    if refined_hits:
+                        vector_hits = refined_hits
+                        logger.debug(f"PRF 精炼生效: {len(refined_hits)} 条结果")
 
             # 提取关键词做 FTS5 BM25 搜索
             reload_user_dict()

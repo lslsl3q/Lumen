@@ -77,7 +77,6 @@ function CharacterEditor({ characterId, onBack, onNavigate }: CharacterEditorPro
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
-  const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const { skills: availableSkills } = useSkills();
 
   const toggleSkill = useCallback((skillId: string) => {
@@ -93,12 +92,6 @@ function CharacterEditor({ characterId, onBack, onNavigate }: CharacterEditorPro
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(isEditMode);
   const [error, setError] = useState<string | null>(null);
-
-  // 从 registry 提取的默认 tips（usage_guide）
-  const defaultTips: Record<string, string> = {};
-  for (const t of availableTools) {
-    if (t.usage_guide) defaultTips[t.name] = t.usage_guide;
-  }
 
   // 加载可用工具列表
   useEffect(() => {
@@ -170,24 +163,6 @@ function CharacterEditor({ characterId, onBack, onNavigate }: CharacterEditorPro
     });
   }, []);
 
-  // 工具 tips 编辑
-  const handleTipChange = useCallback((tool: string, value: string) => {
-    setForm(prev => ({
-      ...prev,
-      tool_tips: { ...(prev.tool_tips || {}), [tool]: value },
-    }));
-  }, []);
-
-  // 恢复默认 tips
-  const resetTip = useCallback((tool: string) => {
-    setForm(prev => {
-      const tips = { ...(prev.tool_tips || {}) };
-      delete tips[tool];
-      return { ...prev, tool_tips: tips };
-    });
-    setExpandedTool(null);
-  }, []);
-
   // 提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,15 +176,8 @@ function CharacterEditor({ characterId, onBack, onNavigate }: CharacterEditorPro
     try {
       setIsSaving(true);
 
-      // 清理 tool_tips：只保留与默认值不同的自定义内容
-      const cleanedTips: Record<string, string> = {};
-      for (const [tool, tip] of Object.entries(form.tool_tips || {})) {
-        if (tip !== (defaultTips[tool] || '')) {
-          cleanedTips[tool] = tip;
-        }
-      }
-
-      const dataToSubmit = { ...form, tool_tips: cleanedTips };
+      // tool_tips 已移到专门的 ToolTips 管理页，角色只保留开关和排序
+      const dataToSubmit = { ...form, tool_tips: {} };
 
       if (isEditMode) {
         await apiUpdate(id!, dataToSubmit, avatarFile || undefined);
@@ -543,116 +511,47 @@ function CharacterEditor({ characterId, onBack, onNavigate }: CharacterEditorPro
               <div className="text-xs text-slate-600">没有找到可用工具（确保后端正在运行）</div>
             ) : (
               <>
-                {/* 已启用工具（按顺序排列，可排序、可编辑 tips） */}
+                {/* 已启用工具（按顺序排列，可排序） */}
                 {form.tools && form.tools.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {form.tools.map((toolName, index) => {
                       const toolInfo = availableTools.find(t => t.name === toolName);
-                      if (!toolInfo) return null; // 工具已从 registry 移除
-                      const isExpanded = expandedTool === toolName;
-                      const customTip = form.tool_tips?.[toolName];
-                      const displayTip = customTip ?? defaultTips[toolName] ?? '';
-                      const isModified = !!customTip && customTip !== defaultTips[toolName];
+                      if (!toolInfo) return null;
 
                       return (
                         <div
                           key={toolName}
-                          className={`
-                            rounded-lg border transition-all duration-150
-                            ${isExpanded
-                              ? 'border-teal-500/30 bg-teal-500/5'
-                              : 'border-slate-700/40 bg-slate-800/20'
-                            }
-                          `}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg
+                            border border-slate-700/40 bg-slate-800/20"
                         >
-                          {/* 工具卡片头部 */}
-                          <div className="flex items-center gap-2 px-3 py-2">
-                            {/* 排序手柄 */}
-                            <span className="text-slate-600 text-xs select-none">&#8942;</span>
-
-                            {/* 工具名 */}
-                            <span className="font-mono text-sm text-teal-400">{toolName}</span>
-
-                            {/* 自定义标记 */}
-                            {isModified && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
-                                已自定义
-                              </span>
-                            )}
-
-                            <div className="flex-1" />
-
-                            {/* 展开/收起 */}
-                            <button
-                              type="button"
-                              onClick={() => setExpandedTool(isExpanded ? null : toolName)}
-                              className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                            >
-                              {isExpanded ? '收起' : '编辑提示'}
-                            </button>
-
-                            {/* 上移 */}
-                            <button
-                              type="button"
-                              disabled={index === 0}
-                              onClick={() => moveTool(index, -1)}
-                              className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-20 transition-opacity"
-                            >
-                              &#9650;
-                            </button>
-
-                            {/* 下移 */}
-                            <button
-                              type="button"
-                              disabled={index === (form.tools?.length ?? 0) - 1}
-                              onClick={() => moveTool(index, 1)}
-                              className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-20 transition-opacity"
-                            >
-                              &#9660;
-                            </button>
-
-                            {/* 移除 */}
-                            <button
-                              type="button"
-                              onClick={() => toggleTool(toolName)}
-                              className="text-xs text-slate-500 hover:text-red-400 transition-colors"
-                            >
-                              &#10005;
-                            </button>
-                          </div>
-
-                          {/* 展开的 tips 编辑区 */}
-                          {isExpanded && (
-                            <div className="px-3 pb-3 pt-1 border-t border-slate-700/30 space-y-2">
-                              <textarea
-                                value={displayTip}
-                                onChange={e => handleTipChange(toolName, e.target.value)}
-                                placeholder="描述这个工具的使用时机和规则..."
-                                rows={3}
-                                className="
-                                  w-full px-3 py-2 rounded-lg text-sm
-                                  bg-slate-800/40 border border-slate-700/40
-                                  text-slate-200 placeholder-slate-600
-                                  focus:border-teal-500/40 focus:outline-hidden
-                                  transition-all duration-150 resize-y
-                                "
-                              />
-                              <div className="flex justify-between items-center">
-                                <span className="text-[10px] text-slate-600">
-                                  {isModified ? '已自定义，不会被工具更新覆盖' : '使用默认提示'}
-                                </span>
-                                {isModified && (
-                                  <button
-                                    type="button"
-                                    onClick={() => resetTip(toolName)}
-                                    className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-                                  >
-                                    恢复默认
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                          <span className="text-slate-600 text-xs select-none">&#8942;</span>
+                          <span className="font-mono text-sm text-teal-400">{toolName}</span>
+                          <span className="text-xs text-slate-600 truncate flex-1">
+                            {toolInfo.description}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={() => moveTool(index, -1)}
+                            className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-20 transition-opacity"
+                          >
+                            &#9650;
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === (form.tools?.length ?? 0) - 1}
+                            onClick={() => moveTool(index, 1)}
+                            className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-20 transition-opacity"
+                          >
+                            &#9660;
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleTool(toolName)}
+                            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                          >
+                            &#10005;
+                          </button>
                         </div>
                       );
                     })}

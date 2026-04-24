@@ -8,14 +8,57 @@ import { useState, useMemo } from 'react';
 
 /** 字段元信息：哪些字段需要特殊处理 */
 const FIELD_META: Record<string, { label: string; type: 'text' | 'password'; placeholder: string }> = {
+  // ── LLM 核心 ──
   API_URL: { label: 'API 地址', type: 'text', placeholder: 'http://127.0.0.1:4000/v1' },
   API_KEY: { label: 'API 密钥', type: 'password', placeholder: 'sk-...' },
   MODEL: { label: '默认模型', type: 'text', placeholder: 'deepseek-chat' },
   SUMMARY_MODEL: { label: '摘要模型', type: 'text', placeholder: '留空则跟随默认模型（用于上下文压缩）' },
+  LLM_TIMEOUT: { label: 'LLM 超时（秒）', type: 'text', placeholder: '60' },
+  MAX_TOOL_ITERATIONS: { label: '工具最大轮次', type: 'text', placeholder: '20' },
+  DEFAULT_CONTEXT_SIZE: { label: '默认上下文窗口（tokens）', type: 'text', placeholder: '8192' },
+
+  // ── 代理 ──
   SEARCH_PROXY: { label: '搜索代理', type: 'text', placeholder: 'http://127.0.0.1:7897' },
   FETCH_PROXY: { label: '抓取代理', type: 'text', placeholder: 'http://127.0.0.1:7897' },
-  LLM_TIMEOUT: { label: 'LLM 超时（秒）', type: 'text', placeholder: '60' },
-  MAX_TOOL_ITERATIONS: { label: '工具最大轮次', type: 'text', placeholder: '10' },
+
+  // ── 嵌入模型（全局） ──
+  EMBEDDING_ENABLED: { label: '启用嵌入搜索', type: 'text', placeholder: 'True' },
+  EMBEDDING_BACKEND: { label: '嵌入后端（local/openai/gemini）', type: 'text', placeholder: 'local' },
+  EMBEDDING_MODEL: { label: '本地嵌入模型', type: 'text', placeholder: 'thenlper/gte-small-zh' },
+  EMBEDDING_API_URL: { label: '嵌入 API 地址', type: 'text', placeholder: 'https://api.openai.com/v1' },
+  EMBEDDING_API_KEY: { label: '嵌入 API 密钥', type: 'password', placeholder: 'sk-...' },
+  EMBEDDING_API_MODEL: { label: '嵌入 API 模型', type: 'text', placeholder: 'text-embedding-3-small' },
+
+  // ── 知识库嵌入（chunk 级，必须配 API 才能用） ──
+  KNOWLEDGE_EMBEDDING_BACKEND: { label: '知识库嵌入后端', type: 'text', placeholder: 'openai（必填，空=不启用）' },
+  KNOWLEDGE_EMBEDDING_API_URL: { label: '知识库嵌入 API 地址', type: 'text', placeholder: 'https://api.siliconflow.cn/v1' },
+  KNOWLEDGE_EMBEDDING_API_KEY: { label: '知识库嵌入 API 密钥', type: 'password', placeholder: 'sk-...' },
+  KNOWLEDGE_EMBEDDING_API_MODEL: { label: '知识库嵌入模型', type: 'text', placeholder: 'BAAI/bge-large-zh-v1.5' },
+
+  // ── 知识库检索参数 ──
+  KNOWLEDGE_CHUNK_SIZE: { label: '分块大小（字符）', type: 'text', placeholder: '300' },
+  KNOWLEDGE_CHUNK_OVERLAP: { label: '分块重叠（字符）', type: 'text', placeholder: '60' },
+  KNOWLEDGE_PLACEHOLDER_BUDGET: { label: '占位符检索 Token 预算', type: 'text', placeholder: '800' },
+  KNOWLEDGE_SEMANTIC_BUDGET: { label: '语义路由 Token 预算', type: 'text', placeholder: '500' },
+
+  // ── 句子级检索 ──
+  KNOWLEDGE_SENTENCE_LEVEL: { label: '启用句子级检索', type: 'text', placeholder: 'True' },
+  KNOWLEDGE_SENTENCE_TOP_N: { label: '句子级 Top N', type: 'text', placeholder: '5' },
+  KNOWLEDGE_SENTENCE_WINDOW: { label: '句子窗口（±N 句）', type: 'text', placeholder: '1' },
+
+  // ── PRF 伪相关反馈 ──
+  PRF_ENABLED: { label: '启用 PRF 精炼', type: 'text', placeholder: 'True' },
+  PRF_TOP_N: { label: 'PRF 反馈数量', type: 'text', placeholder: '5' },
+  PRF_ALPHA: { label: 'PRF 查询权重 α', type: 'text', placeholder: '0.7' },
+  PRF_BETA: { label: 'PRF 反馈权重 β', type: 'text', placeholder: '0.3' },
+
+  // ── 消息记忆嵌入 ──
+  MEMORY_EMBEDDING_BACKEND: { label: '消息记忆嵌入后端', type: 'text', placeholder: '留空用全局默认' },
+  MEMORY_EMBEDDING_API_MODEL: { label: '消息记忆嵌入模型', type: 'text', placeholder: '留空用全局默认' },
+
+  // ── 思维簇嵌入 ──
+  TC_EMBEDDING_BACKEND: { label: '思维簇嵌入后端', type: 'text', placeholder: '留空用全局默认' },
+  TC_EMBEDDING_API_MODEL: { label: '思维簇嵌入模型', type: 'text', placeholder: '留空用全局默认' },
 };
 
 /** 解析 .env 文本 → {注释行列表, 键值对} */

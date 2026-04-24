@@ -18,6 +18,7 @@ import RightRail from './RightRail';
 import DebugDrawer from './DebugDrawer';
 import ContextPanel from './floating/ContextPanel';
 import FloatingLayerHost from './floating/FloatingLayerHost';
+import MemoryWindow from './MemoryWindow';
 import { useFloatingLayers } from './floating/useFloatingLayers';
 import { MEMORY_DEBUG_STORAGE_KEY } from '../pages/TokenInspector';
 
@@ -28,6 +29,7 @@ function ChatInterface() {
   const persona = usePersona();
   const authorNote = useAuthorNote(sessions.currentSessionId);
   const floating = useFloatingLayers();
+  const [memoryWindowOpen, setMemoryWindowOpen] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<{
     current_tokens: number; context_size: number; usage_percent: number
   } | null>(null);
@@ -200,6 +202,7 @@ function ChatInterface() {
         onOpenContextPanel={handleOpenContextPanel}
         onRenameSession={handleRenameSession}
         onOpenSettings={() => {}}
+        onOpenMemoryWindow={() => setMemoryWindowOpen(true)}
       />
       <ChatPanel
         messages={chat.messages}
@@ -212,6 +215,22 @@ function ChatInterface() {
         onSendMessage={handleSendMessage}
         onCommandResult={handleCommandResult}
         onAbort={chat.abort}
+        onCompact={async () => {
+          if (!sessions.currentSessionId) return;
+          try {
+            const { compactSession } = await import('../api/chat');
+            const result = await compactSession(sessions.currentSessionId);
+            if (result.compacted) {
+              chat.addSystemMessage(`上下文已压缩: ${result.tokens_before} → ${result.tokens_after} tokens`);
+            } else {
+              chat.addSystemMessage('上下文已经很简洁，无需压缩');
+            }
+            refreshTokenUsage();
+          } catch (err) {
+            chat.addSystemMessage('压缩失败: ' + (err instanceof Error ? err.message : '未知错误'));
+          }
+        }}
+        onOpenConfig={() => floating.openSettings('config-list')}
         characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
         characterAvatar={characters.currentCharacter?.avatar}
         currentModel=""
@@ -250,6 +269,10 @@ function ChatInterface() {
         onAuthorNoteSetPosition={authorNote.setPosition}
       />
       <FloatingLayerHost floating={floating} />
+      <MemoryWindow
+        open={memoryWindowOpen}
+        onClose={() => setMemoryWindowOpen(false)}
+      />
     </div>
   );
 }

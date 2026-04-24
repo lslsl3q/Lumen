@@ -330,6 +330,8 @@ interface ChatPanelProps {
   onSendMessage: (message: string) => void;
   onCommandResult?: (result: CommandResult) => void;
   onAbort?: () => void;
+  onCompact?: () => void;
+  onOpenConfig?: () => void;
   characterName?: string;
   characterAvatar?: string | null;
   currentModel?: string;
@@ -346,6 +348,8 @@ function ChatPanel({
   onSendMessage,
   onCommandResult,
   onAbort,
+  onCompact,
+  onOpenConfig,
   characterName,
   characterAvatar,
   currentModel,
@@ -557,18 +561,18 @@ function ChatPanel({
                   onKeyDown={handleKeyDown}
                   placeholder="说点什么..."
                   disabled={isLoading || !sessionId}
-                  rows={2}
+                  rows={1}
                   className="
-                    w-full px-4 py-3 resize-none bg-transparent border-none
+                    w-full px-4 py-2.5 resize-none bg-transparent border-none
                     text-slate-200 placeholder-slate-600 text-sm leading-relaxed
-                    focus:outline-hidden focus:shadow-[0_0_8px_rgba(204,124,94,0.1)]
+                    focus:outline-hidden
                     disabled:opacity-40 disabled:cursor-not-allowed
                     transition-all duration-200
                   "
                 />
               </form>
               {/* 工具栏分割线 */}
-              <div className="h-px bg-slate-700/40 mx-3" />
+              <div className="h-px bg-[#2a2926] mx-3" />
               {/* 工具栏 */}
               <div className="flex items-center gap-1 px-3 py-1.5">
                 {/* 附件 */}
@@ -634,6 +638,8 @@ function ChatPanel({
                     percent={tokenUsage.usage_percent}
                     current={tokenUsage.current_tokens}
                     total={tokenUsage.context_size}
+                    onCompact={onCompact}
+                    onOpenConfig={onOpenConfig}
                   />
                 )}
                 {/* 发送 / 停止 */}

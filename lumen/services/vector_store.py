@@ -125,6 +125,7 @@ def search_similar(
         seen.add(key)
 
         hits.append({
+            "id": hit.id if hasattr(hit, "id") else None,
             "role": payload.get("role", ""),
             "content": payload.get("content", ""),
             "session_id": payload.get("session_id", ""),
@@ -162,6 +163,68 @@ def delete_by_character(character_id: str) -> int:
     if count:
         db.flush()
     return count
+
+
+def prf_refine(query_vector: list[float], search_hits: list[dict],
+               alpha: float = 0.7, beta: float = 0.3) -> list[float] | None:
+    """PRF (Pseudo-Relevance Feedback) 查询向量精炼
+
+    Rocchio 公式：refined = α·query + β·centroid(top_hits)
+    从 TriviumDB 读回已存向量算均值，零嵌入开销。
+
+    Args:
+        query_vector: 原始查询向量
+        search_hits: 第一次搜索的结果列表（需要有 id 或 node_id）
+        alpha: 原始查询权重（默认 0.7）
+        beta: PRF 反馈权重（默认 0.3）
+
+    Returns:
+        精炼后的查询向量，失败返回 None
+    """
+    from lumen.config import PRF_TOP_N
+    db = _get_db()
+    if db is None:
+        return None
+
+    top_n = search_hits[:PRF_TOP_N]
+    if not top_n:
+        return None
+
+    # 从 TriviumDB 读回 top-N 的存储向量
+    vectors = []
+    for hit in top_n:
+        node_id = hit.get("id") or hit.get("node_id")
+        if node_id is None:
+            continue
+        try:
+            node = db.get(node_id)
+            if node and hasattr(node, "vector") and node.vector:
+                vectors.append(node.vector)
+        except Exception:
+            continue
+
+    if not vectors:
+        return None
+
+    # centroid = 向量均值
+    dim = len(vectors[0])
+    centroid = [0.0] * dim
+    for vec in vectors:
+        for i in range(dim):
+            centroid[i] += vec[i]
+    for i in range(dim):
+        centroid[i] /= len(vectors)
+
+    # Rocchio: refined = α·query + β·centroid
+    refined = [alpha * query_vector[i] + beta * centroid[i] for i in range(dim)]
+
+    # 归一化（cosine similarity 不受向量长度影响）
+    norm = sum(x * x for x in refined) ** 0.5
+    if norm > 0:
+        refined = [x / norm for x in refined]
+
+    logger.debug(f"PRF 精炼: {len(vectors)} 条反馈向量, α={alpha}, β={beta}")
+    return refined
 
 
 def flush():

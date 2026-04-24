@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSkills } from '../hooks/useSkills';
 import * as api from '../api/skills';
 import { SettingsPageProps } from '../types/settings';
+import { toast } from '../utils/toast';
 
 interface SkillListProps extends SettingsPageProps {}
 
@@ -19,7 +20,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
     try {
       await remove(id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败');
+      toast(err instanceof Error ? err.message : '删除失败', 'error');
     }
   };
 
@@ -31,7 +32,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
       const result = await create({ name, content: '', enabled: true });
       goTo('skill-editor', { id: result.id });
     } catch (err) {
-      alert(err instanceof Error ? err.message : '创建失败');
+      toast(err instanceof Error ? err.message : '创建失败', 'error');
     }
   };
 
@@ -44,10 +45,10 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
       if (!file) return;
       try {
         const result = await api.uploadSkill(file);
-        alert(`成功导入 ${result.imported.length} 个 Skill`);
+        toast(`成功导入 ${result.imported.length} 个 Skill`, 'success');
         refresh();
       } catch (err) {
-        alert(err instanceof Error ? err.message : '导入失败');
+        toast(err instanceof Error ? err.message : '导入失败', 'error');
       }
     };
     input.click();

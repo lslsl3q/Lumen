@@ -31,6 +31,7 @@ interface NavRailProps {
   authorNoteConfig: AuthorsNoteConfig | null;
   onOpenContextPanel: (kind: ContextPanelKind) => void;
   onOpenSettings: () => void;
+  onOpenMemoryWindow: () => void;
 }
 
 /** 统一图标按钮样式 */
@@ -143,6 +144,7 @@ function NavRail({
   activePersonaName,
   authorNoteConfig,
   onOpenContextPanel,
+  onOpenMemoryWindow,
 }: NavRailProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -234,6 +236,13 @@ function NavRail({
 
           {/* 底部功能图标 */}
           <div className="flex flex-col items-center gap-1 py-2 border-t border-slate-800/40">
+            <button onClick={onOpenMemoryWindow}
+              className={iconBtn} title="日记">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </button>
             <button onClick={() => onOpenContextPanel('authornote')}
               className={`${iconBtn} relative`} title="Author's Note">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -298,6 +307,17 @@ function NavRail({
 
           {/* 底部功能行 */}
           <div className="border-t border-slate-800/40">
+            <button
+              onClick={onOpenMemoryWindow}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 cursor-pointer text-left"
+            >
+              <svg className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+              <span className="text-xs text-slate-400 flex-1">日记</span>
+            </button>
+
             <button
               onClick={() => onOpenContextPanel('authornote')}
               className="w-full flex items-center gap-2.5 px-3 py-1.5 cursor-pointer text-left"

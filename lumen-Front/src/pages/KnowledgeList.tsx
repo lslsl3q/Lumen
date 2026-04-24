@@ -10,6 +10,7 @@ import { useKnowledge } from '../hooks/useKnowledge';
 import { searchKnowledge } from '../api/knowledge';
 import type { KnowledgeSearchResult } from '../types/knowledge';
 import type { SettingsPageProps } from '../types/settings';
+import { toast } from '../utils/toast';
 
 interface KnowledgeListProps extends SettingsPageProps {}
 
@@ -41,7 +42,7 @@ function KnowledgeList({ onBack }: KnowledgeListProps) {
         try {
           await upload(file);
         } catch (err) {
-          alert(`${file.name}: ${err instanceof Error ? err.message : '上传失败'}`);
+          toast(`${file.name}: ${err instanceof Error ? err.message : '上传失败'}`, 'error');
         }
       }
     };
@@ -57,7 +58,7 @@ function KnowledgeList({ onBack }: KnowledgeListProps) {
       setCreateFilename('');
       setCreateContent('');
     } catch (err) {
-      alert(err instanceof Error ? err.message : '创建失败');
+      toast(err instanceof Error ? err.message : '创建失败', 'error');
     } finally {
       setCreating(false);
     }
@@ -68,7 +69,7 @@ function KnowledgeList({ onBack }: KnowledgeListProps) {
     try {
       await remove(fileId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败');
+      toast(err instanceof Error ? err.message : '删除失败', 'error');
     }
   };
 

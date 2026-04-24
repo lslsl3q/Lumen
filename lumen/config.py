@@ -103,11 +103,14 @@ EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "")
 # ── 按服务覆盖（可选，不设则用默认值）──
 # MEMORY_EMBEDDING_BACKEND=local       # 消息记忆用本地小模型（快速）
 # KNOWLEDGE_EMBEDDING_BACKEND=openai   # 知识库用 API 大模型（精准）
+#   → 知识库 chunk 级必须配 API（URL+Key），不配则知识库向量功能不可用
 # THINKING_CLUSTERS_EMBEDDING_BACKEND=local  # 思维簇用本地小模型即可
 MEMORY_EMBEDDING_BACKEND = os.getenv("MEMORY_EMBEDDING_BACKEND", "")
 MEMORY_EMBEDDING_API_MODEL = os.getenv("MEMORY_EMBEDDING_API_MODEL", "")
-KNOWLEDGE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_EMBEDDING_BACKEND", "")
-KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "")
+KNOWLEDGE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_EMBEDDING_BACKEND", "")   # 空=不启用
+KNOWLEDGE_EMBEDDING_API_URL = os.getenv("KNOWLEDGE_EMBEDDING_API_URL", "")   # 知识库专属 API URL
+KNOWLEDGE_EMBEDDING_API_KEY = os.getenv("KNOWLEDGE_EMBEDDING_API_KEY", "")   # 知识库专属 API Key
+KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "")  # 知识库专属模型名
 TC_EMBEDDING_BACKEND = os.getenv("TC_EMBEDDING_BACKEND", "")
 TC_EMBEDDING_API_MODEL = os.getenv("TC_EMBEDDING_API_MODEL", "")
 
@@ -122,6 +125,34 @@ KNOWLEDGE_SOURCE_DIR = os.getenv(
 )
 KNOWLEDGE_CHUNK_SIZE = int(os.getenv("KNOWLEDGE_CHUNK_SIZE", "300"))
 KNOWLEDGE_CHUNK_OVERLAP = int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP", "60"))
+
+# PRF 伪相关反馈配置（T18 Stage 1→2 增强层）
+PRF_ENABLED = os.getenv("PRF_ENABLED", "True").lower() in ("true", "1")
+PRF_TOP_N = int(os.getenv("PRF_TOP_N", "5"))          # 取前 N 条结果的向量算均值
+PRF_ALPHA = float(os.getenv("PRF_ALPHA", "0.7"))       # 原始查询向量权重
+PRF_BETA = float(os.getenv("PRF_BETA", "0.3"))         # PRF 均值向量权重
+
+# 句子级检索配置（T18 Stage 3+4）
+KNOWLEDGE_SENTENCE_DB_PATH = os.getenv(
+    "KNOWLEDGE_SENTENCE_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "data", "knowledge_sentences.tdb"),
+)
+KNOWLEDGE_SENTENCE_LEVEL = os.getenv("KNOWLEDGE_SENTENCE_LEVEL", "True").lower() in ("true", "1")
+KNOWLEDGE_SENTENCE_TOP_N = int(os.getenv("KNOWLEDGE_SENTENCE_TOP_N", "5"))
+KNOWLEDGE_SENTENCE_WINDOW = int(os.getenv("KNOWLEDGE_SENTENCE_WINDOW", "1"))
+# 句子级嵌入模型（默认本地小模型，跟 chunk 级分开）
+KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND", "local")
+KNOWLEDGE_SENTENCE_EMBEDDING_MODEL = os.getenv("KNOWLEDGE_SENTENCE_EMBEDDING_MODEL", "thenlper/gte-small-zh")
+
+# Token 预算配置（知识库检索注入的 token 上限）
+KNOWLEDGE_PLACEHOLDER_BUDGET = int(os.getenv("KNOWLEDGE_PLACEHOLDER_BUDGET", "800"))   # 占位符 {{}}/[[]] 共享预算
+KNOWLEDGE_SEMANTIC_BUDGET = int(os.getenv("KNOWLEDGE_SEMANTIC_BUDGET", "500"))          # 语义路由自动注入预算
+
+# AI 日记/档案配置（daily_note 工具系列）
+DAILY_NOTE_DIR = os.getenv(
+    "DAILY_NOTE_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "daily_note"),
+)
 
 # 思维簇配置
 THINKING_CLUSTERS_DIR = os.getenv(

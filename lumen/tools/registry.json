@@ -128,5 +128,32 @@
       },
       "required": ["action", "path"]
     }
+  },
+  "daily_note": {
+    "description": "保存重要信息到日记/档案，跨会话可用",
+    "usage_guide": "你有持久日记能力。以下情况应主动保存：\n- 用户偏好（\"我喜欢简洁回复\"、\"不要用emoji\"）\n- 重要约定（\"下次聊第三章\"）\n- 关键事实（\"我的项目叫XXX\"）\n- 决策记录（\"决定用方案B\"）\n\n不要保存：临时闲聊、已完成的任务进度、用户能看到的信息\n调用 daily_note 工具保存，自动打 tags 帮助未来检索。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "要记住的内容（用第三人称描述，如'用户喜欢简洁回复'）"
+        },
+        "tags": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "标签（帮助未来检索，如['用户偏好','沟通风格']）"
+        },
+        "importance": {
+          "type": "integer",
+          "description": "重要度 1-5（5最重要），默认3"
+        },
+        "category": {
+          "type": "string",
+          "description": "分类：preference(偏好)/fact(事实)/context(上下文)/decision(决策)，默认context"
+        }
+      },
+      "required": ["content"]
+    }
   }
 }

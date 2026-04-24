@@ -171,7 +171,7 @@ async def _resolve_rag(name: str, query: str, top_k: int = 5, token_budget: int 
     )
 
 
-async def resolve(text: str, query: str, token_budget: int = 800) -> tuple[str, bool, set[str]]:
+async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str, bool, set[str]]:
     """解析并替换文本中的所有知识库占位符
 
     Args:
@@ -187,6 +187,9 @@ async def resolve(text: str, query: str, token_budget: int = 800) -> tuple[str, 
         return text, False, set()
 
     resolved = text
+    if token_budget is None:
+        from lumen.config import KNOWLEDGE_PLACEHOLDER_BUDGET
+        token_budget = KNOWLEDGE_PLACEHOLDER_BUDGET
     remaining_budget = token_budget
     covered_file_ids: set[str] = set()
 

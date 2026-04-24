@@ -202,25 +202,61 @@ def _resolve_service_config(service_name: str) -> dict:
     """解析指定服务的嵌入配置（服务级覆盖 → 全局默认）
 
     Args:
-        service_name: "memory" | "knowledge" | "thinking_clusters"
+        service_name: "memory" | "knowledge" | "thinking_clusters" | "knowledge_sentences"
 
     Returns:
         {"backend_type", "model_name", "api_url", "api_key", "api_model"}
+        backend_type 为空字符串表示该服务不启用
     """
     from lumen.config import (
         EMBEDDING_BACKEND, EMBEDDING_MODEL, EMBEDDING_API_URL,
         EMBEDDING_API_KEY, EMBEDDING_API_MODEL,
     )
 
-    # 服务级覆盖映射
+    # 知识库 chunk 级：必须用户显式配置，空=不启用
+    if service_name == "knowledge":
+        from lumen.config import (
+            KNOWLEDGE_EMBEDDING_BACKEND, KNOWLEDGE_EMBEDDING_API_URL,
+            KNOWLEDGE_EMBEDDING_API_KEY, KNOWLEDGE_EMBEDDING_API_MODEL,
+        )
+        backend_type = KNOWLEDGE_EMBEDDING_BACKEND
+        if not backend_type:
+            return {
+                "backend_type": "",  # 空表示不启用
+                "model_name": "",
+                "api_url": KNOWLEDGE_EMBEDDING_API_URL,
+                "api_key": KNOWLEDGE_EMBEDDING_API_KEY,
+                "api_model": KNOWLEDGE_EMBEDDING_API_MODEL,
+            }
+        api_url = KNOWLEDGE_EMBEDDING_API_URL or EMBEDDING_API_URL
+        api_key = KNOWLEDGE_EMBEDDING_API_KEY or EMBEDDING_API_KEY
+        api_model = KNOWLEDGE_EMBEDDING_API_MODEL or EMBEDDING_API_MODEL
+        return {
+            "backend_type": backend_type,
+            "model_name": EMBEDDING_MODEL,
+            "api_url": api_url,
+            "api_key": api_key,
+            "api_model": api_model,
+        }
+
+    # 句子级：固定本地小模型
+    if service_name == "knowledge_sentences":
+        from lumen.config import (
+            KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND, KNOWLEDGE_SENTENCE_EMBEDDING_MODEL,
+        )
+        return {
+            "backend_type": KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND,
+            "model_name": KNOWLEDGE_SENTENCE_EMBEDDING_MODEL,
+            "api_url": EMBEDDING_API_URL,
+            "api_key": EMBEDDING_API_KEY,
+            "api_model": EMBEDDING_API_MODEL,
+        }
+
+    # 其他服务（memory / thinking_clusters）：服务级覆盖 → 全局默认
     overrides = {
         "memory": {
             "backend_env": "MEMORY_EMBEDDING_BACKEND",
             "api_model_env": "MEMORY_EMBEDDING_API_MODEL",
-        },
-        "knowledge": {
-            "backend_env": "KNOWLEDGE_EMBEDDING_BACKEND",
-            "api_model_env": "KNOWLEDGE_EMBEDDING_API_MODEL",
         },
         "thinking_clusters": {
             "backend_env": "TC_EMBEDDING_BACKEND",
@@ -229,10 +265,7 @@ def _resolve_service_config(service_name: str) -> dict:
     }
 
     override = overrides.get(service_name, {})
-
-    # 服务级后端类型，空则用全局默认
     backend_type = os.getenv(override.get("backend_env", ""), "") or EMBEDDING_BACKEND
-    # 服务级 API 模型，空则用全局默认
     api_model = os.getenv(override.get("api_model_env", ""), "") or EMBEDDING_API_MODEL
 
     return {
@@ -271,6 +304,12 @@ async def get_service(service_name: str) -> Optional[EmbeddingBackend]:
             return _services[service_name]
 
         config = _resolve_service_config(service_name)
+
+        # 空后端类型 = 该服务不启用
+        if not config["backend_type"]:
+            logger.info(f"嵌入服务 '{service_name}' 未配置后端，跳过初始化")
+            return None
+
         backend = _build_backend(
             config["backend_type"],
             config["model_name"],

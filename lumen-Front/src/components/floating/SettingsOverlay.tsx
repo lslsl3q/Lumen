@@ -21,6 +21,8 @@ import ConfigList from '../../pages/ConfigList';
 import ConfigEditor from '../../pages/ConfigEditor';
 import TokenInspector from '../../pages/TokenInspector';
 import KnowledgeList from '../../pages/KnowledgeList';
+import ToolTipsPage from '../../pages/ToolTipsPage';
+import ThinkingClustersPage from '../../pages/ThinkingClustersPage';
 
 // Section 类型
 type SettingsPage =
@@ -30,7 +32,8 @@ type SettingsPage =
   | 'skill-list' | 'skill-editor'
   | 'avatar-manager'
   | 'config-list' | 'config-editor'
-  | 'token-inspector' | 'knowledge-list';
+  | 'token-inspector' | 'knowledge-list'
+  | 'tooltips' | 'thinking-clusters';
 
 interface SettingsSection {
   page: SettingsPage;
@@ -60,6 +63,8 @@ const NAV_GROUPS: NavGroup[] = [
       { page: 'config-list', label: '配置' },
       { page: 'token-inspector', label: 'Token Inspector' },
       { page: 'knowledge-list', label: '知识库' },
+      { page: 'tooltips', label: '工具提示词' },
+      { page: 'thinking-clusters', label: '思维簇' },
     ],
   },
 ];
@@ -133,6 +138,10 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
         return <TokenInspector {...contentNav} />;
       case 'knowledge-list':
         return <KnowledgeList {...contentNav} />;
+      case 'tooltips':
+        return <ToolTipsPage {...contentNav} />;
+      case 'thinking-clusters':
+        return <ThinkingClustersPage {...contentNav} />;
     }
   };
 

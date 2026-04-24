@@ -84,7 +84,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -99,6 +99,8 @@ app.include_router(worldbook.router, prefix="/worldbooks", tags=["世界书"])
 app.include_router(avatar.router, prefix="/avatars", tags=["头像管理"])
 app.include_router(skills.router, prefix="/skills", tags=["Skills"])
 app.include_router(knowledge.router, prefix="/knowledge", tags=["知识库"])
+app.include_router(memories.router, prefix="/memories", tags=["日记"])
+app.include_router(thinking_clusters.router, prefix="/thinking-clusters", tags=["思维簇"])
 
 # 挂载头像静态文件目录
 avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"

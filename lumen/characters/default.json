@@ -8,11 +8,22 @@
     "web_search",
     "web_fetch",
     "file_read",
-    "file_write"
+    "file_write",
+    "daily_note"
   ],
   "model": "deepseek-chat",
   "avatar": "default.png",
   "tool_tips": {},
+  "context_size": 200000,
   "auto_compact": true,
-  "compact_threshold": 0.7
+  "compact_threshold": 0.85,
+  "memory_enabled": true,
+  "memory_token_budget": 300,
+  "memory_auto_summarize": false,
+  "knowledge_enabled": true,
+  "knowledge_semantic_routing": true,
+  "knowledge_top_k": 3,
+  "knowledge_min_score": 0.3,
+  "knowledge_token_budget": 500,
+  "skills": []
 }

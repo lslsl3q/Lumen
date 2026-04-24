@@ -4,6 +4,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useWorldBook } from '../hooks/useWorldBook';
 import { SettingsPageProps } from '../types/settings';
+import { toast } from '../utils/toast';
 
 interface WorldBookListProps extends SettingsPageProps {}
 
@@ -18,7 +19,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
     try {
       await remove(id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败');
+      toast(err instanceof Error ? err.message : '删除失败', 'error');
     }
   };
 
@@ -47,7 +48,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
       // 使用后端返回的 ID 导航
       goTo('worldbook-editor', { id: result.id });
     } catch (err) {
-      alert(err instanceof Error ? err.message : '创建失败');
+      toast(err instanceof Error ? err.message : '创建失败', 'error');
     }
   };
 
