@@ -35,6 +35,8 @@ class CharacterCard(BaseModel):
     knowledge_token_budget: int = 500        # 知识注入 token 上限
     # Skills
     skills: List[str] = []                   # 绑定的 Skill ID 列表
+    # 回复风格
+    response_style: Optional[str] = "balanced"  # brief / balanced / detailed
 
 
 class DynamicContext(TypedDict):

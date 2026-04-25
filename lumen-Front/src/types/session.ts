@@ -15,6 +15,7 @@ export interface SessionListItem {
 
 /** 历史消息 — GET /chat/history 返回 */
 export interface HistoryMessage {
+  id?: number;
   role: 'user' | 'assistant';
   content: string;
 }

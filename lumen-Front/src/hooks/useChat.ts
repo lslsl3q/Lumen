@@ -5,105 +5,18 @@
  * 遵循单向依赖：hook → api/chat.ts + api/session.ts，不直接操作 DOM 或 SSE
  */
 import { useState, useCallback, useRef } from 'react';
-import { sendMessageStream, getHistory, cancelChat, StreamEvent } from '../api/chat';
+import { sendMessageStream, getHistory, cancelChat, editMessage as editMessageAPI, deleteMessage as deleteMessageAPI, StreamEvent } from '../api/chat';
 import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
 
-/** 判断消息是否应从历史显示中过滤（纯工具调用/结果） */
+/** 判断消息是否应从历史显示中过滤（仅过滤工具结果，不过滤工具调用） */
 function isToolMessage(msg: HistoryMessage): boolean {
   const content = msg.content.trim();
   if (!content) return false;
-  // AI 可能在 JSON 前加文字（如"让我读取文件..."），用 includes 而非 startsWith
-  if (content.includes('"type": "tool_call') || content.includes('"type":"tool_call')) return true;
-  if (content.includes('"type": "tool_call_parallel') || content.includes('"type":"tool_call_parallel')) return true;
-  if (content.includes('<tool_result')) return true;
+  // 只过滤工具结果消息（user 角色保存的工具执行结果）
+  if (content.startsWith('<tool_result')) return true;
   if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
   return false;
-}
-
-/** 从消息内容中提取工具调用信息（加载历史时用） */
-function extractToolCalls(content: string): ToolCall[] {
-  const calls: ToolCall[] = [];
-  // 旧格式：{"type": "tool_call", "tool": "xxx", ...}
-  const singleRegex = /"type"\s*:\s*"tool_call"\s*,.*?"tool"\s*:\s*"([^"]+)"/g;
-  let m;
-  while ((m = singleRegex.exec(content)) !== null) {
-    calls.push({ callId: _nextCallId++, name: m[1], status: 'done' });
-  }
-  // 旧格式并行：{"type": "tool_call_parallel", "calls": [{"tool": "xxx", ...}, ...]}
-  const parallelRegex = /"type"\s*:\s*"tool_call_parallel"\s*,.*?"calls"\s*:\s*\[([\s\S]*?)\]/g;
-  while ((m = parallelRegex.exec(content)) !== null) {
-    const inner = /"tool"\s*:\s*"([^"]+)"/g;
-    let im;
-    while ((im = inner.exec(m[1])) !== null) {
-      calls.push({ callId: _nextCallId++, name: im[1], status: 'done' });
-    }
-  }
-  // T10 新格式：{"calls": [{"tool": "xxx", "params": {...}}, ...]}
-  // 用花括号深度计数找 JSON 边界，然后解析拿到完整 params
-  const callsIdx = content.indexOf('{"calls"');
-  if (callsIdx !== -1) {
-    const sub = content.substring(callsIdx);
-    let depth = 0, inStr = false, esc = false, jsonEnd = -1;
-    for (let i = 0; i < sub.length; i++) {
-      const ch = sub[i];
-      if (esc) { esc = false; continue; }
-      if (ch === '\\') { esc = true; continue; }
-      if (ch === '"') { inStr = !inStr; continue; }
-      if (inStr) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}') { depth--; if (depth === 0) { jsonEnd = i + 1; break; } }
-    }
-    if (jsonEnd !== -1) {
-      try {
-        const parsed = JSON.parse(sub.substring(0, jsonEnd));
-        if (Array.isArray(parsed.calls)) {
-          for (const c of parsed.calls) {
-            if (c.tool) {
-              calls.push({
-                callId: _nextCallId++,
-                name: c.tool,
-                status: 'done',
-                params: c.params || {},
-              });
-            }
-          }
-        }
-      } catch { /* JSON 解析失败忽略 */ }
-    }
-  }
-  return calls;
-}
-
-/** 剥离消息内容中嵌入的工具调用 JSON，保留前后的文字部分 */
-function stripToolJson(content: string): string {
-  let cleaned = content;
-  // 反复剥离 tool_call 和 tool_result JSON 块
-  for (const marker of ['{"type": "tool_call', '{"type":"tool_call', '{"type": "tool_call_parallel', '{"type":"tool_call_parallel', '{"calls":', '{"calls" :', '{"success":', '{"error_code":']) {
-    while (true) {
-      const idx = cleaned.indexOf(marker);
-      if (idx === -1) break;
-      // 找到匹配的闭合花括号
-      let depth = 0;
-      let inStr = false;
-      let esc = false;
-      let end = -1;
-      for (let i = idx; i < cleaned.length; i++) {
-        const ch = cleaned[i];
-        if (esc) { esc = false; continue; }
-        if (ch === '\\') { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (inStr) continue;
-        if (ch === '{') depth++;
-        else if (ch === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
-      }
-      if (end === -1) break;
-      cleaned = cleaned.slice(0, idx) + cleaned.slice(end);
-    }
-  }
-  // 剥离 XML 格式的工具结果
-  cleaned = cleaned.replace(/<tool_result[\s\S]*?<\/tool_result>/g, '');
-  return cleaned.trim();
 }
 
 /** 工具调用追踪 */
@@ -159,6 +72,7 @@ export interface ReactTraceStep {
 /** 消息 */
 export interface Message {
   id: string;
+  dbId?: number;
   role: 'user' | 'assistant' | 'system';
   content: string;
   toolCalls?: ToolCall[];
@@ -185,6 +99,7 @@ export function useChat() {
   const [memoryDebugMode, setMemoryDebugMode] = useState(false);
   const [memoryDebugInfo, setMemoryDebugInfo] = useState<MemoryDebugData | null>(null);
   const [reactTrace, setReactTrace] = useState<ReactTraceStep[]>([]);
+  const [responseStyle, setResponseStyle] = useState<string>('balanced');
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /** 加载指定会话的历史消息 */
@@ -193,16 +108,13 @@ export function useChat() {
       const data = await getHistory(sessionId);
       const historyMessages: Message[] = data.messages
         .filter((msg: HistoryMessage) => !isToolMessage(msg))
-        .map((msg: HistoryMessage, i: number) => {
-          const toolCalls = extractToolCalls(msg.content);
-          return {
-            id: `hist_${sessionId}_${i}`,
-            role: msg.role,
-            content: stripToolJson(msg.content),
-            ...(toolCalls.length > 0 ? { toolCalls } : {}),
-          };
-        })
-        .filter((msg: Message) => msg.content.length > 0 || (msg.toolCalls && msg.toolCalls.length > 0));
+        .map((msg: HistoryMessage, i: number) => ({
+          id: `hist_${sessionId}_${i}`,
+          dbId: msg.id,
+          role: msg.role,
+          content: msg.content,
+        }))
+        .filter((msg: Message) => msg.content.trim().length > 0);
       setMessages(historyMessages.length > 0 ? historyMessages : []);
       setCurrentSessionId(sessionId);
       
@@ -373,6 +285,8 @@ export function useChat() {
         abortControllerRef.current.signal,
         // memoryDebugMode
         memoryDebugMode,
+        // responseStyle
+        responseStyle,
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -446,6 +360,32 @@ export function useChat() {
     setIsLoading(false);
   }, [currentSessionId]);
 
+  /** 编辑消息 */
+  const editMessage = useCallback(async (messageId: string, newContent: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.dbId || !currentSessionId) return;
+    try {
+      await editMessageAPI(currentSessionId, msg.dbId, newContent);
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, content: newContent } : m
+      ));
+    } catch (err) {
+      console.error('编辑消息失败:', err);
+    }
+  }, [messages, currentSessionId]);
+
+  /** 删除消息 */
+  const deleteMessage = useCallback(async (messageId: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.dbId || !currentSessionId) return;
+    try {
+      await deleteMessageAPI(currentSessionId, msg.dbId);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (err) {
+      console.error('删除消息失败:', err);
+    }
+  }, [messages, currentSessionId]);
+
   return {
     messages,
     isLoading,
@@ -464,5 +404,9 @@ export function useChat() {
     memoryDebugInfo,
     reactTrace,
     toggleMemoryDebug,
+    editMessage,
+    deleteMessage,
+    responseStyle,
+    setResponseStyle,
   };
 }

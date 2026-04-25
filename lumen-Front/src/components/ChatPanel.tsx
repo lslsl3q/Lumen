@@ -4,7 +4,8 @@
  * 职责：消息列表 + 输入框，所有状态来自 props
  * 从原 ChatInterface.tsx 提取而来
  */
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Message, ToolCall } from '../hooks/useChat';
 import MarkdownContent from './MarkdownContent';
 import CommandPalette from './CommandPalette';
@@ -13,6 +14,7 @@ import { executeCommand, getAllCommands, parseCommand } from '../commands/regist
 import '../commands/builtin'; // 副作用：注册内置命令
 import { CommandResult } from '../commands/registry';
 import { getAvatarUrl } from '../api/character';
+import { toast } from '../utils/toast';
 
 /** AI 头像组件 */
 function Avatar({ src, name, className = '' }: { src?: string | null; name?: string; className?: string }) {
@@ -95,8 +97,139 @@ function ThinkingBubble({ content, done }: { content: string; done: boolean }) {
   );
 }
 
-/** 工具调用独立气泡 — 极简线条风格 + 渐进式信息 */
-function ToolCallBlock({ call }: { call: ToolCall }) {
+// ========================================
+// VCP 内联工具气泡渲染
+// 将消息内容中的工具调用 JSON 解析为内联气泡
+// ========================================
+
+/** 工具调用 JSON 标记 — 单一真相源，所有格式都在这 */
+const TOOL_JSON_MARKERS = [
+  '{"type": "tool_call',
+  '{"type":"tool_call',
+  '{"type": "tool_call_parallel',
+  '{"type":"tool_call_parallel',
+  '{"calls":',
+  '{"calls" :',
+  '{"tool":',
+  '{"tool" :',
+];
+
+/** 内容段：文本 或 工具调用 */
+interface ContentSegment {
+  type: 'text' | 'tool_call';
+  text?: string;
+  toolName?: string;
+  toolParams?: Record<string, unknown>;
+}
+
+/** 找到 JSON 块的结束花括号位置（花括号深度计数） */
+function findJsonEnd(content: string, start: number): number {
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < content.length; i++) {
+    const ch = content[i];
+    if (esc) { esc = false; continue; }
+    if (ch === '\\') { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') { depth--; if (depth === 0) return i + 1; }
+  }
+  return -1;
+}
+
+/** 从解析后的 JSON 提取工具调用（兼容所有格式） */
+function extractCallsFromParsed(parsed: Record<string, unknown>): { name: string; params: Record<string, unknown> }[] {
+  if (parsed.type === 'tool_call' && parsed.tool) {
+    return [{ name: parsed.tool as string, params: (parsed.params as Record<string, unknown>) || {} }];
+  }
+  if ((parsed.type === 'tool_call_parallel' || parsed.type === 'tool_call') && Array.isArray(parsed.calls)) {
+    return (parsed.calls as Record<string, unknown>[]).filter(c => c.tool).map(c => ({ name: c.tool as string, params: (c.params as Record<string, unknown>) || {} }));
+  }
+  if (Array.isArray(parsed.calls)) {
+    return (parsed.calls as Record<string, unknown>[]).filter(c => c.tool).map(c => ({ name: c.tool as string, params: (c.params as Record<string, unknown>) || {} }));
+  }
+  if (parsed.tool) {
+    return [{ name: parsed.tool as string, params: (parsed.params as Record<string, unknown>) || {} }];
+  }
+  return [];
+}
+
+/** 将消息内容分割为 文本段 + 工具调用段，保持原始顺序 */
+function splitContentSegments(content: string): ContentSegment[] {
+  const segments: ContentSegment[] = [];
+  let pos = 0;
+
+  while (pos < content.length) {
+    let earliestIdx = -1;
+    for (const marker of TOOL_JSON_MARKERS) {
+      const idx = content.indexOf(marker, pos);
+      if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
+        earliestIdx = idx;
+      }
+    }
+
+    if (earliestIdx === -1) {
+      const text = content.slice(pos).trim();
+      if (text) segments.push({ type: 'text', text });
+      break;
+    }
+
+    if (earliestIdx > pos) {
+      const text = content.slice(pos, earliestIdx).trim();
+      if (text) segments.push({ type: 'text', text });
+    }
+
+    const jsonEnd = findJsonEnd(content, earliestIdx);
+    if (jsonEnd === -1) {
+      const text = content.slice(earliestIdx).trim();
+      if (text) segments.push({ type: 'text', text });
+      break;
+    }
+
+    try {
+      const parsed = JSON.parse(content.slice(earliestIdx, jsonEnd));
+      const calls = extractCallsFromParsed(parsed as Record<string, unknown>);
+      if (calls.length > 0) {
+        for (const call of calls) {
+          segments.push({ type: 'tool_call', toolName: call.name, toolParams: call.params });
+        }
+      } else {
+        segments.push({ type: 'text', text: content.slice(earliestIdx, jsonEnd) });
+      }
+    } catch {
+      segments.push({ type: 'text', text: content.slice(earliestIdx, jsonEnd) });
+    }
+
+    pos = jsonEnd;
+  }
+
+  return segments.length > 0 ? segments : [{ type: 'text', text: content }];
+}
+
+/** 内联消息内容 — 将文本和工具调用按顺序渲染在同一个气泡内 */
+function InlineMessageContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  const segments = useMemo(() => splitContentSegments(content), [content]);
+
+  return (
+    <>
+      {segments.map((seg, i) => {
+        if (seg.type === 'text') {
+          return <MarkdownContent key={i} content={seg.text!} isStreaming={isStreaming} />;
+        }
+        return (
+          <ToolCallBlock
+            key={`tool_${i}`}
+            call={{ callId: i, name: seg.toolName!, status: 'done' as const, params: seg.toolParams || {} }}
+            inline
+          />
+        );
+      })}
+    </>
+  );
+}
+
+/** 工具调用气泡 — 极简线条风格 + 渐进式信息 */
+function ToolCallBlock({ call, inline }: { call: ToolCall; inline?: boolean }) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const isRunning = call.status === 'running';
   const isDone = call.status === 'done';
@@ -117,7 +250,7 @@ function ToolCallBlock({ call }: { call: ToolCall }) {
   const resultText = isDone ? formatResultData(call.data) : '';
 
   return (
-    <div className="flex justify-start pl-10 mb-2">
+    <div className={inline ? 'my-1' : 'flex justify-start pl-10 mb-2'}>
       <div
         className={`
           w-full max-w-[600px] rounded border ${borderColor} ${bgColor}
@@ -262,13 +395,20 @@ function ThinkingIndicator({ characterName, characterAvatar }: {
 }
 
 /** 单条消息气泡（不含工具调用） */
-function MessageBubble({ message, characterName, characterAvatar }: {
+function MessageBubble({ message, characterName, characterAvatar, editingId, editContent, onContextMenu, onSaveEdit, onCancelEdit, onEditChange }: {
   message: Message;
   characterName?: string;
   characterAvatar?: string | null;
+  editingId: string | null;
+  editContent: string;
+  onContextMenu: (messageId: string, e: React.MouseEvent) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
+  onEditChange: (content: string) => void;
 }) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  const isEditing = editingId === message.id;
 
   if (isSystem) {
     return (
@@ -280,18 +420,60 @@ function MessageBubble({ message, characterName, characterAvatar }: {
     );
   }
 
-  // 没有文字内容时：助手消息有工具调用 → 只显示头像（保持头像不消失）
+  // 没有文字内容时：助手消息有工具调用 → 显示头像 + 工具气泡
   // 用户消息/系统消息无内容 → 跳过
   if (!message.content) {
     if (!isUser && message.toolCalls && message.toolCalls.length > 0) {
-      return <Avatar src={characterAvatar} name={characterName} />;
+      return (
+        <div className="flex justify-start items-start gap-2"
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
+          <Avatar src={characterAvatar} name={characterName} />
+          <div className="max-w-[75%]">
+            {message.toolCalls.map(call => <ToolCallBlock key={call.callId} call={call} inline />)}
+          </div>
+        </div>
+      );
     }
     return null;
   }
 
+  // 编辑模式
+  if (isEditing) {
+    return (
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start gap-2`}>
+        {!isUser && <Avatar src={characterAvatar} name={characterName} />}
+        <div className="max-w-[75%] flex flex-col gap-2">
+          <textarea
+            value={editContent}
+            onChange={e => onEditChange(e.target.value)}
+            className="w-full rounded-lg px-4 py-3 bg-slate-800/60 border border-amber-500/30
+              text-slate-200 text-sm leading-relaxed resize-none outline-none
+              focus:border-amber-500/50"
+            rows={Math.max(2, Math.min(editContent.split('\n').length, 10))}
+            autoFocus
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={onCancelEdit}
+              className="px-3 py-1 rounded-lg text-xs cursor-pointer
+                text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors"
+            >取消</button>
+            <button
+              onClick={onSaveEdit}
+              className="px-3 py-1 rounded-lg text-xs cursor-pointer
+                bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors"
+            >保存</button>
+          </div>
+        </div>
+        {isUser && <div className="w-8 h-8 flex-shrink-0" />}
+      </div>
+    );
+  }
+
   if (isUser) {
     return (
-      <div className="flex justify-end items-start gap-2">
+      <div className="flex justify-end items-start gap-2"
+        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
         <div className="max-w-[75%] rounded-lg px-4 py-3 bg-amber-500/10 border border-amber-500/20 text-amber-50">
           <div className="whitespace-pre-wrap leading-relaxed">
             {message.content}
@@ -307,11 +489,13 @@ function MessageBubble({ message, characterName, characterAvatar }: {
   }
 
   return (
-    <div className="flex justify-start items-start gap-2">
+    <div className="flex justify-start items-start gap-2"
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
       <Avatar src={characterAvatar} name={characterName} />
       <div className="max-w-[75%] rounded-lg px-4 py-3 bg-slate-800/40 border border-amber-500/10 text-slate-200">
-        <MarkdownContent
-          content={message.content || (!message.isStreaming ? '(无文本回复)' : '')}
+        {/* 统一使用 VCP 内联解析：流式和历史共用同一个渲染路径 */}
+        <InlineMessageContent
+          content={message.content || ''}
           isStreaming={message.isStreaming}
         />
       </div>
@@ -335,7 +519,18 @@ interface ChatPanelProps {
   characterName?: string;
   characterAvatar?: string | null;
   currentModel?: string;
+  onEditMessage?: (messageId: string, newContent: string) => void;
+  onDeleteMessage?: (messageId: string) => void;
+  responseStyle?: string;
+  onResponseStyleChange?: (style: string) => void;
 }
+
+/** 回复风格配置 */
+const RESPONSE_STYLES = [
+  { key: 'brief', label: '简短', icon: '–' },
+  { key: 'balanced', label: '默认', icon: '≈' },
+  { key: 'detailed', label: '详细', icon: '≡' },
+] as const;
 
 function ChatPanel({
   messages,
@@ -353,9 +548,19 @@ function ChatPanel({
   characterName,
   characterAvatar,
   currentModel,
+  onEditMessage,
+  onDeleteMessage,
+  responseStyle = 'balanced',
+  onResponseStyleChange,
 }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 右键菜单状态
+  const [contextMenu, setContextMenu] = useState<{ messageId: string | null; x: number; y: number } | null>(null);
+  // 编辑模式状态
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
 
   // 自动滚动到最新消息
   useEffect(() => {
@@ -372,6 +577,56 @@ function ChatPanel({
   const [showPalette, setShowPalette] = useState(false);
   const [paletteIndex, setPaletteIndex] = useState(0);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+
+  // 点击外部关闭右键菜单
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [contextMenu]);
+
+  // 右键菜单操作
+  const handleContextMenu = (messageId: string, e: React.MouseEvent) => {
+    setContextMenu({ messageId, x: e.clientX, y: e.clientY });
+  };
+
+  const handleStartEdit = (messageId?: string, content?: string) => {
+    const mid = messageId || contextMenu?.messageId;
+    if (!mid) return;
+    const msg = messages.find(m => m.id === mid);
+    setEditingMessageId(mid);
+    setEditContent(content ?? msg?.content ?? '');
+    setContextMenu(null);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingMessageId && onEditMessage) {
+      onEditMessage(editingMessageId, editContent.trim());
+    }
+    setEditingMessageId(null);
+    setEditContent('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditContent('');
+  };
+
+  const handleDeleteMessage = () => {
+    if (contextMenu?.messageId && onDeleteMessage) {
+      onDeleteMessage(contextMenu.messageId);
+    }
+    setContextMenu(null);
+  };
+
+  // 回复风格切换
+  const cycleResponseStyle = () => {
+    const idx = RESPONSE_STYLES.findIndex(s => s.key === responseStyle);
+    const next = RESPONSE_STYLES[(idx + 1) % RESPONSE_STYLES.length];
+    onResponseStyleChange?.(next.key);
+    toast(`回复风格：${next.label}`, 'info');
+  };
 
   // 是否正在思考（isLoading + 最后一条是空的 assistant）
   const lastMsg = messages[messages.length - 1];
@@ -490,13 +745,14 @@ function ChatPanel({
           <>
             {messages.map((message) => (
               <React.Fragment key={message.id}>
-                <MessageBubble message={message} characterName={characterName} characterAvatar={characterAvatar} />
+                <MessageBubble message={message} characterName={characterName} characterAvatar={characterAvatar}
+                  editingId={editingMessageId} editContent={editContent}
+                  onContextMenu={handleContextMenu}
+                  onSaveEdit={handleSaveEdit} onCancelEdit={handleCancelEdit}
+                  onEditChange={setEditContent} />
                 {message.thinkingContent && (
                   <ThinkingBubble content={message.thinkingContent} done={!!message.thinkingDone} />
                 )}
-                {message.toolCalls?.map((call) => (
-                  <ToolCallBlock key={call.callId} call={call} />
-                ))}
               </React.Fragment>
             ))}
             {/* 呼吸像素思考动画 */}
@@ -625,6 +881,17 @@ function ChatPanel({
                 >
                   <span className="text-sm font-mono font-bold">/</span>
                 </button>
+                {/* 回复风格切换 */}
+                <button
+                  type="button"
+                  onClick={cycleResponseStyle}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center
+                    text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
+                    active:bg-slate-800/40 transition-all duration-150"
+                  title={`回复风格: ${RESPONSE_STYLES.find(s => s.key === responseStyle)?.label || '默认'}`}
+                >
+                  <span className="text-xs font-mono">{RESPONSE_STYLES.find(s => s.key === responseStyle)?.icon || '≈'}</span>
+                </button>
                 <div className="flex-1" />
                 {/* 模型指示 */}
                 {currentModel && (
@@ -681,6 +948,32 @@ function ChatPanel({
           </>
         )}
       </div>
+
+      {/* 右键菜单 */}
+      {contextMenu && createPortal(
+        <div
+          className="fixed z-[200] bg-[#1f1f1c] border border-[#2a2926] rounded-lg shadow-xl
+            py-1 min-w-[140px] overflow-hidden"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <button
+            onClick={() => { handleStartEdit(); setContextMenu(null); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-400
+              hover:text-slate-200 hover:bg-slate-700/40 cursor-pointer transition-colors"
+          >
+            编辑消息
+          </button>
+          <button
+            onClick={handleDeleteMessage}
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-400
+              hover:text-red-400 hover:bg-red-400/08 cursor-pointer transition-colors"
+          >
+            删除此条消息
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

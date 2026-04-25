@@ -234,6 +234,10 @@ function ChatInterface() {
         characterName={characters.currentCharacter?.display_name || characters.currentCharacter?.name}
         characterAvatar={characters.currentCharacter?.avatar}
         currentModel=""
+        onEditMessage={chat.editMessage}
+        onDeleteMessage={chat.deleteMessage}
+        responseStyle={chat.responseStyle}
+        onResponseStyleChange={chat.setResponseStyle}
       />
       <RightRail
         onToggleDebug={handleToggleDebug}

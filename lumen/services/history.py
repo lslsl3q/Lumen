@@ -501,6 +501,45 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
         return msg_id
 
 
+def update_message(msg_id: int, content: str) -> bool:
+    """更新消息内容并重建 FTS5 索引"""
+    with _write_lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "UPDATE messages SET content = ? WHERE id = ?",
+            (content, msg_id),
+        )
+        if cursor.rowcount == 0:
+            return False
+        # 重建 FTS5 索引
+        try:
+            conn.execute("DELETE FROM messages_fts WHERE rowid = ?", (msg_id,))
+            if content and len(content) >= 5:
+                import jieba
+                tokens = " ".join(jieba.cut(content))
+                conn.execute(
+                    "INSERT INTO messages_fts(rowid, content) VALUES(?, ?)",
+                    (msg_id, tokens),
+                )
+        except Exception:
+            pass
+        conn.commit()
+        return True
+
+
+def delete_message(msg_id: int) -> bool:
+    """删除消息及其 FTS5 索引"""
+    with _write_lock:
+        conn = _get_conn()
+        try:
+            conn.execute("DELETE FROM messages_fts WHERE rowid = ?", (msg_id,))
+        except Exception:
+            pass
+        cursor = conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+
 def load_session(session_id: str) -> list[Message]:
     """加载某个会话的所有消息，返回 messages 列表
 
@@ -512,13 +551,13 @@ def load_session(session_id: str) -> list[Message]:
     """
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT role, content, metadata FROM messages WHERE session_id = ? ORDER BY id",
+        "SELECT id, role, content, metadata FROM messages WHERE session_id = ? ORDER BY id",
         (session_id,),
     ).fetchall()
 
     messages = []
     for row in rows:
-        msg = {"role": row["role"], "content": row["content"]}
+        msg = {"id": row["id"], "role": row["role"], "content": row["content"]}
         # 解析 metadata（如果有）
         if row["metadata"]:
             try:

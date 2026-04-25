@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-24（日记/记忆管理 + 全局 toast 通知 + 窗口置顶 + 输入框优化）
+**最后更新**：2026-04-25（VCP 内联工具气泡 + 消息 CRUD + 回复风格 + 标题优化）
 
 ---
 
@@ -14,7 +14,7 @@ Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、日志系统 setup_logging）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
-│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、软静默工具检测、Think标签事件流、知识库注入+占位符解析）— 对标 CC query.ts
+│   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、Think标签事件流、知识库注入+占位符解析、回复风格注入）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
@@ -86,7 +86,7 @@ Lumen/
 ├── api/                          # FastAPI HTTP接口
 │   ├── main.py                   # 应用入口、CORS、路由注册
 │   └── routes/
-│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel + memory_debug + Think事件）
+│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel/message-edit-delete + memory_debug + Think事件 + response_style）
 │       ├── session.py            # 会话（new/load/list/delete/reset）
 │       ├── character.py          # 角色（list/get/switch/create/update/delete/upload-avatar）
 │       ├── persona.py            # Persona（list/get/active/create/update/delete/switch）
@@ -106,7 +106,7 @@ Lumen/
 │       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills, knowledge）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
 │       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useKnowledge）— localStorage 持久化（角色/会话恢复）
-│       ├── components/           # UI 组件（ChatInterface, Sidebar, Panel, MarkdownContent, CommandPalette, CharacterSelector, PersonaPanel, WorldBookPanel, AuthorNotePanel, PromptDebugPanel, DebugDrawer, EnvForm, WorkspacesEditor, PushNotification, ModelSelect）
+│       ├── components/           # UI 组件（ChatInterface, ChatPanel[VCP内联工具气泡], NavRail, RightRail, MarkdownContent, CommandPalette, MemoryWindow, FloatingLayerHost...）
 │       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector, KnowledgeList）
 │       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push, skills, knowledge）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css）
@@ -148,8 +148,10 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
 | 方法 | 路径 | 用途 |
 |------|------|------|
 | `POST` | `/chat/send` | 发消息（非流式） |
-| `POST` | `/chat/stream` | 发消息（SSE流式） |
-| `GET` | `/chat/history` | 聊天历史 |
+| `POST` | `/chat/stream` | 发消息（SSE流式，含 response_style） |
+| `GET` | `/chat/history` | 聊天历史（含消息 id） |
+| `PATCH` | `/chat/message` | 编辑消息 |
+| `DELETE` | `/chat/message` | 删除消息 |
 | `POST` | `/chat/compact` | 手动触发上下文压缩 |
 | `GET` | `/chat/token-usage` | 查看 token 使用情况 |
 | `POST` | `/sessions/new` | 创建会话 |

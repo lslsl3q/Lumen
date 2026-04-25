@@ -42,6 +42,16 @@ def _build_parts(character: dict, dynamic_context: list[DynamicContext] = None) 
         except Exception:
             pass
 
+    # 第 2.7 层：回复风格
+    style = character.get("response_style", "balanced")
+    STYLE_MAP = {
+        "brief": "回复要求：用最简洁的方式回答，直奔主题，不展开解释。除非用户明确要求详细说明。",
+        "balanced": "回复要求：回答适度详细，解释清楚但不过度展开。对复杂问题逐步分析，对简单问题直接回答。",
+        "detailed": "回复要求：尽可能详细地回答，包含完整的分析过程、多种视角的讨论、具体示例和注意事项。主动补充用户可能需要的关联信息。",
+    }
+    if style in STYLE_MAP:
+        layers.append(("回复风格", STYLE_MAP[style]))
+
     # 第三层：工具说明
     tools = character.get("tools", [])
     if tools:

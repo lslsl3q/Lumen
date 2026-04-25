@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom';
 import MarkdownContent from './MarkdownContent';
 import * as api from '../api/memories';
 import type { MemoryFolder, MemoryItem } from '../api/memories';
+import { toast } from '../utils/toast';
 
 /* ── 常量 ── */
 
@@ -42,10 +43,23 @@ function FolderTree({
   onDeleteFolder: (name: string) => void;
   onOpenInExplorer: (name: string) => void;
 }) {
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(folders.map(f => [f.path, true])),
-  );
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [ctxMenu, setCtxMenu] = useState<{ name: string; x: number; y: number } | null>(null);
+
+  // 当 folders 变化时，新文件夹默认展开
+  useEffect(() => {
+    setExpanded(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const f of folders) {
+        if (!(f.path in next)) {
+          next[f.path] = true;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [folders]);
 
   // 点击外部关闭右键菜单
   useEffect(() => {
@@ -221,6 +235,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       setFolders(data.folders);
     } catch (err) {
       console.error('加载文件列表失败:', err);
+      toast('加载文件列表失败', 'error');
     }
   }, []);
 
@@ -239,6 +254,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       setSavedContent(data.content);
     } catch (err) {
       console.error('读取文件失败:', err);
+      toast('读取文件失败，请检查后端是否运行', 'error');
     }
   }, []);
 
@@ -248,8 +264,10 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     try {
       await api.saveMemoryFile(selectedPath, editContent);
       setSavedContent(editContent);
+      toast('保存成功', 'success');
     } catch (err) {
       console.error('保存失败:', err);
+      toast('保存失败', 'error');
     }
   }, [selectedPath, editContent]);
 

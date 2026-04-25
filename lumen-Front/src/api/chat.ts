@@ -93,6 +93,7 @@ export async function sendMessageStream(
   sessionId?: string,
   signal?: AbortSignal,
   memoryDebugMode?: boolean,
+  responseStyle?: string,
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
@@ -100,7 +101,7 @@ export async function sendMessageStream(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false }),
+      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false, response_style: responseStyle || 'balanced' }),
       signal,
     });
 
@@ -207,4 +208,34 @@ export async function cancelChat(sessionId: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId }),
   });
+}
+
+/**
+ * 编辑消息内容
+ */
+export async function editMessage(
+  sessionId: string, messageId: number, content: string
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, message_id: messageId, content }),
+  });
+  if (!res.ok) throw new Error(`编辑消息失败: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * 删除消息
+ */
+export async function deleteMessage(
+  sessionId: string, messageId: number
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, message_id: messageId }),
+  });
+  if (!res.ok) throw new Error(`删除消息失败: ${res.status}`);
+  return res.json();
 }
