@@ -8,9 +8,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listPersonas, deletePersona as apiDeletePersona } from '../api/persona';
 import { PersonaListItem } from '../types/persona';
+import { SettingsPageProps } from '../types/settings';
 
-function PersonaList() {
+interface PersonaListProps extends SettingsPageProps {}
+
+function PersonaList({ onBack, onNavigate }: PersonaListProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/'));
+  const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const [personas, setPersonas] = useState<PersonaListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,13 +80,13 @@ function PersonaList() {
   };
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       <div className="max-w-5xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => goBack()}
               className="
                 px-3 py-1.5 rounded-lg text-sm text-slate-400
                 hover:text-slate-200 hover:bg-slate-800/60
@@ -125,7 +130,7 @@ function PersonaList() {
                   w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                   border border-slate-700/60 text-slate-200
                   placeholder:text-slate-600
-                  focus:border-indigo-500/40 focus:outline-none
+                  focus:border-indigo-500/40 focus:outline-hidden
                   transition-all duration-150
                 "
               />
@@ -166,7 +171,7 @@ function PersonaList() {
             {personas.map(p => (
               <div
                 key={p.id}
-                onClick={() => navigate(`/settings/personas/${p.id}`)}
+                onClick={() => goTo('persona-editor', { id: p.id })}
                 className="
                   group relative p-5 rounded-xl cursor-pointer
                   bg-slate-900/60 border border-slate-800/40

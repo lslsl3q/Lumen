@@ -1,33 +1,30 @@
 /**
  * 斜杠命令补全浮窗
  * 输入 / 时显示在输入框上方
+ * 键盘导航由父组件 ChatPanel 通过 props 驱动
  */
-import { useState, useEffect } from 'react';
 import { getAllCommands, parseCommand } from '../commands/registry';
 import type { SlashCommand } from '../commands/registry';
 
 interface CommandPaletteProps {
   input: string;
-  onSelect: (command: string) => void;
   visible: boolean;
+  selectedIndex: number;
+  onSelect: (command: SlashCommand) => void;
+  onHover: (index: number) => void;
 }
 
-function CommandPalette({ input, onSelect, visible }: CommandPaletteProps) {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+function CommandPalette({ input, visible, selectedIndex, onSelect, onHover }: CommandPaletteProps) {
   const commands = getAllCommands();
 
-  // 根据输入过滤命令
   const parsed = parseCommand(input);
   const filtered = parsed
     ? commands.filter((c) => c.name.startsWith(parsed!.name))
     : commands;
 
-  // 输入变化时重置选中
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [input]);
-
   if (!visible || filtered.length === 0) return null;
+
+  const safeIndex = Math.min(selectedIndex, filtered.length - 1);
 
   return (
     <div
@@ -41,12 +38,12 @@ function CommandPalette({ input, onSelect, visible }: CommandPaletteProps) {
       {filtered.map((cmd: SlashCommand, idx: number) => (
         <button
           key={cmd.name}
-          onClick={() => onSelect(cmd.name)}
-          onMouseEnter={() => setSelectedIndex(idx)}
+          onClick={() => onSelect(cmd)}
+          onMouseEnter={() => onHover(idx)}
           className={`
             w-full px-3 py-2 flex items-center gap-2 text-left text-sm
             transition-all duration-75
-            ${idx === selectedIndex
+            ${idx === safeIndex
               ? 'bg-amber-500/10 text-amber-300'
               : 'text-slate-400 hover:bg-slate-800/60'
             }
@@ -61,3 +58,4 @@ function CommandPalette({ input, onSelect, visible }: CommandPaletteProps) {
 }
 
 export default CommandPalette;
+export type { CommandPaletteProps };

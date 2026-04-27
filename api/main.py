@@ -51,6 +51,19 @@ async def lifespan(app):
     t = threading.Thread(target=_preload, daemon=True, name="preload")
     t.start()
 
+    # 预加载完成后，异步触发知识库自动重建（如果 TDB 为空）
+    async def _auto_rebuild():
+        # 等预加载线程完成（最多等 30 秒）
+        t.join(timeout=30)
+        try:
+            from lumen.services.knowledge import rebuild_if_empty
+            await rebuild_if_empty()
+        except Exception as e:
+            logger.warning(f"知识库自动重建失败: {e}")
+
+    import asyncio
+    asyncio.ensure_future(_auto_rebuild())
+
     yield  # 应用运行中...
 
     # 退出清理
@@ -84,7 +97,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, buffer, graph, tdb
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -99,6 +112,11 @@ app.include_router(worldbook.router, prefix="/worldbooks", tags=["世界书"])
 app.include_router(avatar.router, prefix="/avatars", tags=["头像管理"])
 app.include_router(skills.router, prefix="/skills", tags=["Skills"])
 app.include_router(knowledge.router, prefix="/knowledge", tags=["知识库"])
+app.include_router(memories.router, prefix="/memories", tags=["日记"])
+app.include_router(thinking_clusters.router, prefix="/thinking-clusters", tags=["思维簇"])
+app.include_router(buffer.router, prefix="/buffer", tags=["缓冲区"])
+app.include_router(graph.router, prefix="/graph", tags=["图谱"])
+app.include_router(tdb.router, prefix="/tdb", tags=["TDB浏览"])
 
 # 挂载头像静态文件目录
 avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"

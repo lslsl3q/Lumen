@@ -46,17 +46,23 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
  * SSE 事件类型
  */
 export interface StreamEvent {
-  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'done' | 'error';
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'done' | 'error' | 'msg_saved';
   content?: string;
   status?: string;
   message?: string;
   tool?: string | string[];
+  command?: string;
   params?: Record<string, unknown>;
   success?: boolean;
   data?: unknown;
   error?: string;
   exit_reason?: string;
   mode?: string;
+  // msg_saved 事件字段
+  role?: string;
+  db_id?: number;
+  // done 事件额外字段
+  assistant_db_id?: number;
   // memory_debug 事件字段
   layers?: { name: string; tokens: number; content: string }[];
   total_tokens?: number;
@@ -93,32 +99,42 @@ export async function sendMessageStream(
   sessionId?: string,
   signal?: AbortSignal,
   memoryDebugMode?: boolean,
+  responseStyle?: string,
 ): Promise<void> {
   try {
+    console.log('[API] 发送流式消息请求:', { message, sessionId, memoryDebugMode, responseStyle });
+
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false }),
+      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false, response_style: responseStyle || 'balanced' }),
       signal,
     });
 
     if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
+      const errorText = await response.text().catch(() => '未知错误');
+      console.error('[API] 请求失败:', response.status, errorText);
+      throw new Error(`API请求失败: ${response.status} - ${errorText}`);
     }
 
     const reader = response.body?.getReader();
     if (!reader) {
+      console.error('[API] 无法获取响应流');
       throw new Error('无法获取响应流');
     }
 
     const decoder = new TextDecoder();
     let buffer = '';
+    let eventCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log('[API] 流式接收完成，共接收', eventCount, '个事件');
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -127,9 +143,23 @@ export async function sendMessageStream(
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const data = line.slice(6);
-          if (data === '[DONE]') continue;
+          if (data === '[DONE]') {
+            console.log('[API] 接收结束信号');
+            continue;
+          }
           try {
             const event: StreamEvent = JSON.parse(data);
+            eventCount++;
+
+            // 记录工具调用相关事件
+            if (event.type === 'tool_start') {
+              console.log('[API] 工具开始:', event.tool, event.params);
+            } else if (event.type === 'tool_result') {
+              console.log('[API] 工具结果:', event.tool, event.success ? '成功' : '失败');
+            } else if (event.type === 'error') {
+              console.error('[API] 错误事件:', event.message);
+            }
+
             // 文本事件 → 拼接到回复
             if (event.type === 'text' && event.content) {
               onText(event.content);
@@ -137,13 +167,17 @@ export async function sendMessageStream(
             // 所有事件都通知上层（用于未来 UI 展示工具状态）
             onEvent?.(event);
           } catch (e) {
-            // 忽略解析错误
+            console.warn('[API] 事件解析失败:', data, e);
           }
         }
       }
     }
   } catch (error) {
-    console.error('流式发送失败:', error);
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.log('[API] 请求被用户取消');
+      throw error;
+    }
+    console.error('[API] 流式发送失败:', error);
     throw error;
   }
 }
@@ -207,4 +241,66 @@ export async function cancelChat(sessionId: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId }),
   });
+}
+
+/**
+ * 编辑消息内容
+ */
+export async function editMessage(
+  sessionId: string, messageId: number, content: string
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, message_id: messageId, content }),
+  });
+  if (!res.ok) throw new Error(`编辑消息失败: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * 删除消息
+ */
+export async function deleteMessage(
+  sessionId: string, messageId: number
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, message_id: messageId }),
+  });
+  if (!res.ok) throw new Error(`删除消息失败: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * 重新生成 AI 回复
+ * 删除该消息及之后的所有消息，返回对应的用户消息内容
+ */
+export async function regenerateMessage(
+  sessionId: string, messageId: number
+): Promise<{ user_message: string; session_id: string }> {
+  const res = await fetch(`${API_BASE_URL}/chat/regenerate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, message_id: messageId }),
+  });
+  if (!res.ok) throw new Error(`重新生成失败: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * 创建分支会话
+ * 基于指定消息及之前的消息创建新会话
+ */
+export async function branchSession(
+  sessionId: string, messageId: number
+): Promise<{ new_session_id: string; character_id: string }> {
+  const res = await fetch(`${API_BASE_URL}/chat/branch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, message_id: messageId }),
+  });
+  if (!res.ok) throw new Error(`创建分支失败: ${res.status}`);
+  return res.json();
 }

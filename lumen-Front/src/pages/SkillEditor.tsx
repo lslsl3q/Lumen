@@ -2,13 +2,21 @@
  * Skill 编辑器页
  */
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import * as api from '../api/skills';
+import { SettingsPageProps } from '../types/settings';
 
-function SkillEditor() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface SkillEditorProps extends SettingsPageProps {
+  skillId?: string;
+}
+
+function SkillEditor({ skillId, onBack }: SkillEditorProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = skillId || paramId;
   const isEditMode = !!id;
+
+  // 导航辅助：优先用回调，回退到路由
+  const goBack = onBack ?? (() => goBack());
 
   const [form, setForm] = useState({
     name: '',
@@ -61,7 +69,7 @@ function SkillEditor() {
       } else {
         await api.createSkill(form);
       }
-      navigate('/settings/skills');
+      goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -69,13 +77,13 @@ function SkillEditor() {
     }
   };
 
-  if (isLoading) return <div className="min-h-screen bg-slate-950 text-slate-600 flex items-center justify-center">加载中...</div>;
+  if (isLoading) return <div className="h-full bg-slate-950 text-slate-600 flex items-center justify-center">加载中...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center gap-4 mb-8 px-6 py-4">
-        <button onClick={() => navigate('/settings/skills')} className="text-slate-400 hover:text-slate-200 transition-colors">
+        <button onClick={() => goBack()} className="text-slate-400 hover:text-slate-200 transition-colors">
           ← 返回列表
         </button>
         <h1 className="text-2xl font-bold">{isEditMode ? '编辑 Skill' : '新建 Skill'}</h1>
@@ -95,7 +103,7 @@ function SkillEditor() {
             <input
               value={form.name}
               onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
               placeholder="如：写作助手、代码审查"
             />
           </div>
@@ -105,7 +113,7 @@ function SkillEditor() {
             <input
               value={form.description}
               onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
               placeholder="一句话说明这个 Skill 做什么"
             />
           </div>
@@ -115,7 +123,7 @@ function SkillEditor() {
             <input
               value={form.when_to_use}
               onChange={(e) => setForm(f => ({ ...f, when_to_use: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
               placeholder="如：当用户需要写作帮助、创意灵感时"
             />
             <p className="text-xs text-slate-600 mt-1">AI 会根据这段描述自主判断是否使用此 Skill</p>
@@ -128,7 +136,7 @@ function SkillEditor() {
                 type="number"
                 value={form.priority}
                 onChange={(e) => setForm(f => ({ ...f, priority: Number(e.target.value) }))}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
                 placeholder="0"
               />
               <p className="text-xs text-slate-600 mt-1">数字越大，越优先注入</p>
@@ -138,7 +146,7 @@ function SkillEditor() {
               <input
                 value={form.argument_hint}
                 onChange={(e) => setForm(f => ({ ...f, argument_hint: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all"
                 placeholder="[主题或需求]"
               />
             </div>
@@ -152,7 +160,7 @@ function SkillEditor() {
             <input
               value={form.script}
               onChange={(e) => setForm(f => ({ ...f, script: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all font-mono text-sm"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all font-mono text-sm"
               placeholder="scripts/run.py"
             />
             <p className="text-xs text-slate-600 mt-1">
@@ -169,7 +177,7 @@ function SkillEditor() {
               value={form.content}
               onChange={(e) => setForm(f => ({ ...f, content: e.target.value }))}
               rows={10}
-              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all font-mono text-sm resize-y"
+              className="w-full px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all font-mono text-sm resize-y"
               placeholder={`定义 AI 在使用这个 Skill 时应该遵循的工作流程...\n\n建议格式：\n## Goal\n目标描述\n\n## 原则\n1. 原则一\n2. 原则二`}
             />
             <p className="text-xs text-slate-600 mt-1">
@@ -197,7 +205,7 @@ function SkillEditor() {
         {/* 操作按钮 */}
         <div className="flex gap-3 pt-4">
           <button
-            onClick={() => navigate('/settings/skills')}
+            onClick={() => goBack()}
             className="px-5 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-400 hover:bg-slate-800/60 transition-all"
           >
             取消

@@ -4,9 +4,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useSkills } from '../hooks/useSkills';
 import * as api from '../api/skills';
+import { SettingsPageProps } from '../types/settings';
+import { toast } from '../utils/toast';
 
-function SkillList() {
+interface SkillListProps extends SettingsPageProps {}
+
+function SkillList({ onBack, onNavigate }: SkillListProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/'));
+  const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const { skills, isLoading, create, remove, refresh } = useSkills();
 
   const handleDelete = async (id: string, name: string) => {
@@ -14,7 +20,7 @@ function SkillList() {
     try {
       await remove(id);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败');
+      toast(err instanceof Error ? err.message : '删除失败', 'error');
     }
   };
 
@@ -24,9 +30,9 @@ function SkillList() {
 
     try {
       const result = await create({ name, content: '', enabled: true });
-      navigate(`/settings/skills/${result.id}`);
+      goTo('skill-editor', { id: result.id });
     } catch (err) {
-      alert(err instanceof Error ? err.message : '创建失败');
+      toast(err instanceof Error ? err.message : '创建失败', 'error');
     }
   };
 
@@ -39,22 +45,22 @@ function SkillList() {
       if (!file) return;
       try {
         const result = await api.uploadSkill(file);
-        alert(`成功导入 ${result.imported.length} 个 Skill`);
+        toast(`成功导入 ${result.imported.length} 个 Skill`, 'success');
         refresh();
       } catch (err) {
-        alert(err instanceof Error ? err.message : '导入失败');
+        toast(err instanceof Error ? err.message : '导入失败', 'error');
       }
     };
     input.click();
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-8 px-6 py-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => goBack()}
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
             ← 返回聊天
@@ -100,7 +106,7 @@ function SkillList() {
             {skills.map((skill) => (
               <div
                 key={skill.id}
-                onClick={() => navigate(`/settings/skills/${skill.id}`)}
+                onClick={() => goTo('skill-editor', { id: skill.id })}
                 className="group relative p-5 rounded-xl cursor-pointer bg-slate-900/60 border border-slate-800/40 hover:border-amber-500/30 hover:bg-slate-900/80 transition-all"
               >
                 {/* 删除按钮 */}

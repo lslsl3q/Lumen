@@ -78,7 +78,7 @@ LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60"))
 
 # ReAct 循环最大轮次（防止 AI 无限调用工具）
 # 可以通过环境变量 MAX_TOOL_ITERATIONS 覆盖
-MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "10"))
+MAX_TOOL_ITERATIONS = int(os.getenv("MAX_TOOL_ITERATIONS", "20"))
 
 # 默认上下文窗口大小（tokens），角色级 context_size 未设置时使用
 DEFAULT_CONTEXT_SIZE = int(os.getenv("DEFAULT_CONTEXT_SIZE", "8192"))
@@ -87,15 +87,46 @@ DEFAULT_CONTEXT_SIZE = int(os.getenv("DEFAULT_CONTEXT_SIZE", "8192"))
 # 心跳间隔（秒），保持连接存活（应对休眠唤醒）
 WS_HEARTBEAT_INTERVAL = float(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
 
-# 嵌入模型配置（语义搜索）
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh")
+# ── 嵌入模型配置（两阵营架构）─
 EMBEDDING_ENABLED = os.getenv("EMBEDDING_ENABLED", "True").lower() in ("true", "1", "yes")
-EMBEDDING_DIMENSIONS = 512  # gte-small-zh 固定输出维度
+
+# 阵营 A：本地小模型 — 程序内置模块（memory/buffer/thinking_clusters/knowledge_sentences）
+EMBEDDING_LOCAL_MODEL = os.getenv("EMBEDDING_LOCAL_MODEL", os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh"))
+EMBEDDING_LOCAL_DIM = int(os.getenv("EMBEDDING_LOCAL_DIM", "512"))
+
+# 阵营 B：API 大模型 — 用户新建的知识库
+EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "")
+EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
+EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "")
+EMBEDDING_API_DIM = int(os.getenv("EMBEDDING_API_DIM", os.getenv("KNOWLEDGE_EMBEDDING_DIM", "0")))
+
+# 旧变量兼容导出（embedding.py 内部不再直接 import 这些，但保持向后兼容）
+EMBEDDING_BACKEND = "local"
+EMBEDDING_MODEL = EMBEDDING_LOCAL_MODEL
+EMBEDDING_DIMENSIONS = EMBEDDING_LOCAL_DIM
+KNOWLEDGE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_EMBEDDING_BACKEND", "")  # 空=不启用
+KNOWLEDGE_EMBEDDING_API_URL = os.getenv("KNOWLEDGE_EMBEDDING_API_URL", "") or EMBEDDING_API_URL
+KNOWLEDGE_EMBEDDING_API_KEY = os.getenv("KNOWLEDGE_EMBEDDING_API_KEY", "") or EMBEDDING_API_KEY
+KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "") or EMBEDDING_API_MODEL
+
+
 
 # 知识库配置
+VECTOR_STORE_DIR = os.getenv(
+    "VECTOR_STORE_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "vectors"),
+)
+VECTOR_LOCAL_DIR = os.getenv(
+    "VECTOR_LOCAL_DIR",
+    os.path.join(VECTOR_STORE_DIR, "local"),
+)
+VECTOR_API_DIR = os.getenv(
+    "VECTOR_API_DIR",
+    os.path.join(VECTOR_STORE_DIR, "api"),
+)
 KNOWLEDGE_DB_PATH = os.getenv(
     "KNOWLEDGE_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "data", "knowledge.tdb"),
+    os.path.join(VECTOR_API_DIR, "knowledge.tdb"),
 )
 KNOWLEDGE_SOURCE_DIR = os.getenv(
     "KNOWLEDGE_SOURCE_DIR",
@@ -103,6 +134,50 @@ KNOWLEDGE_SOURCE_DIR = os.getenv(
 )
 KNOWLEDGE_CHUNK_SIZE = int(os.getenv("KNOWLEDGE_CHUNK_SIZE", "300"))
 KNOWLEDGE_CHUNK_OVERLAP = int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP", "60"))
+
+# PRF 伪相关反馈配置（T18 Stage 1→2 增强层）
+PRF_ENABLED = os.getenv("PRF_ENABLED", "True").lower() in ("true", "1")
+PRF_TOP_N = int(os.getenv("PRF_TOP_N", "5"))          # 取前 N 条结果的向量算均值
+PRF_ALPHA = float(os.getenv("PRF_ALPHA", "0.7"))       # 原始查询向量权重
+PRF_BETA = float(os.getenv("PRF_BETA", "0.3"))         # PRF 均值向量权重
+
+# 句子级检索配置（T18 Stage 3+4）
+KNOWLEDGE_SENTENCE_DB_PATH = os.getenv(
+    "KNOWLEDGE_SENTENCE_DB_PATH",
+    os.path.join(VECTOR_LOCAL_DIR, "knowledge_sentences.tdb"),
+)
+KNOWLEDGE_SENTENCE_LEVEL = os.getenv("KNOWLEDGE_SENTENCE_LEVEL", "True").lower() in ("true", "1")
+KNOWLEDGE_SENTENCE_TOP_N = int(os.getenv("KNOWLEDGE_SENTENCE_TOP_N", "5"))
+KNOWLEDGE_SENTENCE_WINDOW = int(os.getenv("KNOWLEDGE_SENTENCE_WINDOW", "1"))
+
+# Token 预算配置（知识库检索注入的 token 上限）
+KNOWLEDGE_PLACEHOLDER_BUDGET = int(os.getenv("KNOWLEDGE_PLACEHOLDER_BUDGET", "800"))   # 占位符 {{}}/[[]] 共享预算
+KNOWLEDGE_SEMANTIC_BUDGET = int(os.getenv("KNOWLEDGE_SEMANTIC_BUDGET", "500"))          # 语义路由自动注入预算
+
+# AI 日记/档案配置（daily_note 工具系列）
+DAILY_NOTE_DIR = os.getenv(
+    "DAILY_NOTE_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "daily_note"),
+)
+
+# 思维簇配置
+THINKING_CLUSTERS_DIR = os.getenv(
+    "THINKING_CLUSTERS_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "thinking_clusters"),
+)
+THINKING_CLUSTERS_DB_PATH = os.getenv(
+    "THINKING_CLUSTERS_DB_PATH",
+    os.path.join(VECTOR_LOCAL_DIR, "thinking_clusters.tdb"),
+)
+
+# 缓冲区配置（记忆生命周期 Phase 1）
+BUFFER_ENABLED = os.getenv("BUFFER_ENABLED", "false").lower() == "true"
+BUFFER_DB_PATH = os.getenv(
+    "BUFFER_DB_PATH",
+    os.path.join(VECTOR_LOCAL_DIR, "buffer.tdb"),
+)
+BUFFER_AUTO_THRESHOLD = int(os.getenv("BUFFER_AUTO_THRESHOLD", "30"))
+BUFFER_MAX_AGE_HOURS = int(os.getenv("BUFFER_MAX_AGE_HOURS", "48"))
 
 
 def get_model(character_config: dict = None) -> str:

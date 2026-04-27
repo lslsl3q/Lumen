@@ -2,13 +2,21 @@
  * 世界书编辑器页
  */
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import * as api from '../api/worldbook';
+import { SettingsPageProps } from '../types/settings';
 
-function WorldBookEditor() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface WorldBookEditorProps extends SettingsPageProps {
+  worldBookId?: string;
+}
+
+function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = worldBookId || paramId;
   const isEditMode = !!id;
+
+  // 导航辅助：优先用回调，回退到路由
+  const goBack = onBack ?? (() => goBack());
 
   const [form, setForm] = useState({
     id: '',
@@ -95,7 +103,7 @@ function WorldBookEditor() {
       } else {
         await api.createWorldBook(form);
       }
-      navigate('/settings/worldbooks');
+      goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
@@ -104,22 +112,22 @@ function WorldBookEditor() {
   };
 
   if (isLoading) {
-    return <div className="min-h-screen bg-slate-950 text-slate-200 flex items-center justify-center">加载中...</div>;
+    return <div className="h-full bg-slate-950 text-slate-200 flex items-center justify-center">加载中...</div>;
   }
 
   // 复用样式常量
-  const inputCls = "w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/40 transition-all";
-  const numInputCls = "w-24 px-3 py-1.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all";
+  const inputCls = "w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-hidden focus:border-amber-500/40 transition-all";
+  const numInputCls = "w-24 px-3 py-1.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all";
   const sectionTitleCls = "text-sm text-slate-400 mb-3";
   const tagCls = (color: string) => `px-3 py-1 rounded-full text-sm bg-${color}-500/10 text-${color}-400 border border-${color}-500/20 flex items-center gap-2`;
   const addBtnCls = (color: string) => `px-4 py-2.5 rounded-lg text-sm bg-${color}-500/10 border border-${color}-500/30 text-${color}-400 hover:bg-${color}-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-6 px-6 py-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/settings/worldbooks')} className="text-slate-400 hover:text-slate-200 transition-colors">
+          <button onClick={() => goBack()} className="text-slate-400 hover:text-slate-200 transition-colors">
             ← 返回
           </button>
           <h1 className="text-2xl font-bold">{isEditMode ? '编辑世界书' : '新建世界书'}</h1>
@@ -183,7 +191,7 @@ function WorldBookEditor() {
                 <div className="space-y-3 pl-1 border-l-2 border-slate-800 ml-1">
                   <div>
                     <select value={form.selective_logic} onChange={e => setForm({ ...form, selective_logic: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all">
+                      className="w-full px-3 py-2 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all">
                       <option value="and">AND — 次关键词也必须命中才触发</option>
                       <option value="not">NOT — 次关键词命中时不触发</option>
                     </select>
@@ -234,7 +242,7 @@ function WorldBookEditor() {
             <div>
               <label className="block text-xs text-slate-500 mb-1">注入位置</label>
               <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value as any })}
-                className="w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-none focus:border-amber-500/40 transition-all">
+                className="w-full px-4 py-2.5 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 focus:outline-hidden focus:border-amber-500/40 transition-all">
                 <option value="before_sys">系统提示词之前</option>
                 <option value="after_sys">系统提示词之后</option>
                 <option value="before_user">用户消息之前</option>
@@ -272,12 +280,12 @@ function WorldBookEditor() {
           <textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
             placeholder="当关键词被触发时，这段内容会被注入到提示词中..."
             rows={10}
-            className="w-full px-4 py-3 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-amber-500/40 transition-all resize-y" />
+            className="w-full px-4 py-3 rounded-lg text-sm bg-slate-800/40 border border-slate-700/40 text-slate-200 placeholder-slate-600 focus:outline-hidden focus:border-amber-500/40 transition-all resize-y" />
         </section>
 
         {/* 底部操作栏 */}
         <div className="flex justify-end gap-3 pt-4 pb-8 border-t border-slate-800/40">
-          <button type="button" onClick={() => navigate('/settings/worldbooks')} className="px-5 py-2.5 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors">
+          <button type="button" onClick={() => goBack()} className="px-5 py-2.5 rounded-lg text-sm text-slate-400 hover:text-slate-200 transition-colors">
             取消
           </button>
           <button type="submit" disabled={isSaving}

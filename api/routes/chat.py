@@ -23,6 +23,7 @@ class ChatRequest(BaseModel):
     """发送消息请求"""
     message: str
     session_id: Optional[str] = None  # 可选：指定会话ID
+    response_style: str = "balanced"
 
 
 class StreamRequest(BaseModel):
@@ -30,6 +31,7 @@ class StreamRequest(BaseModel):
     message: str
     session_id: str = "default"
     memory_debug: bool = False  # /tokens 命令开启记忆调试
+    response_style: str = "balanced"
 
 
 class ChatResponse(BaseModel):
@@ -103,7 +105,7 @@ async def stream_chat(req: StreamRequest):
     async def generate():
         """生成 SSE 事件流（chat_stream 本身已是异步生成器，无需线程池翻译）"""
         try:
-            async for event in chat_stream(req.message, session, memory_debug=req.memory_debug):
+            async for event in chat_stream(req.message, session, memory_debug=req.memory_debug, response_style=req.response_style):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
@@ -173,7 +175,7 @@ async def get_history(session_id: str = "default"):
 
         # 过滤掉系统提示词和工具调用消息，只返回用户和助手的对话
         result = [
-            {"role": msg["role"], "content": msg["content"]}
+            {"id": msg.get("id"), "role": msg["role"], "content": msg["content"]}
             for msg in messages
             if msg["role"] in ("user", "assistant") and not _is_tool_message(msg)
         ]
@@ -182,6 +184,178 @@ async def get_history(session_id: str = "default"):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取历史失败: {str(e)}")
+
+
+# ========================================
+# 消息编辑/删除
+# ========================================
+
+class MessageEditRequest(BaseModel):
+    session_id: str
+    message_id: int
+    content: str
+
+
+class MessageDeleteRequest(BaseModel):
+    session_id: str
+    message_id: int
+
+
+class RegenerateRequest(BaseModel):
+    session_id: str
+    message_id: int
+
+
+class BranchRequest(BaseModel):
+    session_id: str
+    message_id: int
+
+
+@router.patch("/message")
+async def edit_message(req: MessageEditRequest):
+    """编辑消息内容（同步更新 SQLite + memory.tdb 向量）"""
+    from lumen.services import history as history_service
+
+    success = await asyncio.to_thread(history_service.update_message, req.message_id, req.content)
+    if not success:
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    # 同步更新内存中的消息
+    manager = get_session_manager()
+    session = manager.get(req.session_id)
+    if session:
+        for msg in session.messages:
+            if msg.get("id") == req.message_id:
+                msg["content"] = req.content
+                break
+
+    # 同步更新 memory.tdb 向量
+    try:
+        from lumen.services.vector_store import _get_db
+        db = _get_db()
+        for nid in db.all_node_ids():
+            try:
+                node = db.get(nid)
+            except Exception:
+                continue
+            if not node:
+                continue
+            payload = node.payload if hasattr(node, "payload") else {}
+            if payload.get("message_id") == req.message_id:
+                # 重新向量化
+                from lumen.services.embedding import get_service
+                backend = await get_service("memory")
+                if backend:
+                    new_vector = await backend.encode(req.content)
+                    if new_vector:
+                        payload["content"] = req.content
+                        db.update_vector(nid, new_vector)
+                        db.update_payload(nid, payload)
+                        db.flush()
+                        logger.info(f"消息编辑同步向量: message_id={req.message_id}, node={nid}")
+                break
+    except Exception as e:
+        logger.warning(f"消息编辑向量同步失败: {e}")
+
+    return {"success": True}
+
+
+@router.delete("/message")
+async def delete_message(req: MessageDeleteRequest):
+    """删除消息（同步删除 SQLite + memory.tdb 向量）"""
+    from lumen.services import history as history_service
+
+    success = await asyncio.to_thread(history_service.delete_message, req.message_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="消息不存在")
+
+    # 同步删除内存中的消息
+    manager = get_session_manager()
+    session = manager.get(req.session_id)
+    if session:
+        session.messages = [msg for msg in session.messages if msg.get("id") != req.message_id]
+
+    # 同步删除 memory.tdb 向量
+    try:
+        from lumen.services.vector_store import _get_db
+        db = _get_db()
+        for nid in db.all_node_ids():
+            try:
+                node = db.get(nid)
+            except Exception:
+                continue
+            if not node:
+                continue
+            payload = node.payload if hasattr(node, "payload") else {}
+            if payload.get("message_id") == req.message_id:
+                db.delete(nid)
+                db.flush()
+                logger.info(f"消息删除同步向量: message_id={req.message_id}, node={nid}")
+                break
+    except Exception as e:
+        logger.warning(f"消息删除向量同步失败: {e}")
+
+    return {"success": True}
+
+
+@router.post("/regenerate")
+async def regenerate_message(req: RegenerateRequest):
+    """重新生成 AI 回复
+
+    删除该 AI 消息及之后的所有消息，返回触发回复所需的用户消息内容。
+    前端收到后用该内容重新调用流式接口。
+    """
+    from lumen.services import history as history_service
+
+    # 从内存 session 找到该 AI 消息前面的最后一条 user 消息
+    manager = get_session_manager()
+    session = manager.get(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    user_message = None
+    for msg in reversed(session.messages):
+        msg_id = msg.get("id")
+        if msg_id is not None and msg_id >= req.message_id:
+            continue
+        if msg["role"] == "user" and not msg.get("metadata", {}).get("type") == "tool_result":
+            user_message = msg["content"]
+            break
+
+    if not user_message:
+        raise HTTPException(status_code=400, detail="未找到对应的用户消息")
+
+    # 删除该消息及之后的所有消息（DB + 内存）
+    await asyncio.to_thread(history_service.delete_messages_from, req.session_id, req.message_id)
+    session.messages = [msg for msg in session.messages
+                        if msg.get("id") is not None and msg["id"] < req.message_id]
+
+    return {"user_message": user_message, "session_id": req.session_id}
+
+
+@router.post("/branch")
+async def create_branch(req: BranchRequest):
+    """基于某条消息创建分支会话
+
+    创建新会话并复制该消息及之前的所有消息到新会话。
+    """
+    from lumen.services import history as history_service
+
+    # 获取原会话信息
+    manager = get_session_manager()
+    session = manager.get(req.session_id)
+    character_id = session.character_id if session else "default"
+
+    # 创建新会话
+    new_session_id = await asyncio.to_thread(history_service.new_session, character_id)
+
+    # 复制消息
+    await asyncio.to_thread(history_service.copy_messages_to, req.session_id, new_session_id, req.message_id)
+
+    # 在内存中也创建对应 session
+    new_session = manager.get_or_create(new_session_id)
+
+    return {"new_session_id": new_session_id, "character_id": character_id}
 
 
 # ========================================

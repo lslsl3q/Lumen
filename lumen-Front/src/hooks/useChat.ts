@@ -5,78 +5,38 @@
  * 遵循单向依赖：hook → api/chat.ts + api/session.ts，不直接操作 DOM 或 SSE
  */
 import { useState, useCallback, useRef } from 'react';
-import { sendMessageStream, getHistory, cancelChat, StreamEvent } from '../api/chat';
+import { sendMessageStream, getHistory, cancelChat, editMessage as editMessageAPI, deleteMessage as deleteMessageAPI, regenerateMessage as regenerateMessageAPI, branchSession as branchSessionAPI, StreamEvent } from '../api/chat';
 import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
+import { toast } from '../utils/toast';
 
-/** 判断消息是否应从历史显示中过滤（纯工具调用/结果） */
+/** 工具调用 JSON 标记（用于检测 ReAct 循环中的工具调用消息） */
+const TOOL_CALL_MARKERS = [
+  '{"type": "tool_call',
+  '{"type":"tool_call',
+  '{"type": "tool_call_parallel',
+  '{"type":"tool_call_parallel',
+  '{"calls":',
+  '{"calls" :',
+  '{"tool":',
+  '{"tool" :',
+];
+
+/** 判断消息是否应从历史显示中过滤（仅过滤工具结果，不过滤工具调用） */
 function isToolMessage(msg: HistoryMessage): boolean {
   const content = msg.content.trim();
   if (!content) return false;
-  // AI 可能在 JSON 前加文字（如"让我读取文件..."），用 includes 而非 startsWith
-  if (content.includes('"type": "tool_call') || content.includes('"type":"tool_call')) return true;
-  if (content.includes('"type": "tool_call_parallel') || content.includes('"type":"tool_call_parallel')) return true;
-  if (content.includes('<tool_result')) return true;
+  // 只过滤工具结果消息（user 角色保存的工具执行结果）
+  if (content.startsWith('<tool_result')) return true;
   if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
   return false;
-}
-
-/** 从消息内容中提取工具调用信息（加载历史时用） */
-function extractToolCalls(content: string): ToolCall[] {
-  const calls: ToolCall[] = [];
-  // 匹配单个工具调用：{"type": "tool_call", "tool": "xxx", ...}
-  const singleRegex = /"type"\s*:\s*"tool_call"\s*,.*?"tool"\s*:\s*"([^"]+)"/g;
-  let m;
-  while ((m = singleRegex.exec(content)) !== null) {
-    calls.push({ callId: _nextCallId++, name: m[1], status: 'done' });
-  }
-  // 匹配并行工具调用：{"type": "tool_call_parallel", "calls": [{"tool": "xxx", ...}, ...]}
-  const parallelRegex = /"type"\s*:\s*"tool_call_parallel"\s*,.*?"calls"\s*:\s*\[([\s\S]*?)\]/g;
-  while ((m = parallelRegex.exec(content)) !== null) {
-    const inner = /"tool"\s*:\s*"([^"]+)"/g;
-    let im;
-    while ((im = inner.exec(m[1])) !== null) {
-      calls.push({ callId: _nextCallId++, name: im[1], status: 'done' });
-    }
-  }
-  return calls;
-}
-
-/** 剥离消息内容中嵌入的工具调用 JSON，保留前后的文字部分 */
-function stripToolJson(content: string): string {
-  let cleaned = content;
-  // 反复剥离 tool_call 和 tool_result JSON 块
-  for (const marker of ['{"type": "tool_call', '{"type":"tool_call', '{"type": "tool_call_parallel', '{"type":"tool_call_parallel', '{"success":', '{"error_code":']) {
-    while (true) {
-      const idx = cleaned.indexOf(marker);
-      if (idx === -1) break;
-      // 找到匹配的闭合花括号
-      let depth = 0;
-      let inStr = false;
-      let esc = false;
-      let end = -1;
-      for (let i = idx; i < cleaned.length; i++) {
-        const ch = cleaned[i];
-        if (esc) { esc = false; continue; }
-        if (ch === '\\') { esc = true; continue; }
-        if (ch === '"') { inStr = !inStr; continue; }
-        if (inStr) continue;
-        if (ch === '{') depth++;
-        else if (ch === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
-      }
-      if (end === -1) break;
-      cleaned = cleaned.slice(0, idx) + cleaned.slice(end);
-    }
-  }
-  // 剥离 XML 格式的工具结果
-  cleaned = cleaned.replace(/<tool_result[\s\S]*?<\/tool_result>/g, '');
-  return cleaned.trim();
 }
 
 /** 工具调用追踪 */
 export interface ToolCall {
   callId: number;   // 唯一标识，用于匹配 tool_result
   name: string;
+  command?: string;
   status: 'running' | 'done';
   success?: boolean;
   params?: Record<string, unknown>;
@@ -126,6 +86,7 @@ export interface ReactTraceStep {
 /** 消息 */
 export interface Message {
   id: string;
+  dbId?: number;
   role: 'user' | 'assistant' | 'system';
   content: string;
   toolCalls?: ToolCall[];
@@ -152,32 +113,46 @@ export function useChat() {
   const [memoryDebugMode, setMemoryDebugMode] = useState(false);
   const [memoryDebugInfo, setMemoryDebugInfo] = useState<MemoryDebugData | null>(null);
   const [reactTrace, setReactTrace] = useState<ReactTraceStep[]>([]);
+  const [responseStyle, setResponseStyle] = useState<string>('balanced');
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /** 加载指定会话的历史消息 */
   const loadHistory = useCallback(async (sessionId: string, characterId?: string) => {
     try {
       const data = await getHistory(sessionId);
-      const historyMessages: Message[] = data.messages
+      const rawMessages: Message[] = data.messages
         .filter((msg: HistoryMessage) => !isToolMessage(msg))
-        .map((msg: HistoryMessage, i: number) => {
-          const toolCalls = extractToolCalls(msg.content);
-          return {
-            id: `hist_${sessionId}_${i}`,
-            role: msg.role,
-            content: stripToolJson(msg.content),
-            ...(toolCalls.length > 0 ? { toolCalls } : {}),
-          };
-        })
-        .filter((msg: Message) => msg.content.length > 0 || (msg.toolCalls && msg.toolCalls.length > 0));
+        .map((msg: HistoryMessage) => ({
+          // 使用数据库ID作为唯一标识，确保重新加载时ID保持不变
+          id: `db_${msg.id}`,
+          dbId: msg.id,
+          role: msg.role,
+          content: msg.content,
+        }))
+        .filter((msg: Message) => msg.content.trim().length > 0);
+
+      // 合并 ReAct 循环产生的连续 assistant 消息（工具调用 + 最终回复 → 一条消息）
+      const historyMessages: Message[] = [];
+      for (const msg of rawMessages) {
+        if (msg.role === 'assistant' && historyMessages.length > 0) {
+          const prev = historyMessages[historyMessages.length - 1];
+          // 前一条也是 assistant 且包含工具调用 JSON → 合并（与流式行为一致）
+          if (prev.role === 'assistant' && TOOL_CALL_MARKERS.some(m => prev.content.includes(m))) {
+            prev.content += '\n' + msg.content;
+            continue;
+          }
+        }
+        historyMessages.push(msg);
+      }
+
       setMessages(historyMessages.length > 0 ? historyMessages : []);
       setCurrentSessionId(sessionId);
-      
+
       // 记录该角色的最后会话（用于下次恢复）
       if (characterId) {
         localStorage.setItem(`lastSession_${characterId}`, sessionId);
       }
-      
+
       setError(null);
     } catch (err) {
       console.error('加载历史失败:', err);
@@ -261,9 +236,12 @@ export function useChat() {
               case 'tool_start': {
                 const raw = event.tool;
                 const toolNames = (Array.isArray(raw) ? raw : [raw]).filter((n): n is string => typeof n === 'string');
-                const newCalls: ToolCall[] = toolNames.map(name => ({
+                const toolCommands = Array.isArray(event.command) ? event.command : toolNames.map(() => typeof event.command === 'string' ? event.command : '');
+                console.log('[useChat] 工具开始执行:', toolNames, toolCommands);
+                const newCalls: ToolCall[] = toolNames.map((name, idx) => ({
                   callId: _nextCallId++,
                   name,
+                  command: toolCommands[idx] || '',
                   status: 'running' as const,
                   params: event.params,
                 }));
@@ -273,10 +251,17 @@ export function useChat() {
                 ];
               }
               case 'tool_result': {
+                console.log('[useChat] 工具执行结果:', event.tool, event.command, event.success ? '成功' : '失败');
                 const calls = [...(last.toolCalls || [])];
-                const idx = calls.findIndex(c => c.name === event.tool && c.status === 'running');
+                const idx = calls.findIndex(c =>
+                  c.name === event.tool
+                  && c.status === 'running'
+                  && (!event.command || c.command === event.command)
+                );
                 if (idx !== -1) {
                   calls[idx] = { ...calls[idx], status: 'done', success: event.success, error: event.error, data: event.data };
+                } else {
+                  console.warn('[useChat] 未找到匹配的工具调用:', event.tool);
                 }
                 return [...updated.slice(0, -1), { ...last, toolCalls: calls }];
               }
@@ -318,6 +303,10 @@ export function useChat() {
                   error: event.error,
                   exit_reason: event.exit_reason,
                 };
+                // 记录错误步骤
+                if (event.action === 'error') {
+                  console.error('[useChat] ReAct错误:', event.error);
+                }
                 setReactTrace(prev => {
                   const last = prev[prev.length - 1];
                   if (last && last.iteration === newStep.iteration && last.action === newStep.action && last.tool === newStep.tool && last.duration_ms === newStep.duration_ms) {
@@ -327,8 +316,27 @@ export function useChat() {
                 });
                 return prev;
               }
+              case 'msg_saved': {
+                // 后端推送消息的数据库 ID，用于编辑/删除
+                const role = event.role;
+                const dbId = event.db_id;
+                if (!role || dbId === undefined) return prev;
+                // 找到最近一条该角色且没有 dbId 的消息
+                const idx = updated.map((m, i) => ({ m, i }))
+                  .reverse()
+                  .find(({ m }) => m.role === role && !m.dbId);
+                if (idx) {
+                  const newUpdated = [...updated];
+                  newUpdated[idx.i] = { ...idx.m, dbId };
+                  return newUpdated;
+                }
+                return prev;
+              }
               case 'done': {
-                return [...updated.slice(0, -1), { ...last, isStreaming: false }];
+                console.log('[useChat] 流式完成:', event.exit_reason);
+                const updates: Partial<Message> = { isStreaming: false };
+                if (event.assistant_db_id) updates.dbId = event.assistant_db_id;
+                return [...updated.slice(0, -1), { ...last, ...updates }];
               }
               default:
                 return prev;
@@ -340,6 +348,8 @@ export function useChat() {
         abortControllerRef.current.signal,
         // memoryDebugMode
         memoryDebugMode,
+        // responseStyle
+        responseStyle,
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -413,6 +423,65 @@ export function useChat() {
     setIsLoading(false);
   }, [currentSessionId]);
 
+  /** 编辑消息 */
+  const editMessage = useCallback(async (messageId: string, newContent: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.dbId || !currentSessionId) return;
+    try {
+      await editMessageAPI(currentSessionId, msg.dbId, newContent);
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, content: newContent } : m
+      ));
+    } catch (err) {
+      console.error('编辑消息失败:', err);
+    }
+  }, [messages, currentSessionId]);
+
+  /** 删除消息 */
+  const deleteMessage = useCallback(async (messageId: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.dbId || !currentSessionId) return;
+    try {
+      await deleteMessageAPI(currentSessionId, msg.dbId);
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    } catch (err) {
+      console.error('删除消息失败:', err);
+    }
+  }, [messages, currentSessionId]);
+
+  /** 重新生成 AI 回复 */
+  const regenerateMessage = useCallback(async (messageId: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.dbId || !currentSessionId) return;
+    try {
+      const data = await regenerateMessageAPI(currentSessionId, msg.dbId);
+      // 从前端删除该消息及之后的所有消息
+      const idx = messages.findIndex(m => m.id === messageId);
+      if (idx >= 0) {
+        setMessages(prev => prev.slice(0, idx));
+      }
+      // 用原来的用户消息重新触发流式
+      await sendMessageToAPI(data.user_message);
+    } catch (err) {
+      console.error('重新生成失败:', err);
+      toast('重新生成失败', 'error');
+    }
+  }, [messages, currentSessionId, sendMessageToAPI]);
+
+  /** 创建分支会话 */
+  const branchFromMessage = useCallback(async (messageId: string): Promise<string | null> => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg?.dbId || !currentSessionId) return null;
+    try {
+      const data = await branchSessionAPI(currentSessionId, msg.dbId);
+      return data.new_session_id;
+    } catch (err) {
+      console.error('创建分支失败:', err);
+      toast('创建分支失败', 'error');
+      return null;
+    }
+  }, [messages, currentSessionId]);
+
   return {
     messages,
     isLoading,
@@ -431,5 +500,11 @@ export function useChat() {
     memoryDebugInfo,
     reactTrace,
     toggleMemoryDebug,
+    editMessage,
+    deleteMessage,
+    regenerateMessage,
+    branchFromMessage,
+    responseStyle,
+    setResponseStyle,
   };
 }

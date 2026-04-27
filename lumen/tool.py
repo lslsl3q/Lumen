@@ -6,6 +6,7 @@ Lumen - 工具执行引擎
 import json
 import time
 import asyncio
+import threading
 import importlib
 import logging
 from datetime import datetime
@@ -15,6 +16,26 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from lumen.types.tools import ToolResult, ErrorCode
 
 logger = logging.getLogger(__name__)
+
+# ========================================
+# 工具执行上下文（线程安全）
+# ========================================
+
+_current_context = threading.local()
+
+
+def set_tool_context(session_id: str = "", character_id: str = ""):
+    """设置当前工具执行的上下文（在 query.py 调用 execute_tool 前设置）"""
+    _current_context.session_id = session_id
+    _current_context.character_id = character_id
+
+
+def get_tool_context() -> Dict[str, str]:
+    """获取当前工具执行的上下文"""
+    return {
+        "session_id": getattr(_current_context, "session_id", ""),
+        "character_id": getattr(_current_context, "character_id", ""),
+    }
 
 
 # ========================================
@@ -67,16 +88,18 @@ def _format_data_readable(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
-def format_result_for_ai(result: Dict[str, Any]) -> str:
+def format_result_for_ai(result: Dict[str, Any], caller: str = "") -> str:
     """将工具结果格式化为 XML 格式发送给 AI
 
     XML 包裹让 AI 明确区分工具返回与用户消息，减少 token 消耗
+    caller: 调用工具的角色名，帮助 AI 理解"这是我自己调的工具返回的结果"
     """
     tool = result["tool"]
+    caller_attr = f' caller="{caller}"' if caller else ""
 
     if result["success"]:
         content = _format_data_readable(result["data"])
-        return f'<tool_result tool="{tool}" status="success">\n{content}\n</tool_result>'
+        return f'<tool_result tool="{tool}" status="success"{caller_attr}>\n{content}\n</tool_result>'
 
     error_code = result.get("error_code", "")
     error_msg = result.get("error_message", "未知错误")
@@ -85,7 +108,7 @@ def format_result_for_ai(result: Dict[str, Any]) -> str:
     if detail:
         parts.append(f"详情: {json.dumps(detail, ensure_ascii=False)}")
     content = "\n".join(parts)
-    return f'<tool_result tool="{tool}" status="error">\n{content}\n</tool_result>'
+    return f'<tool_result tool="{tool}" status="error"{caller_attr}>\n{content}\n</tool_result>'
 
 
 # ========================================
@@ -162,7 +185,7 @@ def _load_mcp_tools():
 # 工具执行
 # ========================================
 
-def execute_tool(name: str, params: dict) -> Dict[str, Any]:
+def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
     """执行工具调用，返回标准化结果"""
     start_time = time.perf_counter()
 
@@ -178,7 +201,7 @@ def execute_tool(name: str, params: dict) -> Dict[str, Any]:
 
     handler = _TOOL_HANDLERS.get(name)
     if handler:
-        result = handler(params)
+        result = handler(params, command=command)
         if "execution_time" not in result:
             result["execution_time"] = round((time.perf_counter() - start_time) * 1000, 2)
         return result
@@ -210,7 +233,7 @@ def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Opt
         future_to_index = {}
         for i, call in enumerate(calls):
             try:
-                future = executor.submit(execute_tool, call["tool"], call.get("params", {}))
+                future = executor.submit(execute_tool, call["tool"], call.get("params", {}), call.get("command", ""))
                 future_to_index[future] = i
             except Exception as e:
                 results.append(error_result(

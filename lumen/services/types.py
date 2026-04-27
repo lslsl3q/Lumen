@@ -18,3 +18,4 @@ class SessionInfo(TypedDict):
     session_id: str
     character_id: str
     created_at: str
+    title: str | None

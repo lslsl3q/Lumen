@@ -14,12 +14,22 @@ import {
 } from '../api/persona';
 import * as avatarApi from '../api/avatar';
 import type { AvatarItem } from '../types/avatar';
+import { SettingsPageProps } from '../types/settings';
 
-function PersonaEditor() {
-  const { id } = useParams<{ id: string }>();
+interface PersonaEditorProps extends SettingsPageProps {
+  personaId?: string;
+}
+
+function PersonaEditor({ personaId: personaIdProp, onBack, onNavigate }: PersonaEditorProps) {
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = personaIdProp || paramId;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isEditMode = !!id;
+
+  // 导航辅助：优先用回调，回退到路由
+  const goBack = onBack ?? (() => navigate('/settings/personas'));
+  const goTo = onNavigate ?? ((page: string, _params?: { id?: string }) => navigate(`/settings/${page}`));
 
   // 表单状态
   const [personaId, setPersonaId] = useState('');
@@ -122,7 +132,7 @@ function PersonaEditor() {
 
       setSuccessMsg('保存成功');
       setTimeout(() => {
-        navigate('/settings/personas');
+        goBack();
       }, 800);
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
@@ -133,19 +143,19 @@ function PersonaEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface-deep flex items-center justify-center text-slate-600">
+      <div className="h-full bg-surface-deep flex items-center justify-center text-slate-600">
         加载中...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       <div className="max-w-2xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate('/settings/personas')}
+            onClick={() => goBack()}
             className="
               px-3 py-1.5 rounded-lg text-sm text-slate-400
               hover:text-slate-200 hover:bg-slate-800/60
@@ -185,7 +195,7 @@ function PersonaEditor() {
                 w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                 border border-slate-700/60 text-slate-200
                 placeholder:text-slate-600 disabled:opacity-50
-                focus:border-indigo-500/40 focus:outline-none
+                focus:border-indigo-500/40 focus:outline-hidden
                 transition-all duration-150
               "
             />
@@ -202,7 +212,7 @@ function PersonaEditor() {
                 w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                 border border-slate-700/60 text-slate-200
                 placeholder:text-slate-600
-                focus:border-indigo-500/40 focus:outline-none
+                focus:border-indigo-500/40 focus:outline-hidden
                 transition-all duration-150
               "
             />
@@ -220,7 +230,7 @@ function PersonaEditor() {
                 w-full px-3 py-2 rounded-lg text-sm bg-slate-800/60
                 border border-slate-700/60 text-slate-200
                 placeholder:text-slate-600 resize-y
-                focus:border-indigo-500/40 focus:outline-none
+                focus:border-indigo-500/40 focus:outline-hidden
                 transition-all duration-150
               "
             />
@@ -298,7 +308,7 @@ function PersonaEditor() {
                   flex-1 px-3 py-2 rounded-lg text-sm bg-slate-800/60
                   border border-slate-700/60 text-slate-200
                   placeholder:text-slate-600
-                  focus:border-indigo-500/40 focus:outline-none
+                  focus:border-indigo-500/40 focus:outline-hidden
                   transition-all duration-150
                 "
               />
@@ -393,7 +403,7 @@ function PersonaEditor() {
               {/* 底部按钮 */}
               <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-700/60">
                 <button
-                  onClick={() => navigate('/settings/avatars')}
+                  onClick={() => goTo('avatar-manager')}
                   className="
                     px-4 py-2 rounded-lg text-sm
                     bg-slate-800/60 text-slate-400 border border-slate-700/60

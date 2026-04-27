@@ -57,6 +57,7 @@ class SingleToolCall(BaseModel):
 
     mode: str = "single"
     tool: str = ""
+    command: str = ""
     params: Dict[str, Any] = {}
     call_id: Optional[str] = None
     run_in_background: Optional[bool] = None

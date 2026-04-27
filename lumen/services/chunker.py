@@ -2,12 +2,55 @@
 Lumen - 文本分块器
 句子边界感知，支持重叠，用于知识库向量化
 """
+import re
 import logging
 from typing import List
 
 logger = logging.getLogger(__name__)
 
 _BREAK_CHARS = set('。！？；\n.!?;:')
+
+
+def split_sentences(text: str) -> List[str]:
+    """将文本切分为句子列表（中文为主，兼容英文）
+
+    规则：在句末标点（。！？；.!?）和换行处切分，
+    保留省略号（……）不切，跳过空句子。
+    """
+    if not text or not text.strip():
+        return []
+
+    # 先把省略号替换为占位符，防止被当成句号切分
+    text = text.replace("……", "\x00ELLIPSIS\x00")
+    text = text.replace("...", "\x00DOTS\x00")
+
+    # 在句末标点后切分
+    parts = re.split(r'([。！？；!?])', text)
+
+    # 重新拼接：标点归入前一句
+    sentences = []
+    buffer = ""
+    for part in parts:
+        buffer += part
+        if part and part[-1] in '。！？；!?':
+            sentences.append(buffer.strip())
+            buffer = ""
+
+    # 换行也作为切分点
+    if buffer:
+        for line in buffer.split('\n'):
+            line = line.strip()
+            if line:
+                sentences.append(line)
+
+    # 恢复省略号
+    sentences = [
+        s.replace("\x00ELLIPSIS\x00", "……").replace("\x00DOTS\x00", "...")
+        for s in sentences
+    ]
+
+    # 过滤空句子
+    return [s for s in sentences if s.strip()]
 
 
 def chunk_text(

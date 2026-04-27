@@ -9,9 +9,14 @@ import { useNavigate } from 'react-router-dom';
 import { useKnowledge } from '../hooks/useKnowledge';
 import { searchKnowledge } from '../api/knowledge';
 import type { KnowledgeSearchResult } from '../types/knowledge';
+import type { SettingsPageProps } from '../types/settings';
+import { toast } from '../utils/toast';
 
-function KnowledgeList() {
+interface KnowledgeListProps extends SettingsPageProps {}
+
+function KnowledgeList({ onBack }: KnowledgeListProps) {
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/'));
   const { files, isLoading, upload, create, remove } = useKnowledge();
 
   // 搜索状态
@@ -37,7 +42,7 @@ function KnowledgeList() {
         try {
           await upload(file);
         } catch (err) {
-          alert(`${file.name}: ${err instanceof Error ? err.message : '上传失败'}`);
+          toast(`${file.name}: ${err instanceof Error ? err.message : '上传失败'}`, 'error');
         }
       }
     };
@@ -53,7 +58,7 @@ function KnowledgeList() {
       setCreateFilename('');
       setCreateContent('');
     } catch (err) {
-      alert(err instanceof Error ? err.message : '创建失败');
+      toast(err instanceof Error ? err.message : '创建失败', 'error');
     } finally {
       setCreating(false);
     }
@@ -64,7 +69,7 @@ function KnowledgeList() {
     try {
       await remove(fileId);
     } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败');
+      toast(err instanceof Error ? err.message : '删除失败', 'error');
     }
   };
 
@@ -91,12 +96,12 @@ function KnowledgeList() {
   const formatScore = (score: number) => `${(score * 100).toFixed(0)}%`;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="h-full bg-slate-950 text-slate-200">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-6 px-6 py-4">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={goBack}
             className="text-slate-400 hover:text-slate-200 transition-colors"
           >
             &larr; 返回聊天
@@ -129,7 +134,7 @@ function KnowledgeList() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="语义搜索知识库..."
-              className="flex-1 px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 transition-colors text-sm"
+              className="flex-1 px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-amber-500/50 transition-colors text-sm"
             />
             <button
               onClick={handleSearch}
@@ -223,14 +228,14 @@ function KnowledgeList() {
                 value={createFilename}
                 onChange={(e) => setCreateFilename(e.target.value)}
                 placeholder="文件名（如 世界观.md）"
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-amber-500/50 text-sm"
               />
               <textarea
                 value={createContent}
                 onChange={(e) => setCreateContent(e.target.value)}
                 placeholder="内容..."
                 rows={10}
-                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm resize-y"
+                className="w-full px-3 py-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-amber-500/50 text-sm resize-y"
               />
             </div>
 

@@ -1,6 +1,65 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700&display=swap');
+@import "tailwindcss";
+@import "./editor.css";
+
+/* === Tailwind CSS v4 主题配置 ===
+ * 使用 @theme 指令定义自定义设计令牌
+ */
+@theme {
+  /* === 自定义颜色扩展 — 暖灰色调（slate 覆盖） === */
+  --color-slate-50: #FAFAF8;
+  --color-slate-100: #F3F3F0;
+  --color-slate-200: #E8E7E3;
+  --color-slate-300: #D1D0CC;
+  --color-slate-400: #ABA499;
+  --color-slate-500: #8A8478;
+  --color-slate-600: #6A655C;
+  --color-slate-700: #4A4744;
+  --color-slate-800: #333230;
+  --color-slate-900: #1F1F1E;
+  --color-slate-950: #141413;
+
+  /* === 自定义颜色扩展 — 琥珀色阶（amber 覆盖） === */
+  --color-amber-50: #FEF6F2;
+  --color-amber-100: #FDE8DF;
+  --color-amber-200: #F5CFC0;
+  --color-amber-300: #E8A48C;
+  --color-amber-400: #CC7C5E;
+  --color-amber-500: #B86A4A;
+  --color-amber-600: #A05838;
+  --color-amber-700: #86462C;
+  --color-amber-800: #6E3824;
+  --color-amber-900: #5C2F20;
+  --color-amber-950: #331610;
+
+  /* === 语义色（CSS 变量驱动） === */
+  --color-primary: var(--color-primary);
+  --color-primary-light: var(--color-primary-light);
+  --color-primary-dim: var(--color-primary-dim);
+
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+
+  --color-success: var(--color-success);
+  --color-success-light: var(--color-success-light);
+
+  --color-error: var(--color-error);
+  --color-error-light: var(--color-error-light);
+
+  --color-surface-deep: var(--color-bg-deep);
+  --color-surface-base: var(--color-bg-base);
+  --color-surface: var(--color-bg-surface);
+  --color-surface-elevated: var(--color-bg-elevated);
+
+  /* === 自定义边框颜色 === */
+  --border-color-theme: var(--color-border);
+  --border-color-theme-subtle: var(--color-border-subtle);
+
+  /* === 字体家族 === */
+  --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
 
 /* === Lumen 设计令牌 — 暖室台灯（Claude Desktop 风格） ===
  *
@@ -10,6 +69,9 @@
  * 将来做主题系统时，只需切换这套变量即可全局换色。
  */
 :root {
+  /* === 全局字体 === */
+  font-family: var(--font-body);
+
   /* === 主色 — 橙棕色系列（暖光） === */
   --color-primary: #CC7C5E;         /* amber-400 — 暖棕 accent */
   --color-primary-dim: #B86A4A;     /* amber-500 — 深暖棕 */
@@ -57,4 +119,81 @@
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+}
+
+/* ContextPanel 退出 */
+@keyframes slide-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(100%); }
+}
+.animate-slide-out {
+  animation: slide-out 0.2s ease-in forwards;
+}
+
+/* SettingsOverlay 遮罩淡入 */
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-overlay-fade-in {
+  animation: overlay-fade-in 0.25s ease-out;
+}
+
+/* SettingsOverlay 内容入场 */
+@keyframes overlay-content-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-overlay-content-in {
+  animation: overlay-content-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* FloatingWindow 入场 */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-in {
+  animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* === 硅胶质感工具类（Soft UI / Neumorphism） ===
+ *
+ * 原理：双层阴影（暗影 + 亮边）+ 顶部高光 + 按压内凹
+ * 在暖灰底色上产生类似磨砂硅胶的立体感
+ */
+
+/* 面板级质感 — 用于侧边栏、卡片容器 */
+.soft-panel {
+  box-shadow:
+    6px 6px 12px rgba(0, 0, 0, 0.35),
+    -3px -3px 8px rgba(60, 58, 55, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* 条目级质感 — 用于会话条目、卡片 */
+.soft-item {
+  box-shadow:
+    3px 3px 6px rgba(0, 0, 0, 0.25),
+    -2px -2px 4px rgba(55, 53, 50, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  border-radius: 10px;
+}
+
+/* 按钮级质感 */
+.soft-btn {
+  box-shadow:
+    2px 2px 5px rgba(0, 0, 0, 0.3),
+    -1px -1px 3px rgba(55, 53, 50, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+/* 按下效果 — 内凹 */
+.soft-pressed {
+  box-shadow:
+    inset 2px 2px 5px rgba(0, 0, 0, 0.3),
+    inset -1px -1px 3px rgba(55, 53, 50, 0.12);
+  transform: translateY(1px);
+  border-color: rgba(0, 0, 0, 0.15);
 }

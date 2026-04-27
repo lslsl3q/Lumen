@@ -67,7 +67,7 @@ async def api_upload_file(
         raise HTTPException(status_code=400, detail="非法子目录路径")
 
     try:
-        meta = await knowledge_store.import_file(filename, text, category=category, subdir=subdir)
+        meta = await knowledge_store.import_file(filename, text, category=category, subdir=subdir, source="upload")
         return meta
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))

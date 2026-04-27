@@ -42,6 +42,21 @@ env/
 *.sqlite3
 *.log
 data/
+# 思维簇系统模板（文档 + 默认模块 + 链配置）需要入库
+!lumen/data/
+!lumen/data/thinking_clusters/
+!lumen/data/thinking_clusters/SPECIFICATION.md
+!lumen/data/thinking_clusters/chains.json
+!lumen/data/thinking_clusters/task_context/
+!lumen/data/thinking_clusters/reasoning_patterns/
+!lumen/data/thinking_clusters/self_correction/
+
+# 运行时数据（用户日记、配置、缓存）
+lumen/data/daily_note/
+lumen/data/knowledge/daily_note/
+lumen/data/runtime_config.json
+lumen/data/tdb_registry.json
+snapshot*.txt
 
 # ========================================
 # 用户个人数据（Persona / 世界书 / 角色 / Skills，只追踪 default 模板）

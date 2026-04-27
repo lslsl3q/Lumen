@@ -1,132 +1,218 @@
 {
+  "file_manager": {
+    "description": "文件系统管理工具，支持读写文件、目录操作、搜索、编辑、复制移动等",
+    "usage_guide": "所有文件/目录操作统一通过此工具完成。command 决定具体操作：read读文件、write写文件、edit精确替换、list列目录、glob搜文件名、grep搜文件内容、info查文件信息。搜索文件名用 glob，搜索文件内容用 grep。注意：当用户描述的路径不明确时，先用 list 查看父目录，确认实际路径名后再操作，不要猜测路径。",
+    "commands": {
+      "read": {
+        "description": "读取文件内容（支持文本/图片/PDF），带行号",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "文件路径" },
+            "encoding": { "type": "string", "description": "文件编码，默认utf-8" },
+            "offset": { "type": "integer", "description": "起始行号，默认1" },
+            "limit": { "type": "integer", "description": "最大行数，默认2000" }
+          },
+          "required": ["path"]
+        }
+      },
+      "list": {
+        "description": "列出目录内容（表格形式，显示名称/类型/大小/时间）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "目录路径" }
+          },
+          "required": ["path"]
+        }
+      },
+      "glob": {
+        "description": "按文件名模式搜索文件（支持 **/*.py 等通配符）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "搜索根目录" },
+            "pattern": { "type": "string", "description": "文件名模式，如 **/*.py" }
+          },
+          "required": ["path", "pattern"]
+        }
+      },
+      "grep": {
+        "description": "按正则表达式搜索文件内容",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "搜索路径（文件或目录）" },
+            "pattern": { "type": "string", "description": "正则表达式" },
+            "case_sensitive": { "type": "boolean", "description": "区分大小写，默认false" }
+          },
+          "required": ["path", "pattern"]
+        }
+      },
+      "info": {
+        "description": "获取文件或目录的元信息（大小/类型/时间等）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "文件或目录路径" }
+          },
+          "required": ["path"]
+        }
+      },
+      "write": {
+        "description": "创建或覆盖文件（自动创建父目录，已有文件自动备份.bak）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "文件路径" },
+            "content": { "type": "string", "description": "文件内容" },
+            "encoding": { "type": "string", "description": "文件编码，默认utf-8" }
+          },
+          "required": ["path", "content"]
+        }
+      },
+      "edit": {
+        "description": "精确替换文件中的文本（SEARCH/REPLACE方式，old_string必须在文件中唯一）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "文件路径" },
+            "old_string": { "type": "string", "description": "要替换的原始文本（必须精确匹配）" },
+            "new_string": { "type": "string", "description": "替换后的新文本" },
+            "encoding": { "type": "string", "description": "文件编码，默认utf-8" }
+          },
+          "required": ["path", "old_string", "new_string"]
+        }
+      },
+      "append": {
+        "description": "追加内容到文件末尾（文件不存在则创建）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "文件路径" },
+            "content": { "type": "string", "description": "追加内容" },
+            "encoding": { "type": "string", "description": "文件编码，默认utf-8" }
+          },
+          "required": ["path", "content"]
+        }
+      },
+      "copy": {
+        "description": "复制文件（目标已存在自动改名）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "源文件路径" },
+            "destination": { "type": "string", "description": "目标路径" }
+          },
+          "required": ["path", "destination"]
+        }
+      },
+      "move": {
+        "description": "移动文件（目标已存在自动改名）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "源文件路径" },
+            "destination": { "type": "string", "description": "目标路径" }
+          },
+          "required": ["path", "destination"]
+        }
+      },
+      "rename": {
+        "description": "重命名文件（目标已存在则拒绝覆盖）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "原文件路径" },
+            "destination": { "type": "string", "description": "新文件名或路径" }
+          },
+          "required": ["path", "destination"]
+        }
+      },
+      "delete": {
+        "description": "删除文件到回收站（安全删除，不直接永久删除）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "文件路径" }
+          },
+          "required": ["path"]
+        }
+      },
+      "mkdir": {
+        "description": "创建目录（递归创建，类似 mkdir -p）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "目录路径" }
+          },
+          "required": ["path"]
+        }
+      },
+      "download": {
+        "description": "从URL下载文件到本地",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "description": "保存路径" },
+            "url": { "type": "string", "description": "下载地址" }
+          },
+          "required": ["path", "url"]
+        }
+      }
+    }
+  },
+  "web": {
+    "description": "网络工具，支持互联网搜索和网页内容抓取",
+    "usage_guide": "search搜索互联网获取实时信息（新闻/天气/价格等），fetch抓取指定URL的网页正文。通常先search获取URL列表，再用fetch读取详情。",
+    "commands": {
+      "search": {
+        "description": "搜索互联网获取实时信息",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string", "description": "搜索关键词" },
+            "max_results": { "type": "integer", "description": "返回结果数量，默认5，最多10" }
+          },
+          "required": ["query"]
+        }
+      },
+      "fetch": {
+        "description": "抓取指定URL的网页内容并提取正文",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "description": "网页URL" },
+            "max_length": { "type": "integer", "description": "返回内容最大字符数，默认5000" }
+          },
+          "required": ["url"]
+        }
+      }
+    }
+  },
   "calculate": {
     "description": "计算数学表达式的结果，支持加减乘除、幂运算、括号",
     "usage_guide": "用户需要数学计算时必须调用，不要自己心算。适合加减乘除、百分比、单位换算等场景。",
     "parameters": {
       "type": "object",
       "properties": {
-        "expression": {
-          "type": "string",
-          "description": "数学表达式，例如 2+3*4 或 (100-20)/8"
-        }
+        "expression": { "type": "string", "description": "数学表达式，例如 2+3*4 或 (100-20)/8" }
       },
       "required": ["expression"]
     }
   },
-  "web_search": {
-    "description": "搜索互联网获取实时信息，适合回答需要最新数据的问题",
-    "usage_guide": "需要实时信息、事实查询、新闻、天气、价格等可能随时间变化的内容时使用。不确定时先搜索再回答。",
+  "daily_note": {
+    "description": "保存重要信息到日记/档案，跨会话可用",
+    "usage_guide": "你有持久日记能力。以下情况应主动保存：\n- 用户偏好（\"我喜欢简洁回复\"、\"不要用emoji\"）\n- 重要约定（\"下次聊第三章\"）\n- 关键事实（\"我的项目叫XXX\"）\n- 决策记录（\"决定用方案B\"）\n\n不要保存：临时闲聊、已完成的任务进度、用户能看到的信息\n调用 daily_note 工具保存，自动打 tags 帮助未来检索。",
     "parameters": {
       "type": "object",
       "properties": {
-        "query": {
-          "type": "string",
-          "description": "搜索关键词，用简短的词语描述要查找的内容"
-        },
-        "max_results": {
-          "type": "integer",
-          "description": "返回结果数量，默认5，最多10"
-        }
+        "content": { "type": "string", "description": "要记住的内容（用第三人称描述，如'用户喜欢简洁回复'）" },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "标签（帮助未来检索）" },
+        "importance": { "type": "integer", "description": "重要度 1-5（5最重要），默认3" },
+        "category": { "type": "string", "description": "分类：preference/fact/context/decision，默认context" }
       },
-      "required": ["query"]
-    }
-  },
-  "web_fetch": {
-    "description": "抓取指定URL的网页内容并提取正文文本，适合读取文章、博客、文档等公开页面",
-    "usage_guide": "用户提供URL想了解页面内容，或搜索结果中需要进一步读取某个网页详情时使用。通常在 web_search 之后调用。",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "url": {
-          "type": "string",
-          "description": "要抓取的网页URL，必须是http或https开头"
-        },
-        "max_length": {
-          "type": "integer",
-          "description": "返回内容的最大字符数，默认5000，最大10000"
-        }
-      },
-      "required": ["url"]
-    }
-  },
-  "file_read": {
-    "description": "文件读取工具，支持多种操作：读取文件内容、列出目录、按文件名搜索、按内容搜索、查看文件信息",
-    "usage_guide": "需要读取文件、查看目录结构、搜索文件或搜索文件内容时使用。action决定具体操作：read读文件内容（支持文本/图片/PDF）、list列目录、glob按模式搜索文件名、grep按正则搜索文件内容、info查文件元信息。搜索文件名用glob，搜索文件内容用grep。注意：当用户描述的路径不明确时（如'D盘软件文件夹'），先用list查看父目录，确认实际路径名后再操作，不要猜测路径。匹配目录名时要考虑中英文对应（软件=Software、游戏=Game、文档=Documents、下载=Download）和常见缩写，不要只做字面匹配。",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "action": {
-          "type": "string",
-          "description": "操作类型：read读文件、list列目录、glob按模式搜索文件名、grep按正则搜索文件内容、info查文件信息"
-        },
-        "path": {
-          "type": "string",
-          "description": "文件或目录的绝对路径"
-        },
-        "pattern": {
-          "type": "string",
-          "description": "搜索模式（glob用文件名模式如**/*.py，grep用正则表达式）"
-        },
-        "encoding": {
-          "type": "string",
-          "description": "文件编码，默认utf-8"
-        },
-        "offset": {
-          "type": "integer",
-          "description": "read操作的起始行号，默认1"
-        },
-        "limit": {
-          "type": "integer",
-          "description": "read操作的最大行数，默认2000"
-        },
-        "case_sensitive": {
-          "type": "boolean",
-          "description": "grep操作是否区分大小写，默认false"
-        }
-      },
-      "required": ["action", "path"]
-    }
-  },
-  "file_write": {
-    "description": "文件写入工具，支持多种操作：写文件、精确编辑、追加、复制、移动、重命名、删除（到回收站）、创建目录、从URL下载",
-    "usage_guide": "需要创建、修改、管理文件时使用。action决定具体操作：write创建或覆盖文件、edit精确替换文件中的文本（需提供old_string和new_string）、append追加内容、copy复制、move移动、rename重命名、delete删除到回收站、mkdir创建目录、download从URL下载。write会自动创建父目录并备份已有文件。",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "action": {
-          "type": "string",
-          "description": "操作类型：write写文件、edit精确替换、append追加、copy复制、move移动、rename重命名、delete删除到回收站、mkdir创建目录、download从URL下载"
-        },
-        "path": {
-          "type": "string",
-          "description": "文件或目录的绝对路径"
-        },
-        "content": {
-          "type": "string",
-          "description": "要写入或追加的内容（write/append时必填）"
-        },
-        "old_string": {
-          "type": "string",
-          "description": "要替换的原始文本（edit时必填，必须精确匹配）"
-        },
-        "new_string": {
-          "type": "string",
-          "description": "替换后的新文本（edit时必填）"
-        },
-        "destination": {
-          "type": "string",
-          "description": "目标路径（copy/move/rename时必填）"
-        },
-        "url": {
-          "type": "string",
-          "description": "下载地址（download时必填）"
-        },
-        "encoding": {
-          "type": "string",
-          "description": "文件编码，默认utf-8"
-        }
-      },
-      "required": ["action", "path"]
+      "required": ["content"]
     }
   }
 }

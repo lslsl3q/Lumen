@@ -5,7 +5,7 @@
 from lumen.tool import success_result, error_result, ErrorCode
 
 
-def execute(params: dict) -> dict:
+def execute(params: dict, command: str = "") -> dict:
     """计算数学表达式"""
     expression = params.get("expression", "")
 

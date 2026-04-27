@@ -36,6 +36,13 @@ class SessionListItem(BaseModel):
     character_id: str
     created_at: str
     message_count: int
+    title: Optional[str] = None
+
+
+class RenameSessionRequest(BaseModel):
+    """重命名会话请求"""
+    session_id: str
+    title: str
 
 
 # ========================================
@@ -115,7 +122,8 @@ async def list_sessions(
                 session_id=s["session_id"],
                 character_id=s["character_id"],
                 created_at=s["created_at"],
-                message_count=0  # 暂时设置为0，以后可以查询消息数量
+                message_count=0,
+                title=s.get("title"),
             )
             for s in sessions
         ]
@@ -176,3 +184,19 @@ async def reset_session(session_id: str = "default") -> dict:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"重置会话失败: {str(e)}")
+
+
+@router.patch("/rename")
+async def rename_session(req: RenameSessionRequest) -> dict:
+    """重命名会话"""
+    try:
+        title = req.title.strip()[:50]
+        if not title:
+            raise HTTPException(status_code=400, detail="标题不能为空")
+        await asyncio.to_thread(history.update_session_title, req.session_id, title)
+        return {"message": f"已重命名会话", "session_id": req.session_id, "title": title}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"重命名会话失败: {str(e)}")

@@ -1,0 +1,266 @@
+/* ── 富文本编辑器暖灰主题 ── */
+
+/* ProseMirror 编辑区 */
+.rich-text-editor-prosemirror {
+  padding: 1rem 1.5rem;
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: #94a3b8;
+  caret-color: #CC7C5E;
+}
+
+.rich-text-editor-prosemirror:focus {
+  outline: none;
+}
+
+/* 标题 */
+.rich-text-editor-prosemirror h1 {
+  color: #E8E7E3;
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid rgba(204, 124, 94, 0.15);
+}
+
+.rich-text-editor-prosemirror h2 {
+  color: #E8E7E3;
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.3em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid rgba(204, 124, 94, 0.1);
+}
+
+.rich-text-editor-prosemirror h3 {
+  color: #D4D0CA;
+  font-size: 1.1em;
+  font-weight: 500;
+  margin-top: 0.8em;
+  margin-bottom: 0.3em;
+}
+
+/* 段落 */
+.rich-text-editor-prosemirror p {
+  margin-bottom: 0.6em;
+}
+
+/* 加粗 / 斜体 / 删除线 */
+.rich-text-editor-prosemirror strong {
+  color: #E8E7E3;
+  font-weight: 600;
+}
+
+.rich-text-editor-prosemirror em {
+  font-style: italic;
+}
+
+.rich-text-editor-prosemirror s {
+  opacity: 0.5;
+}
+
+/* 行内代码 */
+.rich-text-editor-prosemirror code {
+  background: rgba(204, 124, 94, 0.1);
+  border: 1px solid rgba(204, 124, 94, 0.15);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 0.85em;
+  color: #CC7C5E;
+}
+
+/* 代码块 */
+.rich-text-editor-prosemirror pre {
+  background: #141413;
+  border: 1px solid rgba(204, 124, 94, 0.1);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0.75em 0;
+  overflow-x: auto;
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.rich-text-editor-prosemirror pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: #94a3b8;
+}
+
+/* 引用 */
+.rich-text-editor-prosemirror blockquote {
+  border-left: 3px solid rgba(204, 124, 94, 0.3);
+  background: rgba(204, 124, 94, 0.03);
+  padding: 0.5em 0.75em;
+  margin: 0.75em 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.rich-text-editor-prosemirror blockquote p {
+  margin-bottom: 0.3em;
+}
+
+/* 列表 */
+.rich-text-editor-prosemirror ul {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin-bottom: 0.6em;
+}
+
+.rich-text-editor-prosemirror ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 0.6em;
+}
+
+.rich-text-editor-prosemirror li {
+  margin-bottom: 0.2em;
+}
+
+.rich-text-editor-prosemirror li p {
+  margin-bottom: 0.15em;
+}
+
+/* 任务列表 */
+.rich-text-editor-prosemirror ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rich-text-editor-prosemirror ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+}
+
+.rich-text-editor-prosemirror ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.15em;
+}
+
+.rich-text-editor-prosemirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #4a4540;
+  border-radius: 3px;
+  background: #141413;
+  cursor: pointer;
+  position: relative;
+}
+
+.rich-text-editor-prosemirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked {
+  background: #CC7C5E;
+  border-color: #CC7C5E;
+}
+
+.rich-text-editor-prosemirror ul[data-type="taskList"] li > label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0.5px;
+  width: 5px;
+  height: 8px;
+  border: solid #141413;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* 分割线 */
+.rich-text-editor-prosemirror hr {
+  border: none;
+  border-top: 1px solid rgba(204, 124, 94, 0.15);
+  margin: 1.5em 0;
+}
+
+/* 链接 */
+.rich-text-editor-prosemirror a {
+  color: #CC7C5E;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.rich-text-editor-prosemirror a:hover {
+  color: #E8A88E;
+}
+
+/* 高亮 */
+.rich-text-editor-prosemirror mark {
+  background: rgba(204, 124, 94, 0.25);
+  border-radius: 2px;
+  padding: 0.05em 0.1em;
+}
+
+/* 占位符 */
+.rich-text-editor-prosemirror .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #4a4540;
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+/* 下划线 */
+.rich-text-editor-prosemirror u {
+  text-decoration-color: rgba(204, 124, 94, 0.4);
+}
+
+/* ── 斜杠命令菜单 ── */
+
+.slash-command-list {
+  background: #1f1f1c;
+  border: 1px solid #2a2926;
+  border-radius: 10px;
+  padding: 4px;
+  width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.slash-command-list > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.slash-command-list > div:hover,
+.slash-command-list > div[aria-selected="true"] {
+  background: rgba(204, 124, 94, 0.08);
+}
+
+/* ── 编辑器容器 ── */
+
+.novel-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.novel-editor-wrapper > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.novel-editor-wrapper > div > div {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}

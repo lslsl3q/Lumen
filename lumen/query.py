@@ -20,7 +20,7 @@ from lumen.services import history
 from lumen.services import memory
 from lumen.services.context.compact import should_compact, compact_session
 from lumen.services.context.token_estimator import extract_usage, record_usage
-from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_ai
+from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_ai, set_tool_context
 from lumen.tools.parse import parse_tool_call
 from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat
@@ -75,72 +75,6 @@ def _find_last_user_index(messages: list[Message]) -> int:
         if messages[i]["role"] == "user":
             return i
     return -1
-
-
-# JSON 工具调用模式前缀 — 用于流式软静默检测
-_TOOL_JSON_PREFIXES = (
-    '{"type": "tool_call"',
-    '{"type":"tool_call"',
-    '{"type": "tool_call_parallel"',
-    '{"type":"tool_call_parallel"',
-    '{"tool":',
-    '{"tool" :',
-    '{"calls":',
-    '{"calls" :',
-)
-
-
-def _should_start_silence(buffer: str, new_chunk_len: int) -> bool:
-    """判断是否应进入 JSON 静默模式
-
-    策略：在已输出文字中检测 `{` + 工具调用前缀模式。
-    不是二选一判断，只是"先暂停显示"。
-
-    Args:
-        buffer: 已发送文字 + 当前 chunk 的拼接
-        new_chunk_len: 当前 chunk 的长度（用于判断增量）
-    """
-    # 找最后一个 { 的位置（可能是工具调用 JSON 的起点）
-    brace_idx = buffer.rfind('{')
-    if brace_idx < 0:
-        return False
-
-    from_brace = buffer[brace_idx:]
-
-    # 检查从 { 开始的内容是否匹配工具调用模式
-    for prefix in _TOOL_JSON_PREFIXES:
-        if from_brace.startswith(prefix):
-            return True
-
-    # { 开头但内容还不够长 → 检查关键词片段
-    if len(from_brace) < 40 and from_brace.startswith('{'):
-        if '"tool"' in from_brace or '"calls"' in from_brace or '"type"' in from_brace:
-            return True
-
-    return False
-
-
-def _should_hold_brace(text_emitted: str, content: str) -> bool:
-    """判断是否应暂缓发送当前 chunk（{ 可能是工具调用 JSON 的开头）
-
-    策略：如果 text_emitted 以 { 结尾且内容很短（可能是刚输出的 JSON 起始花括号），
-    暂缓一个 chunk，等更多信息确认是工具调用还是普通文字。
-    """
-    if not text_emitted:
-        return False
-    # text_emitted 以 { 结尾，且整体很短（说明是刚输出的 JSON 开头）
-    if text_emitted == '{':
-        return True
-    # text_emitted 以 { 结尾且前面是文字（如 "好的，{ "）
-    stripped = text_emitted.rstrip()
-    if stripped.endswith('{') and len(stripped) >= 1:
-        # 检查 { 前面是否有足够多的文字（如果是，说明可能只是文字中夹了一个花括号）
-        before_brace = stripped[:-1]
-        # 只有 { 前面的文字很短时才暂缓（很可能是纯工具调用开头）
-        if len(before_brace) <= 3:
-            return True
-    return False
-
 
 def _prepare_messages(messages: list[Message], character_id: str = "default") -> list[Message]:
     """预处理消息：折叠工具调用 → 裁剪上下文 → 过滤已折叠 → 模板变量替换
@@ -292,7 +226,7 @@ async def _resolve_knowledge_placeholders(
             resolved_text, has_placeholders, covered_ids = await resolve(
                 msg["content"],
                 user_input,
-                token_budget=character_config.get("knowledge_token_budget", 800),
+                token_budget=character_config.get("knowledge_token_budget", 0) or None,
             )
             if has_placeholders:
                 result = list(messages)
@@ -324,7 +258,11 @@ async def _inject_knowledge(
 
     top_k = character_config.get("knowledge_top_k", 3)
     min_score = character_config.get("knowledge_min_score", 0.3)
-    token_budget = character_config.get("knowledge_token_budget", 500)
+    if character_config.get("knowledge_token_budget"):
+        token_budget = character_config["knowledge_token_budget"]
+    else:
+        from lumen.config import KNOWLEDGE_SEMANTIC_BUDGET
+        token_budget = KNOWLEDGE_SEMANTIC_BUDGET
 
     results = await knowledge_search(user_input, top_k=top_k, min_score=min_score)
     if not results:
@@ -377,7 +315,63 @@ async def _inject_knowledge(
     return result, kb_log
 
 
-def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
+async def _inject_thinking_clusters(
+    messages: list[Message],
+    user_input: str,
+    character_config: dict,
+) -> tuple[list[Message], list[dict]]:
+    """执行思维簇管道，注入检索到的思维模块
+
+    仅在角色配置 thinking_clusters_enabled=True 时激活。
+    管道：嵌入用户查询 → 按链配置依次检索各簇 → 向量融合 → token 预算裁剪 → 注入
+    """
+    if not character_config.get("thinking_clusters_enabled", False):
+        return messages, []
+
+    from lumen.services.thinking_clusters import run_chain, get_chain_config, ensure_indexed
+    from lumen.services.embedding import get_service
+
+    # 加载链配置
+    chain_name = character_config.get("thinking_clusters_chain", "default")
+    chain = get_chain_config(chain_name)
+    if not chain.steps:
+        return messages, []
+
+    # 确保模块已索引
+    await ensure_indexed()
+
+    # 编码用户查询（必须用 thinking_clusters 服务的后端，与索引一致）
+    backend = await get_service("thinking_clusters")
+    if not backend:
+        return messages, []
+    query_vector = await backend.encode(user_input)
+    if not query_vector:
+        return messages, []
+
+    # 运行管道
+    result = await run_chain(query_vector, chain, character_config)
+    if not result["injection_text"]:
+        return messages, []
+
+    # 注入到最后一条 user 消息之前（与记忆/知识注入一致）
+    last_user_idx = _find_last_user_index(messages)
+    if last_user_idx == -1:
+        return messages, []
+
+    injection_msg = {"role": "system", "content": result["injection_text"]}
+    result_messages = messages[:last_user_idx] + [injection_msg] + messages[last_user_idx:]
+
+    tc_log = [{
+        "source": "thinking_clusters",
+        "chain": chain_name,
+        "modules": len(result["modules"]),
+        "tokens": result["total_tokens"],
+        "degraded": result["degraded_clusters"],
+    }]
+    return result_messages, tc_log
+
+
+def validate_tool_call(tool_name: str, tool_params: dict, command: str = "") -> str | None:
     """验证 AI 的工具调用是否正确
 
     Returns:
@@ -390,7 +384,18 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
         return f"工具 '{tool_name}' 不存在，可用工具: {', '.join(available)}"
 
     tool_def = registry.get_tool(tool_name)
-    params_schema = tool_def.get("parameters", {})
+
+    # 有 commands 的工具：验证 command 并用对应 schema 验证参数
+    commands = tool_def.get("commands", {})
+    if commands:
+        if not command:
+            return f"工具 '{tool_name}' 需要 command 参数，可用命令: {', '.join(commands.keys())}"
+        if command not in commands:
+            return f"工具 '{tool_name}' 没有命令 '{command}'，可用命令: {', '.join(commands.keys())}"
+        params_schema = commands[command].get("parameters", {})
+    else:
+        # 简单工具（无 command）：用顶层 parameters 验证
+        params_schema = tool_def.get("parameters", {})
 
     try:
         jsonschema.validate(instance=tool_params, schema=params_schema)
@@ -400,13 +405,55 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
     return None
 
 
-async def chat_non_stream(user_input: str, session: ChatSession) -> str:
+async def _auto_title(session_id: str):
+    """后台 fire-and-forget：用 LLM 从完整对话内容生成简短会话标题"""
+    try:
+        from lumen.services import history as hist
+        messages_raw = await asyncio.to_thread(hist.load_session, session_id)
+
+        conversation_lines = []
+        for msg in messages_raw[:10]:
+            role_label = "用户" if msg["role"] == "user" else "AI"
+            content = msg["content"][:150]
+            conversation_lines.append(f"{role_label}: {content}")
+
+        if not conversation_lines:
+            return
+
+        conversation_text = "\n".join(conversation_lines)
+
+        from lumen.config import DEFAULT_MODEL
+        resp = await chat(
+            messages=[
+                {"role": "system", "content":
+                    "你是一个会话标题生成器。根据以下对话内容，生成一个简短的标题。\n"
+                    "要求：\n"
+                    "- 一句话概括对话的核心话题（10-20字）\n"
+                    "- 要具体，避免模糊的标题如「对话」「讨论」「聊天」\n"
+                    "- 如果对话涉及具体事物，标题中应包含关键信息\n"
+                    "- 只输出标题文本，不加引号、标点或解释"},
+                {"role": "user", "content": conversation_text},
+            ],
+            model=DEFAULT_MODEL,
+            stream=False,
+        )
+        title = resp.choices[0].message.content.strip()[:20]
+        if title:
+            await asyncio.to_thread(hist.update_session_title, session_id, title)
+            logger.info(f"[自动命名] {session_id} -> {title}")
+    except Exception as e:
+        logger.debug(f"自动命名失败（不影响聊天）: {e}")
+
+
+async def chat_non_stream(user_input: str, session: ChatSession, response_style: str = "balanced") -> str:
     """非流式：等AI想完了再一次性返回"""
     session.messages.append({"role": "user", "content": user_input})
-    await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
+    msg_id = await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
+    session.messages[-1]["id"] = msg_id
 
     # 加载角色配置（模型 + compact）
     character_config = load_character(session.character_id)
+    character_config["response_style"] = response_style
     model = get_model(character_config)
 
     # 自动 compact 检查
@@ -419,6 +466,7 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
     # 知识注入：占位符（system prompt 内替换）+ 语义路由（自动兜底），两层叠加
     trimmed, _, covered_ids = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
     trimmed, _ = await _inject_knowledge(trimmed, user_input, character_config, exclude_file_ids=covered_ids)
+    trimmed, _ = await _inject_thinking_clusters(trimmed, user_input, character_config)
 
     response = await chat(trimmed, model, stream=False)
 
@@ -429,11 +477,15 @@ async def chat_non_stream(user_input: str, session: ChatSession) -> str:
 
     reply = response.choices[0].message.content or ""
     session.messages.append({"role": "assistant", "content": reply})
-    await _save_and_vectorize(session.session_id or "default", "assistant", reply, session.character_id)
+    msg_id = await _save_and_vectorize(session.session_id or "default", "assistant", reply, session.character_id)
+    session.messages[-1]["id"] = msg_id
+    # 首次对话完成后生成标题
+    if len(session.messages) <= 5:
+        asyncio.create_task(_auto_title(session.session_id))
     return reply
 
 
-async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool = False) -> AsyncGenerator[SSEEvent, None]:
+async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool = False, response_style: str = "balanced") -> AsyncGenerator[SSEEvent, None]:
     """流式对话（ReAct 循环）
 
     Args:
@@ -443,11 +495,15 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         SSEEvent — TypedDict 类型的事件（text/done/tool_start/tool_result/status/memory_debug）
     """
     session.messages.append({"role": "user", "content": user_input})
-    await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
+    msg_id = await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
+    session.messages[-1]["id"] = msg_id
+    # 推送用户消息的数据库 ID 给前端（用于编辑/删除）
+    yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
 
     _clear_cancel(session.session_id)
 
     character_config = load_character(session.character_id)
+    character_config["response_style"] = response_style
     model = get_model(character_config)
 
     # 自动 compact 检查
@@ -481,7 +537,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             # 知识注入：占位符（system prompt 内替换）+ 语义路由（自动兜底），两层叠加
             trimmed, _, covered_ids = await _resolve_knowledge_placeholders(trimmed, user_input, character_config)
             trimmed, kb_log = await _inject_knowledge(trimmed, user_input, character_config, exclude_file_ids=covered_ids)
-            recall_log = mem_log + kb_log
+            trimmed, tc_log = await _inject_thinking_clusters(trimmed, user_input, character_config)
+            recall_log = mem_log + kb_log + tc_log
 
         # /tokens 记忆调试：yield 提示词分层信息
         if memory_debug and iteration == 0:
@@ -497,6 +554,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                         layer_infos.append({"name": "跨会话记忆", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
                     elif msg["content"].startswith("<knowledge_base>"):
                         layer_infos.append({"name": "知识库检索", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+                    elif msg["content"].startswith("<thinking_modules>"):
+                        layer_infos.append({"name": "思维簇", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
             yield {
                 "type": "memory_debug",
                 "layers": layer_infos,
@@ -511,10 +570,6 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         full_text = ""
         in_think = False  # <think...</think 标签状态
         think_sent_start = False
-        text_emitted = ""  # 已发送给前端的文字（用于 text_set 回退）
-        json_silenced = False  # 进入 JSON 静默模式（不再发送 text 事件）
-        pre_json_text = ""  # JSON 出现前的文字
-        holding_brace = False  # 正在暂缓 { 的发送（等下一个 chunk 确认）
 
         async for chunk in response:
             if not chunk.choices:
@@ -538,8 +593,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                         in_think = False
                         think_sent_start = False
                         remaining = content[gt_idx + 1:]
-                        if remaining and not json_silenced:
-                            text_emitted += remaining
+                        if remaining:
                             yield {"type": "text", "content": remaining}
                     else:
                         yield {"type": "think_content", "content": content}
@@ -554,8 +608,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 if gt_idx >= 0:
                     before = content[:tag_start]
                     after = content[gt_idx + 1:]
-                    if before and not json_silenced:
-                        text_emitted += before
+                    if before:
                         yield {"type": "text", "content": before}
                     yield {"type": "think_start"}
                     think_sent_start = True
@@ -571,8 +624,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                                 yield {"type": "think_end"}
                                 in_think = False
                                 remaining = after[close_gt + 1:]
-                                if remaining and not json_silenced:
-                                    text_emitted += remaining
+                                if remaining:
                                     yield {"type": "text", "content": remaining}
                         else:
                             yield {"type": "think_content", "content": after}
@@ -581,43 +633,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                     # 不完整标签，先缓冲
                     continue
 
-            # ---- 软静默策略：检测 JSON 工具调用模式 ----
-            if not json_silenced:
-                # 检查当前内容是否触发了 JSON 静默
-                check_text = text_emitted + content
-                if _should_start_silence(check_text, len(content)):
-                    json_silenced = True
-                    pre_json_text = text_emitted
-                    # 不发送这段 content，静默收集
-                    continue
-
-                # 花括号暂缓：如果 text_emitted 末尾有 { 且可能是 JSON 开头
-                if holding_brace:
-                    # 上一个 chunk 暂缓了一个 {，现在有更多信息了
-                    check_with_held = text_emitted + content
-                    if _should_start_silence(check_with_held, len(content)):
-                        json_silenced = True
-                        pre_json_text = text_emitted
-                        continue
-                    # 不是工具调用 → 发出暂缓的 { 和当前内容
-                    holding_brace = False
-                    text_emitted += content
-                    yield {"type": "text", "content": content}
-                    continue
-
-                # 正常流式发送
-                text_emitted += content
-                yield {"type": "text", "content": content}
-
-                # 检查是否需要暂缓这个 chunk 里的 {
-                if _should_hold_brace(text_emitted, content):
-                    holding_brace = True
-            # json_silenced=True 时：只收集 full_text，不发送 text 事件
-
-        # 流结束后：如果还暂缓着 { ，补发出去
-        if holding_brace and not json_silenced:
-            yield {"type": "text", "content": text_emitted[-1]}  # 补发最后的 {
-            holding_brace = False
+            # 直接流式发送，前端 VCP 内联解析处理工具 JSON
+            yield {"type": "text", "content": content}
 
         # 流式结束后检查取消
         thinking_ms = round((time.perf_counter() - llm_start) * 1000)
@@ -632,12 +649,6 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         tool_call, parse_error = parse_tool_call(full_text) if full_text.strip() else (None, "empty response")
 
         if not tool_call:
-            # 如果之前进入了静默模式，但最终不是工具调用 → 补发被静默的内容
-            if json_silenced:
-                silenced_part = full_text[len(text_emitted):]
-                if silenced_part:
-                    yield {"type": "text", "content": silenced_part}
-
             if trace_enabled:
                 yield {
                     "type": "react_trace",
@@ -652,11 +663,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 logger.warning(f"[ReAct] suspected tool call with parse error: {full_text[:200]}")
                 if trace_enabled:
                     yield {"type": "react_trace", "iteration": iteration, "action": "error", "error": f"tool call parse failed: {parse_error}", "duration_ms": thinking_ms}
-                # 保留思考文字，清除 JSON 碎片
-                import re as _re
-                _thinking = _re.sub(r'\{.*', '', full_text, flags=_re.DOTALL).strip()
-                _thinking = _re.sub(r'<think\b.*?</think\b[>\s]*', '', _thinking, flags=_re.DOTALL).strip()
-                yield {"type": "text_set", "content": _thinking}
+                # 工具调用格式错误 — 前端 VCP 内联解析会处理 JSON 碎片
                 yield {"type": "status", "status": "tool_error", "message": "工具调用格式错误"}
                 preview = full_text[:200] + ("..." if len(full_text) > 200 else "")
                 error_feedback = (
@@ -680,17 +687,14 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             if tool_iterations > 0:
                 exit_reason = "completed_after_tools"
             session.messages.append({"role": "assistant", "content": full_text})
-            await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
+            msg_id = await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
+            session.messages[-1]["id"] = msg_id
+            # 首次对话完成后生成标题
+            if len(session.messages) <= 5:
+                asyncio.create_task(_auto_title(session.session_id))
             logger.info(f"[ReAct] 循环结束: {exit_reason}，共 {tool_iterations} 轮工具调用")
-            yield {"type": "done", "exit_reason": exit_reason}
+            yield {"type": "done", "exit_reason": exit_reason, "assistant_db_id": msg_id}
             return
-
-        # 工具调用解析成功 — 用 text_set 替换前端内容为纯文字（去掉 JSON）
-        # 提取思考文字（JSON 之前的内容，不含 think 标签）
-        import re as _re
-        thinking_text = full_text[:full_text.find('{')].strip() if '{' in full_text else ""
-        thinking_text = _re.sub(r'<think\b.*?</think\b[>\s]*', '', thinking_text, flags=_re.DOTALL).strip()
-        yield {"type": "text_set", "content": thinking_text}
 
         # --- 有工具调用，进入 ReAct 循环 ---
         tool_iterations += 1
@@ -713,7 +717,14 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             }
 
         session.messages.append({"role": "assistant", "content": full_text})
-        await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
+        msg_id = await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
+        session.messages[-1]["id"] = msg_id
+
+        # 清除前端消息中的工具调用 JSON，只保留思考文字
+        if thinking_text:
+            yield {"type": "text_set", "content": thinking_text}
+        else:
+            yield {"type": "text_clear"}
 
         mode = tool_call.get("mode", "single")
 
@@ -721,8 +732,9 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         if mode == "single":
             tool_name = tool_call.get("tool", "")
             tool_params = tool_call.get("params", {})
+            tool_command = tool_call.get("command", "")
 
-            validation_error = validate_tool_call(tool_name, tool_params)
+            validation_error = validate_tool_call(tool_name, tool_params, tool_command)
             if validation_error:
                 logger.warning(f"工具验证失败: {validation_error}")
                 yield {"type": "status", "status": "tool_error", "message": validation_error}
@@ -734,9 +746,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 history.save_message(session.session_id, "user", error_feedback)
                 continue
 
-            yield {"type": "tool_start", "tool": tool_name, "params": tool_params}
+            yield {"type": "tool_start", "tool": tool_name, "command": tool_command, "params": tool_params}
+            set_tool_context(session.session_id or "", session.character_id or "")
             tool_exec_start = time.perf_counter()
-            tool_result = execute_tool(tool_name, tool_params)
+            tool_result = execute_tool(tool_name, tool_params, command=tool_command)
             tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
             logger.info(
                 f"工具调用: {tool_name}({tool_params}) → "
@@ -745,6 +758,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             yield {
                 "type": "tool_result",
                 "tool": tool_name,
+                "command": tool_command,
                 "success": tool_result["success"],
                 "data": tool_result.get("data"),
                 "error": tool_result.get("error_message"),
@@ -759,9 +773,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                     "duration_ms": tool_exec_ms,
                 }
 
+            caller_name = character_config.get("name", "")
             session.messages.append({
                 "role": "user",
-                "content": format_result_for_ai(tool_result),
+                "content": format_result_for_ai(tool_result, caller=caller_name),
                 "metadata": {
                     "type": "tool_result",
                     "tool_name": tool_name,
@@ -770,7 +785,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             })
             history.save_message(
                 session.session_id, "user",
-                format_result_for_ai(tool_result),
+                format_result_for_ai(tool_result, caller=caller_name),
                 {"type": "tool_result", "tool_name": tool_name, "folded": False},
             )
 
@@ -780,7 +795,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
 
             all_errors = []
             for call in calls:
-                error = validate_tool_call(call.get("tool", ""), call.get("params", {}))
+                error = validate_tool_call(call.get("tool", ""), call.get("params", {}), call.get("command", ""))
                 if error:
                     all_errors.append(f"- {call.get('tool')}: {error}")
 
@@ -797,18 +812,21 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 continue
 
             tool_names = [c.get("tool") for c in calls]
-            yield {"type": "tool_start", "tool": tool_names, "mode": "parallel"}
+            tool_commands = [c.get("command", "") for c in calls]
+            yield {"type": "tool_start", "tool": tool_names, "command": tool_commands, "mode": "parallel"}
+            set_tool_context(session.session_id or "", session.character_id or "")
             logger.info(f"并行执行 {len(calls)} 个工具...")
             tool_exec_start = time.perf_counter()
             results = execute_tools_parallel(calls)
             tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
 
-            for r in results:
+            for i, r in enumerate(results):
                 status = "✅" if r["success"] else "❌"
                 logger.info(f"  - {r['tool']}: {status}")
                 yield {
                     "type": "tool_result",
                     "tool": r["tool"],
+                    "command": calls[i].get("command", "") if i < len(calls) else "",
                     "success": r["success"],
                     "data": r.get("data"),
                     "error": r.get("error_message"),
@@ -825,9 +843,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                         "duration_ms": tool_exec_ms,
                     }
 
+            caller_name = character_config.get("name", "")
             session.messages.append({
                 "role": "user",
-                "content": "\n".join(format_result_for_ai(r) for r in results),
+                "content": "\n".join(format_result_for_ai(r, caller=caller_name) for r in results),
                 "metadata": {
                     "type": "tool_result_parallel",
                     "tool_count": len(results),
@@ -836,7 +855,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             })
             history.save_message(
                 session.session_id, "user",
-                "\n".join(format_result_for_ai(r) for r in results),
+                "\n".join(format_result_for_ai(r, caller=caller_name) for r in results),
                 {"type": "tool_result_parallel", "tool_count": len(results), "folded": False},
             )
 
@@ -870,5 +889,9 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             yield {"type": "text", "content": content}
 
     session.messages.append({"role": "assistant", "content": final_reply})
-    await _save_and_vectorize(session.session_id or "default", "assistant", final_reply, session.character_id)
-    yield {"type": "done", "exit_reason": exit_reason}
+    msg_id = await _save_and_vectorize(session.session_id or "default", "assistant", final_reply, session.character_id)
+    session.messages[-1]["id"] = msg_id
+    # 首次对话完成后生成标题
+    if len(session.messages) <= 5:
+        asyncio.create_task(_auto_title(session.session_id))
+    yield {"type": "done", "exit_reason": exit_reason, "assistant_db_id": msg_id}

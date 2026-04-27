@@ -19,33 +19,72 @@ html, body, #root {
 
 /* === 发光效果 === */
 
-.glow-teal {
-  box-shadow: 0 0 12px var(--glow-primary),
-              inset 0 0 8px rgba(204, 124, 94, 0.06);
-}
-
 .glow-amber {
   box-shadow: 0 0 12px var(--glow-primary),
               inset 0 0 8px rgba(204, 124, 94, 0.06);
 }
 
-/* === 自定义滚动条 === */
+/* === 自定义滚动条 — 极简胶囊形状设计 === */
 
+/* 消息区域滚动条 */
 .scrollbar-lumen::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
 }
 
 .scrollbar-lumen::-webkit-scrollbar-track {
   background: transparent;
-}
-
-.scrollbar-lumen::-webkit-scrollbar-thumb {
-  background: rgba(204, 124, 94, 0.2);
   border-radius: 3px;
 }
 
-.scrollbar-lumen::-webkit-scrollbar-thumb:hover {
-  background: rgba(204, 124, 94, 0.4);
+.scrollbar-lumen::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.25s ease;
+}
+
+/* hover 时显示淡淡的胶囊滚动条 */
+.scrollbar-lumen:hover::-webkit-scrollbar-thumb {
+  background: rgba(138, 132, 120, 0.2);
+}
+
+/* 悬停在滚动条上时稍微加深 */
+.scrollbar-lumen:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 132, 120, 0.35);
+}
+
+/* 拖拽/滚动中时显示更明显的反馈 */
+.scrollbar-lumen::-webkit-scrollbar-thumb:active {
+  background: rgba(138, 132, 120, 0.4);
+}
+
+/* 编辑框/textarea 内滚动条（更窄更淡） */
+textarea::-webkit-scrollbar {
+  width: 4px;
+}
+
+textarea::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 2px;
+}
+
+textarea::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+  transition: background 0.25s ease;
+}
+
+/* hover 时显示淡淡的滚动条 */
+textarea:hover::-webkit-scrollbar-thumb {
+  background: rgba(138, 132, 120, 0.15);
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 132, 120, 0.25);
+}
+
+/* 拖拽/滚动中反馈 */
+textarea::-webkit-scrollbar-thumb:active {
+  background: rgba(138, 132, 120, 0.3);
 }
 
 /* === 工具旋转动画 === */

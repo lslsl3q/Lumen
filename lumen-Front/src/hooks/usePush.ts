@@ -97,6 +97,7 @@ export function usePush() {
   return {
     notifications,
     connectionStatus,
+    addNotification,
     dismissNotification,
   };
 }

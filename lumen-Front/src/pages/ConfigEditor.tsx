@@ -12,6 +12,7 @@ import { getConfig, updateConfig } from '../api/config';
 import { ConfigDetail } from '../types/config';
 import EnvForm from '../components/EnvForm';
 import WorkspacesEditor from '../components/WorkspacesEditor';
+import type { SettingsPageProps } from '../types/settings';
 
 /** 工具定义结构（从 registry.json 解析） */
 interface ToolDef {
@@ -24,9 +25,16 @@ interface ToolDef {
   };
 }
 
-function ConfigEditor() {
-  const { resource } = useParams<{ resource: string }>();
+interface ConfigEditorProps extends SettingsPageProps {
+  resource?: string;
+  onNavigate?: (page: string, params?: { resource?: string }) => void;
+}
+
+function ConfigEditor({ resource: propResource, onBack }: ConfigEditorProps) {
+  const { resource: paramResource } = useParams<{ resource: string }>();
+  const resource = propResource || paramResource;
   const navigate = useNavigate();
+  const goBack = onBack ?? (() => navigate('/settings/config'));
   const [config, setConfig] = useState<ConfigDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +78,7 @@ function ConfigEditor() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-surface-deep text-slate-200 flex items-center justify-center">
+      <div className="h-full bg-surface-deep text-slate-200 flex items-center justify-center">
         <div className="text-slate-600">加载中...</div>
       </div>
     );
@@ -78,19 +86,19 @@ function ConfigEditor() {
 
   if (!config || !resource) {
     return (
-      <div className="min-h-screen bg-surface-deep text-slate-200 flex items-center justify-center">
+      <div className="h-full bg-surface-deep text-slate-200 flex items-center justify-center">
         <div className="text-slate-600">配置不存在</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-slate-200">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => navigate('/settings/config')}
+            onClick={goBack}
             className="
               px-3 py-1.5 rounded-lg text-sm text-slate-400
               hover:text-slate-200 hover:bg-slate-800/60
