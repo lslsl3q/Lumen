@@ -14,32 +14,31 @@ import triviumdb
 
 logger = logging.getLogger(__name__)
 
-_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+from lumen.config import VECTOR_LOCAL_DIR
+
+_DATA_DIR = VECTOR_LOCAL_DIR
 _DB_PATH = os.path.join(_DATA_DIR, "memory.tdb")
 
 _db: Optional[triviumdb.TriviumDB] = None
 
-
-def _get_dimensions() -> int:
-    """从嵌入服务获取维度（已初始化时），或用环境变量 fallback"""
-    from lumen.services.embedding import get_dimensions
-    dims = get_dimensions("memory")
-    if dims > 0:
-        return dims
-    # fallback：环境变量手动指定
-    from lumen.config import EMBEDDING_DIMENSIONS
-    if EMBEDDING_DIMENSIONS > 0:
-        return EMBEDDING_DIMENSIONS
-    return 512  # 最终 fallback
+_DIM_FILE = _DB_PATH + ".dim"
 
 
 def _get_db() -> triviumdb.TriviumDB:
-    """获取 TriviumDB 实例（单例，首次调用时创建）"""
+    """获取 TriviumDB 实例（单例）"""
     global _db
     if _db is None:
         os.makedirs(_DATA_DIR, exist_ok=True)
-        dim = _get_dimensions()
+        from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
+        dim = resolve_dimensions("memory")
+
+        # 维度一致性检查 — 不匹配就报错，不自动修
+        err = check_dim_consistency(_DB_PATH, dim)
+        if err:
+            raise RuntimeError(err)
+
         _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
+        _save_dim_file(_DB_PATH, dim)
         logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
     return _db
 

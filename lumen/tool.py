@@ -185,7 +185,7 @@ def _load_mcp_tools():
 # 工具执行
 # ========================================
 
-def execute_tool(name: str, params: dict) -> Dict[str, Any]:
+def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
     """执行工具调用，返回标准化结果"""
     start_time = time.perf_counter()
 
@@ -201,7 +201,7 @@ def execute_tool(name: str, params: dict) -> Dict[str, Any]:
 
     handler = _TOOL_HANDLERS.get(name)
     if handler:
-        result = handler(params)
+        result = handler(params, command=command)
         if "execution_time" not in result:
             result["execution_time"] = round((time.perf_counter() - start_time) * 1000, 2)
         return result
@@ -233,7 +233,7 @@ def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Opt
         future_to_index = {}
         for i, call in enumerate(calls):
             try:
-                future = executor.submit(execute_tool, call["tool"], call.get("params", {}))
+                future = executor.submit(execute_tool, call["tool"], call.get("params", {}), call.get("command", ""))
                 future_to_index[future] = i
             except Exception as e:
                 results.append(error_result(

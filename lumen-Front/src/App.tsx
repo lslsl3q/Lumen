@@ -73,7 +73,7 @@ function App() {
         <div className="flex-1 overflow-hidden flex flex-col">
           <Routes>
             {/* 聊天主页面 */}
-            <Route path="/" element={<ChatInterface />} />
+            <Route path="/" element={<ErrorBoundary><ChatInterface /></ErrorBoundary>} />
 
             {/* 角色管理页面 */}
             <Route path="/settings/characters" element={<CharacterList />} />

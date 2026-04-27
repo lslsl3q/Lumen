@@ -12,8 +12,8 @@
     "windows": [
       {
         "title": "Lumen AI",
-        "width": 1440,
-        "height": 900,
+        "width": 1920,
+        "height": 1200,
         "resizable": true,
         "fullscreen": false,
         "decorations": false,

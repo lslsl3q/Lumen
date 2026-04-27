@@ -11,13 +11,50 @@ from pathlib import Path
 # 工具定义验证规则
 # ========================================
 
+def _validate_parameters(params: dict, errors: list, prefix: str = ""):
+    """验证 parameters JSON Schema"""
+    if "type" not in params:
+        errors.append(f"{prefix}parameters 缺少 type 字段")
+    elif params["type"] != "object":
+        errors.append(f"{prefix}parameters.type 必须是 'object'，当前是 '{params['type']}'")
+
+    if "properties" not in params:
+        errors.append(f"{prefix}parameters 缺少 properties 字段")
+    elif not isinstance(params["properties"], dict):
+        errors.append(f"{prefix}parameters.properties 必须是对象")
+    else:
+        for param_name, param_def in params["properties"].items():
+            if not isinstance(param_def, dict):
+                errors.append(f"{prefix}参数 '{param_name}' 的定义必须是对象")
+                continue
+
+            if "type" not in param_def:
+                errors.append(f"{prefix}参数 '{param_name}' 缺少 type 字段")
+            elif param_def["type"] not in ["string", "number", "integer", "boolean", "array", "object"]:
+                errors.append(f"{prefix}参数 '{param_name}' 的 type '{param_def['type']}' 无效")
+
+            if "enum" in param_def:
+                if not isinstance(param_def["enum"], list):
+                    errors.append(f"{prefix}参数 '{param_name}' 的 enum 必须是数组")
+
+    if "required" in params:
+        if not isinstance(params["required"], list):
+            errors.append(f"{prefix}parameters.required 必须是数组")
+        else:
+            for req in params["required"]:
+                if not isinstance(req, str):
+                    errors.append(f"{prefix}required 中的项必须是字符串，发现: {type(req)}")
+                elif "properties" in params and req not in params["properties"]:
+                    errors.append(f"{prefix}required 中引用了不存在的参数: {req}")
+
+
 def validate_tool_definition(name: str, definition: dict) -> tuple:
     """
-    验证工具定义是否符合 JSON Schema 格式规范
+    验证工具定义是否符合格式规范
 
-    Args:
-        name: 工具名称
-        definition: 工具定义
+    支持两种格式：
+    - 简单格式：有顶层 parameters（如 calculate、daily_note）
+    - commands 格式：有 commands 字典，每个 command 有自己的 parameters（如 file_manager、web）
 
     Returns:
         (is_valid, error_message)
@@ -30,46 +67,32 @@ def validate_tool_definition(name: str, definition: dict) -> tuple:
     elif not isinstance(definition["description"], str):
         errors.append("description 必须是字符串")
 
-    if "parameters" not in definition:
-        errors.append("缺少 parameters 字段")
-    elif not isinstance(definition["parameters"], dict):
-        errors.append("parameters 必须是对象")
-    else:
-        params = definition["parameters"]
-
-        if "type" not in params:
-            errors.append("parameters 缺少 type 字段")
-        elif params["type"] != "object":
-            errors.append(f"parameters.type 必须是 'object'，当前是 '{params['type']}'")
-
-        if "properties" not in params:
-            errors.append("parameters 缺少 properties 字段")
-        elif not isinstance(params["properties"], dict):
-            errors.append("parameters.properties 必须是对象")
+    # commands 格式：每个 command 有自己的 parameters
+    if "commands" in definition:
+        if not isinstance(definition["commands"], dict):
+            errors.append("commands 必须是对象")
         else:
-            for param_name, param_def in params["properties"].items():
-                if not isinstance(param_def, dict):
-                    errors.append(f"参数 '{param_name}' 的定义必须是对象")
+            for cmd_name, cmd_def in definition["commands"].items():
+                if not isinstance(cmd_def, dict):
+                    errors.append(f"command '{cmd_name}' 的定义必须是对象")
                     continue
+                if "description" not in cmd_def:
+                    errors.append(f"command '{cmd_name}' 缺少 description")
+                if "parameters" in cmd_def:
+                    if not isinstance(cmd_def["parameters"], dict):
+                        errors.append(f"command '{cmd_name}' 的 parameters 必须是对象")
+                    else:
+                        _validate_parameters(cmd_def["parameters"], errors, prefix=f"command '{cmd_name}' ")
 
-                if "type" not in param_def:
-                    errors.append(f"参数 '{param_name}' 缺少 type 字段")
-                elif param_def["type"] not in ["string", "number", "integer", "boolean", "array", "object"]:
-                    errors.append(f"参数 '{param_name}' 的 type '{param_def['type']}' 无效")
+    # 简单格式：顶层 parameters
+    elif "parameters" in definition:
+        if not isinstance(definition["parameters"], dict):
+            errors.append("parameters 必须是对象")
+        else:
+            _validate_parameters(definition["parameters"], errors)
 
-                if "enum" in param_def:
-                    if not isinstance(param_def["enum"], list):
-                        errors.append(f"参数 '{param_name}' 的 enum 必须是数组")
-
-        if "required" in params:
-            if not isinstance(params["required"], list):
-                errors.append("parameters.required 必须是数组")
-            else:
-                for req in params["required"]:
-                    if not isinstance(req, str):
-                        errors.append(f"required 中的项必须是字符串，发现: {type(req)}")
-                    elif "properties" in params and req not in params["properties"]:
-                        errors.append(f"required 中引用了不存在的参数: {req}")
+    else:
+        errors.append("缺少 parameters 或 commands 字段")
 
     is_valid = len(errors) == 0
     error_msg = "; ".join(errors) if errors else None

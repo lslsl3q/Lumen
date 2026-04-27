@@ -15,6 +15,7 @@ import '../commands/builtin'; // 副作用：注册内置命令
 import { CommandResult } from '../commands/registry';
 import { getAvatarUrl } from '../api/character';
 import { toast } from '../utils/toast';
+import Tooltip from './Tooltip';
 
 /** AI 头像组件 */
 function Avatar({ src, name, className = '' }: { src?: string | null; name?: string; className?: string }) {
@@ -119,6 +120,7 @@ interface ContentSegment {
   type: 'text' | 'tool_call';
   text?: string;
   toolName?: string;
+  toolCommand?: string;
   toolParams?: Record<string, unknown>;
 }
 
@@ -138,24 +140,25 @@ function findJsonEnd(content: string, start: number): number {
 }
 
 /** 从解析后的 JSON 提取工具调用（兼容所有格式） */
-function extractCallsFromParsed(parsed: Record<string, unknown>): { name: string; params: Record<string, unknown> }[] {
+function extractCallsFromParsed(parsed: Record<string, unknown>): { name: string; command?: string; params: Record<string, unknown> }[] {
+  const extractCommand = (c: Record<string, unknown>) => (typeof c.command === 'string' && c.command ? c.command : undefined);
   if (parsed.type === 'tool_call' && parsed.tool) {
-    return [{ name: parsed.tool as string, params: (parsed.params as Record<string, unknown>) || {} }];
+    return [{ name: parsed.tool as string, command: extractCommand(parsed), params: (parsed.params as Record<string, unknown>) || {} }];
   }
   if ((parsed.type === 'tool_call_parallel' || parsed.type === 'tool_call') && Array.isArray(parsed.calls)) {
-    return (parsed.calls as Record<string, unknown>[]).filter(c => c.tool).map(c => ({ name: c.tool as string, params: (c.params as Record<string, unknown>) || {} }));
+    return (parsed.calls as Record<string, unknown>[]).filter(c => c.tool).map(c => ({ name: c.tool as string, command: extractCommand(c as Record<string, unknown>), params: (c.params as Record<string, unknown>) || {} }));
   }
   if (Array.isArray(parsed.calls)) {
-    return (parsed.calls as Record<string, unknown>[]).filter(c => c.tool).map(c => ({ name: c.tool as string, params: (c.params as Record<string, unknown>) || {} }));
+    return (parsed.calls as Record<string, unknown>[]).filter(c => c.tool).map(c => ({ name: c.tool as string, command: extractCommand(c as Record<string, unknown>), params: (c.params as Record<string, unknown>) || {} }));
   }
   if (parsed.tool) {
-    return [{ name: parsed.tool as string, params: (parsed.params as Record<string, unknown>) || {} }];
+    return [{ name: parsed.tool as string, command: extractCommand(parsed), params: (parsed.params as Record<string, unknown>) || {} }];
   }
   return [];
 }
 
 /** 将消息内容分割为 文本段 + 工具调用段，保持原始顺序 */
-function splitContentSegments(content: string): ContentSegment[] {
+function splitContentSegments(content: string, excludeToolCalls: boolean = false): ContentSegment[] {
   const segments: ContentSegment[] = [];
   let pos = 0;
 
@@ -174,10 +177,15 @@ function splitContentSegments(content: string): ContentSegment[] {
       break;
     }
 
-    if (earliestIdx > pos) {
-      const text = content.slice(pos, earliestIdx).trim();
-      if (text) segments.push({ type: 'text', text });
+    // 检测 JSON 是否在 markdown 代码围栏内（前面有 ```json 等标记）
+    let beforeText = content.slice(pos, earliestIdx);
+    const inCodeBlock = /```[\w]*\s*\n?\s*$/.test(beforeText);
+    if (inCodeBlock) {
+      beforeText = beforeText.replace(/\n?```[\w]*\s*$/, '');
     }
+
+    const trimmedBefore = beforeText.trim();
+    if (trimmedBefore) segments.push({ type: 'text', text: trimmedBefore });
 
     const jsonEnd = findJsonEnd(content, earliestIdx);
     if (jsonEnd === -1) {
@@ -186,12 +194,22 @@ function splitContentSegments(content: string): ContentSegment[] {
       break;
     }
 
+    // 如果 JSON 在代码围栏内，跳过后面可能存在的闭合 ```
+    let afterPos = jsonEnd;
+    const afterContent = content.slice(jsonEnd);
+    const codeFenceClose = afterContent.match(/^\n?\n?```/);
+    if (codeFenceClose) {
+      afterPos = jsonEnd + codeFenceClose[0].length;
+    }
+
     try {
       const parsed = JSON.parse(content.slice(earliestIdx, jsonEnd));
       const calls = extractCallsFromParsed(parsed as Record<string, unknown>);
       if (calls.length > 0) {
-        for (const call of calls) {
-          segments.push({ type: 'tool_call', toolName: call.name, toolParams: call.params });
+        if (!excludeToolCalls) {
+          for (const call of calls) {
+            segments.push({ type: 'tool_call', toolName: call.name, toolCommand: call.command, toolParams: call.params });
+          }
         }
       } else {
         segments.push({ type: 'text', text: content.slice(earliestIdx, jsonEnd) });
@@ -200,15 +218,15 @@ function splitContentSegments(content: string): ContentSegment[] {
       segments.push({ type: 'text', text: content.slice(earliestIdx, jsonEnd) });
     }
 
-    pos = jsonEnd;
+    pos = afterPos;
   }
 
   return segments.length > 0 ? segments : [{ type: 'text', text: content }];
 }
 
 /** 内联消息内容 — 将文本和工具调用按顺序渲染在同一个气泡内 */
-function InlineMessageContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
-  const segments = useMemo(() => splitContentSegments(content), [content]);
+function InlineMessageContent({ content, isStreaming, excludeToolCalls }: { content: string; isStreaming?: boolean; excludeToolCalls?: boolean }) {
+  const segments = useMemo(() => splitContentSegments(content, excludeToolCalls), [content, excludeToolCalls]);
 
   return (
     <>
@@ -219,7 +237,7 @@ function InlineMessageContent({ content, isStreaming }: { content: string; isStr
         return (
           <ToolCallBlock
             key={`tool_${i}`}
-            call={{ callId: i, name: seg.toolName!, status: 'done' as const, params: seg.toolParams || {} }}
+            call={{ callId: i, name: seg.toolName!, command: seg.toolCommand, status: 'done' as const, params: seg.toolParams || {} }}
             inline
           />
         );
@@ -279,7 +297,7 @@ function ToolCallBlock({ call, inline }: { call: ToolCall; inline?: boolean }) {
 
             {/* 工具名 + 参数摘要 */}
             <span className={`text-xs font-mono ${textColor} truncate`}>
-              {call.name}
+              {call.command ? `${call.name}:${call.command}` : call.name}
               {paramsSummary && !isExpanded && (
                 <span className="text-slate-600"> {paramsSummary}</span>
               )}
@@ -422,13 +440,14 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
 
   // 没有文字内容时：助手消息有工具调用 → 显示头像 + 工具气泡
   // 用户消息/系统消息无内容 → 跳过
-  if (!message.content) {
+  if (!message.content || message.content.trim() === '') {
     if (!isUser && message.toolCalls && message.toolCalls.length > 0) {
       return (
         <div className="flex justify-start items-start gap-2"
-          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
+          onContextMenu={e => e.preventDefault()}>
           <Avatar src={characterAvatar} name={characterName} />
-          <div className="max-w-[75%]">
+          <div className="max-w-[75%]" data-message-bubble="true"
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
             {message.toolCalls.map(call => <ToolCallBlock key={call.callId} call={call} inline />)}
           </div>
         </div>
@@ -442,7 +461,7 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
     return (
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} items-start gap-2`}>
         {!isUser && <Avatar src={characterAvatar} name={characterName} />}
-        <div className="max-w-[75%] flex flex-col gap-2">
+        <div className="w-full max-w-[75%] min-w-[200px] flex flex-col gap-2">
           <textarea
             value={editContent}
             onChange={e => onEditChange(e.target.value)}
@@ -473,8 +492,10 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
   if (isUser) {
     return (
       <div className="flex justify-end items-start gap-2"
-        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
-        <div className="max-w-[75%] rounded-lg px-4 py-3 bg-amber-500/10 border border-amber-500/20 text-amber-50">
+        onContextMenu={e => e.preventDefault()}>
+        <div className="max-w-[75%] rounded-lg px-4 py-3 bg-amber-500/10 border border-amber-500/20 text-amber-50"
+          data-message-bubble="true"
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
           <div className="whitespace-pre-wrap leading-relaxed">
             {message.content}
           </div>
@@ -490,14 +511,35 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
 
   return (
     <div className="flex justify-start items-start gap-2"
-      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
+      onContextMenu={e => e.preventDefault()}>
       <Avatar src={characterAvatar} name={characterName} />
-      <div className="max-w-[75%] rounded-lg px-4 py-3 bg-slate-800/40 border border-amber-500/10 text-slate-200">
-        {/* 统一使用 VCP 内联解析：流式和历史共用同一个渲染路径 */}
-        <InlineMessageContent
-          content={message.content || ''}
-          isStreaming={message.isStreaming}
-        />
+      <div className="max-w-[75%] rounded-lg px-4 py-3 bg-slate-800/40 border border-amber-500/10 text-slate-200"
+        data-message-bubble="true"
+        onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
+        {/* 优先使用 toolCalls 字段（有完整的执行状态和结果） */}
+        {message.toolCalls && message.toolCalls.length > 0 ? (
+          <div>
+            {message.toolCalls.map(call => (
+              <ToolCallBlock key={call.callId} call={call} inline />
+            ))}
+            {/* 如果有其他文本内容，也显示（排除工具调用JSON） */}
+            {message.content && message.content.trim() !== '' && (
+              <div className="mt-2">
+                <InlineMessageContent
+                  content={message.content || ''}
+                  isStreaming={message.isStreaming}
+                  excludeToolCalls={true}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          /* 没有工具调用时，使用 VCP 内联解析 */
+          <InlineMessageContent
+            content={message.content || ''}
+            isStreaming={message.isStreaming}
+          />
+        )}
       </div>
     </div>
   );
@@ -521,6 +563,8 @@ interface ChatPanelProps {
   currentModel?: string;
   onEditMessage?: (messageId: string, newContent: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onRegenerateMessage?: (messageId: string) => void;
+  onBranchFromMessage?: (messageId: string) => Promise<string | null>;
   responseStyle?: string;
   onResponseStyleChange?: (style: string) => void;
 }
@@ -550,6 +594,8 @@ function ChatPanel({
   currentModel,
   onEditMessage,
   onDeleteMessage,
+  onRegenerateMessage,
+  onBranchFromMessage,
   responseStyle = 'balanced',
   onResponseStyleChange,
 }: ChatPanelProps) {
@@ -561,9 +607,15 @@ function ChatPanel({
   // 编辑模式状态
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  // 编辑/删除后不自动滚到底部的标记
+  const skipScrollRef = useRef(false);
 
   // 自动滚动到最新消息
   useEffect(() => {
+    if (skipScrollRef.current) {
+      skipScrollRef.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -581,14 +633,27 @@ function ChatPanel({
   // 点击外部关闭右键菜单
   useEffect(() => {
     if (!contextMenu) return;
-    const handler = () => setContextMenu(null);
+    const handler = () => {
+      setContextMenu(null);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [contextMenu]);
 
   // 右键菜单操作
   const handleContextMenu = (messageId: string, e: React.MouseEvent) => {
-    setContextMenu({ messageId, x: e.clientX, y: e.clientY });
+    e.preventDefault();
+    e.stopPropagation();
+    // 边界检测：避免菜单超出视口
+    const menuWidth = 160;
+    const menuHeight = 160;
+    const x = e.clientX + menuWidth > window.innerWidth
+      ? e.clientX - menuWidth
+      : e.clientX;
+    const y = e.clientY + menuHeight > window.innerHeight
+      ? e.clientY - menuHeight
+      : e.clientY;
+    setContextMenu({ messageId, x, y });
   };
 
   const handleStartEdit = (messageId?: string, content?: string) => {
@@ -602,6 +667,7 @@ function ChatPanel({
 
   const handleSaveEdit = () => {
     if (editingMessageId && onEditMessage) {
+      skipScrollRef.current = true;
       onEditMessage(editingMessageId, editContent.trim());
     }
     setEditingMessageId(null);
@@ -615,7 +681,25 @@ function ChatPanel({
 
   const handleDeleteMessage = () => {
     if (contextMenu?.messageId && onDeleteMessage) {
+      skipScrollRef.current = true;
       onDeleteMessage(contextMenu.messageId);
+    }
+    setContextMenu(null);
+  };
+
+  const handleRegenerate = () => {
+    if (contextMenu?.messageId && onRegenerateMessage) {
+      onRegenerateMessage(contextMenu.messageId);
+    }
+    setContextMenu(null);
+  };
+
+  const handleBranch = async () => {
+    if (contextMenu?.messageId && onBranchFromMessage) {
+      const newSessionId = await onBranchFromMessage(contextMenu.messageId);
+      if (newSessionId) {
+        toast('已创建分支会话', 'success');
+      }
     }
     setContextMenu(null);
   };
@@ -727,7 +811,8 @@ function ChatPanel({
   return (
     <div className="flex-1 flex flex-col bg-slate-950">
       {/* 消息区域 */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-lumen">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-lumen"
+        onContextMenu={e => e.preventDefault()}>
         {messages.length === 0 && !sessionId ? (
           // 空状态提示
           <div className="h-full flex items-center justify-center">
@@ -833,6 +918,7 @@ function ChatPanel({
               <div className="flex items-center gap-1 px-3 py-1.5">
                 {/* 附件 */}
                 <div className="relative">
+                  <Tooltip text="附件">
                   <button
                     type="button"
                     onClick={() => setShowAttachMenu(!showAttachMenu)}
@@ -841,12 +927,12 @@ function ChatPanel({
                       active:bg-slate-800/40
                       focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40
                       transition-all duration-150"
-                    title="附件"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                   </button>
+                  </Tooltip>
                   {showAttachMenu && (
                     <div className="absolute bottom-full left-0 mb-1 py-1 rounded-lg bg-slate-900 border border-slate-700/60 shadow-lg min-w-[140px] z-50">
                       <button
@@ -860,6 +946,7 @@ function ChatPanel({
                   )}
                 </div>
                 {/* 斜杠命令 */}
+                <Tooltip text="斜杠命令">
                 <button
                   type="button"
                   onClick={() => {
@@ -877,21 +964,23 @@ function ChatPanel({
                     active:bg-slate-800/40
                     focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40
                     transition-all duration-150"
-                  title="斜杠命令"
                 >
                   <span className="text-sm font-mono font-bold">/</span>
                 </button>
+                </Tooltip>
                 {/* 回复风格切换 */}
+                <Tooltip text={`回复风格: ${RESPONSE_STYLES.find(s => s.key === responseStyle)?.label || '默认'}`}>
                 <button
                   type="button"
                   onClick={cycleResponseStyle}
                   className="w-7 h-7 rounded-lg flex items-center justify-center
                     text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
                     active:bg-slate-800/40 transition-all duration-150"
-                  title={`回复风格: ${RESPONSE_STYLES.find(s => s.key === responseStyle)?.label || '默认'}`}
+                  // tooltip: reply style(s => s.key === responseStyle)?.label || '默认'}`}
                 >
                   <span className="text-xs font-mono">{RESPONSE_STYLES.find(s => s.key === responseStyle)?.icon || '≈'}</span>
                 </button>
+                </Tooltip>
                 <div className="flex-1" />
                 {/* 模型指示 */}
                 {currentModel && (
@@ -911,6 +1000,7 @@ function ChatPanel({
                 )}
                 {/* 发送 / 停止 */}
                 {isLoading ? (
+                  <Tooltip text="停止">
                   <button
                     type="button"
                     onClick={onAbort}
@@ -919,13 +1009,14 @@ function ChatPanel({
                       hover:bg-red-500/25 hover:border-red-500/50
                       focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-red-500/40
                       transition-all duration-200"
-                    title="停止"
                   >
                     <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
                       <rect x="3" y="3" width="10" height="10" rx="2" />
                     </svg>
                   </button>
+                  </Tooltip>
                 ) : (
+                  <Tooltip text="发送">
                   <button
                     type="button"
                     onClick={() => doSend()}
@@ -936,12 +1027,12 @@ function ChatPanel({
                       disabled:opacity-30 disabled:cursor-not-allowed
                       focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40
                       transition-all duration-200"
-                    title="发送"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5M5 12l7-7 7 7" />
                     </svg>
                   </button>
+                  </Tooltip>
                 )}
               </div>
             </div>
@@ -952,8 +1043,9 @@ function ChatPanel({
       {/* 右键菜单 */}
       {contextMenu && createPortal(
         <div
+          data-context-menu="true"
           className="fixed z-[200] bg-[#1f1f1c] border border-[#2a2926] rounded-lg shadow-xl
-            py-1 min-w-[140px] overflow-hidden"
+            py-1 min-w-[140px] flex flex-col"
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={e => e.stopPropagation()}
         >
@@ -963,6 +1055,22 @@ function ChatPanel({
               hover:text-slate-200 hover:bg-slate-700/40 cursor-pointer transition-colors"
           >
             编辑消息
+          </button>
+          {contextMenu.messageId && messages.find(m => m.id === contextMenu.messageId)?.role === 'assistant' && (
+            <button
+              onClick={handleRegenerate}
+              className="w-full text-left px-3 py-1.5 text-xs text-slate-400
+                hover:text-amber-300 hover:bg-slate-700/40 cursor-pointer transition-colors"
+            >
+              重新回复
+            </button>
+          )}
+          <button
+            onClick={handleBranch}
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-400
+              hover:text-amber-300 hover:bg-slate-700/40 cursor-pointer transition-colors"
+          >
+            创建分支
           </button>
           <button
             onClick={handleDeleteMessage}

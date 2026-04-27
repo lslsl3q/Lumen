@@ -1,17 +1,15 @@
 {
   "name": "助手",
-  "system_prompt": "你是一个运行在用户本地的AI助手，可以直接访问用户电脑上的文件系统。当用户提到文件、目录、文档时，你应该主动使用 file_read 和 file_write 工具来操作，而不是让用户手动复制粘贴内容。用中文回答问题。",
+  "system_prompt": "你是一个运行在用户本地的AI助手，可以直接访问用户电脑上的文件系统。当用户提到文件、目录、文档时，你应该主动使用 file_manager 工具来操作，而不是让用户手动复制粘贴内容。用中文回答问题。",
   "description": "",
   "greeting": "你好！有什么可以帮你的？",
   "tools": [
     "calculate",
-    "web_search",
-    "web_fetch",
-    "file_read",
-    "file_write",
+    "web",
+    "file_manager",
     "daily_note"
   ],
-  "model": "deepseek-chat",
+  "model": "deepseek-reasoner",
   "avatar": "default.png",
   "tool_tips": {},
   "context_size": 200000,
@@ -25,5 +23,6 @@
   "knowledge_top_k": 3,
   "knowledge_min_score": 0.3,
   "knowledge_token_budget": 500,
-  "skills": []
+  "skills": [],
+  "response_style": "balanced"
 }

@@ -362,7 +362,11 @@ def _rrf_merge(
 
 async def vectorize_message(message_id: int, content: str, role: str,
                             session_id: str, character_id: str, created_at: str = ""):
-    """异步计算消息向量并存入 TriviumDB（不阻塞对话流）"""
+    """异步计算消息向量并存入 TriviumDB（不阻塞对话流）
+
+    缓冲区启用时，同时写入 buffer（小模型向量），用于后续知识提取。
+    无论缓冲区状态，消息始终存入 memory.tdb 保证检索正常。
+    """
     if not _is_worth_indexing(content, role):
         return
     try:
@@ -375,6 +379,21 @@ async def vectorize_message(message_id: int, content: str, role: str,
             )
     except Exception as e:
         logger.debug(f"向量计算跳过 (msg {message_id}): {e}")
+
+    # 缓冲区：值得索引的消息同时写入 buffer（小模型向量）
+    try:
+        from lumen.services.buffer import is_enabled as buffer_enabled, add as buffer_add
+        if buffer_enabled():
+            await buffer_add(
+                content=content,
+                source="chat",
+                session_id=session_id,
+                character_id=character_id,
+                category="context",
+                importance=3,
+            )
+    except Exception as e:
+        logger.debug(f"缓冲区写入跳过: {e}")
 
 
 async def get_relevant_memories(
@@ -401,6 +420,18 @@ async def get_relevant_memories(
     # 尝试加载模型
     if not embedding.is_available():
         await embedding.ensure_loaded()
+
+    # 缓冲区搜索（小模型向量，独立空间）
+    buffer_hits = []
+    if character_id:
+        try:
+            from lumen.services.buffer import search as buffer_search, has_data
+            if has_data():
+                buffer_hits = await buffer_search(
+                    user_input, top_k=3, character_id=character_id,
+                )
+        except Exception as e:
+            logger.debug(f"缓冲区搜索跳过: {e}")
 
     # 向量语义搜索
     if embedding.is_available():
@@ -433,6 +464,14 @@ async def get_relevant_memories(
 
             # RRF 融合：向量 + BM25
             hits = _rrf_merge(vector_hits, bm25_hits)
+
+            # 合并缓冲区结果（按时间混排）
+            if buffer_hits:
+                for bh in buffer_hits:
+                    bh["rrf_score"] = bh.get("score", 0.5)
+                    bh["role"] = "buffer"
+                hits.extend(buffer_hits)
+                hits.sort(key=lambda h: h.get("rrf_score", 0), reverse=True)
 
             # 过滤搜索结果中的噪音（否认/确认/寒暄）
             hits = [h for h in hits if _is_worth_indexing(h.get("content", ""), h.get("role", "assistant"))]

@@ -236,6 +236,17 @@ function ChatInterface() {
         currentModel=""
         onEditMessage={chat.editMessage}
         onDeleteMessage={chat.deleteMessage}
+        onRegenerateMessage={chat.regenerateMessage}
+        onBranchFromMessage={async (messageId: string) => {
+          const newId = await chat.branchFromMessage(messageId);
+          if (newId) {
+            await chat.loadHistory(newId, characters.currentCharacterId || undefined);
+            chat.setCurrentSessionId(newId);
+            sessions.switchSession(newId);
+            sessions.refreshSessions();
+          }
+          return newId;
+        }}
         responseStyle={chat.responseStyle}
         onResponseStyleChange={chat.setResponseStyle}
       />

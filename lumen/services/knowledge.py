@@ -39,6 +39,19 @@ _db_lock = threading.Lock()
 _sentence_db: Optional[triviumdb.TriviumDB] = None
 _sentence_db_lock = threading.Lock()
 
+# ── 维度持久化 ──
+_KNOWLEDGE_DIM_FILE = KNOWLEDGE_DB_PATH + ".dim"
+_SENTENCE_DIM_FILE = KNOWLEDGE_SENTENCE_DB_PATH + ".dim"
+
+
+def _save_dim(dim_file: str, dim: int):
+    try:
+        with open(dim_file, "w") as f:
+            f.write(str(dim))
+    except Exception:
+        pass
+
+
 # ── Registry 缓存 ──
 _registry_cache: Optional[Dict[str, Dict]] = None
 _registry_lock = threading.Lock()
@@ -53,11 +66,16 @@ def _get_db() -> triviumdb.TriviumDB:
         with _db_lock:
             if _db is None:
                 os.makedirs(os.path.dirname(KNOWLEDGE_DB_PATH), exist_ok=True)
-                from lumen.services.embedding import get_dimensions
-                dim = get_dimensions("knowledge")
-                if dim == 0:
-                    dim = 512  # fallback
+                from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
+                dim = resolve_dimensions("knowledge")
+
+                # 维度一致性检查 — 不匹配就报错
+                err = check_dim_consistency(KNOWLEDGE_DB_PATH, dim)
+                if err:
+                    raise RuntimeError(err)
+
                 _db = triviumdb.TriviumDB(KNOWLEDGE_DB_PATH, dim=dim)
+                _save_dim_file(KNOWLEDGE_DB_PATH, dim)
                 logger.info(f"知识库 TriviumDB 已打开: {KNOWLEDGE_DB_PATH} (维度: {dim})")
     return _db
 
@@ -69,20 +87,12 @@ def _get_sentence_db() -> triviumdb.TriviumDB:
         with _sentence_db_lock:
             if _sentence_db is None:
                 os.makedirs(os.path.dirname(KNOWLEDGE_SENTENCE_DB_PATH), exist_ok=True)
-                # 句子级用小模型，延迟获取维度
-                dim = _get_sentence_dimensions()
+                from lumen.services.embedding import resolve_dimensions
+                dim = resolve_dimensions("knowledge_sentences")
                 _sentence_db = triviumdb.TriviumDB(KNOWLEDGE_SENTENCE_DB_PATH, dim=dim)
+                _save_dim(_SENTENCE_DIM_FILE, dim)
                 logger.info(f"句子级 TriviumDB 已打开: {KNOWLEDGE_SENTENCE_DB_PATH} (维度: {dim})")
     return _sentence_db
-
-
-def _get_sentence_dimensions() -> int:
-    """获取句子级嵌入维度"""
-    from lumen.services.embedding import get_dimensions
-    dim = get_dimensions("knowledge_sentences")
-    if dim > 0:
-        return dim
-    return 512  # gte-small-zh fallback
 
 
 def _prf_refine(db, query_vector: list[float], hits: list[dict],
@@ -235,6 +245,7 @@ async def import_file(
     content: str,
     category: str = "imports",
     subdir: str = "",
+    source: str = "upload",
 ) -> Dict:
     """导入文件: 保存源文件 → 切分 → 批量嵌入 → 存入 knowledge.tdb
 
@@ -289,6 +300,7 @@ async def import_file(
             "source_path": rel_path,
             "filename": filename,
             "category": category,
+            "source": source,
             "chunk_index": i,
             "content": chunk,
             "tags": [],
@@ -579,6 +591,15 @@ async def search(
     # ── RRF 合并 ──
     hits = _rrf_merge(vector_hits, bm25_hits, top_k=top_k)
 
+    # ── 缓冲区搜索（小模型向量，独立空间）──
+    buffer_hits = []
+    try:
+        from lumen.services.buffer import search as buffer_search, has_data
+        if has_data():
+            buffer_hits = await buffer_search(query, top_k=max(1, top_k // 2))
+    except Exception as e:
+        logger.debug(f"缓冲区搜索跳过: {e}")
+
     # ── PRF 精炼：用 top-N 结果的向量修正查询，再搜一次 ──
     if PRF_ENABLED and hits:
         refined_vector = _prf_refine(db, query_vector, hits, PRF_ALPHA, PRF_BETA)
@@ -608,6 +629,14 @@ async def search(
             if refined_hits:
                 hits = refined_hits
                 logger.debug(f"知识库 PRF 精炼: {len(refined_hits)} 条结果")
+
+    # ── 缓冲区结果合并（按分数混排）──
+    if buffer_hits:
+        for bh in buffer_hits:
+            bh["rrf_score"] = bh.get("score", 0.5)
+            bh["source"] = "buffer"
+        hits.extend(buffer_hits)
+        hits.sort(key=lambda h: h.get("rrf_score", h.get("score", 0)), reverse=True)
 
     # ── 句子级精排 ──
     if KNOWLEDGE_SENTENCE_LEVEL and hits:
@@ -684,6 +713,72 @@ def close():
         _sentence_db.flush()
         _sentence_db = None
         logger.info("句子级 TriviumDB 已关闭")
+
+
+async def rebuild_if_empty():
+    """启动时检测 knowledge.tdb 是否为空，为空则从源文件自动重建。
+
+    场景：用户换了 embedding API、删除了 TDB 文件、或首次启动。
+    扫描 KNOWLEDGE_SOURCE_DIR 下所有 .md/.txt/.markdown 文件，
+    跳过 _registry.json 和已有条目的文件，逐个调用 import_file。
+    """
+    db = _get_db()
+    node_ids = db.all_node_ids()
+    if len(node_ids) > 0:
+        logger.info(f"知识库已有 {len(node_ids)} 条向量，跳过自动重建")
+        return
+
+    logger.info("知识库为空，扫描源文件进行自动重建...")
+
+    if not os.path.isdir(KNOWLEDGE_SOURCE_DIR):
+        logger.info("源文件目录不存在，跳过")
+        return
+
+    # 收集已有 source_path（虽然为空，但防并发）
+    existing_paths = set()
+
+    ALLOWED_EXT = {".md", ".txt", ".markdown"}
+    files_to_import = []
+
+    for dirpath, dirnames, filenames in os.walk(KNOWLEDGE_SOURCE_DIR):
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        for f in sorted(filenames):
+            if f == "_registry.json":
+                continue
+            ext = os.path.splitext(f)[1].lower()
+            if ext in ALLOWED_EXT:
+                full_path = os.path.join(dirpath, f)
+                rel_path = os.path.relpath(full_path, KNOWLEDGE_SOURCE_DIR).replace("\\", "/")
+                if rel_path not in existing_paths:
+                    files_to_import.append((full_path, rel_path))
+
+    if not files_to_import:
+        logger.info("无源文件需要导入")
+        return
+
+    logger.info(f"发现 {len(files_to_import)} 个源文件，开始自动重建...")
+
+    imported = 0
+    failed = 0
+    for full_path, rel_path in files_to_import:
+        try:
+            with open(full_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            if not content.strip():
+                continue
+            parts = rel_path.split("/")
+            filename = parts[-1]
+            category = parts[0] if len(parts) > 1 else "imports"
+            subdir = "/".join(parts[1:-1]) if len(parts) > 2 else ""
+            # 保留原始来源：daily_note 目录下的 = daily_note，其余 = upload
+            source = parts[0] if parts[0] == "daily_note" else "upload"
+            await import_file(filename, content, category=category, subdir=subdir, source=source)
+            imported += 1
+        except Exception as e:
+            failed += 1
+            logger.warning(f"自动重建失败: {rel_path}: {e}")
+
+    logger.info(f"自动重建完成: 导入 {imported} 个文件, 失败 {failed} 个")
 
 
 # ── 内部工具 ──

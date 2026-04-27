@@ -371,7 +371,7 @@ async def _inject_thinking_clusters(
     return result_messages, tc_log
 
 
-def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
+def validate_tool_call(tool_name: str, tool_params: dict, command: str = "") -> str | None:
     """验证 AI 的工具调用是否正确
 
     Returns:
@@ -384,7 +384,18 @@ def validate_tool_call(tool_name: str, tool_params: dict) -> str | None:
         return f"工具 '{tool_name}' 不存在，可用工具: {', '.join(available)}"
 
     tool_def = registry.get_tool(tool_name)
-    params_schema = tool_def.get("parameters", {})
+
+    # 有 commands 的工具：验证 command 并用对应 schema 验证参数
+    commands = tool_def.get("commands", {})
+    if commands:
+        if not command:
+            return f"工具 '{tool_name}' 需要 command 参数，可用命令: {', '.join(commands.keys())}"
+        if command not in commands:
+            return f"工具 '{tool_name}' 没有命令 '{command}'，可用命令: {', '.join(commands.keys())}"
+        params_schema = commands[command].get("parameters", {})
+    else:
+        # 简单工具（无 command）：用顶层 parameters 验证
+        params_schema = tool_def.get("parameters", {})
 
     try:
         jsonschema.validate(instance=tool_params, schema=params_schema)
@@ -486,6 +497,8 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
     session.messages.append({"role": "user", "content": user_input})
     msg_id = await _save_and_vectorize(session.session_id or "default", "user", user_input, session.character_id)
     session.messages[-1]["id"] = msg_id
+    # 推送用户消息的数据库 ID 给前端（用于编辑/删除）
+    yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
 
     _clear_cancel(session.session_id)
 
@@ -680,7 +693,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             if len(session.messages) <= 5:
                 asyncio.create_task(_auto_title(session.session_id))
             logger.info(f"[ReAct] 循环结束: {exit_reason}，共 {tool_iterations} 轮工具调用")
-            yield {"type": "done", "exit_reason": exit_reason}
+            yield {"type": "done", "exit_reason": exit_reason, "assistant_db_id": msg_id}
             return
 
         # --- 有工具调用，进入 ReAct 循环 ---
@@ -707,14 +720,21 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
         msg_id = await _save_and_vectorize(session.session_id or "default", "assistant", full_text, session.character_id)
         session.messages[-1]["id"] = msg_id
 
+        # 清除前端消息中的工具调用 JSON，只保留思考文字
+        if thinking_text:
+            yield {"type": "text_set", "content": thinking_text}
+        else:
+            yield {"type": "text_clear"}
+
         mode = tool_call.get("mode", "single")
 
         # ========== 单个工具 ==========
         if mode == "single":
             tool_name = tool_call.get("tool", "")
             tool_params = tool_call.get("params", {})
+            tool_command = tool_call.get("command", "")
 
-            validation_error = validate_tool_call(tool_name, tool_params)
+            validation_error = validate_tool_call(tool_name, tool_params, tool_command)
             if validation_error:
                 logger.warning(f"工具验证失败: {validation_error}")
                 yield {"type": "status", "status": "tool_error", "message": validation_error}
@@ -726,10 +746,10 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 history.save_message(session.session_id, "user", error_feedback)
                 continue
 
-            yield {"type": "tool_start", "tool": tool_name, "params": tool_params}
+            yield {"type": "tool_start", "tool": tool_name, "command": tool_command, "params": tool_params}
             set_tool_context(session.session_id or "", session.character_id or "")
             tool_exec_start = time.perf_counter()
-            tool_result = execute_tool(tool_name, tool_params)
+            tool_result = execute_tool(tool_name, tool_params, command=tool_command)
             tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
             logger.info(
                 f"工具调用: {tool_name}({tool_params}) → "
@@ -738,6 +758,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
             yield {
                 "type": "tool_result",
                 "tool": tool_name,
+                "command": tool_command,
                 "success": tool_result["success"],
                 "data": tool_result.get("data"),
                 "error": tool_result.get("error_message"),
@@ -774,7 +795,7 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
 
             all_errors = []
             for call in calls:
-                error = validate_tool_call(call.get("tool", ""), call.get("params", {}))
+                error = validate_tool_call(call.get("tool", ""), call.get("params", {}), call.get("command", ""))
                 if error:
                     all_errors.append(f"- {call.get('tool')}: {error}")
 
@@ -791,19 +812,21 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
                 continue
 
             tool_names = [c.get("tool") for c in calls]
-            yield {"type": "tool_start", "tool": tool_names, "mode": "parallel"}
+            tool_commands = [c.get("command", "") for c in calls]
+            yield {"type": "tool_start", "tool": tool_names, "command": tool_commands, "mode": "parallel"}
             set_tool_context(session.session_id or "", session.character_id or "")
             logger.info(f"并行执行 {len(calls)} 个工具...")
             tool_exec_start = time.perf_counter()
             results = execute_tools_parallel(calls)
             tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
 
-            for r in results:
+            for i, r in enumerate(results):
                 status = "✅" if r["success"] else "❌"
                 logger.info(f"  - {r['tool']}: {status}")
                 yield {
                     "type": "tool_result",
                     "tool": r["tool"],
+                    "command": calls[i].get("command", "") if i < len(calls) else "",
                     "success": r["success"],
                     "data": r.get("data"),
                     "error": r.get("error_message"),
@@ -871,4 +894,4 @@ async def chat_stream(user_input: str, session: ChatSession, memory_debug: bool 
     # 首次对话完成后生成标题
     if len(session.messages) <= 5:
         asyncio.create_task(_auto_title(session.session_id))
-    yield {"type": "done", "exit_reason": exit_reason}
+    yield {"type": "done", "exit_reason": exit_reason, "assistant_db_id": msg_id}

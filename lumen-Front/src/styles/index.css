@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700&display=swap');
 @import "tailwindcss";
+@import "./editor.css";
 
 /* === Tailwind CSS v4 主题配置 ===
  * 使用 @theme 指令定义自定义设计令牌

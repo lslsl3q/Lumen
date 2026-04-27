@@ -23,6 +23,7 @@ import TokenInspector from '../../pages/TokenInspector';
 import KnowledgeList from '../../pages/KnowledgeList';
 import ToolTipsPage from '../../pages/ToolTipsPage';
 import ThinkingClustersPage from '../../pages/ThinkingClustersPage';
+import BufferSettingsPage from '../../pages/BufferSettingsPage';
 
 // Section 类型
 type SettingsPage =
@@ -33,7 +34,8 @@ type SettingsPage =
   | 'avatar-manager'
   | 'config-list' | 'config-editor'
   | 'token-inspector' | 'knowledge-list'
-  | 'tooltips' | 'thinking-clusters';
+  | 'tooltips' | 'thinking-clusters'
+  | 'buffer-settings';
 
 interface SettingsSection {
   page: SettingsPage;
@@ -65,6 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
       { page: 'knowledge-list', label: '知识库' },
       { page: 'tooltips', label: '工具提示词' },
       { page: 'thinking-clusters', label: '思维簇' },
+      { page: 'buffer-settings', label: '缓冲区' },
     ],
   },
 ];
@@ -142,6 +145,8 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
         return <ToolTipsPage {...contentNav} />;
       case 'thinking-clusters':
         return <ThinkingClustersPage {...contentNav} />;
+      case 'buffer-settings':
+        return <BufferSettingsPage {...contentNav} />;
     }
   };
 

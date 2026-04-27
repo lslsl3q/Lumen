@@ -189,6 +189,7 @@ def _validate_single(data: dict) -> Optional[Dict[str, Any]]:
     call = SingleToolCall(
         mode="single",
         tool=tool,
+        command=data.get("command", ""),
         params=data.get("params", {}),
     )
     if "id" in data:

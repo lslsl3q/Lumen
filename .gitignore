@@ -51,6 +51,13 @@ data/
 !lumen/data/thinking_clusters/reasoning_patterns/
 !lumen/data/thinking_clusters/self_correction/
 
+# 运行时数据（用户日记、配置、缓存）
+lumen/data/daily_note/
+lumen/data/knowledge/daily_note/
+lumen/data/runtime_config.json
+lumen/data/tdb_registry.json
+snapshot*.txt
+
 # ========================================
 # 用户个人数据（Persona / 世界书 / 角色 / Skills，只追踪 default 模板）
 # ========================================

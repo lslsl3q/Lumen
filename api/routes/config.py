@@ -82,16 +82,104 @@ async def list_configs():
     return list(_RESOURCE_INFO.values())
 
 
+# ── 具体路由必须在 /{resource} 之前注册，否则会被通配路由抢先匹配 ──
+
+
+# ========================================
+# 缓冲区运行时配置
+# ========================================
+
+class BufferSettingsRequest(BaseModel):
+    buffer_enabled: bool | None = None
+    buffer_auto_cleanup: bool | None = None
+    buffer_auto_consolidate_threshold: int | None = None
+    buffer_consolidation_model: str | None = None
+
+
+class BufferToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.get("/buffer")
+async def get_buffer_settings():
+    """获取缓冲区运行时设置"""
+    from lumen.services.runtime_config import get_all
+    from lumen.services.buffer import get_stats
+
+    settings = get_all()
+    stats = get_stats()
+    return {"settings": settings, "stats": stats}
+
+
+@router.post("/buffer")
+async def update_buffer_settings(req: BufferSettingsRequest):
+    """更新缓冲区运行时设置"""
+    from lumen.services.runtime_config import update_many
+
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    if not updates:
+        return {"message": "无更新"}
+    update_many(updates)
+    return {"message": f"已更新: {list(updates.keys())}"}
+
+
+@router.post("/buffer/toggle")
+async def toggle_buffer(req: BufferToggleRequest):
+    """切换缓冲区开关"""
+    from lumen.services.runtime_config import set as rc_set
+
+    rc_set("buffer_enabled", req.enabled)
+    return {"message": f"缓冲区已{'开启' if req.enabled else '关闭'}", "enabled": req.enabled}
+
+
+# ========================================
+# TDB 列表（编辑器用）
+# ========================================
+
+@router.get("/tdbs")
+async def list_tdbs():
+    """列出用户可见的 TDB 文件（动态，前端标签页用）"""
+    data_dir = os.path.join(_PROJECT_ROOT, "lumen", "data")
+
+    # 排除的内部 TDB
+    _INTERNAL = {"knowledge_sentences.tdb", "thinking_clusters.tdb"}
+
+    tdbs = []
+    # 扫描 data/ 及子目录（vectors/api/, vectors/local/）
+    for root, dirs, files in os.walk(data_dir):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for f in sorted(files):
+            if not f.endswith(".tdb"):
+                continue
+            if f in _INTERNAL:
+                continue
+
+            name = f.replace(".tdb", "")
+            path = os.path.join(root, f)
+            size = os.path.getsize(path)
+
+            tdbs.append({
+                "name": name,
+                "filename": f,
+                "size": size,
+            })
+
+    # 兜底：核心 TDB 即使文件未创建也要显示
+    _ALWAYS_SHOW = ["knowledge", "memory", "buffer", "daily_note"]
+    existing_names = {t["name"] for t in tdbs}
+    for name in _ALWAYS_SHOW:
+        if name not in existing_names:
+            tdbs.append({"name": name, "filename": None, "size": 0})
+
+    return {"tdbs": tdbs}
+
+
+# ── 通配路由（必须放最后） ──
+
+
 @router.get("/{resource}")
 async def get_config(resource: str):
-    """获取某个配置项的内容
-
-    Args:
-        resource: 资源名称（env / tools）
-
-    Returns:
-        配置内容和元信息
-    """
+    """获取某个配置项的内容"""
     if resource not in _RESOURCE_FILES:
         raise HTTPException(
             status_code=404,
@@ -107,7 +195,6 @@ async def get_config(resource: str):
         with open(filepath, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # JSON 文件解析验证
         parsed = None
         info = _RESOURCE_INFO.get(resource)
         if info and info.type == "json":
@@ -132,15 +219,7 @@ async def get_config(resource: str):
 
 @router.post("/{resource}")
 async def update_config(resource: str, req: ConfigUpdateRequest):
-    """更新某个配置项
-
-    Args:
-        resource: 资源名称
-        req: 包含新内容的请求体
-
-    Returns:
-        更新结果
-    """
+    """更新某个配置项"""
     if resource not in _RESOURCE_FILES:
         raise HTTPException(
             status_code=404,
@@ -151,7 +230,6 @@ async def update_config(resource: str, req: ConfigUpdateRequest):
     if info and not info.editable:
         raise HTTPException(status_code=403, detail=f"配置项 {resource} 不可编辑")
 
-    # JSON 类型的内容先验证格式
     if info and info.type == "json":
         try:
             json.loads(req.content)

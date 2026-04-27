@@ -540,6 +540,46 @@ def delete_message(msg_id: int) -> bool:
         return cursor.rowcount > 0
 
 
+def delete_messages_from(session_id: str, from_id: int) -> int:
+    """删除指定 ID 及之后的所有消息（含 FTS 索引），返回删除数量"""
+    with _write_lock:
+        conn = _get_conn()
+        try:
+            conn.execute(
+                "DELETE FROM messages_fts WHERE rowid IN "
+                "(SELECT id FROM messages WHERE session_id = ? AND id >= ?)",
+                (session_id, from_id),
+            )
+        except Exception:
+            pass
+        cursor = conn.execute(
+            "DELETE FROM messages WHERE session_id = ? AND id >= ?",
+            (session_id, from_id),
+        )
+        conn.commit()
+        return cursor.rowcount
+
+
+def copy_messages_to(src_session_id: str, dst_session_id: str, up_to_id: int):
+    """复制源会话中指定 ID 及之前的所有消息到目标会话"""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT role, content, metadata FROM messages "
+        "WHERE session_id = ? AND id <= ? ORDER BY id",
+        (src_session_id, up_to_id),
+    ).fetchall()
+
+    with _write_lock:
+        conn_exec = _get_conn()
+        for role, content, metadata in rows:
+            metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+            conn_exec.execute(
+                "INSERT INTO messages (session_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?)",
+                (dst_session_id, role, content, metadata_json, datetime.now().isoformat()),
+            )
+        conn_exec.commit()
+
+
 def load_session(session_id: str) -> list[Message]:
     """加载某个会话的所有消息，返回 messages 列表
 

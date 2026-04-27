@@ -87,37 +87,46 @@ DEFAULT_CONTEXT_SIZE = int(os.getenv("DEFAULT_CONTEXT_SIZE", "8192"))
 # 心跳间隔（秒），保持连接存活（应对休眠唤醒）
 WS_HEARTBEAT_INTERVAL = float(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
 
-# 嵌入模型配置（语义搜索）
+# ── 嵌入模型配置（两阵营架构）─
 EMBEDDING_ENABLED = os.getenv("EMBEDDING_ENABLED", "True").lower() in ("true", "1", "yes")
 
-# 默认后端类型：local（SentenceTransformer）| openai（OpenAI 兼容 API）| gemini（Google Gemini）
-EMBEDDING_BACKEND = os.getenv("EMBEDDING_BACKEND", "local")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh")  # local 模型名
-EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "0"))  # 0=自动检测
+# 阵营 A：本地小模型 — 程序内置模块（memory/buffer/thinking_clusters/knowledge_sentences）
+EMBEDDING_LOCAL_MODEL = os.getenv("EMBEDDING_LOCAL_MODEL", os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh"))
+EMBEDDING_LOCAL_DIM = int(os.getenv("EMBEDDING_LOCAL_DIM", "512"))
 
-# OpenAI 兼容 API 配置（覆盖大部分国内服务商：豆包/智谱/硅基流动/零一万物/阿里等）
+# 阵营 B：API 大模型 — 用户新建的知识库
 EMBEDDING_API_URL = os.getenv("EMBEDDING_API_URL", "")
 EMBEDDING_API_KEY = os.getenv("EMBEDDING_API_KEY", "")
 EMBEDDING_API_MODEL = os.getenv("EMBEDDING_API_MODEL", "")
+EMBEDDING_API_DIM = int(os.getenv("EMBEDDING_API_DIM", os.getenv("KNOWLEDGE_EMBEDDING_DIM", "0")))
 
-# ── 按服务覆盖（可选，不设则用默认值）──
-# MEMORY_EMBEDDING_BACKEND=local       # 消息记忆用本地小模型（快速）
-# KNOWLEDGE_EMBEDDING_BACKEND=openai   # 知识库用 API 大模型（精准）
-#   → 知识库 chunk 级必须配 API（URL+Key），不配则知识库向量功能不可用
-# THINKING_CLUSTERS_EMBEDDING_BACKEND=local  # 思维簇用本地小模型即可
-MEMORY_EMBEDDING_BACKEND = os.getenv("MEMORY_EMBEDDING_BACKEND", "")
-MEMORY_EMBEDDING_API_MODEL = os.getenv("MEMORY_EMBEDDING_API_MODEL", "")
-KNOWLEDGE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_EMBEDDING_BACKEND", "")   # 空=不启用
-KNOWLEDGE_EMBEDDING_API_URL = os.getenv("KNOWLEDGE_EMBEDDING_API_URL", "")   # 知识库专属 API URL
-KNOWLEDGE_EMBEDDING_API_KEY = os.getenv("KNOWLEDGE_EMBEDDING_API_KEY", "")   # 知识库专属 API Key
-KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "")  # 知识库专属模型名
-TC_EMBEDDING_BACKEND = os.getenv("TC_EMBEDDING_BACKEND", "")
-TC_EMBEDDING_API_MODEL = os.getenv("TC_EMBEDDING_API_MODEL", "")
+# 旧变量兼容导出（embedding.py 内部不再直接 import 这些，但保持向后兼容）
+EMBEDDING_BACKEND = "local"
+EMBEDDING_MODEL = EMBEDDING_LOCAL_MODEL
+EMBEDDING_DIMENSIONS = EMBEDDING_LOCAL_DIM
+KNOWLEDGE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_EMBEDDING_BACKEND", "")  # 空=不启用
+KNOWLEDGE_EMBEDDING_API_URL = os.getenv("KNOWLEDGE_EMBEDDING_API_URL", "") or EMBEDDING_API_URL
+KNOWLEDGE_EMBEDDING_API_KEY = os.getenv("KNOWLEDGE_EMBEDDING_API_KEY", "") or EMBEDDING_API_KEY
+KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "") or EMBEDDING_API_MODEL
+
+
 
 # 知识库配置
+VECTOR_STORE_DIR = os.getenv(
+    "VECTOR_STORE_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "vectors"),
+)
+VECTOR_LOCAL_DIR = os.getenv(
+    "VECTOR_LOCAL_DIR",
+    os.path.join(VECTOR_STORE_DIR, "local"),
+)
+VECTOR_API_DIR = os.getenv(
+    "VECTOR_API_DIR",
+    os.path.join(VECTOR_STORE_DIR, "api"),
+)
 KNOWLEDGE_DB_PATH = os.getenv(
     "KNOWLEDGE_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "data", "knowledge.tdb"),
+    os.path.join(VECTOR_API_DIR, "knowledge.tdb"),
 )
 KNOWLEDGE_SOURCE_DIR = os.getenv(
     "KNOWLEDGE_SOURCE_DIR",
@@ -135,14 +144,11 @@ PRF_BETA = float(os.getenv("PRF_BETA", "0.3"))         # PRF 均值向量权重
 # 句子级检索配置（T18 Stage 3+4）
 KNOWLEDGE_SENTENCE_DB_PATH = os.getenv(
     "KNOWLEDGE_SENTENCE_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "data", "knowledge_sentences.tdb"),
+    os.path.join(VECTOR_LOCAL_DIR, "knowledge_sentences.tdb"),
 )
 KNOWLEDGE_SENTENCE_LEVEL = os.getenv("KNOWLEDGE_SENTENCE_LEVEL", "True").lower() in ("true", "1")
 KNOWLEDGE_SENTENCE_TOP_N = int(os.getenv("KNOWLEDGE_SENTENCE_TOP_N", "5"))
 KNOWLEDGE_SENTENCE_WINDOW = int(os.getenv("KNOWLEDGE_SENTENCE_WINDOW", "1"))
-# 句子级嵌入模型（默认本地小模型，跟 chunk 级分开）
-KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND = os.getenv("KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND", "local")
-KNOWLEDGE_SENTENCE_EMBEDDING_MODEL = os.getenv("KNOWLEDGE_SENTENCE_EMBEDDING_MODEL", "thenlper/gte-small-zh")
 
 # Token 预算配置（知识库检索注入的 token 上限）
 KNOWLEDGE_PLACEHOLDER_BUDGET = int(os.getenv("KNOWLEDGE_PLACEHOLDER_BUDGET", "800"))   # 占位符 {{}}/[[]] 共享预算
@@ -161,8 +167,17 @@ THINKING_CLUSTERS_DIR = os.getenv(
 )
 THINKING_CLUSTERS_DB_PATH = os.getenv(
     "THINKING_CLUSTERS_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "data", "thinking_clusters.tdb"),
+    os.path.join(VECTOR_LOCAL_DIR, "thinking_clusters.tdb"),
 )
+
+# 缓冲区配置（记忆生命周期 Phase 1）
+BUFFER_ENABLED = os.getenv("BUFFER_ENABLED", "false").lower() == "true"
+BUFFER_DB_PATH = os.getenv(
+    "BUFFER_DB_PATH",
+    os.path.join(VECTOR_LOCAL_DIR, "buffer.tdb"),
+)
+BUFFER_AUTO_THRESHOLD = int(os.getenv("BUFFER_AUTO_THRESHOLD", "30"))
+BUFFER_MAX_AGE_HOURS = int(os.getenv("BUFFER_MAX_AGE_HOURS", "48"))
 
 
 def get_model(character_config: dict = None) -> str:

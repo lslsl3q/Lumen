@@ -19,10 +19,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _call_tool(name: str, params: dict) -> str:
+def _call_tool(name: str, params: dict, command: str = "") -> str:
     """调用 Lumen 工具，返回 data 字符串"""
     from lumen.tool import execute_tool
-    result = execute_tool(name, params)
+    result = execute_tool(name, params, command=command)
     if not result.get("success"):
         raise RuntimeError(f"工具 {name} 执行失败: {result.get('error_message', '未知错误')}")
     return result.get("data", "")
@@ -38,7 +38,7 @@ def search(query: str, max_results: int = 5) -> str:
     Returns:
         格式化搜索结果文本
     """
-    return _call_tool("web_search", {"query": query, "max_results": max_results})
+    return _call_tool("web", {"query": query, "max_results": max_results}, command="search")
 
 
 def fetch(url: str, max_length: int = 5000) -> str:
@@ -51,7 +51,7 @@ def fetch(url: str, max_length: int = 5000) -> str:
     Returns:
         网页文本内容
     """
-    return _call_tool("web_fetch", {"url": url, "max_length": max_length})
+    return _call_tool("web", {"url": url, "max_length": max_length}, command="fetch")
 
 
 def read_file(path: str) -> str:
@@ -63,7 +63,7 @@ def read_file(path: str) -> str:
     Returns:
         文件文本内容
     """
-    return _call_tool("file_read", {"action": "read", "path": path})
+    return _call_tool("file_manager", {"path": path}, command="read")
 
 
 def list_files(path: str, pattern: str = "*") -> str:
@@ -76,7 +76,7 @@ def list_files(path: str, pattern: str = "*") -> str:
     Returns:
         格式化文件列表文本
     """
-    return _call_tool("file_read", {"action": "list", "path": path, "pattern": pattern})
+    return _call_tool("file_manager", {"path": path, "pattern": pattern}, command="list")
 
 
 def calculate(expression: str) -> str:

@@ -67,7 +67,30 @@ async def _async_store(content: str, character_id: str, session_id: str,
                        content_display: str, md_filename: str,
                        tags: list[str], importance: int, category: str,
                        note_id: str, now_str: str):
-    """异步：用知识库的嵌入模型向量化 + 存 knowledge.tdb"""
+    """异步：向量化 + 存储（缓冲模式 → buffer.tdb，否则 → knowledge.tdb）"""
+    from lumen.services.buffer import is_enabled as buffer_enabled, add as buffer_add
+
+    if buffer_enabled():
+        # 缓冲模式：写 buffer.tdb（小模型向量），MD 文件已在外部保存
+        await buffer_add(
+            content=content,
+            source="daily_note",
+            session_id=session_id,
+            character_id=character_id,
+            keywords=tags,
+            importance=importance,
+            category=f"active_{category}",
+            extra_payload={
+                "file_id": note_id,
+                "source_path": f"active/{md_filename}",
+                "filename": md_filename,
+                "content_display": content_display,
+            },
+        )
+        logger.info(f"日记已存入缓冲区: {note_id}")
+        return
+
+    # 原有逻辑：直接写 knowledge.tdb（大模型向量）
     from lumen.services.embedding import get_service
     backend = await get_service("knowledge")
     if not backend:
@@ -101,7 +124,7 @@ async def _async_store(content: str, character_id: str, session_id: str,
     logger.info(f"日记向量已存储到 knowledge.tdb: {note_id}")
 
 
-def execute(params: dict) -> dict:
+def execute(params: dict, command: str = "") -> dict:
     """保存日记/档案 — 三写（TriviumDB + SQLite + MD）"""
     content = params.get("content", "").strip()
     if not content:

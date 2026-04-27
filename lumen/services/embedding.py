@@ -199,81 +199,42 @@ def _build_backend(backend_type: str, model_name: str, api_url: str, api_key: st
 
 
 def _resolve_service_config(service_name: str) -> dict:
-    """解析指定服务的嵌入配置（服务级覆盖 → 全局默认）
+    """解析指定服务的嵌入配置（两阵营架构）
 
-    Args:
-        service_name: "memory" | "knowledge" | "thinking_clusters" | "knowledge_sentences"
+    阵营 A（本地小模型）：memory / buffer / thinking_clusters / knowledge_sentences
+    阵营 B（API 大模型）：knowledge + 所有用户新建知识库
 
     Returns:
         {"backend_type", "model_name", "api_url", "api_key", "api_model"}
         backend_type 为空字符串表示该服务不启用
     """
     from lumen.config import (
-        EMBEDDING_BACKEND, EMBEDDING_MODEL, EMBEDDING_API_URL,
+        EMBEDDING_LOCAL_MODEL, EMBEDDING_API_URL,
         EMBEDDING_API_KEY, EMBEDDING_API_MODEL,
+        KNOWLEDGE_EMBEDDING_BACKEND,
     )
 
-    # 知识库 chunk 级：必须用户显式配置，空=不启用
+    # ── 阵营 B：知识库（API 大模型）──
     if service_name == "knowledge":
-        from lumen.config import (
-            KNOWLEDGE_EMBEDDING_BACKEND, KNOWLEDGE_EMBEDDING_API_URL,
-            KNOWLEDGE_EMBEDDING_API_KEY, KNOWLEDGE_EMBEDDING_API_MODEL,
-        )
-        backend_type = KNOWLEDGE_EMBEDDING_BACKEND
-        if not backend_type:
-            return {
-                "backend_type": "",  # 空表示不启用
-                "model_name": "",
-                "api_url": KNOWLEDGE_EMBEDDING_API_URL,
-                "api_key": KNOWLEDGE_EMBEDDING_API_KEY,
-                "api_model": KNOWLEDGE_EMBEDDING_API_MODEL,
-            }
-        api_url = KNOWLEDGE_EMBEDDING_API_URL or EMBEDDING_API_URL
-        api_key = KNOWLEDGE_EMBEDDING_API_KEY or EMBEDDING_API_KEY
-        api_model = KNOWLEDGE_EMBEDDING_API_MODEL or EMBEDDING_API_MODEL
+        if not KNOWLEDGE_EMBEDDING_BACKEND:
+            return {"backend_type": "", "model_name": "",
+                    "api_url": EMBEDDING_API_URL, "api_key": EMBEDDING_API_KEY,
+                    "api_model": EMBEDDING_API_MODEL}
         return {
-            "backend_type": backend_type,
-            "model_name": EMBEDDING_MODEL,
-            "api_url": api_url,
-            "api_key": api_key,
-            "api_model": api_model,
-        }
-
-    # 句子级：固定本地小模型
-    if service_name == "knowledge_sentences":
-        from lumen.config import (
-            KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND, KNOWLEDGE_SENTENCE_EMBEDDING_MODEL,
-        )
-        return {
-            "backend_type": KNOWLEDGE_SENTENCE_EMBEDDING_BACKEND,
-            "model_name": KNOWLEDGE_SENTENCE_EMBEDDING_MODEL,
+            "backend_type": KNOWLEDGE_EMBEDDING_BACKEND,
+            "model_name": "",
             "api_url": EMBEDDING_API_URL,
             "api_key": EMBEDDING_API_KEY,
             "api_model": EMBEDDING_API_MODEL,
         }
 
-    # 其他服务（memory / thinking_clusters）：服务级覆盖 → 全局默认
-    overrides = {
-        "memory": {
-            "backend_env": "MEMORY_EMBEDDING_BACKEND",
-            "api_model_env": "MEMORY_EMBEDDING_API_MODEL",
-        },
-        "thinking_clusters": {
-            "backend_env": "TC_EMBEDDING_BACKEND",
-            "api_model_env": "TC_EMBEDDING_API_MODEL",
-        },
-    }
-
-    override = overrides.get(service_name, {})
-    backend_type = os.getenv(override.get("backend_env", ""), "") or EMBEDDING_BACKEND
-    api_model = os.getenv(override.get("api_model_env", ""), "") or EMBEDDING_API_MODEL
-
+    # ── 阵营 A：所有内部模块（本地小模型）──
     return {
-        "backend_type": backend_type,
-        "model_name": EMBEDDING_MODEL,
-        "api_url": EMBEDDING_API_URL,
-        "api_key": EMBEDDING_API_KEY,
-        "api_model": api_model,
+        "backend_type": "local",
+        "model_name": EMBEDDING_LOCAL_MODEL,
+        "api_url": "",
+        "api_key": "",
+        "api_model": "",
     }
 
 
@@ -336,6 +297,62 @@ def get_dimensions(service_name: str = "memory") -> int:
     if backend:
         return backend.dimensions
     return 0
+
+
+def resolve_dimensions(service_name: str) -> int:
+    """获取指定服务的向量维度 — 两阵营，从配置读，不猜测
+
+    阵营 A（本地小模型）：读 EMBEDDING_LOCAL_DIM，默认 512
+    阵营 B（API 大模型）：读 EMBEDDING_API_DIM，必须配置
+    要换维度：改 .env → 删 .tdb 文件 → 重启
+    """
+    from lumen.config import EMBEDDING_LOCAL_DIM, EMBEDDING_API_DIM
+
+    # 阵营 B：知识库必须用户显式配置
+    if service_name == "knowledge":
+        if EMBEDDING_API_DIM > 0:
+            return EMBEDDING_API_DIM
+        raise ValueError(
+            "知识库维度未配置。请在 .env 中设置 EMBEDDING_API_DIM=xxx，"
+            "然后删除 knowledge.tdb 重启"
+        )
+
+    # 阵营 A：所有内部模块，读本地模型维度
+    return EMBEDDING_LOCAL_DIM
+
+
+def _save_dim_file(db_path: str, dim: int):
+    """保存维度到 .dim 文件（纯记录，不参与维度决策）"""
+    try:
+        with open(db_path + ".dim", "w") as f:
+            f.write(str(dim))
+    except Exception:
+        pass
+
+
+def check_dim_consistency(db_path: str, dim: int) -> str | None:
+    """检查 .dim 文件与当前配置是否一致
+
+    Returns: None 表示一致，否则返回错误信息
+    """
+    dim_file = db_path + ".dim"
+    if not os.path.exists(dim_file) or not os.path.exists(db_path):
+        return None
+    try:
+        saved = int(open(dim_file).read().strip())
+        if saved != dim:
+            return (
+                f"维度不匹配：数据库 {db_path} 创建时维度={saved}，"
+                f"当前配置维度={dim}。"
+                f"请删除 {db_path} 和 {dim_file} 后重启重建"
+            )
+    except Exception:
+        pass
+    return None
+
+    # 终极兜底：512（匹配 gte-small-zh，Lumen 的默认模型）
+    logger.warning(f"无法确定 '{service_name}' 的维度，使用默认值 512")
+    return 512
 
 
 # ── 向后兼容的公共 API ──
