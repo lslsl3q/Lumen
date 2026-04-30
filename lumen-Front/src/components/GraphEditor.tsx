@@ -9,6 +9,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Graph } from '@antv/g6';
 import * as graphApi from '../api/graph';
 import type { GraphEntity, GraphEdge } from '../api/graph';
+import { reExtractGraph, getGraphPrompt, updateGraphPrompt } from '../api/graph';
+import { syncGraph } from '../api/knowledge';
+import { getTdbFileTree } from '../api/tdb';
+import type { TdbFileFolder } from '../api/tdb';
+import TdbFileTree from './TdbFileTree';
+import ResizablePanel from './ResizablePanel';
 import { toast } from '../utils/toast';
 
 /* ── 颜色映射（暖灰色调，适配暗色背景）── */
@@ -70,6 +76,17 @@ function GraphEditor({ tdb }: GraphEditorProps) {
   const [newEntityType, setNewEntityType] = useState('entity');
   const [isCreating, setIsCreating] = useState(false);
 
+  // 重抽图谱
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractingFile, setExtractingFile] = useState<string | null>(null);
+
+  // 源文件树（复用 getTdbFileTree API）
+  const [fileFolders, setFileFolders] = useState<TdbFileFolder[]>([]);
+
+  // 提示词编辑
+  const [promptText, setPromptText] = useState('');
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+
   // 编辑实体
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('');
@@ -108,25 +125,32 @@ function GraphEditor({ tdb }: GraphEditorProps) {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [entData, edgeData] = await Promise.all([
+      const [entData, edgeData, treeData] = await Promise.all([
         graphApi.listEntities(tdb),
         graphApi.listEdges(tdb),
+        getTdbFileTree(tdb).catch(() => ({ folders: [] as TdbFileFolder[], total_files: 0 })),
       ]);
       setEntities(entData.entities);
       setEdges(edgeData.edges);
+      setFileFolders(treeData.folders);
 
-      if (graphRef.current) {
-        graphRef.current.setData({
+      const graph = graphRef.current;
+      if (graph) {
+        const data = {
           nodes: entData.entities.map(toG6Node),
           edges: edgeData.edges.map(toG6Edge),
-        });
-        graphRef.current.render();
+        };
+        graph.clear();
+        graph.setData(data);
+        graph.render();
       }
     } catch (err) {
       console.error('加载图谱数据失败:', err);
     } finally {
       setIsLoading(false);
     }
+    // 加载提示词（不阻塞主流程）
+    getGraphPrompt().then(d => setPromptText(d.raw_content)).catch(() => {});
   }, [tdb]);
 
   /* ── G6 初始化 ── */
@@ -225,7 +249,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         },
       ],
       animation: true,
-      background: '#141413',
+      background: '#1C1B19',
     });
 
     // 节点点击 → 选中
@@ -392,8 +416,14 @@ function GraphEditor({ tdb }: GraphEditorProps) {
 
   return (
     <div className="flex h-full w-full">
-      {/* ── 左栏：实体列表 ── */}
-      <div className="w-48 flex-shrink-0 border-r border-[#2a2926] bg-[#171715] flex flex-col">
+      {/* ── 左栏：实体列表（可拖拽调宽）── */}
+      <ResizablePanel
+        defaultWidth={192}
+        minWidth={144}
+        maxWidth={320}
+        storageKey="lumen_graph_sidebar_width"
+        className="border-r border-[#2a2926] bg-[#171715] flex flex-col"
+      >
         <div className="px-3 py-2 border-b border-[#2a2926] flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-widest text-slate-600">
             实体 ({entities.length})
@@ -412,11 +442,11 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         </div>
 
         {/* 布局切换 */}
-        <div className="px-3 py-1.5 border-b border-[#2a2926]">
+        <div className="px-3 py-1.5 border-b border-[#2a2926] flex gap-1.5">
           <select
             value={layoutType}
             onChange={e => setLayoutType(e.target.value)}
-            className="w-full text-[10px] bg-[#141413] border border-[#2a2926] rounded
+            className="flex-1 text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded
               px-2 py-1 text-slate-500 outline-none cursor-pointer
               hover:border-[#CC7C5E]/20 focus:border-[#CC7C5E]/30"
           >
@@ -425,6 +455,116 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             ))}
           </select>
         </div>
+
+        {/* 源文件树（可折叠） */}
+        {fileFolders.length > 0 && (
+          <details className="border-b border-[#2a2926] group" open>
+            <summary className="px-3 py-1.5 cursor-pointer flex items-center gap-1.5
+              text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors">
+              <svg className="w-2.5 h-2.5 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              源文件 ({fileFolders.reduce((s, f) => s + f.files.length, 0)})
+            </summary>
+            <div className="max-h-48 overflow-y-auto scrollbar-lumen">
+              <TdbFileTree
+                folders={fileFolders}
+                selectedPath={null}
+                onSelect={() => {}}
+                renderFileActions={(file) => {
+                  const isExtractingThis = extractingFile === file.path;
+                  return (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (extractingFile) return;
+                        setExtractingFile(file.path);
+                        try {
+                          const result = await reExtractGraph(tdb, file.path);
+                          if (result.total_entities > 0 || result.total_edges > 0) {
+                            toast(`${file.name}: ${result.total_entities} 实体, ${result.total_edges} 关系`, 'success');
+                          } else {
+                            toast(`${file.name}: 未发现新内容`, 'info');
+                          }
+                          loadData();
+                        } catch {
+                          toast(`${file.name} 重抽失败`, 'error');
+                        } finally {
+                          setExtractingFile(null);
+                        }
+                      }}
+                      disabled={extractingFile !== null}
+                      className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
+                        ${isExtractingThis
+                          ? 'text-amber-400 bg-amber-400/10 cursor-wait'
+                          : 'text-slate-700 hover:text-amber-400 hover:bg-amber-400/10'
+                        }`}
+                      title={`重抽 ${file.name}`}
+                    >
+                      {isExtractingThis ? '...' : '抽'}
+                    </button>
+                  );
+                }}
+                footer={
+                  <div className="px-3 pl-6 pt-1 border-t border-[#2a2926]/50 mt-0.5 flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        if (isExtracting) return;
+                        if (!confirm('重抽全部源文件的图谱？会消耗 token。')) return;
+                        setIsExtracting(true);
+                        try {
+                          const result = await reExtractGraph(tdb);
+                          if (result.total_entities > 0 || result.total_edges > 0) {
+                            toast(`全部重抽: ${result.total_entities} 实体, ${result.total_edges} 关系`, 'success');
+                          } else {
+                            toast('全部重抽完成，未发现新内容', 'info');
+                          }
+                          loadData();
+                        } catch {
+                          toast('全部重抽失败', 'error');
+                        } finally {
+                          setIsExtracting(false);
+                        }
+                      }}
+                      disabled={isExtracting || extractingFile !== null}
+                      className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
+                        ${isExtracting
+                          ? 'text-amber-400 cursor-wait'
+                          : 'text-slate-600 hover:text-amber-400 hover:bg-amber-400/10'
+                        }`}
+                    >
+                      {isExtracting ? '全部抽取中...' : '全部重抽'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (isExtracting) return;
+                        setIsExtracting(true);
+                        try {
+                          const result = await syncGraph();
+                          toast(`已同步 ${result.count ?? 0} 个文件的图谱`, 'success');
+                          loadData();
+                        } catch {
+                          toast('图谱同步失败', 'error');
+                        } finally {
+                          setIsExtracting(false);
+                        }
+                      }}
+                      disabled={isExtracting || extractingFile !== null}
+                      className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
+                        ${isExtracting
+                          ? 'text-amber-400 cursor-wait'
+                          : 'text-slate-600 hover:text-amber-400 hover:bg-amber-400/10'
+                        }`}
+                      title="同步知识库变更到图谱"
+                    >
+                      {isExtracting ? '同步中...' : '同步变更'}
+                    </button>
+                  </div>
+                }
+              />
+            </div>
+          </details>
+        )}
 
         <div className="flex-1 overflow-y-auto scrollbar-lumen">
           {Object.entries(entitiesByType).map(([type, items]) => (
@@ -472,7 +612,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               onChange={e => setNewEntityName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreateEntity(); if (e.key === 'Escape') setIsCreating(false); }}
               placeholder="实体名称"
-              className="w-full text-xs bg-[#141413] border border-[#2a2926] rounded
+              className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
                 px-2 py-1 text-slate-300 placeholder:text-slate-700
                 outline-none focus:border-[#CC7C5E]/30"
               autoFocus
@@ -480,7 +620,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             <select
               value={newEntityType}
               onChange={e => setNewEntityType(e.target.value)}
-              className="w-full text-xs bg-[#141413] border border-[#2a2926] rounded
+              className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
                 px-2 py-1 text-slate-400 outline-none cursor-pointer"
             >
               {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
@@ -493,7 +633,63 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             </div>
           </div>
         )}
-      </div>
+
+        {/* 提示词编辑区（折叠） */}
+        <details className="border-t border-[#2a2926] group/prompt">
+          <summary className="px-3 py-1.5 cursor-pointer flex items-center gap-1.5
+            text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors">
+            <svg className="w-2.5 h-2.5 transition-transform group-open/prompt:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            抽取提示词
+          </summary>
+          <div className="px-2 pb-2 space-y-1.5">
+            <textarea
+              value={promptText}
+              onChange={e => setPromptText(e.target.value)}
+              className="w-full h-48 text-[10px] leading-relaxed bg-[#1C1B19] border border-[#2a2926] rounded
+                px-2 py-1.5 text-slate-400 outline-none resize-y
+                focus:border-[#CC7C5E]/30"
+              spellCheck={false}
+            />
+            <div className="flex gap-1.5">
+              <button
+                onClick={async () => {
+                  if (!promptText.trim()) return;
+                  setIsSavingPrompt(true);
+                  try {
+                    await updateGraphPrompt(promptText);
+                    toast('提示词已保存，下次抽取生效', 'success');
+                  } catch (err) {
+                    toast('保存失败', 'error');
+                  } finally {
+                    setIsSavingPrompt(false);
+                  }
+                }}
+                disabled={isSavingPrompt}
+                className="flex-1 text-[10px] px-2 py-1 rounded bg-amber-500/15 text-amber-400
+                  hover:bg-amber-500/25 transition-colors cursor-pointer
+                  disabled:opacity-40 disabled:cursor-wait"
+              >
+                {isSavingPrompt ? '保存中...' : '保存'}
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const d = await getGraphPrompt();
+                    setPromptText(d.raw_content);
+                    toast('已重新加载', 'info');
+                  } catch { /* */ }
+                }}
+                className="text-[10px] px-2 py-1 rounded text-slate-600
+                  hover:text-slate-400 hover:bg-slate-700/40 transition-colors cursor-pointer"
+              >
+                重载
+              </button>
+            </div>
+          </div>
+        </details>
+      </ResizablePanel>
 
       {/* ── 中栏：G6 画布 ── */}
       <div className="flex-1 relative" ref={containerRef} />
@@ -521,14 +717,14 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               <input
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
-                className="w-full text-xs bg-[#141413] border border-[#2a2926] rounded
+                className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
                   px-2 py-1 text-slate-300 outline-none focus:border-[#CC7C5E]/30"
                 placeholder="名称"
               />
               <select
                 value={editType}
                 onChange={e => setEditType(e.target.value)}
-                className="w-full text-xs bg-[#141413] border border-[#2a2926] rounded
+                className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
                   px-2 py-1 text-slate-400 outline-none cursor-pointer"
               >
                 {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
