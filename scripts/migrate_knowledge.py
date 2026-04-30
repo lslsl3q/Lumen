@@ -32,10 +32,19 @@ def migrate():
                 shutil.rmtree(dst)
             shutil.copytree(src, dst)
 
-    # 4. 迁移 registry → knowledge/_registry.json
+    # 4. 迁移 registry → knowledge/_manifest.json 的 files 字段
     old_reg = os.path.join(OLD_DIR, "_registry.json")
     if os.path.exists(old_reg):
-        shutil.copy2(old_reg, os.path.join(NEW_DIR, "knowledge", "_registry.json"))
+        import json as _json
+        with open(old_reg, "r", encoding="utf-8") as f:
+            files_data = _json.load(f)
+        # ensure_manifest_for_existing_kb 会创建 _manifest.json，
+        # 然后我们把旧 registry 的 files 写进去
+        from lumen.services.manifest import load_kb_manifest, save_kb_manifest
+        manifest = load_kb_manifest("knowledge")
+        if manifest is not None:
+            manifest["files"] = files_data
+            save_kb_manifest("knowledge", manifest)
 
     # 5. 生成 _manifest.json
     from lumen.services.manifest import ensure_manifest_for_existing_kb
