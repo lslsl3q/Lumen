@@ -17,20 +17,26 @@ def _md5_file(filepath: str) -> str:
 
 
 def _load_registry(kb_dir: str) -> dict:
-    """加载知识库的 _registry.json"""
-    reg_path = os.path.join(kb_dir, "_registry.json")
-    if not os.path.exists(reg_path):
+    """加载知识库的文件注册表（从 _manifest.json 的 files 字段）"""
+    manifest_path = os.path.join(kb_dir, "_manifest.json")
+    if not os.path.exists(manifest_path):
         return {}
-    with open(reg_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+    return manifest.get("files", {})
 
 
 def _save_registry(kb_dir: str, registry: dict) -> None:
-    """保存知识库的 _registry.json"""
+    """保存文件注册表（写回 _manifest.json 的 files 字段）"""
+    manifest_path = os.path.join(kb_dir, "_manifest.json")
+    manifest = {}
+    if os.path.exists(manifest_path):
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    manifest["files"] = registry
     os.makedirs(kb_dir, exist_ok=True)
-    reg_path = os.path.join(kb_dir, "_registry.json")
-    with open(reg_path, "w", encoding="utf-8") as f:
-        json.dump(registry, f, ensure_ascii=False, indent=2)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
 
 
 def _walk_files(directory: str) -> list[str]:
@@ -71,8 +77,8 @@ def scan_knowledge_lib() -> dict:
         if entry.startswith("_") or entry.startswith("."):
             continue
 
-        has_registry = os.path.exists(os.path.join(entry_path, "_registry.json"))
-        if not has_registry:
+        has_manifest = os.path.exists(os.path.join(entry_path, "_manifest.json"))
+        if not has_manifest:
             result["new_kbs"].append({"folder": entry})
             continue
 
