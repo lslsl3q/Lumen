@@ -176,10 +176,10 @@ KNOWLEDGE_PLACEHOLDER_BUDGET = int(os.getenv("KNOWLEDGE_PLACEHOLDER_BUDGET", "80
 KNOWLEDGE_SEMANTIC_BUDGET = int(os.getenv("KNOWLEDGE_SEMANTIC_BUDGET", "500"))          # 语义路由自动注入预算
 
 # AI 日记/档案配置（daily_note 工具系列）
-# 日记按 Agent 分文件夹：data/knowledge/agents/{agent_id}/diary/
+# 日记按 Agent 分文件夹：data/知识库/agent_knowledge/{agent_id}/diary/
 DAILY_NOTE_DIR = os.getenv(
     "DAILY_NOTE_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "knowledge", "agents"),
+    os.path.join(os.path.dirname(__file__), "data", "知识库", "agent_knowledge"),
 )
 
 # Agent 知识库配置（阵营 B，大模型向量）
