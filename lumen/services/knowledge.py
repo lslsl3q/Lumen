@@ -5,6 +5,7 @@ Lumen - 知识库存储服务
 """
 
 import json
+import hashlib
 import os
 import time
 import random
@@ -17,6 +18,7 @@ import triviumdb
 
 from lumen.config import (
     KNOWLEDGE_DB_PATH,
+    AGENT_KNOWLEDGE_DB_PATH,
     KNOWLEDGE_CHUNK_SIZE,
     KNOWLEDGE_CHUNK_OVERLAP,
     KNOWLEDGE_SOURCE_DIR,
@@ -24,6 +26,7 @@ from lumen.config import (
     KNOWLEDGE_SENTENCE_LEVEL,
     KNOWLEDGE_SENTENCE_TOP_N,
     KNOWLEDGE_SENTENCE_WINDOW,
+    SPARSE_EMBEDDING_ENABLED,
 )
 from lumen.services.embedding import get_service as get_embedding_service
 from lumen.services.chunker import chunk_text, split_sentences
@@ -31,9 +34,20 @@ from lumen.services import history
 
 logger = logging.getLogger(__name__)
 
+# ── 最后一次搜索的元数据（供调用方读取各路径命中数和方法）──
+_last_search_meta: dict = {}
+
+def get_last_search_meta() -> dict:
+    """返回最近一次 knowledge.search() 的元数据（副本）"""
+    return _last_search_meta.copy()
+
 # ── TriviumDB 单例（独立于 memory.tdb）──
 _db: Optional[triviumdb.TriviumDB] = None
 _db_lock = threading.Lock()
+
+# ── Agent 知识库 TriviumDB 单例（阵营 B，独立于 knowledge.tdb）──
+_agent_db: Optional[triviumdb.TriviumDB] = None
+_agent_db_lock = threading.Lock()
 
 # ── 句子级 TriviumDB 单例（独立于 knowledge.tdb，不同维度）──
 _sentence_db: Optional[triviumdb.TriviumDB] = None
@@ -41,6 +55,7 @@ _sentence_db_lock = threading.Lock()
 
 # ── 维度持久化 ──
 _KNOWLEDGE_DIM_FILE = KNOWLEDGE_DB_PATH + ".dim"
+_AGENT_KNOWLEDGE_DIM_FILE = AGENT_KNOWLEDGE_DB_PATH + ".dim"
 _SENTENCE_DIM_FILE = KNOWLEDGE_SENTENCE_DB_PATH + ".dim"
 
 
@@ -78,6 +93,26 @@ def _get_db() -> triviumdb.TriviumDB:
                 _save_dim_file(KNOWLEDGE_DB_PATH, dim)
                 logger.info(f"知识库 TriviumDB 已打开: {KNOWLEDGE_DB_PATH} (维度: {dim})")
     return _db
+
+
+def _get_agent_db() -> triviumdb.TriviumDB:
+    """获取 agent_knowledge.tdb 实例（单例，线程安全，阵营 B 维度）"""
+    global _agent_db
+    if _agent_db is None:
+        with _agent_db_lock:
+            if _agent_db is None:
+                os.makedirs(os.path.dirname(AGENT_KNOWLEDGE_DB_PATH), exist_ok=True)
+                from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
+                dim = resolve_dimensions("agent_knowledge")
+
+                err = check_dim_consistency(AGENT_KNOWLEDGE_DB_PATH, dim)
+                if err:
+                    raise RuntimeError(err)
+
+                _agent_db = triviumdb.TriviumDB(AGENT_KNOWLEDGE_DB_PATH, dim=dim)
+                _save_dim_file(AGENT_KNOWLEDGE_DB_PATH, dim)
+                logger.info(f"Agent 知识库 TriviumDB 已打开: {AGENT_KNOWLEDGE_DB_PATH} (维度: {dim})")
+    return _agent_db
 
 
 def _get_sentence_db() -> triviumdb.TriviumDB:
@@ -135,18 +170,46 @@ def _prf_refine(db, query_vector: list[float], hits: list[dict],
     return refined
 
 
+def _enrich_sparse_content(db, sparse_hits: list[dict]):
+    """从 TriviumDB 补充稀疏搜索结果的 content 字段
+
+    sparse_store 只存索引不存原文，需要从 TriviumDB 读回。
+    """
+    for hit in sparse_hits:
+        if hit.get("content"):
+            continue
+        # 通过 file_id + chunk_index 在 TriviumDB 中找原文
+        fid = hit.get("file_id", "")
+        ci = hit.get("chunk_index", 0)
+        if not fid:
+            continue
+        try:
+            nodes = db.filter_where({"file_id": fid})
+            for node in nodes:
+                payload = node.payload if hasattr(node, "payload") else {}
+                if payload.get("chunk_index") == ci:
+                    hit["content"] = payload.get("content", "")
+                    hit["source_path"] = payload.get("source_path", "")
+                    hit["filename"] = payload.get("filename", "")
+                    break
+        except Exception:
+            continue
+
+
 def _rrf_merge(
     vector_hits: list[dict],
     bm25_hits: list[dict],
+    graph_hits: list[dict] | None = None,
     top_k: int = 5,
-    vector_weight: float = 0.6,
-    bm25_weight: float = 0.4,
+    vector_weight: float = 0.4,
+    bm25_weight: float = 0.3,
+    graph_weight: float = 0.3,
     k: int = 60,
 ) -> list[dict]:
-    """RRF (Reciprocal Rank Fusion) 合并向量和 BM25 结果
+    """RRF (Reciprocal Rank Fusion) 合并向量、BM25 和 图谱 结果
 
     公式: rrf_score = Σ (weight / (k + rank))
-    每条结果按 (file_id, chunk_index) 去重，保留最高分来源的内容。
+    每条结果按 (file_id, chunk_index) 去重（图谱用 entity_id）。
     """
     scores: Dict[tuple, float] = {}
     content_map: Dict[tuple, dict] = {}
@@ -171,6 +234,23 @@ def _rrf_merge(
                 "chunk_index": hit.get("chunk_index", 0),
                 "score": 0.0,
             }
+
+    # T19 图谱路径
+    if graph_hits:
+        for rank, hit in enumerate(graph_hits):
+            eid = hit.get("entity_id", 0)
+            key = (f"graph:{eid}", rank)
+            scores[key] = scores.get(key, 0.0) + graph_weight / (k + rank + 1)
+            if key not in content_map:
+                content_map[key] = {
+                    "file_id": f"graph_{eid}",
+                    "source_path": "",
+                    "filename": "图谱召回",
+                    "content": hit.get("content", ""),
+                    "chunk_index": rank,
+                    "score": hit.get("score", 0.0),
+                    "entity_id": eid,
+                }
 
     # 按 RRF 分数排序
     sorted_keys = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
@@ -218,6 +298,24 @@ def _generate_file_id() -> str:
     timestamp = str(int(time.time()))[-6:]
     random_chars = "".join(random.choices(string.ascii_lowercase, k=3))
     return f"kb{timestamp}{random_chars}"
+
+
+def _compute_md5(text: str) -> str:
+    """计算文本内容 MD5"""
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+
+def _read_file_content(path: str) -> str | None:
+    """读取文件内容，自动尝试 UTF-8 和 GBK 编码"""
+    for enc in ("utf-8", "gbk", "utf-8-sig"):
+        try:
+            with open(path, "r", encoding=enc) as f:
+                return f.read()
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        except Exception:
+            return None
+    return None
 
 
 # ── 公开 API ──
@@ -278,14 +376,30 @@ async def import_file(
 
     if not chunks:
         # 空内容，只保存源文件不向量化
-        meta = _build_meta(fid, filename, category, subdir, 0, len(content), now)
+        meta = _build_meta(fid, filename, category, subdir, 0, len(content), now, content)
         _update_registry(fid, meta)
         logger.info(f"知识库导入（空内容）: {fid} ({filename})")
         return meta
 
-    # 3. 批量嵌入
+    # 3. 批量嵌入（尝试同时获取稠密+稀疏向量）
     backend = await get_embedding_service("knowledge")
-    vectors = await backend.encode_batch(chunks) if backend else None
+
+    sparse_vectors = None
+    vectors = None
+
+    if SPARSE_EMBEDDING_ENABLED and hasattr(backend, 'encode_batch_with_sparse'):
+        try:
+            sparse_result = await backend.encode_batch_with_sparse(
+                chunks, instruction_type="document"
+            )
+            if sparse_result:
+                vectors = [r[0] for r in sparse_result]
+                sparse_vectors = [r[1] for r in sparse_result]
+        except Exception as e:
+            logger.warning(f"稀疏向量编码失败，回退纯稠密: {e}")
+
+    if not vectors:
+        vectors = await backend.encode_batch(chunks) if backend else None
     if not vectors:
         raise RuntimeError("Embedding 服务不可用，无法向量化")
 
@@ -294,6 +408,7 @@ async def import_file(
     rel_path = os.path.join(category, subdir, filename) if subdir else os.path.join(category, filename)
     rel_path = rel_path.replace("\\", "/")
 
+    node_ids = []
     for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
         payload = {
             "file_id": fid,
@@ -305,8 +420,49 @@ async def import_file(
             "content": chunk,
             "tags": [],
         }
-        db.insert(vector, payload)
+        nid = db.insert(vector, payload)
+        node_ids.append(nid)
     db.flush()
+
+    # 4.1 存入稀疏向量（如果获取成功）
+    if sparse_vectors:
+        try:
+            from lumen.services.sparse_store import save_sparse_batch
+            items = []
+            for i, sv in enumerate(sparse_vectors):
+                if sv:
+                    items.append({
+                        "node_id": node_ids[i],
+                        "file_id": fid,
+                        "chunk_index": i,
+                        "category": category,
+                        "sparse_data": sv,
+                    })
+            if items:
+                save_sparse_batch(items)
+        except Exception as e:
+            logger.warning(f"稀疏向量存储失败 ({fid}): {e}")
+
+    # T19: 图谱抽取（异步，不阻塞）
+    async def _graph_extract_task():
+        try:
+            from lumen.services.graph_extract import extract_and_store
+            result = await extract_and_store(
+                content=content, tdb_name="knowledge",
+                source_episode_id=fid, owner_id="",
+            )
+            if result:
+                logger.info(f"图谱抽取完成 (fid={fid}): {result}")
+            else:
+                logger.warning(f"图谱抽取无结果 (fid={fid})")
+        except Exception as e:
+            logger.error(f"图谱抽取失败 (fid={fid}): {e}", exc_info=True)
+
+    try:
+        import asyncio as _asyncio
+        _asyncio.create_task(_graph_extract_task())
+    except Exception as e:
+        logger.warning(f"图谱抽取任务创建失败 (fid={fid}): {e}")
 
     # 4.5 写入 BM25 索引（FTS5 + jieba 分词）
     try:
@@ -341,7 +497,7 @@ async def import_file(
             logger.info(f"句子级向量化: {fid}, {total_sentences} 句")
 
     # 5. 更新 registry
-    meta = _build_meta(fid, filename, category, subdir, len(chunks), len(content), now)
+    meta = _build_meta(fid, filename, category, subdir, len(chunks), len(content), now, content)
     _update_registry(fid, meta)
 
     logger.info(f"知识库导入: {fid} ({filename}), {len(chunks)} chunks")
@@ -520,7 +676,7 @@ async def search(
     min_score: float = 0.3,
     category: str = None,
 ) -> List[Dict]:
-    """混合搜索: 向量 + BM25 → RRF 合并 → PRF 精炼 → 句子级精排"""
+    """混合搜索: 向量 + BM25 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排"""
     from lumen.config import PRF_ENABLED, PRF_ALPHA, PRF_BETA
 
     backend = await get_embedding_service("knowledge")
@@ -554,51 +710,97 @@ async def search(
         if len(vector_hits) >= top_k:
             break
 
-    # ── Path B: BM25 搜索（知识库 chunks + 主动记忆）──
+    # ── Path B: 稀疏向量搜索（fallback 到 BM25）──
     bm25_hits = []
-    try:
-        import jieba
-        keywords = [w for w in jieba.cut(query) if len(w.strip()) > 1]
-        if keywords:
-            bm25_hits = history.search_knowledge_bm25(
-                keywords, category=category or "", limit=top_k
-            )
-            # 主动记忆（daily_note）也走 BM25，合并到同一路径进 RRF
-            if not category or category.startswith("active"):
-                active_hits = []
-                for kw in keywords:
-                    active_hits.extend(
-                        history.search_active_memories_bm25(kw, limit=top_k)
-                    )
-                # 去重
-                seen = {(h.get("file_id", ""), h.get("chunk_index", 0)) for h in bm25_hits}
-                for ah in active_hits:
-                    key = (ah.get("memory_id", ""), 0)
-                    if key not in seen:
-                        bm25_hits.append({
-                            "file_id": ah.get("memory_id", ""),
-                            "source_path": "",
-                            "filename": "",
-                            "category": f"active_{ah.get('category', 'context')}",
-                            "chunk_index": 0,
-                            "content": ah.get("content", ""),
-                            "bm25_score": ah.get("bm25_score", 0.0),
-                        })
-                        seen.add(key)
-    except Exception as e:
-        logger.debug(f"知识库 BM25 搜索跳过: {e}")
+    sparse_used = False
 
-    # ── RRF 合并 ──
-    hits = _rrf_merge(vector_hits, bm25_hits, top_k=top_k)
+    if SPARSE_EMBEDDING_ENABLED and hasattr(backend, 'encode_with_sparse'):
+        try:
+            from lumen.services.sparse_store import has_sparse_data, search_sparse
+            if has_sparse_data():
+                sparse_result = await backend.encode_with_sparse(
+                    query, instruction_type="query"
+                )
+                if sparse_result:
+                    _, query_sparse = sparse_result
+                    bm25_hits = search_sparse(query_sparse, category or "", top_k)
+                    sparse_used = True
+                    # 补充 TriviumDB 中的 content（sparse_store 只存索引不存原文）
+                    if bm25_hits:
+                        _enrich_sparse_content(db, bm25_hits)
+        except Exception as e:
+            logger.debug(f"稀疏向量搜索失败: {e}")
 
-    # ── 缓冲区搜索（小模型向量，独立空间）──
-    buffer_hits = []
+    if not sparse_used:
+        try:
+            import jieba
+            keywords = [w for w in jieba.cut(query) if len(w.strip()) > 1]
+            if keywords:
+                bm25_hits = history.search_knowledge_bm25(
+                    keywords, category=category or "", limit=top_k
+                )
+                # 主动记忆（daily_note）也走 BM25，合并到同一路径进 RRF
+                if not category or category.startswith("active"):
+                    active_hits = []
+                    for kw in keywords:
+                        active_hits.extend(
+                            history.search_active_memories_bm25(kw, limit=top_k)
+                        )
+                    # 去重
+                    seen_bm25 = {(h.get("file_id", ""), h.get("chunk_index", 0)) for h in bm25_hits}
+                    for ah in active_hits:
+                        key = (ah.get("memory_id", ""), 0)
+                        if key not in seen_bm25:
+                            bm25_hits.append({
+                                "file_id": ah.get("memory_id", ""),
+                                "source_path": "",
+                                "filename": "",
+                                "category": f"active_{ah.get('category', 'context')}",
+                                "chunk_index": 0,
+                                "content": ah.get("content", ""),
+                                "bm25_score": ah.get("bm25_score", 0.0),
+                            })
+                            seen_bm25.add(key)
+        except Exception as e:
+            logger.debug(f"知识库 BM25 搜索跳过: {e}")
+
+    # ── Path C: 图谱召回（T19）──
+    graph_hits = []
     try:
-        from lumen.services.buffer import search as buffer_search, has_data
-        if has_data():
-            buffer_hits = await buffer_search(query, top_k=max(1, top_k // 2))
+        from lumen.config import GRAPH_RECALL_TOP_K
+        from lumen.services.graph import get_entity_neighbors_text
+        # searchHybrid 在图谱实体中找锚点
+        graph_results = db.search(query_vector, top_k=GRAPH_RECALL_TOP_K, min_score=0.1)
+        entity_ids = []
+        for r in graph_results:
+            payload = r.payload if hasattr(r, "payload") else {}
+            if "name" in payload and "type" in payload:
+                eid = r.id if hasattr(r, "id") else 0
+                if eid:
+                    entity_ids.append(eid)
+        if entity_ids:
+            snippets = get_entity_neighbors_text("knowledge", entity_ids)
+            for eid, snippet in zip(entity_ids, snippets):
+                graph_hits.append({
+                    "entity_id": eid,
+                    "content": f"[图谱] {snippet}",
+                    "score": 0.5,
+                })
     except Exception as e:
-        logger.debug(f"缓冲区搜索跳过: {e}")
+        logger.debug(f"图谱召回跳过: {e}")
+
+    # ── 记录搜索元数据（先于 PRF 和句子级精排）──
+    global _last_search_meta
+    _last_search_meta = {
+        "vector_count": len(vector_hits),
+        "sparse_count": len(bm25_hits) if sparse_used else 0,
+        "bm25_count": 0 if sparse_used else len(bm25_hits),
+        "graph_count": len(graph_hits),
+        "bm25_method": "sparse" if sparse_used else "bm25",
+    }
+
+    # ── RRF 合并（三路）──
+    hits = _rrf_merge(vector_hits, bm25_hits, graph_hits, top_k=top_k)
 
     # ── PRF 精炼：用 top-N 结果的向量修正查询，再搜一次 ──
     if PRF_ENABLED and hits:
@@ -628,20 +830,69 @@ async def search(
                     break
             if refined_hits:
                 hits = refined_hits
+                _last_search_meta["prf_refined"] = True
                 logger.debug(f"知识库 PRF 精炼: {len(refined_hits)} 条结果")
-
-    # ── 缓冲区结果合并（按分数混排）──
-    if buffer_hits:
-        for bh in buffer_hits:
-            bh["rrf_score"] = bh.get("score", 0.5)
-            bh["source"] = "buffer"
-        hits.extend(buffer_hits)
-        hits.sort(key=lambda h: h.get("rrf_score", h.get("score", 0)), reverse=True)
 
     # ── 句子级精排 ──
     if KNOWLEDGE_SENTENCE_LEVEL and hits:
         refined = await refine_with_sentences(query, hits)
+        _last_search_meta["sentence_refined"] = True
         return refined
+
+    return hits
+
+
+async def search_agent_knowledge(
+    query: str,
+    agent_id: str = "",
+    top_k: int = 5,
+    min_score: float = 0.3,
+) -> List[Dict]:
+    """搜索 agent_knowledge.tdb，按 access_list 过滤
+
+    Args:
+        query: 搜索文本
+        agent_id: 当前 Agent ID，用于过滤 access_list（空 = 不过滤）
+        top_k: 返回条数
+        min_score: 最低相似度
+    """
+    backend = await get_embedding_service("agent_knowledge")
+    query_vector = await backend.encode(query) if backend else None
+    if not query_vector:
+        return []
+
+    db = _get_agent_db()
+    results = db.search(query_vector, top_k=top_k * 3, min_score=min_score)
+
+    hits = []
+    seen = set()
+    for hit in results:
+        payload = hit.payload if hasattr(hit, "payload") else {}
+        access_list = payload.get("access_list", ["public"])
+
+        # 按 access_list 过滤
+        if agent_id and "public" not in access_list and agent_id not in access_list:
+            continue
+
+        key = (payload.get("file_id", ""), payload.get("chunk_index", 0))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        hits.append({
+            "chunk_id": hit.id if hasattr(hit, "id") else 0,
+            "file_id": payload.get("file_id", ""),
+            "source_path": payload.get("source_path", ""),
+            "filename": payload.get("filename", ""),
+            "content": payload.get("content", ""),
+            "score": hit.score if hasattr(hit, "score") else 0.0,
+            "chunk_index": payload.get("chunk_index", 0),
+            "owner_id": payload.get("owner_id", ""),
+            "access_list": access_list,
+            "source": payload.get("source", ""),
+        })
+        if len(hits) >= top_k:
+            break
 
     return hits
 
@@ -671,6 +922,13 @@ async def delete_file(file_id: str) -> None:
             logger.info(f"知识库 BM25 清理: {file_id}, {bm25_count} 条")
     except Exception as e:
         logger.warning(f"知识库 BM25 清理失败 ({file_id}): {e}")
+
+    # 1.2 删稀疏向量
+    try:
+        from lumen.services.sparse_store import delete_by_file as delete_sparse
+        delete_sparse(file_id)
+    except Exception as e:
+        logger.warning(f"稀疏向量清理失败 ({file_id}): {e}")
 
     # 1.5 删句子向量（句子级）
     if _sentence_db is not None:
@@ -702,17 +960,242 @@ async def delete_file(file_id: str) -> None:
     logger.info(f"知识库删除: {file_id} ({meta.get('filename', '')}), 清理 {count} 条向量")
 
 
+async def reindex_file(file_id: str) -> dict:
+    """重新索引已修改的文件（全文件覆写，幂等）。
+
+    流程：删旧数据 → 重读源文件 → 重新分块嵌入 → 更新 registry
+    """
+    with _registry_lock:
+        registry = _load_registry()
+    if file_id not in registry:
+        return {"error": f"file_id {file_id} not found in registry"}
+
+    info = registry[file_id]
+    source_path = info.get("source_path", "")
+    category = info.get("category", "")
+    source = info.get("source", "upload")
+
+    # 构建源文件完整路径
+    full_path = os.path.join(KNOWLEDGE_SOURCE_DIR, source_path)
+    if not os.path.exists(full_path):
+        return {"error": f"source file not found: {source_path}"}
+
+    # 读取文件内容
+    content = _read_file_content(full_path)
+    if content is None:
+        return {"error": f"cannot read file: {source_path}"}
+
+    # 1. 删除旧数据（复用 delete_file 的清理逻辑，但不删源文件和 registry 条目）
+    db = _get_db()
+    nodes = db.filter_where({"file_id": file_id})
+    for node in nodes:
+        db.delete(node.id)
+    db.flush()
+
+    # 清理句子库
+    if _sentence_db is not None:
+        try:
+            s_nodes = _sentence_db.filter_where({"file_id": file_id})
+            for node in s_nodes:
+                _sentence_db.delete(node.id)
+            _sentence_db.flush()
+        except Exception as e:
+            logger.warning(f"重索引句子级清理失败 ({file_id}): {e}")
+
+    # 清理 BM25
+    try:
+        history.delete_knowledge_chunks(file_id)
+    except Exception as e:
+        logger.warning(f"重索引 BM25 清理失败 ({file_id}): {e}")
+
+    # 清理 sparse
+    try:
+        from lumen.services.sparse_store import delete_by_file as delete_sparse
+        delete_sparse(file_id)
+    except Exception as e:
+        logger.warning(f"重索引稀疏向量清理失败 ({file_id}): {e}")
+
+    # 2. 重新分块
+    chunks = chunk_text(content, KNOWLEDGE_CHUNK_SIZE, KNOWLEDGE_CHUNK_OVERLAP)
+    if not chunks:
+        chunks = [content] if content.strip() else []
+
+    if not chunks:
+        # 空内容，只更新 registry
+        new_md5 = _compute_md5(content)
+        with _registry_lock:
+            reg = _load_registry()
+            reg[file_id]["md5"] = new_md5
+            reg[file_id]["graph_sync_needed"] = True
+            reg[file_id]["chunk_count"] = 0
+            reg[file_id]["char_count"] = len(content)
+            from datetime import datetime as _dt
+            reg[file_id]["updated_at"] = _dt.now().isoformat()
+            _save_registry(reg)
+        return {"file_id": file_id, "chunks": 0, "md5": new_md5}
+
+    # 3. 重新嵌入
+    backend = await get_embedding_service("knowledge")
+
+    vectors = None
+    sparse_vectors = None
+
+    if SPARSE_EMBEDDING_ENABLED and hasattr(backend, 'encode_batch_with_sparse'):
+        try:
+            sparse_result = await backend.encode_batch_with_sparse(
+                chunks, instruction_type="document"
+            )
+            if sparse_result:
+                vectors = [r[0] for r in sparse_result]
+                sparse_vectors = [r[1] for r in sparse_result]
+        except Exception as e:
+            logger.warning(f"重索引稀疏向量编码失败，回退纯稠密: {e}")
+
+    if not vectors:
+        vectors = await backend.encode_batch(chunks) if backend else None
+    if not vectors:
+        return {"error": "Embedding 服务不可用，无法向量化"}
+
+    # 4. 存入 TriviumDB
+    node_ids = []
+    for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
+        payload = {
+            "file_id": file_id,
+            "source_path": source_path,
+            "filename": info.get("filename", ""),
+            "category": category,
+            "source": source,
+            "chunk_index": i,
+            "content": chunk,
+            "tags": [],
+        }
+        nid = db.insert(vector, payload)
+        node_ids.append(nid)
+    db.flush()
+
+    # 4.1 存入稀疏向量
+    if sparse_vectors:
+        try:
+            from lumen.services.sparse_store import save_sparse_batch
+            items = []
+            for i, sv in enumerate(sparse_vectors):
+                if sv:
+                    items.append({
+                        "node_id": node_ids[i],
+                        "file_id": file_id,
+                        "chunk_index": i,
+                        "category": category,
+                        "sparse_data": sv,
+                    })
+            if items:
+                save_sparse_batch(items)
+        except Exception as e:
+            logger.warning(f"重索引稀疏向量存储失败 ({file_id}): {e}")
+
+    # 4.5 句子级向量化
+    sentence_backend = await get_embedding_service("knowledge_sentences")
+    if sentence_backend:
+        sdb = _get_sentence_db()
+        total_sentences = 0
+        for i, chunk in enumerate(chunks):
+            sentences = split_sentences(chunk)
+            if not sentences:
+                continue
+            sentence_vectors = await sentence_backend.encode_batch(sentences)
+            if not sentence_vectors:
+                continue
+            for j, (sent, svec) in enumerate(zip(sentences, sentence_vectors)):
+                sdb.insert(svec, {
+                    "file_id": file_id,
+                    "source_path": source_path,
+                    "category": category,
+                    "chunk_index": i,
+                    "sentence_index": j,
+                    "content": sent,
+                })
+                total_sentences += 1
+        if total_sentences:
+            sdb.flush()
+            logger.info(f"重索引句子级向量化: {file_id}, {total_sentences} 句")
+
+    # 5. BM25 重建
+    try:
+        history.save_knowledge_chunks_batch(file_id, source_path, info.get("filename", ""), category, chunks)
+    except Exception as e:
+        logger.warning(f"重索引 BM25 写入失败 ({file_id}): {e}")
+
+    # 6. 更新 registry
+    new_md5 = _compute_md5(content)
+    from datetime import datetime as _dt
+    with _registry_lock:
+        reg = _load_registry()
+        reg[file_id]["md5"] = new_md5
+        reg[file_id]["graph_sync_needed"] = True
+        reg[file_id]["chunk_count"] = len(chunks)
+        reg[file_id]["char_count"] = len(content)
+        reg[file_id]["updated_at"] = _dt.now().isoformat()
+        _save_registry(reg)
+
+    logger.info(f"知识库重索引: {file_id} ({info.get('filename', '')}), {len(chunks)} chunks")
+    return {"file_id": file_id, "chunks": len(chunks), "md5": new_md5}
+
+
 def close():
     """关闭 TriviumDB"""
-    global _db, _sentence_db
+    global _db, _sentence_db, _agent_db
     if _db is not None:
         _db.flush()
         _db = None
         logger.info("知识库 TriviumDB 已关闭")
+    if _agent_db is not None:
+        _agent_db.flush()
+        _agent_db = None
+        logger.info("Agent 知识库 TriviumDB 已关闭")
     if _sentence_db is not None:
         _sentence_db.flush()
         _sentence_db = None
         logger.info("句子级 TriviumDB 已关闭")
+
+
+def cleanup_orphan_registry() -> int:
+    """清理 registry 中指向不存在 TDB 节点的孤儿条目
+
+    场景：用户在 MemoryWindow 编辑器手动删了 TDB 节点，
+    或 TDB 文件损坏/重建后，registry 里残留旧条目。
+
+    Returns:
+        清理的孤儿条目数
+    """
+    db = _get_db()
+    all_ids = set(db.all_node_ids())
+
+    registry = _load_registry()
+    orphans = []
+
+    for file_id, meta in registry.items():
+        # 检查 knowledge.tdb 中是否有至少一条属于此 file_id 的节点
+        has_chunk = False
+        try:
+            nodes = db.filter_where({"file_id": file_id})
+            for node in nodes:
+                nid = node.id if hasattr(node, "id") else None
+                if nid and nid in all_ids:
+                    has_chunk = True
+                    break
+        except Exception:
+            # filter_where 失败 → 保守策略，不删
+            continue
+
+        if not has_chunk:
+            orphans.append(file_id)
+
+    if orphans:
+        for fid in orphans:
+            del registry[fid]
+        _save_registry(registry)
+        logger.info(f"Registry 清理: {len(orphans)} 个孤儿条目已移除")
+
+    return len(orphans)
 
 
 async def rebuild_if_empty():
@@ -780,6 +1263,16 @@ async def rebuild_if_empty():
 
     logger.info(f"自动重建完成: 导入 {imported} 个文件, 失败 {failed} 个")
 
+    # 重建完成后恢复图谱实体
+    if imported > 0:
+        try:
+            from lumen.services.graph_backup import restore_graph
+            restored = restore_graph("knowledge")
+            if restored > 0:
+                logger.info(f"图谱实体已从备份恢复: {restored} 个")
+        except Exception as e:
+            logger.warning(f"图谱恢复失败: {e}")
+
 
 # ── 内部工具 ──
 
@@ -787,6 +1280,7 @@ async def rebuild_if_empty():
 def _build_meta(
     fid: str, filename: str, category: str, subdir: str,
     chunk_count: int, char_count: int, now: str,
+    content: str = "",
 ) -> Dict:
     rel_path = os.path.join(category, subdir, filename) if subdir else os.path.join(category, filename)
     rel_path = rel_path.replace("\\", "/")
@@ -802,6 +1296,8 @@ def _build_meta(
         "tags": [],
         "created_at": now,
         "updated_at": now,
+        "md5": _compute_md5(content) if content else "",
+        "graph_sync_needed": False,
     }
 
 
