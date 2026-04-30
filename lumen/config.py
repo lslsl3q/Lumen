@@ -22,7 +22,8 @@ def _validate_env():
     """
     required_vars = {
         "API_URL": "API 服务器地址",
-        "API_KEY": "API 密钥"
+        "API_KEY": "API 密钥",
+        "MODEL": "你要用的模型名称（如 deepseek-chat、gemini-2.5-flash）",
     }
 
     missing = []
@@ -65,8 +66,8 @@ client = AsyncOpenAI(
 )
 
 
-# 默认模型（可以通过环境变量覆盖）
-DEFAULT_MODEL = os.getenv("MODEL", "glm-5.1")
+# 默认模型（在 .env 中必须配置，不设兜底）
+DEFAULT_MODEL = os.getenv("MODEL")
 
 # 摘要模型（用于 compact 压缩、记忆摘要等，可以和聊天模型不同）
 # 留空则跟随角色/默认模型
@@ -90,7 +91,7 @@ WS_HEARTBEAT_INTERVAL = float(os.getenv("WS_HEARTBEAT_INTERVAL", "30"))
 # ── 嵌入模型配置（两阵营架构）─
 EMBEDDING_ENABLED = os.getenv("EMBEDDING_ENABLED", "True").lower() in ("true", "1", "yes")
 
-# 阵营 A：本地小模型 — 程序内置模块（memory/buffer/thinking_clusters/knowledge_sentences）
+# 阵营 A：本地小模型 — 程序内置模块（memory/thinking_clusters/knowledge_sentences）
 EMBEDDING_LOCAL_MODEL = os.getenv("EMBEDDING_LOCAL_MODEL", os.getenv("EMBEDDING_MODEL", "thenlper/gte-small-zh"))
 EMBEDDING_LOCAL_DIM = int(os.getenv("EMBEDDING_LOCAL_DIM", "512"))
 
@@ -132,6 +133,23 @@ KNOWLEDGE_SOURCE_DIR = os.getenv(
     "KNOWLEDGE_SOURCE_DIR",
     os.path.join(os.path.dirname(__file__), "data", "knowledge"),
 )
+
+# ── T23 动态知识库 ──
+KNOWLEDGE_LIB_DIR = "data/知识库"
+MANIFEST_PATH = os.path.join(KNOWLEDGE_LIB_DIR, "_manifest.json")
+
+GRAPH_BACKUP_DIR = os.getenv(
+    "GRAPH_BACKUP_DIR",
+    os.path.join(os.path.dirname(__file__), "data", "graph"),
+)
+
+# T19 图谱系统
+GRAPH_ENTITY_TYPES = ["Character", "Location", "Item", "Organization", "Event", "Concept"]
+GRAPH_EXTRACT_MODEL = os.getenv("GRAPH_EXTRACT_MODEL", "")  # 空=跟随 DEFAULT_MODEL
+GRAPH_RECALL_WEIGHT = float(os.getenv("GRAPH_RECALL_WEIGHT", "0.3"))
+GRAPH_RECALL_TOP_K = int(os.getenv("GRAPH_RECALL_TOP_K", "10"))
+GRAPH_RECALL_EXPAND_DEPTH = int(os.getenv("GRAPH_RECALL_EXPAND_DEPTH", "2"))
+
 KNOWLEDGE_CHUNK_SIZE = int(os.getenv("KNOWLEDGE_CHUNK_SIZE", "300"))
 KNOWLEDGE_CHUNK_OVERLAP = int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP", "60"))
 
@@ -140,6 +158,9 @@ PRF_ENABLED = os.getenv("PRF_ENABLED", "True").lower() in ("true", "1")
 PRF_TOP_N = int(os.getenv("PRF_TOP_N", "5"))          # 取前 N 条结果的向量算均值
 PRF_ALPHA = float(os.getenv("PRF_ALPHA", "0.7"))       # 原始查询向量权重
 PRF_BETA = float(os.getenv("PRF_BETA", "0.3"))         # PRF 均值向量权重
+
+# ── 稀疏向量（T25: doubao sparse embedding）──
+SPARSE_EMBEDDING_ENABLED = os.getenv("SPARSE_EMBEDDING_ENABLED", "True").strip().lower() in ("true", "1", "yes")
 
 # 句子级检索配置（T18 Stage 3+4）
 KNOWLEDGE_SENTENCE_DB_PATH = os.getenv(
@@ -155,9 +176,16 @@ KNOWLEDGE_PLACEHOLDER_BUDGET = int(os.getenv("KNOWLEDGE_PLACEHOLDER_BUDGET", "80
 KNOWLEDGE_SEMANTIC_BUDGET = int(os.getenv("KNOWLEDGE_SEMANTIC_BUDGET", "500"))          # 语义路由自动注入预算
 
 # AI 日记/档案配置（daily_note 工具系列）
+# 日记按 Agent 分文件夹：data/knowledge/agents/{agent_id}/diary/
 DAILY_NOTE_DIR = os.getenv(
     "DAILY_NOTE_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "daily_note"),
+    os.path.join(os.path.dirname(__file__), "data", "knowledge", "agents"),
+)
+
+# Agent 知识库配置（阵营 B，大模型向量）
+AGENT_KNOWLEDGE_DB_PATH = os.getenv(
+    "AGENT_KNOWLEDGE_DB_PATH",
+    os.path.join(VECTOR_API_DIR, "agent_knowledge.tdb"),
 )
 
 # 思维簇配置
@@ -169,16 +197,6 @@ THINKING_CLUSTERS_DB_PATH = os.getenv(
     "THINKING_CLUSTERS_DB_PATH",
     os.path.join(VECTOR_LOCAL_DIR, "thinking_clusters.tdb"),
 )
-
-# 缓冲区配置（记忆生命周期 Phase 1）
-BUFFER_ENABLED = os.getenv("BUFFER_ENABLED", "false").lower() == "true"
-BUFFER_DB_PATH = os.getenv(
-    "BUFFER_DB_PATH",
-    os.path.join(VECTOR_LOCAL_DIR, "buffer.tdb"),
-)
-BUFFER_AUTO_THRESHOLD = int(os.getenv("BUFFER_AUTO_THRESHOLD", "30"))
-BUFFER_MAX_AGE_HOURS = int(os.getenv("BUFFER_MAX_AGE_HOURS", "48"))
-
 
 def get_model(character_config: dict = None) -> str:
     """获取当前应该使用的模型
