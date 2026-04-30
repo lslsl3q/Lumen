@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-04-27（两阵营嵌入架构 + 富文本编辑器 + 工具合并 + 图谱API + 缓冲区前后端）
+**最后更新**：2026-04-30（T23 动态知识库：扫描+MD5变更检测+审批重索引+多知识库管理+图谱延迟同步）
 
 ---
 
@@ -12,14 +12,14 @@
 ```
 Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
-│   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、日志系统 setup_logging）
+│   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、两阵营嵌入、SPARSE_EMBEDDING_ENABLED、日记目录）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
 │   ├── query.py                  # 查询引擎（ReAct 循环、SSE 流式、Think标签事件流、知识库注入+占位符解析、回复风格注入）— 对标 CC query.ts
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
 │   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
 │   ├── skills/                   # Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter，含 README.md 开发指南）
-│   ├── data/                     # 运行时数据（history.db、thinking_clusters/、vectors/api/knowledge.tdb、vectors/local/memory.tdb 等）
+│   ├── data/                     # 运行时数据（history.db、thinking_clusters/、vectors/、graph/extract_prompt.md 等）
 │   │
 │   ├── core/                     # 大脑 — 会话状态
 │   │   └── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
@@ -33,7 +33,7 @@ Lumen/
 │   │   ├── file_manager.py       # 文件读写合并（read/write/edit/list/glob/grep/copy/move/delete等）
 │   │   ├── web.py                # 网页搜索+抓取合并（search→DuckDuckGo, fetch→httpx异步）
 │   │   ├── calculate.py          # 计算器
-│   │   ├── daily_note.py         # AI 日记工具（创建/编辑/列表/搜索/缓冲模式写入）
+│   │   ├── daily_note.py         # AI 日记工具（YAML frontmatter + agent_knowledge.tdb 阵营B写入 + 按Agent分目录）
 │   │   ├── skill_script.py       # Skill 脚本安全执行器（子进程+超时+输出截断+哈希白名单）
 │   │   └── lumen_skill_api.py    # Skill 脚本工具 API（search/fetch/read_file/list_files/calculate）
 │   │
@@ -47,16 +47,22 @@ Lumen/
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
 │   │   ├── history.py            # SQLite持久化（会话、消息、摘要、FTS5全文索引、向量级联删除）
-│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25 RRF混合检索、噪音过滤、去重）
+│   │   ├── memory.py             # 记忆系统（异步摘要、记忆注入、向量+BM25 RRF混合检索、噪音过滤、去重，buffer写入已移除）
 │   │   ├── vector_store.py       # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除 + .dim 一致性检查）
-│   │   ├── embedding.py          # 文本嵌入（两阵营架构：A-本地小模型512维/B-API大模型，多后端 LocalBackend/OpenAI/Gemini）
-│   │   ├── knowledge.py          # 知识库存储（TriviumDB 单例、文件导入/切分/向量化/语义搜索/删除、.dim 一致性检查）
+│   │   ├── embedding.py          # 文本嵌入（两阵营架构 + 稀疏向量 encode_with_sparse + instruction_type 预留）
+│   │   ├── manifest.py           # T23 知识库注册表（_manifest.json 读写、注册/注销/列表、旧知识库自动注册）
+│   │   ├── knowledge_scanner.py  # T23 扫描服务（MD5变更检测、新知识库发现、registry更新、脏标记查询）
+│   │   ├── knowledge.py          # 知识库存储（双库、access_list、导入/切分/搜索/删除、稀疏向量导入+搜索 Path B、reindex_file全文件重索引）
+│   │   ├── sparse_store.py       # 稀疏向量存储（SQLite + In-memory 缓存 + Dot Product 搜索，T25）
 │   │   ├── buffer.py             # 记忆缓冲区（小模型向量临时存储+检索，批量整理后大模型重算写入正式库，独立 buffer.tdb，is_enabled 读运行时配置，新增 has_data/update_content）
 │   │   ├── runtime_config.py     # 运行时配置服务（持久化到 runtime_config.json，线程安全读写）
 │   │   ├── thinking_clusters.py  # 思维簇引擎（VCP MetaThinkingManager 重实现：索引、链式检索、向量融合、降级模式、token 预算）
 │   │   ├── chunker.py            # 文本分块器（句子边界感知，支持重叠，用于知识库向量化）
 │   │   ├── knowledge_resolver.py # 知识库占位符解析器（正则匹配 {{}}/[[]]，RAG/全文检索，替换注入 system prompt）
 │   │   ├── consolidation.py     # 记忆整理服务（缓冲区→正式库，小模型→大模型向量重算）
+│   │   ├── graph.py              # T19 图谱核心服务（实体Upsert、边管理、邻居文本召回）
+│   │   ├── graph_extract.py      # T19 图谱提取管道（文本→LLM抽取→batch_upsert，错误日志记录）
+│   │   ├── graph_backup.py       # 图谱备份/恢复（实体+边导出JSON，重建后自动恢复+Git提交）
 │   │   └── emotion.py            # 【预留】情感引擎
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
@@ -69,6 +75,7 @@ Lumen/
 │   │   ├── worldbook_matcher.py  # 世界书关键词匹配引擎（扫描消息→匹配关键词→返回注入内容）
 │   │   ├── character.py          # 角色卡片加载 + CRUD + 头像管理
 │   │   ├── template.py           # 模板变量系统（{{xxx}} 替换）
+│   │   ├── graph_extract.py      # T19 图谱提取 Prompt（文件热加载 + markdown 解析 + 默认值回退）
 │   │   └── thinking_injector.py  # 思维簇注入文本格式化（<thinking_modules> 标签，按簇分组+相似度排序）
 │   │
 │   └── types/                    # 词汇 — 类型定义
@@ -76,12 +83,12 @@ Lumen/
 │       ├── events.py             # SSE 事件类型（含 MemoryDebugEvent + RecallLogEntry 召回详情）
 │       ├── ws_events.py          # WebSocket 推送事件类型（TypedDict）
 │       ├── tools.py              # 工具协议类型（Pydantic）+ ErrorCode 常量 + ToolDefinition TypedDict
-│       ├── prompt.py             # 提示词类型（CharacterCard Pydantic + DynamicContext TypedDict）
+│       ├── prompt.py             # 提示词类型（CharacterCard + accessible_knowledge + DynamicContext TypedDict）
 │       ├── persona.py            # Persona 类型（PersonaCard + ActivePersona Pydantic 模型）
 │       ├── authors_note.py       # Author's Note 类型（AuthorsNoteConfig + UpdateRequest）
 │       ├── worldbook.py          # 世界书类型（WorldBookEntry + WorldBookListItem Pydantic 模型）
 │       └── skills.py             # Skills 类型（SkillCard + SkillCreateRequest + SkillUpdateRequest Pydantic 模型）
-│       └── knowledge.py          # 知识库类型（KnowledgeFileCard + KnowledgeSearchRequest + KnowledgeSearchResult Pydantic 模型）
+│       └── knowledge.py          # 知识库类型（KnowledgeFileCard + access_list/owner_id/file_id + KnowledgeSearchRequest/Result）
 │       └── thinking_clusters.py  # 思维簇类型（ChainStep/ChainConfig Pydantic + RetrievedModule/PipelineResult TypedDict）
 │
 ├── api/                          # FastAPI HTTP接口
@@ -94,27 +101,29 @@ Lumen/
 │       ├── authors_note.py       # Author's Note（get/save/delete，每会话独立）
 │       ├── worldbook.py          # 世界书（list/get/create/update/delete，文件存储）
 │       └── skills.py             # Skills（list/get/create/update/delete/upload/invoke，Markdown 目录存储）
-│       ├── knowledge.py          # 知识库（list/get/upload/create/search/delete，文件切分+向量化+语义搜索）
+│       ├── knowledge.py          # 知识库（list/get/upload/create/search/delete + scan/bases/graph sync，文件切分+向量化+语义搜索）
 │       ├── tdb.py                # TDB 通用浏览（条目 CRUD + 文件树 + 从磁盘导入 + 去重 + 编辑同步源文件）
-│       ├── graph.py              # 图谱 CRUD API（实体/边/邻居查询，通用支持任意 TDB）
+│       ├── graph.py              # 图谱 CRUD + 重抽 API（实体/边/邻居/重抽，通用支持任意 TDB）
 │       ├── avatar.py             # 头像管理（upload/list/delete，文件存储到 characters/avatars/）
 │       ├── models.py             # 模型（list，从 LiteLLM 代理获取可用模型）
-│       ├── config.py             # 配置（list/read/update）+ 缓冲区设置 API + TDB 列表 API
+│       ├── config.py             # 配置（list/read/update）+ TDB 列表 + 图谱提示词编辑 API
 │       └── ws.py                 # WebSocket 推送端点（/ws/push）
 │
 ├── lumen-Front/                  # 前端（Tauri 2 桌面应用）
 │   ├── tailwind.config.js        # Tailwind 配置（覆盖 slate/amber 色阶为暖灰色调）
 │   └── src/
 │       ├── App.tsx               # 应用入口（HashRouter 路由 + Overlay 挂载点）
-│       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills, knowledge, graph, buffer, tdb）
+│       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills, knowledge, graph, tdb）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
-│       ├── hooks/                # 状态管理（useChat, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useKnowledge）— localStorage 持久化（角色/会话恢复）
-│       ├── components/           # UI 组件（ChatInterface, ChatPanel[VCP内联工具气泡], NavRail, RightRail, MarkdownContent, CommandPalette, MemoryWindow[TDB标签页+条目/文件双视图+chunk编辑+导入], FloatingLayerHost, GraphEditor[力导向图+Canvas+CRUD], editors/[RichTextEditor+TipTap富文本]...）
-│       ├── pages/                # 页面组件（CharacterList, CharacterEditor, PersonaList, PersonaEditor, WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, TokenInspector, KnowledgeList, BufferSettingsPage[开关/整理模型/统计]）
+│       ├── hooks/                # 状态管理（useChat, useDebugState, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useNavRailPins, useResizableWidth[可拖拽宽度]）— localStorage 持久化
+│       ├── components/           # UI 组件（ChatInterface, ChatPanel, ActivityBar, SidePanel, Popover, MarkdownContent, CommandPalette, MemoryWindow, GraphWindow, GraphEditor, FloatingLayerHost, TdbFileTree[共享文件树], ResizablePanel[可拖拽面板], panels/）
+│       ├── pages/                # 页面组件（WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, DebugWindowPage[独立监控窗口+localStorage持久化], ToolTipsPage, ThinkingClustersPage）
 │       ├── types/                # 类型定义（session, character, persona, authorNote, worldbook, avatar, config, push, skills, knowledge）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css, editor.css 暖灰富文本主题）
 │
 ├── tests/                        # 测试
+├── scripts/                      # 一次性脚本
+│   └── migrate_knowledge.py      # T23 迁移：data/knowledge/ → data/知识库/
 ├── requirements.txt              # Python依赖
 └── .env                          # 环境配置（API_URL, API_KEY, MODEL）
 ```
@@ -132,7 +141,7 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
                           ├── services/memory.py（记忆注入）
                           ├── services/knowledge.py（知识库检索注入）
                           ├── services/thinking_clusters.py（思维簇注入）
-                          ├── services/embedding.py（两阵营嵌入：本地512维 + API大模型）
+                          ├── services/embedding.py（两阵营嵌入 + 稀疏向量）
                           ├── tool.py（工具执行引擎）
                           ├── tools/parse.py（工具解析）
                           ├── tools/registry.py（工具验证）
@@ -200,6 +209,12 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
 | `POST` | `/knowledge/create` | 直接文本创建知识库条目 |
 | `POST` | `/knowledge/search` | 语义搜索知识库 |
 | `DELETE` | `/knowledge/{file_id}` | 删除知识库文件及向量 |
+| `GET` | `/knowledge/scan` | 扫描知识库变更+新知识库发现（T23） |
+| `POST` | `/knowledge/scan/apply` | 确认处理扫描变更（T23） |
+| `GET` | `/knowledge/bases` | 知识库列表（T23） |
+| `POST` | `/knowledge/bases` | 新建知识库（T23） |
+| `DELETE` | `/knowledge/bases/{name}` | 删除知识库（T23） |
+| `POST` | `/knowledge/graph/sync` | 同步脏文件图谱（T23） |
 | `GET` | `/models/list` | 获取可用模型列表 |
 | `GET` | `/config/list` | 配置项列表 |
 | `GET` | `/config/{resource}` | 读取配置 |
@@ -211,6 +226,9 @@ api/routes/chat.py ──→ lumen/query.py（ReAct 主循环）
 | `GET` | `/graph/neighbors` | 查询实体邻居 |
 | `DELETE` | `/graph/entities/{id}` | 删除图谱实体 |
 | `DELETE` | `/graph/edges/{id}` | 删除图谱边 |
+| `POST` | `/graph/{tdb}/re-extract` | 图谱重抽（按文件或全量） |
+| `GET` | `/config/graph-prompt` | 读取图谱抽取提示词 |
+| `PUT` | `/config/graph-prompt` | 更新图谱抽取提示词 |
 | `GET` | `/config/buffer/settings` | 缓冲区设置（开关、整理模型） |
 | `POST` | `/config/buffer/settings` | 更新缓冲区设置 |
 | `GET` | `/config/tdb/list` | TDB 数据库列表 |
