@@ -3,28 +3,20 @@
  *
  * 顶层：编辑器模式切换（文件/图谱）+ TDB 标签页
  * daily_note 标签：文件树 + 编辑器 + 预览（保持原有行为）
- * buffer 标签：审批列表 + 详情编辑 + 操作按钮
- * 其他 TDB 标签：预留
+ * knowledge / memory 标签：条目浏览 + 源文件管理
  */
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import GraphEditor from './GraphEditor';
 import RichTextEditor from './editors/RichTextEditor';
 import * as memoriesApi from '../api/memories';
 import type { MemoryFolder, MemoryItem } from '../api/memories';
-import {
-  listBufferItems,
-  listTdbs,
-  updateBufferItem,
-  confirmBufferItem,
-  discardBufferItem,
-  consolidateBuffer,
-  getBufferStats,
-} from '../api/buffer';
-import type { BufferItem, BufferStats, TdbInfo } from '../api/buffer';
-import { listTdbEntries, updateTdbEntry, deleteTdbEntry, getTdbFileTree, importTdbFile, getTdbStats } from '../api/tdb';
-import type { TdbEntry, TdbFileFolder, TdbStats } from '../api/tdb';
+import { listTdbs, listTdbEntries, updateTdbEntry, getTdbFileTree, importTdbFile, getTdbStats } from '../api/tdb';
+import { uploadKnowledgeFile, deleteKnowledgeFile, listKnowledgeFiles, scanKnowledge, applyScanChanges } from '../api/knowledge';
+import type { TdbInfo, TdbEntry, TdbFileFolder, TdbStats } from '../api/tdb';
+import TdbFileTree from './TdbFileTree';
+import ResizablePanel from './ResizablePanel';
 import { toast } from '../utils/toast';
+import { RefreshCw } from 'lucide-react';
 
 /* ── 常量 ── */
 
@@ -168,54 +160,6 @@ function FolderTree({
 }
 
 /* ══════════════════════════════════════════
-   子组件：缓冲区条目行
-   ══════════════════════════════════════════ */
-
-function BufferItemRow({
-  item,
-  isSelected,
-  isChecked,
-  onSelect,
-  onToggleCheck,
-}: {
-  item: BufferItem;
-  isSelected: boolean;
-  isChecked: boolean;
-  onSelect: () => void;
-  onToggleCheck: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      className={`w-full flex items-start gap-2 px-3 py-2 cursor-pointer transition-colors duration-100 text-left
-        ${isSelected
-          ? 'bg-[#CC7C5E]/08 text-slate-200'
-          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
-        }`}
-    >
-      <input
-        type="checkbox"
-        checked={isChecked}
-        onClick={onToggleCheck}
-        onChange={() => {}}
-        className="mt-0.5 rounded border-slate-600 accent-amber-500 flex-shrink-0"
-      />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[item.category] || 'text-slate-500'}`}>
-            {CATEGORY_LABELS[item.category] || item.category}
-          </span>
-          {item.importance >= 4 && (
-            <span className="text-[10px] text-amber-500">!</span>
-          )}
-        </div>
-        <p className="text-xs leading-relaxed line-clamp-2">{item.content}</p>
-      </div>
-    </button>
-  );
-}
-
-/* ══════════════════════════════════════════
    子组件：搜索结果卡片
    ══════════════════════════════════════════ */
 
@@ -274,7 +218,6 @@ interface MemoryWindowProps {
 
 function MemoryWindow({ open, onClose }: MemoryWindowProps) {
   /* ── 全局状态 ── */
-  const [editorMode, setEditorMode] = useState<'file' | 'graph'>('file');
   const [tdbs, setTdbs] = useState<TdbInfo[]>([]);
   const [activeTdb, setActiveTdb] = useState<string>('knowledge');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -295,18 +238,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  /* ── 缓冲区状态 ── */
-  const [bufferItems, setBufferItems] = useState<BufferItem[]>([]);
-  const [bufferStats, setBufferStats] = useState<BufferStats | null>(null);
-  const [selectedBufferId, setSelectedBufferId] = useState<number | null>(null);
-  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
-  const [bufferStatusFilter, setBufferStatusFilter] = useState<'pending' | 'confirmed' | 'discarded'>('pending');
-
-  /* 缓冲区详情编辑 */
-  const [editBufferItem, setEditBufferItem] = useState<BufferItem | null>(null);
-  const [isSavingBuffer, setIsSavingBuffer] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-
   /* ── TDB 浏览状态（knowledge / memory） ── */
   const [tdbEntries, setTdbEntries] = useState<TdbEntry[]>([]);
   const [tdbTotal, setTdbTotal] = useState(0);
@@ -323,6 +254,14 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
   const [tdbViewMode, setTdbViewMode] = useState<'entries' | 'files'>('entries');
   const [fileFolders, setFileFolders] = useState<TdbFileFolder[]>([]);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  /* 知识库 registry 视图 */
+  const [knowledgeFiles, setKnowledgeFiles] = useState<Array<{id:string; filename:string; source_path:string; category:string; chunk_count:number; char_count:number; created_at:string}>>([]);
+  const [isDeletingFile, setIsDeletingFile] = useState<string | null>(null);
+  const [importingPaths, setImportingPaths] = useState<Set<string>>(new Set());
+  /* 知识库扫描状态 */
+  const [scanResult, setScanResult] = useState<any>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [showScanPanel, setShowScanPanel] = useState(false);
 
   /* ── 加载 TDB 列表 ── */
   useEffect(() => {
@@ -339,20 +278,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       console.error('加载文件列表失败:', err);
     }
   }, []);
-
-  /* ── 加载缓冲区 ── */
-  const loadBuffer = useCallback(async () => {
-    try {
-      const [itemsData, statsData] = await Promise.all([
-        listBufferItems({ status: bufferStatusFilter, limit: 100 }),
-        getBufferStats(),
-      ]);
-      setBufferItems(itemsData.items);
-      setBufferStats(statsData);
-    } catch (err) {
-      console.error('加载缓冲区失败:', err);
-    }
-  }, [bufferStatusFilter]);
 
   /* ── 加载 TDB 条目（knowledge / memory） ── */
   const loadTdbEntries = useCallback(async () => {
@@ -381,18 +306,39 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     }
   }, [activeTdb]);
 
-  /* ── 切换 TDB 时加载对应数据 ── */
+  /* ── 加载知识库 registry 文件列表 ── */
+  const loadKnowledgeFiles = useCallback(async () => {
+    try {
+      const data = await listKnowledgeFiles();
+      setKnowledgeFiles(data);
+    } catch (err) {
+      console.error('加载知识库文件列表失败:', err);
+    }
+  }, []);
+
+  // source_path → file_id 映射（用于文件视图中定位 registry 条目）
+  const pathToFileId = Object.fromEntries(
+    knowledgeFiles.map(f => [f.source_path, f.id])
+  );
+
+  /* ── 切换 TDB 时重置状态 + 加载对应数据 ── */
   useEffect(() => {
     if (!open) return;
+    // 重置选中/编辑状态，防止跨 TDB 数据泄漏
+    setSelectedEntryId(null);
+    setSelectedFilePath(null);
+    setTdbSourceFilter('');
+    setIsEditingTdb(false);
+    setTdbViewMode('entries');
+
     if (activeTdb === 'daily_note') {
       loadFiles();
-    } else if (activeTdb === 'buffer') {
-      loadBuffer();
     } else if (activeTdb === 'knowledge' || activeTdb === 'memory') {
       loadTdbEntries();
       loadFileTree();
+      if (activeTdb === 'knowledge') loadKnowledgeFiles();
     }
-  }, [open, activeTdb, loadFiles, loadBuffer, loadTdbEntries]);
+  }, [open, activeTdb, loadFiles, loadTdbEntries, loadFileTree, loadKnowledgeFiles]);
 
   /* ── 选中文件 ── */
   const handleSelectFile = useCallback(async (folderPath: string, fileName: string) => {
@@ -429,7 +375,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         if (activeTdb === 'daily_note') handleSaveFile();
-        else if (activeTdb === 'buffer' && editBufferItem) handleSaveBufferEdit();
       }
     };
     window.addEventListener('keydown', handler);
@@ -521,114 +466,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     });
   }, [loadFiles]);
 
-  /* ═══ 缓冲区操作 ═══ */
-
-  /* 选中缓冲区条目 */
-  const handleSelectBufferItem = useCallback((item: BufferItem) => {
-    setSelectedBufferId(item.id);
-    setEditBufferItem({ ...item });
-  }, []);
-
-  /* 复选框切换 */
-  const handleToggleCheck = useCallback((id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  /* 全选/取消 */
-  const handleToggleAll = useCallback(() => {
-    const pendingIds = bufferItems.filter(i => i.status === 'pending').map(i => i.id);
-    if (checkedIds.size === pendingIds.length) {
-      setCheckedIds(new Set());
-    } else {
-      setCheckedIds(new Set(pendingIds));
-    }
-  }, [bufferItems, checkedIds]);
-
-  /* 保存缓冲区编辑 */
-  const handleSaveBufferEdit = useCallback(async () => {
-    if (!editBufferItem) return;
-    setIsSavingBuffer(true);
-    try {
-      await updateBufferItem(editBufferItem.id, {
-        content: editBufferItem.content,
-        category: editBufferItem.category,
-        tags: editBufferItem.keywords,
-        importance: editBufferItem.importance,
-      });
-      toast('已保存修改', 'success');
-      loadBuffer();
-    } catch (err) {
-      console.error('保存失败:', err);
-      toast('保存失败', 'error');
-    } finally {
-      setIsSavingBuffer(false);
-    }
-  }, [editBufferItem, loadBuffer]);
-
-  /* 审批通过（勾选的条目） */
-  const handleApprove = useCallback(async () => {
-    if (checkedIds.size === 0) return;
-    setIsApproving(true);
-    try {
-      const ids = Array.from(checkedIds);
-      // 逐条确认（后端逐条重算大模型向量）
-      let ok = 0;
-      for (const id of ids) {
-        try {
-          await confirmBufferItem(id);
-          ok++;
-        } catch { /* skip */ }
-      }
-      toast(`已审批 ${ok} 条`, 'success');
-      setCheckedIds(new Set());
-      setSelectedBufferId(null);
-      setEditBufferItem(null);
-      loadBuffer();
-    } catch (err) {
-      console.error('审批失败:', err);
-      toast('审批失败', 'error');
-    } finally {
-      setIsApproving(false);
-    }
-  }, [checkedIds, loadBuffer]);
-
-  /* 丢弃单条 */
-  const handleDiscardBuffer = useCallback(async (id: number) => {
-    try {
-      await discardBufferItem(id);
-      if (selectedBufferId === id) {
-        setSelectedBufferId(null);
-        setEditBufferItem(null);
-      }
-      setCheckedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
-      loadBuffer();
-    } catch (err) {
-      console.error('丢弃失败:', err);
-      toast('丢弃失败', 'error');
-    }
-  }, [selectedBufferId, loadBuffer]);
-
-  /* 整理全部 pending */
-  const handleConsolidateAll = useCallback(async () => {
-    setIsApproving(true);
-    try {
-      const result = await consolidateBuffer();
-      toast(`整理完成: ${result.confirmed} 条确认, ${result.failed} 条失败`, 'success');
-      loadBuffer();
-    } catch (err) {
-      console.error('整理失败:', err);
-      toast('整理失败', 'error');
-    } finally {
-      setIsApproving(false);
-    }
-  }, [loadBuffer]);
-
   /* ── 派生状态 ── */
   const hasFileChanges = editContent !== savedContent;
 
@@ -640,9 +477,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       {tdbs
         .map(tdb => {
           const isActive = activeTdb === tdb.name;
-          const label = tdb.name === 'buffer' && bufferStats && bufferStats.pending > 0
-            ? `buffer(${bufferStats.pending})`
-            : tdb.name;
+          const label = tdb.name;
           return (
             <button
               key={tdb.name}
@@ -719,7 +554,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); }
                 }}
                 placeholder="文件夹名"
-                className="flex-1 text-xs bg-[#141413] border border-[#2a2926] rounded
+                className="flex-1 text-xs bg-[#1C1B19] border border-[#2a2926] rounded
                   px-2 py-1 text-slate-300 placeholder:text-slate-700
                   outline-none focus:border-[#CC7C5E]/30"
                 autoFocus
@@ -762,265 +597,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     );
   };
 
-  /* ── 渲染 buffer 内容 ── */
-  const renderBufferContent = () => {
-    const pendingItems = bufferItems.filter(i => i.status === 'pending');
-
-    return (
-      <>
-        {/* 左栏：缓冲区列表 */}
-        <div className="w-56 flex-shrink-0 border-r border-[#2a2926] bg-[#171715] flex flex-col">
-          {/* 状态过滤 */}
-          <div className="px-2 py-2 border-b border-[#2a2926] flex gap-0.5">
-            {(['pending', 'confirmed', 'discarded'] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setBufferStatusFilter(s)}
-                className={`flex-1 py-1 rounded text-[10px] transition-colors cursor-pointer
-                  ${bufferStatusFilter === s
-                    ? 'bg-[#2a2926] text-slate-300'
-                    : 'text-slate-600 hover:text-slate-400'
-                  }`}
-              >
-                {s === 'pending' ? `待整理 (${bufferStats?.pending ?? 0})` :
-                 s === 'confirmed' ? `已确认 (${bufferStats?.confirmed ?? 0})` :
-                 `已丢弃 (${bufferStats?.discarded ?? 0})`}
-              </button>
-            ))}
-          </div>
-
-          {/* 全选 + 操作栏 */}
-          {bufferStatusFilter === 'pending' && pendingItems.length > 0 && (
-            <div className="px-3 py-1.5 border-b border-[#2a2926] flex items-center gap-2">
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={checkedIds.size === pendingItems.length && pendingItems.length > 0}
-                  onChange={handleToggleAll}
-                  className="rounded border-slate-600 accent-amber-500"
-                />
-                <span className="text-[10px] text-slate-500">全选</span>
-              </label>
-              <button
-                onClick={handleApprove}
-                disabled={checkedIds.size === 0 || isApproving}
-                className="ml-auto px-2 py-0.5 rounded text-[10px] cursor-pointer
-                  bg-amber-500/10 text-amber-400 border border-amber-500/20
-                  hover:bg-amber-500/20
-                  disabled:opacity-30 disabled:cursor-not-allowed
-                  transition-colors"
-              >
-                {isApproving ? '审批中...' : `审批 (${checkedIds.size})`}
-              </button>
-            </div>
-          )}
-
-          {/* 条目列表 */}
-          <div className="flex-1 overflow-y-auto scrollbar-lumen">
-            {bufferItems.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-xs text-slate-700">
-                  {bufferStatusFilter === 'pending' ? '暂无待整理条目' :
-                   bufferStatusFilter === 'confirmed' ? '暂无已确认条目' : '暂无已丢弃条目'}
-                </p>
-              </div>
-            ) : (
-              bufferItems.map(item => (
-                <BufferItemRow
-                  key={item.id}
-                  item={item}
-                  isSelected={item.id === selectedBufferId}
-                  isChecked={checkedIds.has(item.id)}
-                  onSelect={() => handleSelectBufferItem(item)}
-                  onToggleCheck={(e) => handleToggleCheck(item.id, e)}
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* 中栏：详情编辑 */}
-        <div className="flex-1 flex flex-col min-w-0 border-r border-[#2a2926]">
-          {editBufferItem ? (
-            <>
-              <div className="px-4 py-2 border-b border-[#2a2926] bg-[#1c1c1a] flex items-center gap-3">
-                {/* 分类选择 */}
-                <select
-                  value={editBufferItem.category}
-                  onChange={e => setEditBufferItem(prev => prev ? { ...prev, category: e.target.value } : prev)}
-                  className="text-xs bg-[#141413] border border-[#2a2926] rounded px-2 py-1
-                    text-slate-300 outline-none cursor-pointer"
-                >
-                  {CATEGORY_OPTIONS.map(c => (
-                    <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>
-                  ))}
-                </select>
-
-                {/* 重要度 */}
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-slate-600">重要度</span>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <button
-                      key={n}
-                      onClick={() => setEditBufferItem(prev => prev ? { ...prev, importance: n } : prev)}
-                      className={`w-4 h-4 rounded text-[10px] cursor-pointer transition-colors
-                        ${n <= editBufferItem.importance ? 'text-amber-400' : 'text-slate-700'}`}
-                    >
-                      ★
-                    </button>
-                  ))}
-                </div>
-
-                {/* 来源 + 时间 */}
-                <span className="text-[10px] text-slate-600 ml-auto">
-                  {editBufferItem.source} · {editBufferItem.created_at?.slice(0, 16)}
-                </span>
-              </div>
-
-              {/* 内容编辑 */}
-              <textarea
-                value={editBufferItem.content}
-                onChange={e => setEditBufferItem(prev => prev ? { ...prev, content: e.target.value } : prev)}
-                className="flex-1 w-full p-4 bg-transparent text-slate-300 text-sm
-                  leading-relaxed resize-none outline-none font-mono
-                  placeholder:text-slate-700"
-                spellCheck={false}
-              />
-
-              {/* 操作栏 */}
-              <div className="px-4 py-2 border-t border-[#2a2926] flex items-center gap-2">
-                <button
-                  onClick={handleSaveBufferEdit}
-                  disabled={isSavingBuffer}
-                  className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                    bg-[#CC7C5E]/15 text-[#CC7C5E] hover:bg-[#CC7C5E]/25
-                    disabled:opacity-50 transition-colors"
-                >
-                  {isSavingBuffer ? '保存中...' : '保存修改'}
-                </button>
-                <button
-                  onClick={() => handleDiscardBuffer(editBufferItem.id)}
-                  className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                    text-slate-600 hover:text-red-400 hover:bg-red-400/10
-                    transition-colors"
-                >
-                  丢弃
-                </button>
-                {editBufferItem.status === 'pending' && (
-                  <button
-                    onClick={async () => {
-                      setIsApproving(true);
-                      try {
-                        await confirmBufferItem(editBufferItem.id);
-                        toast('已审批通过', 'success');
-                        setSelectedBufferId(null);
-                        setEditBufferItem(null);
-                        loadBuffer();
-                      } catch (err) {
-                        toast('审批失败', 'error');
-                      } finally {
-                        setIsApproving(false);
-                      }
-                    }}
-                    disabled={isApproving}
-                    className="ml-auto px-3 py-1 rounded-lg text-xs cursor-pointer
-                      bg-amber-500/10 text-amber-400 border border-amber-500/20
-                      hover:bg-amber-500/20
-                      disabled:opacity-50 transition-colors"
-                  >
-                    审批通过
-                  </button>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <svg className="w-8 h-8 mx-auto mb-3 text-slate-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-                <p className="text-xs text-slate-500">选择条目查看详情</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 右栏：标签 + 元信息 */}
-        <div className="w-52 flex-shrink-0 flex flex-col">
-          <div className="px-3 py-1.5 border-b border-[#2a2926] bg-[#1c1c1a]">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600">标签</span>
-          </div>
-          <div className="flex-1 p-3 overflow-y-auto scrollbar-lumen">
-            {editBufferItem ? (
-              <>
-                {/* 标签编辑 */}
-                <div className="mb-3">
-                  <input
-                    value={editBufferItem.keywords.join(', ')}
-                    onChange={e => setEditBufferItem(prev => prev
-                      ? { ...prev, keywords: e.target.value.split(/[,，]\s*/).filter(Boolean) }
-                      : prev
-                    )}
-                    placeholder="标签（逗号分隔）"
-                    className="w-full text-xs bg-transparent border-b border-[#2a2926]
-                      px-1 py-1 text-slate-300 placeholder:text-slate-700
-                      outline-none focus:border-[#CC7C5E]/30"
-                  />
-                </div>
-
-                {/* 元信息 */}
-                <div className="space-y-2 text-[10px] text-slate-600">
-                  <div className="flex justify-between">
-                    <span>来源</span>
-                    <span className="text-slate-400">{editBufferItem.source}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>状态</span>
-                    <span className={
-                      editBufferItem.status === 'pending' ? 'text-amber-400' :
-                      editBufferItem.status === 'confirmed' ? 'text-emerald-400' :
-                      'text-slate-500'
-                    }>
-                      {editBufferItem.status === 'pending' ? '待整理' :
-                       editBufferItem.status === 'confirmed' ? '已确认' : '已丢弃'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>创建时间</span>
-                    <span className="text-slate-400">{editBufferItem.created_at?.slice(0, 16)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>ID</span>
-                    <span className="text-slate-500 font-mono">{editBufferItem.id}</span>
-                  </div>
-                </div>
-
-                {/* 批量操作 */}
-                {bufferStatusFilter === 'pending' && bufferStats && bufferStats.pending > 0 && (
-                  <div className="mt-6 pt-3 border-t border-[#2a2926]">
-                    <button
-                      onClick={handleConsolidateAll}
-                      disabled={isApproving}
-                      className="w-full py-1.5 rounded-lg text-xs cursor-pointer
-                        bg-slate-700/30 text-slate-400 border border-slate-700/40
-                        hover:bg-slate-700/50
-                        disabled:opacity-50 transition-colors"
-                    >
-                      {isApproving ? '整理中...' : `整理全部 (${bufferStats.pending})`}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-slate-700">选择条目查看标签和元信息</p>
-            )}
-          </div>
-        </div>
-      </>
-    );
-  };
-
   /* ── 渲染通用 TDB 浏览器（knowledge / memory） ── */
   const renderTdbBrowser = () => {
     // 前端来源过滤（只影响条目列表显示，不影响文件视图和详情选中）
@@ -1038,13 +614,19 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
 
     return (
       <>
-        {/* 左栏：条目/文件切换 */}
-        <div className="w-56 flex-shrink-0 border-r border-[#2a2926] bg-[#171715] flex flex-col">
+        {/* 左栏：条目/文件切换（可拖拽调宽） */}
+        <ResizablePanel
+          defaultWidth={256}
+          minWidth={180}
+          maxWidth={400}
+          storageKey="lumen_knowledge_sidebar_width"
+          className="border-r border-[#2a2926] bg-[#171715] flex flex-col"
+        >
           {/* 视图切换 + 过滤 */}
           <div className="px-2 py-2 border-b border-[#2a2926]">
             <div className="flex items-center gap-1.5">
               {fileFolders.length > 0 && (
-                <div className="flex gap-0.5 bg-[#141413] rounded p-0.5">
+                <div className="flex gap-0.5 bg-[#1C1B19] rounded p-0.5">
                   <button
                     onClick={() => setTdbViewMode('entries')}
                     className={`px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition-colors
@@ -1064,13 +646,13 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     <select
                       value={tdbSourceFilter}
                       onChange={e => setTdbSourceFilter(e.target.value)}
-                      className="ml-auto text-[10px] bg-[#141413] border border-[#2a2926] rounded px-1.5 py-0.5
+                      className="ml-auto text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded px-1.5 py-0.5
                         text-slate-400 outline-none cursor-pointer"
                     >
                       <option value="">全部来源</option>
                       {tdbStats && Object.keys(tdbStats.sources).map(src => (
                         <option key={src} value={src}>
-                          {src === 'daily_note' ? '日记' : src === 'chat' ? '聊天' : src === 'upload' ? '上传' : src === 'manual' ? '手动导入' : src === 'buffer' ? '缓冲区' : src}
+                          {src === 'daily_note' ? '日记' : src === 'chat' ? '聊天' : src === 'upload' ? '上传' : src === 'manual' ? '手动导入' : src}
                         </option>
                       ))}
                     </select>
@@ -1080,8 +662,144 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               {tdbViewMode === 'files' && (
                 <span className="text-[10px] text-slate-600">{fileFolders.reduce((s, f) => s + f.files.length, 0)} 文件</span>
               )}
+              {activeTdb === 'knowledge' && (
+                <div className="ml-auto flex items-center gap-1">
+                  <button
+                    onClick={async () => {
+                      setIsScanning(true);
+                      try {
+                        const result = await scanKnowledge();
+                        setScanResult(result);
+                        setShowScanPanel(true);
+                      } catch (err) {
+                        toast('扫描失败', 'error');
+                      }
+                      setIsScanning(false);
+                    }}
+                    className="p-1 rounded text-slate-600 hover:text-sky-400 hover:bg-sky-500/10
+                      transition-colors cursor-pointer"
+                    title="扫描知识库变更"
+                    disabled={isScanning}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = '.txt,.md,.markdown';
+                      input.multiple = true;
+                      input.onchange = async () => {
+                        if (!input.files) return;
+                        for (const file of Array.from(input.files)) {
+                          try {
+                            await uploadKnowledgeFile(file, 'lumen_docs');
+                            toast(`${file.name} 上传成功`, 'success');
+                          } catch (err) {
+                            toast(`${file.name}: ${err instanceof Error ? err.message : '上传失败'}`, 'error');
+                          }
+                        }
+                        loadTdbEntries();
+                        loadFileTree();
+                      };
+                      input.click();
+                    }}
+                    className="p-1 rounded text-slate-600 hover:text-amber-400 hover:bg-amber-500/10
+                      transition-colors cursor-pointer"
+                    title="上传文件到知识库"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* T23 扫描结果面板 */}
+          {showScanPanel && scanResult && (
+            <div className="border-b border-[#2a2926] p-3 bg-[#1C1B19]/50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase tracking-widest text-slate-500">扫描结果</span>
+                <button
+                  onClick={() => { setShowScanPanel(false); setScanResult(null); }}
+                  className="text-slate-700 hover:text-slate-400 cursor-pointer"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {scanResult.new_kbs?.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[9px] text-emerald-500 mb-1">新知识库</div>
+                  {scanResult.new_kbs.map((kb: string) => (
+                    <div key={kb} className="text-[10px] text-slate-400 pl-2">{kb}/</div>
+                  ))}
+                </div>
+              )}
+
+              {scanResult.added?.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[9px] text-sky-400 mb-1">新增文件 ({scanResult.added.length})</div>
+                  {scanResult.added.map((f: any, i: number) => (
+                    <div key={i} className="text-[10px] text-slate-400 pl-2">{f.path}</div>
+                  ))}
+                </div>
+              )}
+
+              {scanResult.modified?.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[9px] text-amber-400 mb-1">已修改 ({scanResult.modified.length})</div>
+                  {scanResult.modified.map((f: any, i: number) => (
+                    <div key={i} className="text-[10px] text-slate-400 pl-2">{f.path}</div>
+                  ))}
+                </div>
+              )}
+
+              {scanResult.deleted?.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[9px] text-red-400 mb-1">已删除 ({scanResult.deleted.length})</div>
+                  {scanResult.deleted.map((f: any, i: number) => (
+                    <div key={i} className="text-[10px] text-slate-400 pl-2">{f.path}</div>
+                  ))}
+                </div>
+              )}
+
+              {(!scanResult.new_kbs?.length && !scanResult.added?.length && !scanResult.modified?.length && !scanResult.deleted?.length) && (
+                <p className="text-[10px] text-slate-600">未发现变更</p>
+              )}
+
+              {(scanResult.new_kbs?.length || scanResult.added?.length || scanResult.modified?.length || scanResult.deleted?.length) && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const result = await applyScanChanges({
+                        register_kbs: scanResult.new_kbs || [],
+                        added: scanResult.added || [],
+                        modified: scanResult.modified || [],
+                        deleted: scanResult.deleted || [],
+                      });
+                      toast(`处理完成: ${result.results?.length ?? 0} 项`, 'success');
+                      setShowScanPanel(false);
+                      setScanResult(null);
+                      loadTdbEntries();
+                      loadFileTree();
+                    } catch (err) {
+                      toast('处理变更失败', 'error');
+                    }
+                  }}
+                  className="mt-2 w-full py-1 rounded text-[10px] font-medium cursor-pointer
+                    bg-sky-600/20 text-sky-400 hover:bg-sky-600/30 transition-colors"
+                >
+                  确认处理
+                </button>
+              )}
+            </div>
+          )}
 
           {/* 条目列表 or 文件树 */}
           <div className="flex-1 overflow-y-auto scrollbar-lumen">
@@ -1120,84 +838,148 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               )
             ) : (
               /* 源文件视图：目录树 */
-              fileFolders.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-xs text-slate-700">无源文件</p>
-                </div>
-              ) : (
-                fileFolders.map(folder => (
-                  <div key={folder.path || folder.name}>
-                    {folder.path && (
-                      <div className="flex items-center gap-1.5 px-3 py-1">
-                        <svg className="w-3 h-3 text-amber-700/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                            d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
-                        </svg>
-                        <span className="text-xs text-slate-400">{folder.name}</span>
-                        <span className="text-[10px] text-slate-700 ml-auto">{folder.files.length}</span>
-                      </div>
+              <TdbFileTree
+                folders={fileFolders}
+                selectedPath={selectedFilePath}
+                onSelect={(path) => { setSelectedFilePath(path); setSelectedEntryId(null); }}
+                renderFileActions={(file) => {
+                  const chunkCount = tdbEntries.filter(e =>
+                    e.source_path === file.path || e.source_path?.endsWith('/' + file.path)
+                  ).length;
+                  if (chunkCount === 0) {
+                    return (<>
+                      <span className="text-[9px] text-amber-500/80 mr-1">未导入</span>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (importingPaths.has(file.path)) return;
+                          setImportingPaths(prev => new Set(prev).add(file.path));
+                          try {
+                            const result = await importTdbFile(activeTdb, file.path);
+                            toast(`导入成功，${result.chunks} 个片段`, 'success');
+                            loadTdbEntries();
+                            loadFileTree();
+                            loadKnowledgeFiles();
+                          } catch (err: any) {
+                            toast(err.message || '导入失败', 'error');
+                          } finally {
+                            setImportingPaths(prev => { const n = new Set(prev); n.delete(file.path); return n; });
+                          }
+                        }}
+                        disabled={importingPaths.has(file.path)}
+                        className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400
+                          hover:bg-amber-500/25 transition-colors flex-shrink-0 cursor-pointer
+                          disabled:opacity-40 disabled:cursor-wait"
+                      >
+                        {importingPaths.has(file.path) ? '导入中...' : '导入'}
+                      </button>
+                    </>);
+                  }
+                  return (<>
+                    <span className="text-[10px] text-slate-700 mr-0.5">{chunkCount}段</span>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (importingPaths.has(file.path)) return;
+                        if (!confirm(`「${file.name}」已导入，重新导入将清空旧数据并重新切分向量化。确定继续？`)) return;
+                        setImportingPaths(prev => new Set(prev).add(file.path));
+                        try {
+                          const result = await importTdbFile(activeTdb, file.path);
+                          toast(`重新导入成功，${result.chunks} 个片段`, 'success');
+                          loadTdbEntries();
+                          loadFileTree();
+                          loadKnowledgeFiles();
+                        } catch (err: any) {
+                          toast(err.message || '导入失败', 'error');
+                        } finally {
+                          setImportingPaths(prev => { const n = new Set(prev); n.delete(file.path); return n; });
+                        }
+                      }}
+                      disabled={importingPaths.has(file.path)}
+                      className="text-[9px] px-1.5 py-0.5 rounded text-slate-600 hover:text-amber-400 hover:bg-amber-500/10
+                        transition-colors flex-shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-wait"
+                      title="重新导入"
+                    >
+                      {importingPaths.has(file.path) ? '...' : '重导'}
+                    </button>
+                    {pathToFileId[file.path] && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const fileId = pathToFileId[file.path];
+                          if (!confirm(`确定删除「${file.name}」吗？\n向量数据、源文件和索引都会一并删除。`)) return;
+                          setIsDeletingFile(fileId);
+                          try {
+                            await deleteKnowledgeFile(fileId);
+                            toast(`已删除: ${file.name}`, 'success');
+                            loadTdbEntries();
+                            loadFileTree();
+                            loadKnowledgeFiles();
+                          } catch (err) {
+                            toast(err instanceof Error ? err.message : '删除失败', 'error');
+                          } finally {
+                            setIsDeletingFile(null);
+                          }
+                        }}
+                        disabled={isDeletingFile === pathToFileId[file.path]}
+                        className="text-[9px] px-1.5 py-0.5 rounded text-red-400/60 hover:text-red-400 hover:bg-red-500/10
+                          transition-colors flex-shrink-0 cursor-pointer disabled:opacity-30"
+                      >
+                        {isDeletingFile === pathToFileId[file.path] ? '...' : '删'}
+                      </button>
                     )}
-                    {folder.files.map(file => {
-                      const isActive = selectedFilePath === file.path;
-                      const chunkCount = tdbEntries.filter(e =>
-                        e.source_path === file.path || e.source_path?.endsWith('/' + file.path)
-                      ).length;
-                      return (
-                        <div
-                          key={file.path}
-                          className={`w-full flex items-center gap-1.5 px-3 py-1 cursor-pointer transition-colors duration-100
-                            ${folder.path ? 'pl-7' : 'pl-3'}
-                            ${isActive
-                              ? 'bg-[#CC7C5E]/08 text-slate-200'
-                              : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
-                            }`}
-                          onClick={() => {
-                            setSelectedFilePath(file.path);
-                            setSelectedEntryId(null);
-                          }}
-                        >
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0-1.125-.504-1.125-1.125V11.25a9 9 0 00-9-9z" />
-                          </svg>
-                          <span className="text-xs truncate">{file.name}</span>
-                          {chunkCount === 0 ? (
-                            <span className="text-[9px] text-amber-500/80 ml-auto mr-1">未导入</span>
-                          ) : (
-                            <span className="text-[10px] text-slate-700 ml-auto">{chunkCount}段</span>
-                          )}
-                          {(chunkCount === 0) && (
-                            <button
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  const result = await importTdbFile(activeTdb, file.path);
-                                  toast(`导入成功，${result.chunks} 个片段`, 'success');
-                                  loadTdbEntries();
-                                  loadFileTree();
-                                } catch (err: any) {
-                                  if (err.message?.includes('409')) {
-                                    toast('该文件已在向量库中', 'info');
-                                  } else {
-                                    toast(err.message || '导入失败', 'error');
-                                  }
-                                }
-                              }}
-                              className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400
-                                hover:bg-amber-500/25 transition-colors flex-shrink-0 cursor-pointer"
-                            >
-                              导入
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))
-              )
+                  </>);
+                }}
+                footer={
+                  /* orphan 条目：registry 里有但磁盘上找不到源文件 */
+                  (() => {
+                    const filePaths = new Set<string>();
+                    for (const folder of fileFolders) {
+                      for (const f of folder.files) {
+                        filePaths.add(f.path);
+                      }
+                    }
+                    const orphans = knowledgeFiles.filter(f => !filePaths.has(f.source_path));
+                    if (orphans.length === 0) return null;
+                    return (
+                      <div className="border-t border-[#2a2926] mt-1">
+                        <details className="group">
+                          <summary className="px-3 py-2 text-[10px] text-amber-500/70 cursor-pointer hover:text-amber-400 transition-colors">
+                            孤立条目 ({orphans.length})
+                          </summary>
+                          <div className="pb-1">
+                            {orphans.map(file => (
+                              <div key={file.id} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800/20">
+                                <span className="text-[10px] text-slate-500 truncate flex-1">{file.filename}</span>
+                                <span className="text-[9px] text-slate-600">{file.chunk_count}段</span>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`确定清理孤立条目「${file.filename}」吗？`)) return;
+                                    try {
+                                      await deleteKnowledgeFile(file.id);
+                                      toast(`已清理: ${file.filename}`, 'success');
+                                      loadKnowledgeFiles();
+                                      loadTdbEntries();
+                                      loadFileTree();
+                                    } catch (err) {
+                                      toast(err instanceof Error ? err.message : '清理失败', 'error');
+                                    }
+                                  }}
+                                  className="text-[9px] px-1.5 py-0.5 rounded text-red-400/60 hover:text-red-400 hover:bg-red-500/10
+                                    transition-colors flex-shrink-0 cursor-pointer"
+                                >清理</button>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      </div>
+                    );
+                  })()
+                }
+              />
             )}
           </div>
-        </div>
+        </ResizablePanel>
 
         {/* 中栏：内容详情（只读） */}
         <div className="flex-1 flex flex-col min-w-0 border-r border-[#2a2926]">
@@ -1313,24 +1095,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     )}
                   </>
                 )}
-                <button
-                  onClick={async () => {
-                    if (!displayEntry?.id) return;
-                    const tdbName = activeTdb as 'knowledge' | 'memory';
-                    try {
-                      await deleteTdbEntry(tdbName, displayEntry!.id!);
-                      toast('已删除', 'success');
-                      setSelectedEntryId(null);
-                      loadTdbEntries();
-                    } catch (err) {
-                      toast('删除失败', 'error');
-                    }
-                  }}
-                  className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                    text-slate-600 hover:text-red-400 hover:bg-red-400/08 transition-colors ml-auto"
-                >
-                  删除
-                </button>
               </div>
             </>
           ) : (
@@ -1365,7 +1129,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     <select
                       value={editTdbCategory}
                       onChange={e => setEditTdbCategory(e.target.value)}
-                      className="w-full mt-1 text-[10px] bg-[#141413] border border-[#2a2926] rounded px-1.5 py-0.5
+                      className="w-full mt-1 text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded px-1.5 py-0.5
                         text-slate-400 outline-none cursor-pointer"
                     >
                       {CATEGORY_OPTIONS.map(opt => (
@@ -1400,7 +1164,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       value={editTdbTags}
                       onChange={e => setEditTdbTags(e.target.value)}
                       placeholder="标签1, 标签2"
-                      className="w-full mt-1 text-[10px] bg-[#141413] border border-[#2a2926] rounded px-1.5 py-0.5
+                      className="w-full mt-1 text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded px-1.5 py-0.5
                         text-slate-400 outline-none"
                     />
                   ) : displayEntry.keywords?.length > 0 ? (
@@ -1449,7 +1213,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="absolute inset-0 bg-[#141413]/80 backdrop-blur-sm animate-overlay-fade-in" />
+      <div className="absolute inset-0 bg-[#1C1B19]/80 backdrop-blur-sm animate-overlay-fade-in" />
 
       <div
         className={`relative flex flex-col overflow-hidden
@@ -1461,30 +1225,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       >
         {/* ── 标题栏 ── */}
         <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#2a2926] bg-[#1f1f1c]">
-          {/* 编辑器模式切换 */}
-          <div className="flex gap-0.5 bg-[#141413] rounded-lg p-0.5">
-            <button
-              onClick={() => setEditorMode('file')}
-              className={`px-2.5 py-1 rounded-md text-[11px] transition-all duration-150 cursor-pointer
-                ${editorMode === 'file'
-                  ? 'bg-[#2a2926] text-slate-200'
-                  : 'text-slate-600 hover:text-slate-400'
-                }`}
-            >
-              文件编辑器
-            </button>
-            <button
-              onClick={() => setEditorMode('graph')}
-              className={`px-2.5 py-1 rounded-md text-[11px] transition-all duration-150 cursor-pointer
-                ${editorMode === 'graph'
-                  ? 'bg-[#2a2926] text-slate-200'
-                  : 'text-slate-600 hover:text-slate-400'
-                }`}
-            >
-              图谱编辑器
-            </button>
-          </div>
-
           {/* TDB 标签页 */}
           {renderTdbTabs()}
 
@@ -1497,7 +1237,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
                   placeholder="搜索日记..."
-                  className="w-32 text-[11px] bg-[#141413] border border-[#2a2926] rounded-lg
+                  className="w-32 text-[11px] bg-[#1C1B19] border border-[#2a2926] rounded-lg
                     px-2.5 py-1 text-slate-300 placeholder:text-slate-700
                     outline-none focus:border-[#CC7C5E]/30 transition-colors"
                 />
@@ -1565,28 +1305,9 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
 
         {/* ── 内容区 ── */}
         <div className="flex flex-1 min-h-0">
-          {editorMode === 'file' ? (
-            activeTdb === 'daily_note' ? renderDailyNoteContent() :
-            activeTdb === 'buffer' ? renderBufferContent() :
-            (activeTdb === 'knowledge' || activeTdb === 'memory') ? renderTdbBrowser() :
-            renderDailyNoteContent()
-          ) : (
-            /* 图谱编辑器模式 */
-            activeTdb === 'daily_note' ? (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <svg className="w-8 h-8 mx-auto mb-3 text-slate-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-                      d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                  </svg>
-                  <p className="text-xs text-slate-500">日记无图谱数据</p>
-                  <p className="text-[10px] text-slate-700 mt-1">切换到其他 TDB 标签查看图谱</p>
-                </div>
-              </div>
-            ) : (
-              <GraphEditor tdb={activeTdb} />
-            )
-          )}
+          {activeTdb === 'daily_note' ? renderDailyNoteContent() :
+           (activeTdb === 'knowledge' || activeTdb === 'memory') ? renderTdbBrowser() :
+           renderDailyNoteContent()}
         </div>
       </div>
 
