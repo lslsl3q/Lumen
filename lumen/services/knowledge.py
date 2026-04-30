@@ -71,7 +71,7 @@ def _save_dim(dim_file: str, dim: int):
 _registry_cache: Optional[Dict[str, Dict]] = None
 _registry_lock = threading.Lock()
 
-REGISTRY_PATH = os.path.join(KNOWLEDGE_SOURCE_DIR, "_registry.json")
+MANIFEST_PATH = os.path.join(KNOWLEDGE_SOURCE_DIR, "_manifest.json")
 
 
 def _get_db() -> triviumdb.TriviumDB:
@@ -264,27 +264,33 @@ def _rrf_merge(
 
 
 def _load_registry() -> Dict[str, Dict]:
-    """加载 registry.json（带内存缓存）"""
+    """加载 registry（从 _manifest.json 的 files 字段，带内存缓存）"""
     global _registry_cache
     if _registry_cache is not None:
         return _registry_cache
-    if os.path.exists(REGISTRY_PATH):
-        try:
-            with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
-                _registry_cache = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            _registry_cache = {}
-    else:
-        _registry_cache = {}
+    try:
+        if os.path.exists(MANIFEST_PATH):
+            with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+                _registry_cache = manifest.get("files", {})
+            return _registry_cache
+    except (json.JSONDecodeError, IOError):
+        pass
+    _registry_cache = {}
     return _registry_cache
 
 
 def _save_registry(registry: Dict[str, Dict]) -> None:
-    """保存 registry.json 并刷新缓存"""
+    """保存 registry（写回 _manifest.json 的 files 字段）并刷新缓存"""
     global _registry_cache
-    os.makedirs(KNOWLEDGE_SOURCE_DIR, exist_ok=True)
-    with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
-        json.dump(registry, f, ensure_ascii=False, indent=2)
+    manifest = {}
+    if os.path.exists(MANIFEST_PATH):
+        with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+    manifest["files"] = registry
+    os.makedirs(os.path.dirname(MANIFEST_PATH), exist_ok=True)
+    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
     _registry_cache = registry
 
 
@@ -1203,7 +1209,7 @@ async def rebuild_if_empty():
 
     场景：用户换了 embedding API、删除了 TDB 文件、或首次启动。
     扫描 KNOWLEDGE_SOURCE_DIR 下所有 .md/.txt/.markdown 文件，
-    跳过 _registry.json 和已有条目的文件，逐个调用 import_file。
+    跳过 _manifest.json 和已有条目的文件，逐个调用 import_file。
     """
     db = _get_db()
     node_ids = db.all_node_ids()
@@ -1226,7 +1232,7 @@ async def rebuild_if_empty():
     for dirpath, dirnames, filenames in os.walk(KNOWLEDGE_SOURCE_DIR):
         dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         for f in sorted(filenames):
-            if f == "_registry.json":
+            if f == "_manifest.json":
                 continue
             ext = os.path.splitext(f)[1].lower()
             if ext in ALLOWED_EXT:
