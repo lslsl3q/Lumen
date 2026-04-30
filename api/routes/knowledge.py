@@ -154,7 +154,7 @@ async def list_bases():
 async def create_base(body: dict):
     """创建新知识库"""
     from lumen.config import KNOWLEDGE_LIB_DIR
-    from lumen.services.manifest import register_kb
+    from lumen.services.manifest import create_kb
 
     name = body.get("name", "").strip()
     if not name or name.startswith("_"):
@@ -164,8 +164,7 @@ async def create_base(body: dict):
     if os.path.exists(kb_dir):
         raise HTTPException(status_code=409, detail=f"知识库 '{name}' 已存在")
 
-    os.makedirs(kb_dir, exist_ok=True)
-    entry = register_kb(
+    entry = create_kb(
         name,
         tdb_path=f"data/vectors/api/kb_{name}.tdb",
         graph_path=f"data/graphs/kb_{name}.tdb",
@@ -177,16 +176,12 @@ async def create_base(body: dict):
 @router.delete("/bases/{name}")
 async def delete_base(name: str):
     """删除知识库（文件夹 + 注册信息）"""
-    import shutil
-    from lumen.config import KNOWLEDGE_LIB_DIR
-    from lumen.services.manifest import unregister_kb
+    from lumen.services.manifest import delete_kb, get_kb
 
-    kb_dir = os.path.join(KNOWLEDGE_LIB_DIR, name)
-    if not os.path.exists(kb_dir):
+    if not get_kb(name):
         raise HTTPException(status_code=404, detail="知识库不存在")
 
-    shutil.rmtree(kb_dir)
-    unregister_kb(name)
+    delete_kb(name)
     return {"deleted": name}
 
 
