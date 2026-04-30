@@ -131,12 +131,11 @@ KNOWLEDGE_DB_PATH = os.getenv(
 )
 KNOWLEDGE_SOURCE_DIR = os.getenv(
     "KNOWLEDGE_SOURCE_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "knowledge"),
+    os.path.join(os.path.dirname(__file__), "data", "知识库", "knowledge"),
 )
 
 # ── T23 动态知识库 ──
-KNOWLEDGE_LIB_DIR = "data/知识库"
-MANIFEST_PATH = os.path.join(KNOWLEDGE_LIB_DIR, "_manifest.json")
+KNOWLEDGE_LIB_DIR = os.path.join(os.path.dirname(__file__), "data", "知识库")
 
 GRAPH_BACKUP_DIR = os.getenv(
     "GRAPH_BACKUP_DIR",
