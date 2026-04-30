@@ -1,78 +1,90 @@
-"""_manifest.json 管理 — 知识库注册表"""
+"""_manifest.json 管理 — 每个知识库一个自包含清单"""
 import json
 import os
+import shutil
 from datetime import datetime
 from typing import Optional
 
-from lumen.config import MANIFEST_PATH
+from lumen.config import KNOWLEDGE_LIB_DIR
 
 
-def _default_manifest() -> dict:
-    return {"version": 1, "knowledge_bases": {}}
+def kb_manifest_path(name: str) -> str:
+    """知识库 _manifest.json 路径"""
+    return os.path.join(KNOWLEDGE_LIB_DIR, name, "_manifest.json")
 
 
-def load_manifest() -> dict:
-    """加载 _manifest.json，不存在则返回空模板"""
-    if not os.path.exists(MANIFEST_PATH):
-        return _default_manifest()
-    with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+def load_kb_manifest(name: str) -> Optional[dict]:
+    """加载知识库的 _manifest.json"""
+    path = kb_manifest_path(name)
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def save_manifest(manifest: dict) -> None:
-    """写入 _manifest.json"""
-    os.makedirs(os.path.dirname(MANIFEST_PATH), exist_ok=True)
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+def save_kb_manifest(name: str, manifest: dict) -> None:
+    """写入知识库的 _manifest.json"""
+    kb_dir = os.path.join(KNOWLEDGE_LIB_DIR, name)
+    os.makedirs(kb_dir, exist_ok=True)
+    path = kb_manifest_path(name)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
 
 
-def register_kb(folder_name: str, tdb_path: str, graph_path: Optional[str] = None,
-                sentence_path: Optional[str] = None, embedding_camp: str = "api") -> dict:
-    """注册一个知识库到 manifest"""
-    manifest = load_manifest()
-    entry = {
-        "folder": folder_name,
+def list_kbs() -> list[dict]:
+    """扫描所有知识库（动态发现）"""
+    if not os.path.exists(KNOWLEDGE_LIB_DIR):
+        return []
+    results = []
+    for entry in sorted(os.listdir(KNOWLEDGE_LIB_DIR)):
+        entry_path = os.path.join(KNOWLEDGE_LIB_DIR, entry)
+        if not os.path.isdir(entry_path):
+            continue
+        if entry.startswith("_") or entry.startswith("."):
+            continue
+        manifest = load_kb_manifest(entry)
+        if manifest:
+            results.append({"name": entry, **manifest})
+        else:
+            results.append({"name": entry})
+    return results
+
+
+def get_kb(name: str) -> Optional[dict]:
+    """获取单个知识库信息"""
+    return load_kb_manifest(name)
+
+
+def create_kb(name: str, tdb_path: str, graph_path: Optional[str] = None,
+              sentence_path: Optional[str] = None, embedding_camp: str = "api") -> dict:
+    """创建新知识库（文件夹 + _manifest.json）"""
+    manifest = {
         "tdb_path": tdb_path,
         "graph_path": graph_path,
         "sentence_path": sentence_path,
         "embedding_camp": embedding_camp,
+        "access_mode": "public",
+        "allowed_characters": [],
         "created_at": datetime.now().isoformat(),
+        "files": {},
     }
-    manifest["knowledge_bases"][folder_name] = entry
-    save_manifest(manifest)
-    return entry
+    save_kb_manifest(name, manifest)
+    return {"name": name, **manifest}
 
 
-def unregister_kb(folder_name: str) -> None:
-    """从 manifest 注销知识库"""
-    manifest = load_manifest()
-    manifest["knowledge_bases"].pop(folder_name, None)
-    save_manifest(manifest)
+def delete_kb(name: str) -> None:
+    """删除知识库（整个文件夹）"""
+    kb_dir = os.path.join(KNOWLEDGE_LIB_DIR, name)
+    if os.path.exists(kb_dir):
+        shutil.rmtree(kb_dir)
 
 
-def list_kbs() -> list[dict]:
-    """列出所有已注册知识库"""
-    manifest = load_manifest()
-    return [
-        {"name": name, **info}
-        for name, info in manifest["knowledge_bases"].items()
-    ]
-
-
-def get_kb(folder_name: str) -> Optional[dict]:
-    """获取单个知识库信息"""
-    manifest = load_manifest()
-    return manifest["knowledge_bases"].get(folder_name)
-
-
-def ensure_manifest_for_existing_kb(folder_name: str) -> dict:
-    """确保现有知识库（knowledge/agent_knowledge）在 manifest 中注册。
-    如果已注册直接返回，否则自动注册。"""
-    existing = get_kb(folder_name)
+def ensure_manifest_for_existing_kb(name: str) -> dict:
+    """确保现有知识库有 _manifest.json。如果已有直接返回，否则自动创建。"""
+    existing = load_kb_manifest(name)
     if existing:
         return existing
 
-    # 已有的两个知识库保持原有 TDB 路径
     defaults = {
         "knowledge": {
             "tdb_path": "data/vectors/api/knowledge.tdb",
@@ -85,9 +97,9 @@ def ensure_manifest_for_existing_kb(folder_name: str) -> dict:
             "sentence_path": None,
         },
     }
-    info = defaults.get(folder_name, {
-        "tdb_path": f"data/vectors/api/kb_{folder_name}.tdb",
-        "graph_path": f"data/graphs/kb_{folder_name}.tdb",
-        "sentence_path": f"data/vectors/local/knowledge_sentences_{folder_name}.tdb",
+    info = defaults.get(name, {
+        "tdb_path": f"data/vectors/api/kb_{name}.tdb",
+        "graph_path": f"data/graphs/kb_{name}.tdb",
+        "sentence_path": f"data/vectors/local/knowledge_sentences_{name}.tdb",
     })
-    return register_kb(folder_name, **info)
+    return create_kb(name, **info)
