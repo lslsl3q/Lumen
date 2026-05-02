@@ -9,6 +9,12 @@ from typing import Optional, List, Dict
 from typing import TypedDict
 
 
+class ThinkingConfig(BaseModel):
+    """思考链配置 — 控制模型的推理深度"""
+    enabled: bool = False
+    budget_tokens: int = 1024       # 思考 token 预算（256 ~ 32000）
+
+
 class CharacterCard(BaseModel):
     """角色卡片 — 从 JSON 文件加载时校验"""
     name: str
@@ -37,6 +43,10 @@ class CharacterCard(BaseModel):
     skills: List[str] = []                   # 绑定的 Skill ID 列表
     # 回复风格
     response_style: Optional[str] = "balanced"  # brief / balanced / detailed
+    # 知识库访问权限
+    accessible_knowledge: List[str] = []  # ["public", "char_alice", "shared"]
+    # 思考链
+    thinking: Optional[ThinkingConfig] = None
 
 
 class DynamicContext(TypedDict):

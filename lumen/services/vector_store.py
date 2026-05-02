@@ -6,6 +6,7 @@ Lumen - 向量存储
 维度从嵌入服务动态获取，不再硬编码。
 """
 
+import json
 import logging
 import os
 from typing import Optional
@@ -23,6 +24,9 @@ _db: Optional[triviumdb.TriviumDB] = None
 
 _DIM_FILE = _DB_PATH + ".dim"
 
+# v0.6.0 需要建索引的 Payload 字段
+_INDEX_FIELDS = ["character_id", "session_id", "owner_id", "type", "status"]
+
 
 def _get_db() -> triviumdb.TriviumDB:
     """获取 TriviumDB 实例（单例）"""
@@ -39,6 +43,14 @@ def _get_db() -> triviumdb.TriviumDB:
 
         _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
         _save_dim_file(_DB_PATH, dim)
+
+        # v0.6.0 属性二级索引：O(1) 等值过滤
+        for field in _INDEX_FIELDS:
+            try:
+                _db.create_index(field)
+            except Exception:
+                pass  # 索引已存在则跳过
+
         logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
     return _db
 
@@ -80,6 +92,8 @@ def insert_vector(
             "character_id": character_id,
             "message_id": message_id,
             "created_at": created_at,
+            "source": "chat",
+            "category": "message",
         },
     )
     return node_id
@@ -139,29 +153,19 @@ def search_similar(
 
 
 def delete_by_session(session_id: str) -> int:
-    """删除指定会话的所有向量，返回删除数量"""
+    """用 TQL 按 session_id 批量删除向量，返回删除数量"""
     db = _get_db()
-    nodes = db.filter_where({"session_id": session_id})
-    count = 0
-    for node in nodes:
-        db.delete(node.id)
-        count += 1
-    if count:
-        db.flush()
-    return count
+    result = db.tql_mut(f'MATCH (a {{session_id: {json.dumps(session_id)}}}) DETACH DELETE a')
+    db.flush()
+    return result.get("affected", 0) if isinstance(result, dict) else 0
 
 
 def delete_by_character(character_id: str) -> int:
-    """删除指定角色的所有向量，返回删除数量"""
+    """用 TQL 按 character_id 批量删除向量，返回删除数量"""
     db = _get_db()
-    nodes = db.filter_where({"character_id": character_id})
-    count = 0
-    for node in nodes:
-        db.delete(node.id)
-        count += 1
-    if count:
-        db.flush()
-    return count
+    result = db.tql_mut(f'MATCH (a {{character_id: {json.dumps(character_id)}}}) DETACH DELETE a')
+    db.flush()
+    return result.get("affected", 0) if isinstance(result, dict) else 0
 
 
 def prf_refine(query_vector: list[float], search_hits: list[dict],

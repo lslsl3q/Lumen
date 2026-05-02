@@ -85,12 +85,7 @@ def _collect_custom_variables() -> Dict[str, str]:
     从配置文件加载用户自己定义的变量
     未来实现：从 config API 或 JSON 文件读取
     """
-    # TODO: 从配置存储加载用户自定义变量
-    # 示例格式：
-    # {
-    #   "user_name": "小明",
-    #   "favorite_color": "蓝色"
-    # }
+    # RESERVED: 从配置存储加载用户自定义模板变量
     return {}
 
 

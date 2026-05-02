@@ -126,3 +126,53 @@ export async function getNeighbors(
   if (!res.ok) throw new Error(`邻居查询失败: ${res.statusText}`);
   return res.json();
 }
+
+// ── 图谱重抽 ──
+
+export interface ReExtractResult {
+  success: boolean;
+  files_processed: number;
+  total_files: number;
+  total_entities: number;
+  total_edges: number;
+  errors: string[];
+}
+
+export async function reExtractGraph(
+  tdb: string,
+  sourcePath = '',
+): Promise<ReExtractResult> {
+  const res = await fetch(`${API_BASE_URL}/graph/${tdb}/re-extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_path: sourcePath }),
+  });
+  if (!res.ok) throw new Error(`图谱重抽失败: ${res.statusText}`);
+  return res.json();
+}
+
+// ── 图谱提示词 ──
+
+const CONFIG_BASE_URL = 'http://127.0.0.1:8888/config';
+
+export interface GraphPrompt {
+  system_prompt: string;
+  user_template: string;
+  raw_content: string;
+}
+
+export async function getGraphPrompt(): Promise<GraphPrompt> {
+  const res = await fetch(`${CONFIG_BASE_URL}/graph-prompt`);
+  if (!res.ok) throw new Error(`读取图谱提示词失败: ${res.statusText}`);
+  return res.json();
+}
+
+export async function updateGraphPrompt(content: string): Promise<{ message: string }> {
+  const res = await fetch(`${CONFIG_BASE_URL}/graph-prompt`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(`保存图谱提示词失败: ${res.statusText}`);
+  return res.json();
+}

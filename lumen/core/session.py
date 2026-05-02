@@ -1,6 +1,9 @@
 """
 会话管理器 - 替代全局状态
 每个会话是一个独立实例，支持多会话并发
+
+T24 注意：system prompt 由 Agent + Components 动态构建，
+messages[0] 只是占位（角色名），不在初始化时拼装完整 prompt。
 """
 
 from typing import List, Dict, Any, Optional
@@ -27,48 +30,32 @@ class ChatSession:
         else:
             self._initialize_existing()
 
+    def _make_placeholder(self) -> str:
+        """生成占位 system prompt（Agent 在每次 act() 时会用 Components 重建）"""
+        from lumen.prompt.character import load_character
+        character = load_character(self.character_id)
+        name = character.get("name", "AI")
+        return f"[system: {name}]"
+
     def _initialize_new(self):
         """初始化新会话"""
-        from lumen.prompt.character import load_character
-        from lumen.prompt.builder import build_system_prompt
-        from lumen.services import memory, history
-        character = load_character(self.character_id)
+        from lumen.services import history
 
-        # 构建系统提示词
-        memory_text = memory.get_memory_context(self.character_id)
+        placeholder = self._make_placeholder()
 
-        dynamic_context = []
-        if memory_text:
-            dynamic_context.append({"content": memory_text, "injection_point": "system"})
-
-        system_prompt = build_system_prompt(character, dynamic_context or None)
-
-        # 创建数据库会话
         self.session_id = history.new_session(self.character_id)
 
-        # 初始化消息
-        self.messages = [{"role": "system", "content": system_prompt}]
-        history.save_message(self.session_id, "system", system_prompt)
+        self.messages = [{"role": "system", "content": placeholder}]
+        history.save_message(self.session_id, "system", placeholder)
 
     def _initialize_existing(self):
         """加载已有会话"""
-        from lumen.prompt.character import load_character
-        from lumen.prompt.builder import build_system_prompt
-        from lumen.services import memory, history
-        character = load_character(self.character_id)
+        from lumen.services import history
 
-        # 构建系统提示词（包含记忆）
-        memory_text = memory.get_memory_context(self.character_id)
+        placeholder = self._make_placeholder()
 
-        dynamic_context = []
-        if memory_text:
-            dynamic_context.append({"content": memory_text, "injection_point": "system"})
-
-        system_prompt = build_system_prompt(character, dynamic_context or None)
-
-        # 加载历史消息
         old_messages = history.load_session(self.session_id)
-        self.messages = [{"role": "system", "content": system_prompt}] + old_messages
+        self.messages = [{"role": "system", "content": placeholder}] + old_messages
 
     def reset(self):
         """清空历史，用当前角色创建新会话"""
@@ -79,23 +66,12 @@ class ChatSession:
         self._initialize_new()
 
     def reload_system_prompt(self):
-        """重载系统提示词（Persona 切换后调用）
+        """重载系统提示词占位（Persona 切换后调用）
 
-        只替换 messages[0]（system 消息），不丢失聊天历史
+        只替换 messages[0]（system 消息），不丢失聊天历史。
+        实际 system prompt 由 Agent + Components 在每次 act() 时动态构建。
         """
-        from lumen.prompt.character import load_character
-        from lumen.prompt.builder import build_system_prompt
-        from lumen.services import memory
-
-        character = load_character(self.character_id)
-        memory_text = memory.get_memory_context(self.character_id)
-
-        dynamic_context = []
-        if memory_text:
-            dynamic_context.append({"content": memory_text, "injection_point": "system"})
-
-        system_prompt = build_system_prompt(character, dynamic_context or None)
-        self.messages[0] = {"role": "system", "content": system_prompt}
+        self.messages[0] = {"role": "system", "content": self._make_placeholder()}
 
 
 class SessionManager:

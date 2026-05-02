@@ -205,7 +205,7 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
               <textarea
                 value={currentDraft}
                 onChange={e => handleEdit(e.target.value)}
-                className="flex-1 w-full bg-[#141413] border border-[#2a2926] rounded-lg
+                className="flex-1 w-full bg-[#1C1B19] border border-[#2a2926] rounded-lg
                   p-4 text-sm text-slate-300 leading-relaxed
                   resize-none outline-none
                   focus:border-[#CC7C5E]/20 transition-colors

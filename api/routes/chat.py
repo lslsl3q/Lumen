@@ -12,7 +12,8 @@ router = APIRouter()
 
 # 导入核心逻辑
 from lumen.core.session import get_session_manager, ChatSession
-from lumen.query import chat_stream, request_cancel
+from lumen.agent_chat import agent_chat_stream
+from lumen.components.react_acting import request_cancel
 
 
 # ========================================
@@ -62,7 +63,7 @@ async def send_message(req: ChatRequest) -> ChatResponse:
         session = manager.get_or_create(req.session_id or "default")
 
         reply_parts = []
-        async for event in chat_stream(req.message, session, memory_debug=False):
+        async for event in agent_chat_stream(req.message, session, memory_debug=False):
             if event.get("type") == "text":
                 reply_parts.append(event["content"])
 
@@ -105,13 +106,13 @@ async def stream_chat(req: StreamRequest):
     async def generate():
         """生成 SSE 事件流（chat_stream 本身已是异步生成器，无需线程池翻译）"""
         try:
-            async for event in chat_stream(req.message, session, memory_debug=req.memory_debug, response_style=req.response_style):
+            async for event in agent_chat_stream(req.message, session, memory_debug=req.memory_debug, response_style=req.response_style):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
         finally:
             # 清理可能残留的取消标志，防止下次对话被误判为已取消
-            from lumen.query import _clear_cancel
+            from lumen.components.react_acting import _clear_cancel
             _clear_cancel(session.session_id)
 
         # SSE 连接关闭信号
@@ -128,21 +129,21 @@ async def stream_chat(req: StreamRequest):
 
 
 def _is_tool_message(msg: dict) -> bool:
-    """判断是否为工具调用/结果消息（不应展示给用户）"""
+    """判断是否为工具调用/结果/系统反馈消息（不应展示给用户）"""
+    # metadata 驱动：统一过滤所有内部消息
+    meta = msg.get("metadata")
+    if isinstance(meta, dict) and meta.get("type") in (
+        "tool_result", "tool_result_parallel", "system_feedback",
+    ):
+        return True
     content = msg.get("content", "").strip()
     if msg.get("role") == "assistant":
         if 'type": "tool_call' in content or 'type":"tool_call' in content:
             return True
     if msg.get("role") == "user":
-        # 新格式：XML 包裹的工具结果
         if content.startswith('<tool_result'):
             return True
-        # 旧格式：JSON
         if content.startswith('{"success"') or content.startswith('{"error_code"'):
-            return True
-        # metadata 标记的工具结果
-        meta = msg.get("metadata")
-        if isinstance(meta, dict) and meta.get("type") in ("tool_result", "tool_result_parallel"):
             return True
     return False
 
@@ -175,7 +176,12 @@ async def get_history(session_id: str = "default"):
 
         # 过滤掉系统提示词和工具调用消息，只返回用户和助手的对话
         result = [
-            {"id": msg.get("id"), "role": msg["role"], "content": msg["content"]}
+            {
+                "id": msg.get("id"),
+                "role": msg["role"],
+                "content": msg["content"],
+                "hidden": False,
+            }
             for msg in messages
             if msg["role"] in ("user", "assistant") and not _is_tool_message(msg)
         ]

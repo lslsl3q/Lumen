@@ -3,6 +3,18 @@
  */
 const API_BASE_URL = 'http://127.0.0.1:8888';
 
+export interface TdbInfo {
+  name: string;
+  filename: string | null;
+  size: number;
+}
+
+export async function listTdbs(): Promise<{ tdbs: TdbInfo[] }> {
+  const res = await fetch(`${API_BASE_URL}/config/tdbs`);
+  if (!res.ok) throw new Error(`获取 TDB 列表失败: ${res.status}`);
+  return res.json();
+}
+
 export interface TdbEntry {
   id: number | null;
   content: string;
@@ -76,17 +88,6 @@ export async function updateTdbEntry(
   return res.json();
 }
 
-export async function deleteTdbEntry(
-  name: string,
-  entryId: number,
-): Promise<{ id: number; deleted: boolean }> {
-  const res = await fetch(`${API_BASE_URL}/tdb/${name}/entries/${entryId}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error(`删除失败: ${res.status}`);
-  return res.json();
-}
-
 export interface TdbFileFolder {
   name: string;
   path: string;
@@ -105,7 +106,7 @@ export async function getTdbFileTree(name: string): Promise<{
 export async function importTdbFile(
   name: string,
   path: string,
-): Promise<{ success: boolean; file_id: string; chunks: number }> {
+): Promise<{ success: boolean; file_id: string; chunks: number; reimported?: boolean }> {
   const res = await fetch(`${API_BASE_URL}/tdb/${name}/import-file`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

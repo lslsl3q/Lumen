@@ -86,53 +86,6 @@ async def list_configs():
 
 
 # ========================================
-# 缓冲区运行时配置
-# ========================================
-
-class BufferSettingsRequest(BaseModel):
-    buffer_enabled: bool | None = None
-    buffer_auto_cleanup: bool | None = None
-    buffer_auto_consolidate_threshold: int | None = None
-    buffer_consolidation_model: str | None = None
-
-
-class BufferToggleRequest(BaseModel):
-    enabled: bool
-
-
-@router.get("/buffer")
-async def get_buffer_settings():
-    """获取缓冲区运行时设置"""
-    from lumen.services.runtime_config import get_all
-    from lumen.services.buffer import get_stats
-
-    settings = get_all()
-    stats = get_stats()
-    return {"settings": settings, "stats": stats}
-
-
-@router.post("/buffer")
-async def update_buffer_settings(req: BufferSettingsRequest):
-    """更新缓冲区运行时设置"""
-    from lumen.services.runtime_config import update_many
-
-    updates = {k: v for k, v in req.model_dump().items() if v is not None}
-    if not updates:
-        return {"message": "无更新"}
-    update_many(updates)
-    return {"message": f"已更新: {list(updates.keys())}"}
-
-
-@router.post("/buffer/toggle")
-async def toggle_buffer(req: BufferToggleRequest):
-    """切换缓冲区开关"""
-    from lumen.services.runtime_config import set as rc_set
-
-    rc_set("buffer_enabled", req.enabled)
-    return {"message": f"缓冲区已{'开启' if req.enabled else '关闭'}", "enabled": req.enabled}
-
-
-# ========================================
 # TDB 列表（编辑器用）
 # ========================================
 
@@ -165,7 +118,7 @@ async def list_tdbs():
             })
 
     # 兜底：核心 TDB 即使文件未创建也要显示
-    _ALWAYS_SHOW = ["knowledge", "memory", "buffer", "daily_note"]
+    _ALWAYS_SHOW = ["knowledge", "memory"]
     existing_names = {t["name"] for t in tdbs}
     for name in _ALWAYS_SHOW:
         if name not in existing_names:
@@ -241,11 +194,107 @@ async def update_config(resource: str, req: ConfigUpdateRequest):
 
     filepath = _RESOURCE_FILES[resource]
 
+    # ── 嵌入模型变更检测（.env 保存时）──
+    rebuild_warning = None
+    if resource == "env":
+        # 解析新旧 .env 中的嵌入相关键
+        def _parse_env(text: str) -> dict:
+            result = {}
+            for line in text.split("\n"):
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    result[k.strip()] = v.strip()
+            return result
+
+        old_env = {}
+        if os.path.exists(filepath):
+            with open(filepath, "r", encoding="utf-8") as f:
+                old_env = _parse_env(f.read())
+        new_env = _parse_env(req.content)
+
+        EMBED_KEYS = [
+            "EMBEDDING_MODEL",
+            "EMBEDDING_LOCAL_MODEL",
+            "EMBEDDING_API_MODEL",
+            "KNOWLEDGE_EMBEDDING_API_MODEL",
+        ]
+        changed = [k for k in EMBED_KEYS
+                   if old_env.get(k) != new_env.get(k)]
+
+        if changed:
+            rebuild_warning = (
+                f"嵌入模型配置已变更（{', '.join(changed)}）。"
+                "向量维度可能不匹配，请重启后端后重新导入知识库文件以重建向量。"
+            )
+
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(req.content)
 
-        return {"message": f"已更新配置: {resource}"}
+        result = {"message": f"已更新配置: {resource}"}
+        if rebuild_warning:
+            result["rebuild_warning"] = rebuild_warning
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存配置失败: {str(e)}")
+
+
+# ========================================
+# 图谱抽取提示词
+# ========================================
+
+@router.get("/graph-prompt")
+async def get_graph_prompt():
+    """读取图谱抽取提示词文件"""
+    from lumen.prompt.graph_extract import get_prompt_file_path, load_prompts
+
+    filepath = get_prompt_file_path()
+    system_prompt, user_template = load_prompts()
+
+    # 尝试读取原始文件内容
+    raw_content = ""
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            raw_content = f.read()
+    except Exception:
+        pass
+
+    return {
+        "system_prompt": system_prompt,
+        "user_template": user_template,
+        "file_path": filepath,
+        "raw_content": raw_content,
+    }
+
+
+class GraphPromptUpdate(BaseModel):
+    content: str
+
+
+@router.put("/graph-prompt")
+async def update_graph_prompt(req: GraphPromptUpdate):
+    """更新图谱抽取提示词文件（直接写 markdown 文件）"""
+    from lumen.prompt.graph_extract import get_prompt_file_path, _parse_prompt_file
+
+    filepath = get_prompt_file_path()
+
+    # 验证内容可以解析
+    system_prompt, user_template = _parse_prompt_file(req.content)
+    if not system_prompt or not user_template:
+        raise HTTPException(400, "提示词格式错误：需要包含 '## 系统提示词' 和 '## 用户提示词模板' 两个段落")
+
+    # 用户提示词模板必须包含 {content} 占位符
+    if "{content}" not in user_template:
+        raise HTTPException(400, "用户提示词模板必须包含 {content} 占位符")
+
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(req.content)
+        return {"message": "图谱提示词已更新，下次抽取时生效"}
+    except Exception as e:
+        raise HTTPException(500, f"保存提示词失败: {str(e)}")

@@ -18,12 +18,7 @@ _CONFIG_PATH = os.path.join(_DATA_DIR, "runtime_config.json")
 _lock = threading.Lock()
 _cache: dict | None = None
 
-_DEFAULTS = {
-    "buffer_enabled": False,
-    "buffer_auto_cleanup": False,
-    "buffer_auto_consolidate_threshold": 20,
-    "buffer_consolidation_model": "",
-}
+_DEFAULTS = {}
 
 
 def _load() -> dict:

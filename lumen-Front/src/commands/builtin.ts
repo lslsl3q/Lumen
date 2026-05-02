@@ -48,16 +48,6 @@ registerCommand({
   },
 });
 
-// /medebug — 开启/关闭 Token 监控面板
-registerCommand({
-  name: 'medebug',
-  description: '开启/关闭 Token 监控面板',
-  usage: '/medebug',
-  execute: async () => {
-    return { success: true, message: 'toggle_memory_debug' };
-  },
-});
-
 // /help — 列出所有命令
 registerCommand({
   name: 'help',

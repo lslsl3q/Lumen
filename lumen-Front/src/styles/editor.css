@@ -76,7 +76,7 @@
 
 /* 代码块 */
 .rich-text-editor-prosemirror pre {
-  background: #141413;
+  background: #1C1B19;
   border: 1px solid rgba(204, 124, 94, 0.1);
   border-radius: 8px;
   padding: 0.75rem 1rem;
@@ -152,7 +152,7 @@
   height: 14px;
   border: 1.5px solid #4a4540;
   border-radius: 3px;
-  background: #141413;
+  background: #1C1B19;
   cursor: pointer;
   position: relative;
 }
@@ -169,7 +169,7 @@
   top: 0.5px;
   width: 5px;
   height: 8px;
-  border: solid #141413;
+  border: solid #1C1B19;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

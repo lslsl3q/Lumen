@@ -89,5 +89,13 @@ class ReactTraceStep(TypedDict, total=False):
     exit_reason: str   # 结束原因（action=response 时）
 
 
+class RpgStateEvent(TypedDict, total=False):
+    """RPG 世界状态快照事件 — SSE 流末尾附带，前端据此更新血条/位置"""
+    type: str          # "rpg_state"
+    room_id: str
+    room_name: str
+    entities: list     # list[{id, name, hp, max_hp}]
+
+
 # chat_stream 的 yield 类型
-SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEvent, MemoryDebugEvent, ReactTraceStep]
+SSEEvent = Union[TextEvent, DoneEvent, ToolStartEvent, ToolResultEvent, StatusEvent, MemoryDebugEvent, ReactTraceStep, RpgStateEvent]

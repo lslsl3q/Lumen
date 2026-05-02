@@ -1,23 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,500;12..96,700&display=swap');
 @import "tailwindcss";
 @import "./editor.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* ---break---
+ */
+@custom-variant dark (&:is(.dark *));  /* 保留但无用，暗色主题默认即暗 */
 
 /* === Tailwind CSS v4 主题配置 ===
  * 使用 @theme 指令定义自定义设计令牌
  */
 @theme {
-  /* === 自定义颜色扩展 — 暖灰色调（slate 覆盖） === */
+  /* === 自定义颜色扩展 — 暖灰色调（slate 覆盖，温和提亮版） === */
   --color-slate-50: #FAFAF8;
   --color-slate-100: #F3F3F0;
-  --color-slate-200: #E8E7E3;
-  --color-slate-300: #D1D0CC;
-  --color-slate-400: #ABA499;
-  --color-slate-500: #8A8478;
-  --color-slate-600: #6A655C;
-  --color-slate-700: #4A4744;
-  --color-slate-800: #333230;
-  --color-slate-900: #1F1F1E;
-  --color-slate-950: #141413;
+  --color-slate-200: #EBEAE6;
+  --color-slate-300: #D4D3CF;
+  --color-slate-400: #B5AFA5;
+  --color-slate-500: #948E84;
+  --color-slate-600: #757068;
+  --color-slate-700: #4C4A47;
+  --color-slate-800: #363432;
+  --color-slate-900: #262422;
+  --color-slate-950: #1C1B19;
 
   /* === 自定义颜色扩展 — 琥珀色阶（amber 覆盖） === */
   --color-amber-50: #FEF6F2;
@@ -84,25 +89,59 @@
   --color-error: #ef4444;           /* red-500 */
   --color-error-light: #f87171;     /* red-400 */
 
-  /* 背景色 — 暖灰系列 */
-  --color-bg-deep: #141413;         /* slate-950 */
-  --color-bg-base: #1F1F1E;         /* slate-900 */
-  --color-bg-surface: #333230;      /* slate-800 */
-  --color-bg-elevated: #4A4744;     /* slate-700 */
+  /* 背景色 — 暖灰系列（温和提亮版） */
+  --color-bg-deep: #1C1B19;         /* ~11% 亮度，从 #141413 提亮 */
+  --color-bg-base: #262422;         /* ~15% 亮度，从 #1F1F1E 提亮 */
+  --color-bg-surface: #363432;      /* ~21% 亮度，从 #333230 微调 */
+  --color-bg-elevated: #4C4A47;     /* ~30% 亮度，从 #4A4744 微调 */
 
-  /* 文字色 */
-  --color-text-primary: #E8E7E3;    /* slate-200 */
-  --color-text-secondary: #ABA499;  /* slate-400 */
-  --color-text-muted: #8A8478;      /* slate-500 */
-  --color-text-dim: #6A655C;        /* slate-600 */
+  /* 文字色 — 次要文字微调，提升可读性 */
+  --color-text-primary: #EBEAE6;    /* 从 #E8E7E3 微亮 */
+  --color-text-secondary: #B5AFA5;  /* 从 #ABA499 微亮 */
+  --color-text-muted: #948E84;      /* 从 #8A8478 微亮 */
+  --color-text-dim: #757068;        /* 从 #6A655C 微亮 */
 
-  /* 边框 */
-  --color-border: rgba(74, 71, 68, 0.6);      /* slate-700/60 */
-  --color-border-subtle: rgba(74, 71, 68, 0.4); /* slate-700/40 */
+  /* 边框 — 随背景提亮调整 */
+  --color-border: rgba(76, 74, 71, 0.6);
+  --color-border-subtle: rgba(76, 74, 71, 0.4);
 
   /* 发光效果 — 暖棕 accent */
   --glow-primary: rgba(204, 124, 94, 0.15);
   --glow-subtle: rgba(204, 124, 94, 0.08);
+
+  /* === Shadcn 语义变量 — 暗色主题（映射到 Lumen 设计令牌） === */
+  --background: #1C1B19;                          /* bg-deep */
+  --foreground: #EBEAE6;                          /* text-primary */
+  --card: #262422;                                /* bg-base */
+  --card-foreground: #EBEAE6;
+  --popover: #262422;
+  --popover-foreground: #EBEAE6;
+  --primary: #CC7C5E;                             /* amber-400 */
+  --primary-foreground: #1C1B19;
+  --secondary: #363432;                           /* bg-surface */
+  --secondary-foreground: #EBEAE6;
+  --muted: #363432;
+  --muted-foreground: #B5AFA5;
+  --accent: #363432;
+  --accent-foreground: #EBEAE6;
+  --destructive: #ef4444;
+  --border: rgba(76, 74, 71, 0.6);
+  --input: rgba(76, 74, 71, 0.6);
+  --ring: #CC7C5E;
+  --chart-1: #CC7C5E;
+  --chart-2: #B5AFA5;
+  --chart-3: #757068;
+  --chart-4: #4C4A47;
+  --chart-5: #363432;
+  --radius: 0.625rem;
+  --sidebar: #262422;
+  --sidebar-foreground: #EBEAE6;
+  --sidebar-primary: #CC7C5E;
+  --sidebar-primary-foreground: #1C1B19;
+  --sidebar-accent: #363432;
+  --sidebar-accent-foreground: #EBEAE6;
+  --sidebar-border: rgba(76, 74, 71, 0.4);
+  --sidebar-ring: #CC7C5E;
 }
 
 /* === 自定义动画 === */
@@ -157,6 +196,15 @@
   animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* FloatingWindow float 模式入场 */
+@keyframes float-in {
+  from { opacity: 0; transform: translateX(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+.animate-float-in {
+  animation: float-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* === 硅胶质感工具类（Soft UI / Neumorphism） ===
  *
  * 原理：双层阴影（暗影 + 亮边）+ 顶部高光 + 按压内凹
@@ -196,4 +244,86 @@
     inset -1px -1px 3px rgba(55, 53, 50, 0.12);
   transform: translateY(1px);
   border-color: rgba(0, 0, 0, 0.15);
+}
+/* ---break---
+ */
+@theme inline {
+  --font-heading: var(--font-display);
+  --font-sans: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+/* ---break---
+ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    /* 全局滚动条：细圆条，无箭头 */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(138, 132, 120, 0.2) transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  /* Webkit 细圆条（覆盖原生箭头样式） */
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(138, 132, 120, 0.15);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 132, 120, 0.3);
+  }
+  *::-webkit-scrollbar-thumb:active {
+    background: rgba(138, 132, 120, 0.4);
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }

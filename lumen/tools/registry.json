@@ -214,5 +214,69 @@
       },
       "required": ["content"]
     }
+  },
+  "dice": {
+    "description": "掷骰子，支持标准骰子表达式",
+    "usage_guide": "需要随机决定结果时使用。格式: NdS[+M]，如 2d6+3 掷2个6面骰加3，1d20 掷1个20面骰。",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "expression": { "type": "string", "description": "骰子表达式，如 1d20, 2d6+3, 3d8-1，默认 1d20" }
+      },
+      "required": []
+    }
+  },
+  "rpg": {
+    "description": "RPG 游戏动作工具：移动、检定、战斗",
+    "usage_guide": "RPG 跑团专用。move_to 移动到新房间，roll_check 进行属性检定，resolve_attack 执行攻击判定。",
+    "commands": {
+      "move_to": {
+        "description": "移动到指定房间（自动离开旧房间、加入新房间）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "agent_id": { "type": "string", "description": "移动的 Agent ID（默认为当前角色）" },
+            "room_id": { "type": "string", "description": "目标房间 ID" }
+          },
+          "required": ["room_id"]
+        }
+      },
+      "roll_check": {
+        "description": "属性检定：掷 1d20 + 属性修正 vs 难度等级",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "agent_id": { "type": "string", "description": "检定的 Agent ID（默认为当前角色）" },
+            "attribute": { "type": "string", "description": "属性名（str/dex/con/int/wis/cha），默认 str" },
+            "difficulty": { "type": "integer", "description": "难度等级 DC，默认 10" }
+          },
+          "required": []
+        }
+      },
+      "resolve_attack": {
+        "description": "战斗判定：攻击掷骰 → 命中 → 伤害 → HP 更新",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "attacker_id": { "type": "string", "description": "攻击者 ID（默认为当前角色）" },
+            "target_id": { "type": "string", "description": "目标 ID 或名字" },
+            "attack_attr": { "type": "string", "description": "攻击属性（默认 str）" },
+            "defense_attr": { "type": "string", "description": "防御属性（默认 dex）" },
+            "damage_dice": { "type": "string", "description": "伤害骰子表达式（默认 1d6）" }
+          },
+          "required": ["target_id"]
+        }
+      },
+      "look": {
+        "description": "查看当前房间：描述 + 实体列表",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "agent_id": { "type": "string", "description": "查看者 ID（默认为当前角色）" }
+          },
+          "required": []
+        }
+      }
+    }
   }
 }

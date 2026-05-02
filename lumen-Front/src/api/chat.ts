@@ -46,7 +46,7 @@ export async function sendMessage(message: string): Promise<ChatResponse> {
  * SSE 事件类型
  */
 export interface StreamEvent {
-  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'done' | 'error' | 'msg_saved';
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'rpg_state' | 'done' | 'error' | 'msg_saved';
   content?: string;
   status?: string;
   message?: string;
@@ -72,6 +72,10 @@ export interface StreamEvent {
     source: string;
     results: number;
     tokens: number;
+    method?: string;
+    vector_count?: number;
+    sparse_count?: number;
+    graph_count?: number;
     messages: { role: string; content: string; session_id: string; created_at: string }[];
   }[];
   // react_trace 事件字段
@@ -79,6 +83,10 @@ export interface StreamEvent {
   action?: 'thinking' | 'tool_call' | 'tool_result' | 'response' | 'error' | 'cancelled';
   duration_ms?: number;
   thinking?: string;
+  // rpg_state 事件字段
+  room_id?: string;
+  room_name?: string;
+  entities?: { id: string; name: string; hp: number; max_hp: number }[];
 }
 
 /**

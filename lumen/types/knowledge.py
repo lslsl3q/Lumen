@@ -14,7 +14,11 @@ class KnowledgeFileCard(BaseModel):
     category: str = Field(default="imports", description="分类: imports/notes/rpg/public")
     chunk_count: int = Field(default=0, description="切分后的 chunk 数量")
     char_count: int = Field(default=0, description="原始文件字符数")
-    tags: List[str] = Field(default_factory=list, description="标签（预留P2）")
+    access_list: List[str] = Field(default_factory=lambda: ["public"], description="访问控制列表")
+    owner_id: str = Field(default="", description="所属 Agent ID")
+    file_id: str = Field(default="", description="源文件追踪 ID")
+    # RESERVED: P2 标签系统 — 知识库条目分类标签
+    tags: List[str] = Field(default_factory=list)
     created_at: str = Field(default="", description="导入时间 ISO格式")
     updated_at: str = Field(default="", description="最后更新时间")
 

@@ -112,11 +112,38 @@ async def _async_store(content: str, character_id: str, session_id: str,
 
     # T19: 日记图谱抽取
     try:
-        from lumen.services.graph_extract import extract_and_store
+        from lumen.services.graph import extract_and_store
         await extract_and_store(
             content=content, tdb_name="knowledge",
             source_episode_id=note_id, owner_id=character_id,
         )
+    except Exception:
+        pass
+
+    # T22: 反射触发器 — 日记保存后自动送入反思管道
+    try:
+        from lumen.core.reflection import enqueue_reflection
+        from lumen.events.schema import ReflectionEvent, SourceType
+        event = ReflectionEvent(
+            source_type=SourceType.DIARY_ENTRY,
+            timestamp=time.time(),
+            content=content,
+            summary=content[:200],
+            session_id=session_id,
+            character_id=character_id,
+            source_id=note_id,
+            metadata={"category": category, "importance": importance, "tags": tags},
+        )
+        enqueue_reflection(event)
+    except Exception:
+        pass
+
+    # T22 Step 4: 通知深梦境调度器（日记积累计数）
+    try:
+        from lumen.core.dream import get_dream_scheduler
+        scheduler = get_dream_scheduler()
+        if scheduler:
+            scheduler.notify_diary_saved()
     except Exception:
         pass
 

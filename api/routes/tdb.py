@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_ALLOWED = {"knowledge", "memory", "buffer"}
+_ALLOWED = {"knowledge", "memory"}
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -28,13 +28,7 @@ def _get_tdb(name: str):
     if name not in _ALLOWED:
         raise HTTPException(404, f"未知 TDB: {name}，可用: {list(_ALLOWED)}")
 
-    if name == "buffer":
-        from lumen.services.buffer import _get_db
-        db = _get_db()
-        if not db:
-            raise HTTPException(400, "缓冲区未初始化")
-        return db
-    elif name == "knowledge":
+    if name == "knowledge":
         from lumen.services.knowledge import _get_db
         return _get_db()
     elif name == "memory":
@@ -173,10 +167,9 @@ async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
             payload["importance"] = body.importance
 
         # 内容变了且需要重向量化
-        if body.reindex and body.content is not None and name in ("knowledge", "buffer"):
-            service_map = {"knowledge": "knowledge", "buffer": "buffer"}
+        if body.reindex and body.content is not None and name == "knowledge":
             from lumen.services.embedding import get_service
-            backend = await get_service(service_map.get(name, name))
+            backend = await get_service("knowledge")
             if backend:
                 new_vector = await backend.encode(body.content)
                 if new_vector:
@@ -214,23 +207,6 @@ async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
         raise
     except Exception as e:
         raise HTTPException(500, f"更新条目失败: {e}")
-
-
-@router.delete("/{name}/entries/{entry_id}")
-async def delete_entry(name: str, entry_id: int):
-    """删除 TDB 条目"""
-    db = _get_tdb(name)
-    try:
-        node = db.get(entry_id)
-        if not node:
-            raise HTTPException(404, f"条目不存在: {entry_id}")
-        db.delete(entry_id)
-        db.flush()
-        return {"id": entry_id, "deleted": True}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"删除条目失败: {e}")
 
 
 @router.get("/{name}/file-tree")
@@ -321,22 +297,77 @@ async def import_file_from_disk(name: str, req: ImportFileRequest):
 
     # 调用 knowledge 导入
     if name == "knowledge":
-        # 去重检查：已有同 source_path 的条目则拒绝重复导入
-        db = _get_tdb(name)
-        for nid in db.all_node_ids():
-            try:
-                node = db.get(nid)
-            except Exception:
-                continue
-            if not node:
-                continue
-            payload = node.payload if hasattr(node, "payload") else {}
-            if payload.get("source_path", "").endswith(req.path) or payload.get("source_path") == req.path:
-                raise HTTPException(409, f"该文件已在向量库中，如需重新导入请先删除旧条目")
-
-        from lumen.services.knowledge import import_file
-        subdir = "/".join(parts[1:-1]) if len(parts) > 2 else ""
-        meta = await import_file(filename, content, category=category, subdir=subdir, source="manual")
-        return {"success": True, "file_id": meta.get("id"), "chunks": meta.get("chunk_count", 0)}
+        result = await _import_or_reimport(name, req.path, filename, content, category, parts)
+        return result
     else:
         raise HTTPException(400, f"TDB {name} 暂不支持文件导入")
+
+
+async def _import_or_reimport(
+    name: str,
+    req_path: str,
+    filename: str,
+    content: str,
+    category: str,
+    parts: list,
+):
+    """导入或重新导入：已存在则先清旧数据再重导（幂等）"""
+    db = _get_tdb(name)
+
+    # 查找已有的同 source_path 条目
+    old_file_ids = set()
+    old_node_ids = []
+    for nid in db.all_node_ids():
+        try:
+            node = db.get(nid)
+        except Exception:
+            continue
+        if not node:
+            continue
+        payload = node.payload if hasattr(node, "payload") else {}
+        sp = payload.get("source_path", "")
+        if sp.endswith(req_path) or sp == req_path:
+            old_node_ids.append(nid)
+            fid = payload.get("file_id", "")
+            if fid:
+                old_file_ids.add(fid)
+
+    # 清理旧 TDB chunks
+    for nid in old_node_ids:
+        try:
+            db.delete(nid)
+        except Exception:
+            pass
+    if old_node_ids:
+        db.flush()
+
+    # 清理旧 BM25 索引
+    for fid in old_file_ids:
+        try:
+            from lumen.services.history import delete_knowledge_chunks
+            delete_knowledge_chunks(fid)
+        except Exception:
+            pass
+
+    # 清理旧 registry 条目
+    if old_file_ids:
+        try:
+            from lumen.services.knowledge import _load_registry, _save_registry
+            registry = _load_registry()
+            for fid in old_file_ids:
+                registry.pop(fid, None)
+            _save_registry(registry)
+        except Exception:
+            pass
+
+    # 正式导入
+    from lumen.services.knowledge import import_file as knowledge_import
+    subdir = "/".join(parts[1:-1]) if len(parts) > 2 else ""
+    meta = await knowledge_import(filename, content, category=category, subdir=subdir, source="manual")
+
+    return {
+        "success": True,
+        "file_id": meta.get("id"),
+        "chunks": meta.get("chunk_count", 0),
+        "reimported": bool(old_file_ids),
+    }

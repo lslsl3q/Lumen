@@ -29,7 +29,7 @@ export async function getConfig(resource: string): Promise<ConfigDetail> {
 export async function updateConfig(
   resource: string,
   payload: ConfigUpdatePayload,
-): Promise<{ message: string }> {
+): Promise<{ message: string; rebuild_warning?: string }> {
   const res = await fetch(`${API_BASE_URL}/config/${encodeURIComponent(resource)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

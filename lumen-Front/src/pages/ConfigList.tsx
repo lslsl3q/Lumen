@@ -117,7 +117,7 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
               <h3 className="text-sm text-slate-500 mb-4">其他功能</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
-                  onClick={() => goTo('knowledge-list')}
+                  onClick={() => window.dispatchEvent(new CustomEvent('lumen:open-knowledge'))}
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-slate-900/60 border border-slate-800/40

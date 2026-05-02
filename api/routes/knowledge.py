@@ -110,7 +110,7 @@ async def api_delete_file(file_id: str):
 @router.get("/scan")
 async def scan_knowledge():
     """扫描所有知识库，返回变更（新增/修改/删除的文件）"""
-    from lumen.services.knowledge_scanner import scan_knowledge_lib
+    from lumen.services.knowledge import scan_knowledge_lib
 
     return scan_knowledge_lib()
 
@@ -120,7 +120,7 @@ async def apply_scan_changes(changes: dict):
     """确认处理扫描变更。
     Body: {"register_kbs": ["跑团世界"], "reindex": ["file_id_1", "file_id_2"], "delete": ["file_id_3"]}
     """
-    from lumen.services.manifest import ensure_manifest_for_existing_kb
+    from lumen.services.knowledge import ensure_manifest_for_existing_kb
 
     results = {"registered": [], "reindexed": [], "deleted": []}
 
@@ -145,7 +145,7 @@ async def apply_scan_changes(changes: dict):
 @router.get("/bases")
 async def list_bases():
     """列出所有已注册的知识库"""
-    from lumen.services.manifest import list_kbs
+    from lumen.services.knowledge import list_kbs
 
     return {"bases": list_kbs()}
 
@@ -154,7 +154,7 @@ async def list_bases():
 async def create_base(body: dict):
     """创建新知识库"""
     from lumen.config import KNOWLEDGE_LIB_DIR
-    from lumen.services.manifest import create_kb
+    from lumen.services.knowledge import create_kb
 
     name = body.get("name", "").strip()
     if not name or name.startswith("_"):
@@ -176,7 +176,7 @@ async def create_base(body: dict):
 @router.delete("/bases/{name}")
 async def delete_base(name: str):
     """删除知识库（文件夹 + 注册信息）"""
-    from lumen.services.manifest import delete_kb, get_kb
+    from lumen.services.knowledge import delete_kb, get_kb
 
     if not get_kb(name):
         raise HTTPException(status_code=404, detail="知识库不存在")
@@ -188,8 +188,8 @@ async def delete_base(name: str):
 @router.post("/graph/sync")
 async def sync_graph(body: dict = None):
     """同步图谱：对脏文件执行图谱抽取"""
-    from lumen.services.knowledge_scanner import get_dirty_files, update_registry_entry
-    from lumen.services.graph_extract import extract_and_store
+    from lumen.services.knowledge import get_dirty_files, update_registry_entry
+    from lumen.services.graph import extract_and_store
     from lumen.config import KNOWLEDGE_LIB_DIR
     from lumen.services.knowledge import _read_file_content
 

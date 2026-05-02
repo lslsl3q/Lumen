@@ -171,7 +171,7 @@ async def _resolve_rag(name: str, query: str, top_k: int = 5, token_budget: int 
     )
 
 
-async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str, bool, set[str]]:
+async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str, bool, set[str], list[dict]]:
     """解析并替换文本中的所有知识库占位符
 
     Args:
@@ -180,11 +180,11 @@ async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str,
         token_budget: 总 token 预算（所有占位符共享）
 
     Returns:
-        (替换后的文本, 是否有占位符被解析, 已覆盖的 file_id 集合)
+        (替换后的文本, 是否有占位符被解析, 已覆盖的 file_id 集合, 召回日志)
     """
     placeholders = parse_placeholders(text)
     if not placeholders:
-        return text, False, set()
+        return text, False, set(), []
 
     resolved = text
     if token_budget is None:
@@ -192,6 +192,7 @@ async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str,
         token_budget = KNOWLEDGE_PLACEHOLDER_BUDGET
     remaining_budget = token_budget
     covered_file_ids: set[str] = set()
+    ph_log: list[dict] = []
 
     for ph in placeholders:
         name = ph["name"]
@@ -199,8 +200,37 @@ async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str,
 
         if mode == "fulltext":
             result, ids = await _resolve_fulltext(name, token_budget=remaining_budget)
+            if result:
+                ph_log.append({
+                    "keyword": f"占位符 {{{{ {name} }}}}: 全文注入",
+                    "source": "knowledge_placeholder",
+                    "results": len(ids),
+                    "tokens": 0,
+                    "method": "fulltext",
+                })
         else:
             result, ids = await _resolve_rag(name, query, token_budget=remaining_budget)
+            if result:
+                from lumen.services.knowledge import get_last_search_meta
+                meta = get_last_search_meta()
+                method = meta.get("bm25_method", "bm25")
+                method_label = "稀疏向量" if method == "sparse" else "BM25"
+                vc = meta.get("vector_count", 0)
+                sc = meta.get("sparse_count", 0) or meta.get("bm25_count", 0)
+                gc = meta.get("graph_count", 0)
+                keyword = f"占位符 [[{name}]]: 向量{vc}条 + {method_label}{sc}条"
+                if gc:
+                    keyword += f" + 图谱{gc}条"
+                ph_log.append({
+                    "keyword": keyword,
+                    "source": "knowledge_placeholder",
+                    "results": len(ids),
+                    "tokens": 0,
+                    "method": method,
+                    "vector_count": vc,
+                    "sparse_count": sc,
+                    "graph_count": gc,
+                })
 
         if result:
             resolved = resolved.replace(ph["match"], result, 1)
@@ -213,4 +243,4 @@ async def resolve(text: str, query: str, token_budget: int = None) -> tuple[str,
             resolved = resolved.replace(ph["match"], "", 1)
 
     logger.info(f"知识库占位符解析: {len(placeholders)} 个，已替换")
-    return resolved, True, covered_file_ids
+    return resolved, True, covered_file_ids, ph_log

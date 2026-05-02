@@ -8,7 +8,7 @@ Lumen - 嵌入服务
 import logging
 import os
 import asyncio
-from typing import Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +83,17 @@ class LocalBackend:
 # ── OpenAIEmbeddingBackend：OpenAI 兼容 API ──
 
 class OpenAIEmbeddingBackend:
-    """OpenAI 兼容嵌入后端，覆盖豆包/智谱/硅基流动/零一万物/阿里等"""
+    """OpenAI 兼容嵌入后端，覆盖豆包/智谱/硅基流动/零一万物/阿里等
+
+    多模态模型自动探测：先以标准格式调用，若 API 返回错误码（非 4xx），
+    自动切换为 multimodal 格式重试。探测结果在首次调用后缓存。
+    """
 
     def __init__(self, api_url: str, api_key: str, model: str):
         self._api_url = api_url
         self._api_key = api_key
         self._model = model
+        self._multimodal: Optional[bool] = None  # None=未探测, True=多模态, False=标准
         self.dimensions = 0  # 从第一次 API 响应中检测
         self._client = None
 
@@ -107,6 +112,33 @@ class OpenAIEmbeddingBackend:
     async def encode_batch(self, texts: list[str]) -> Optional[list[list[float]]]:
         if not texts:
             return []
+
+        # 已知格式 → 直接调用
+        if self._multimodal is False:
+            return await self._encode_standard(texts)
+        if self._multimodal is True:
+            return await self._encode_multimodal(texts)
+
+        # 未探测 → 先试标准格式，失败则切换多模态
+        vectors = await self._encode_standard(texts)
+        if vectors is not None:
+            self._multimodal = False
+            return vectors
+
+        # 标准格式失败，尝试多模态
+        logger.info(f"标准嵌入格式失败，尝试多模态格式 (模型: {self._model})")
+        vectors = await self._encode_multimodal(texts)
+        if vectors is not None:
+            self._multimodal = True
+            logger.info(f"多模态嵌入格式已确认 (模型: {self._model})")
+            return vectors
+
+        # 两种都失败
+        logger.error(f"嵌入编码失败：标准和多模态格式均不可用 (模型: {self._model})")
+        return None
+
+    async def _encode_standard(self, texts: list[str]) -> Optional[list[list[float]]]:
+        """标准 OpenAI embeddings API 格式"""
         self._ensure_client()
         try:
             response = await self._client.embeddings.create(
@@ -114,15 +146,141 @@ class OpenAIEmbeddingBackend:
                 input=texts,
             )
             vectors = [item.embedding for item in response.data]
-
-            # 首次调用时检测维度
             if self.dimensions == 0 and vectors:
                 self.dimensions = len(vectors[0])
                 logger.info(f"API 嵌入维度已检测: {self.dimensions} (模型: {self._model})")
+            return vectors
+        except Exception as e:
+            logger.warning(f"标准嵌入格式调用失败: {e}")
+            return None
+
+    async def _encode_multimodal(self, texts: list[str]) -> Optional[list[list[float]]]:
+        """多模态 embeddings API 格式（raw HTTP）
+
+        多模态端点将所有 input 合为一个嵌入，所以逐条调用。
+        格式: POST {api_url}/embeddings/multimodal
+        Body: {"model":"...", "input":[{"type":"text","text":"..."}]}
+        响应: {"data":{"embedding":[...]}}（单个对象，非列表）
+        """
+        import aiohttp
+
+        base = self._api_url.rstrip("/")
+        url = f"{base}/embeddings/multimodal"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        vectors = []
+        try:
+            async with aiohttp.ClientSession() as session:
+                for text in texts:
+                    async with session.post(
+                        url,
+                        json={"model": self._model, "input": [{"type": "text", "text": text}]},
+                        headers=headers,
+                    ) as resp:
+                        if resp.status != 200:
+                            body = await resp.text()
+                            logger.warning(f"多模态嵌入 API 错误 ({resp.status}): {body[:300]}")
+                            return None
+                        data = await resp.json()
+
+                    # 响应格式: {"data": {"embedding": [...]}}
+                    embedding = None
+                    if isinstance(data.get("data"), dict):
+                        embedding = data["data"].get("embedding")
+                    elif isinstance(data.get("data"), list) and data["data"]:
+                        embedding = data["data"][0].get("embedding")
+
+                    if not embedding:
+                        logger.warning(f"多模态嵌入响应缺少 embedding: {str(data)[:200]}")
+                        return None
+
+                    vectors.append(embedding)
+
+            if self.dimensions == 0 and vectors:
+                self.dimensions = len(vectors[0])
+                logger.info(f"多模态嵌入维度已检测: {self.dimensions} (模型: {self._model})")
 
             return vectors
         except Exception as e:
-            logger.error(f"API 嵌入编码失败: {e}")
+            logger.warning(f"多模态嵌入编码失败: {e}")
+            return None
+
+    # ── 稀疏向量支持（doubao-embedding-vision 250615+）──
+
+    InstructionType = Literal["query", "document", None]
+
+    async def encode_with_sparse(
+        self, text: str, instruction_type: "OpenAIEmbeddingBackend.InstructionType" = None
+    ) -> Optional[tuple[list[float], list[dict] | dict]]:
+        """编码单条文本，同时返回稠密+稀疏向量"""
+        result = await self.encode_batch_with_sparse([text], instruction_type=instruction_type)
+        if result:
+            return result[0]
+        return None
+
+    async def encode_batch_with_sparse(
+        self, texts: list[str], instruction_type: "OpenAIEmbeddingBackend.InstructionType" = None
+    ) -> Optional[list[tuple[list[float], list[dict] | dict]]]:
+        """批量编码，同时返回稠密+稀疏向量 [(dense, sparse), ...]
+
+        通过 multimodal 端点 + sparse_embedding: enabled 实现。
+        instruction_type 预留参数，本期底层不拼接。
+        """
+        import aiohttp
+
+        base = self._api_url.rstrip("/")
+        url = f"{base}/embeddings/multimodal"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        results = []
+        try:
+            async with aiohttp.ClientSession() as session:
+                for text in texts:
+                    body = {
+                        "model": self._model,
+                        "input": [{"type": "text", "text": text}],
+                        "sparse_embedding": {"type": "enabled"},
+                        "encoding_format": "float",
+                    }
+
+                    async with session.post(url, json=body, headers=headers) as resp:
+                        if resp.status != 200:
+                            body_text = await resp.text()
+                            logger.warning(f"稀疏嵌入 API 错误 ({resp.status}): {body_text[:300]}")
+                            return None
+                        data = await resp.json()
+
+                    # 提取稠密向量
+                    embedding = None
+                    data_obj = data.get("data")
+                    if isinstance(data_obj, dict):
+                        embedding = data_obj.get("embedding")
+                        sparse = data_obj.get("sparse_embedding")
+                    elif isinstance(data_obj, list) and data_obj:
+                        embedding = data_obj[0].get("embedding")
+                        sparse = data_obj[0].get("sparse_embedding")
+                    else:
+                        logger.warning(f"稀疏嵌入响应格式异常: {str(data)[:200]}")
+                        return None
+
+                    if not embedding:
+                        logger.warning(f"稀疏嵌入响应缺少 embedding: {str(data)[:200]}")
+                        return None
+
+                    if self.dimensions == 0:
+                        self.dimensions = len(embedding)
+
+                    results.append((embedding, sparse))
+
+            return results
+        except Exception as e:
+            logger.warning(f"稀疏嵌入编码失败: {e}")
             return None
 
 
@@ -201,8 +359,8 @@ def _build_backend(backend_type: str, model_name: str, api_url: str, api_key: st
 def _resolve_service_config(service_name: str) -> dict:
     """解析指定服务的嵌入配置（两阵营架构）
 
-    阵营 A（本地小模型）：memory / buffer / thinking_clusters / knowledge_sentences
-    阵营 B（API 大模型）：knowledge + 所有用户新建知识库
+    阵营 A（本地小模型）：memory / thinking_clusters / knowledge_sentences
+    阵营 B（API 大模型）：knowledge + agent_knowledge + 所有用户新建知识库
 
     Returns:
         {"backend_type", "model_name", "api_url", "api_key", "api_model"}
@@ -215,7 +373,7 @@ def _resolve_service_config(service_name: str) -> dict:
     )
 
     # ── 阵营 B：知识库（API 大模型）──
-    if service_name == "knowledge":
+    if service_name in ("knowledge", "agent_knowledge"):
         if not KNOWLEDGE_EMBEDDING_BACKEND:
             return {"backend_type": "", "model_name": "",
                     "api_url": EMBEDDING_API_URL, "api_key": EMBEDDING_API_KEY,
@@ -309,7 +467,7 @@ def resolve_dimensions(service_name: str) -> int:
     from lumen.config import EMBEDDING_LOCAL_DIM, EMBEDDING_API_DIM
 
     # 阵营 B：知识库必须用户显式配置
-    if service_name == "knowledge":
+    if service_name in ("knowledge", "agent_knowledge"):
         if EMBEDDING_API_DIM > 0:
             return EMBEDDING_API_DIM
         raise ValueError(
@@ -349,10 +507,6 @@ def check_dim_consistency(db_path: str, dim: int) -> str | None:
     except Exception:
         pass
     return None
-
-    # 终极兜底：512（匹配 gte-small-zh，Lumen 的默认模型）
-    logger.warning(f"无法确定 '{service_name}' 的维度，使用默认值 512")
-    return 512
 
 
 # ── 向后兼容的公共 API ──

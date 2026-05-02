@@ -63,12 +63,16 @@ function ConfigEditor({ resource: propResource, onBack }: ConfigEditorProps) {
       setIsSaving(true);
       setError(null);
       setSuccessMsg(null);
-      await updateConfig(resource, { content });
+      const result = await updateConfig(resource, { content });
       // 刷新配置
       const detail = await getConfig(resource);
       setConfig(detail);
-      setSuccessMsg('保存成功');
-      setTimeout(() => setSuccessMsg(null), 2000);
+      if (result.rebuild_warning) {
+        setSuccessMsg(`保存成功。⚠ ${result.rebuild_warning}`);
+      } else {
+        setSuccessMsg('保存成功');
+        setTimeout(() => setSuccessMsg(null), 2000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {

@@ -16,7 +16,7 @@
   "auto_compact": true,
   "compact_threshold": 0.85,
   "memory_enabled": true,
-  "memory_token_budget": 300,
+  "memory_token_budget": 3000,
   "memory_auto_summarize": false,
   "knowledge_enabled": true,
   "knowledge_semantic_routing": true,
@@ -24,5 +24,10 @@
   "knowledge_min_score": 0.3,
   "knowledge_token_budget": 500,
   "skills": [],
-  "response_style": "balanced"
+  "response_style": "balanced",
+  "accessible_knowledge": [],
+  "thinking": {
+    "enabled": true,
+    "budget_tokens": 4096
+  }
 }

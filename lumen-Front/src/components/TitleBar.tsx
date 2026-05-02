@@ -1,7 +1,7 @@
 /**
  * TitleBar — 自定义标题栏
  *
- * 三段式：左侧品牌 | 中间模式切换 | 右侧窗口控制
+ * 三段式：左侧品牌 | 中间模式切换 | 右侧功能+窗口控制
  * data-tauri-drag-region 只应用在空白区域，按钮不在 drag region 内
  */
 import { useState, useEffect, useMemo } from 'react';
@@ -15,18 +15,17 @@ const MODES = [
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-/** 还原图标：两个重叠方块 */
+/** 还原图标 */
 function RestoreIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor">
       <rect x="4" y="1" width="11" height="11" rx="1" strokeWidth="1.2" />
-      <rect x="1" y="4" width="11" height="11" rx="1" strokeWidth="1.2"
-        strokeOpacity="0.5" />
+      <rect x="1" y="4" width="11" height="11" rx="1" strokeWidth="1.2" strokeOpacity="0.5" />
     </svg>
   );
 }
 
-/** 最大化图标：单方块+展开角标 */
+/** 最大化图标 */
 function MaximizeIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor">
@@ -81,7 +80,7 @@ function TitleBar() {
       {/* 左侧填充 — 拖拽区 */}
       <div data-tauri-drag-region className="flex-1 h-full cursor-default" />
 
-      {/* 中间模式切换 — 绝对定位，以整个标题栏为参考居中 */}
+      {/* 中间模式切换 — 绝对定位居中 */}
       <div className="absolute left-1/2 -translate-x-1/2">
         <ModeSwitch
           modes={MODES}
@@ -95,7 +94,7 @@ function TitleBar() {
 
       {/* 右侧窗口控制 — 不带 drag region */}
       <div className="flex items-center h-full">
-        {/* 功能按钮组 */}
+        {/* 置顶 */}
         <button
           onClick={handlePin}
           className="h-full flex items-center justify-center px-1 cursor-pointer"
@@ -113,6 +112,21 @@ function TitleBar() {
             </svg>
           </span>
         </button>
+        {/* 主题（预留） */}
+        <button
+          onClick={() => {/* TODO: Phase D 主题切换 */}}
+          className="h-full flex items-center justify-center px-1 cursor-pointer"
+          title="主题（即将推出）"
+        >
+          <span className="w-6 h-6 flex items-center justify-center rounded-md
+            hover:bg-slate-700/40 transition-all duration-200">
+            <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+            </svg>
+          </span>
+        </button>
+        {/* 设置 */}
         <button
           onClick={handleSettings}
           className="h-full flex items-center justify-center px-1 cursor-pointer"

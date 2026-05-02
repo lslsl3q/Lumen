@@ -9,7 +9,7 @@ __version__ = "0.1.0"
 from lumen.core.session import ChatSession, SessionManager, get_session_manager
 
 # 聊天功能（core/）
-from lumen.query import validate_tool_call, chat_stream, chat_non_stream
+from lumen.query import validate_tool_call, chat_non_stream
 
 # 上下文管理（services/context/）
 from lumen.services.context import trim_messages, fold_tool_calls, filter_for_ai
@@ -27,7 +27,6 @@ from lumen.types.messages import (
 
 # 角色提示词（prompt/）
 from lumen.prompt.character import list_characters, load_character
-from lumen.prompt.builder import build_system_prompt, build_messages
 
 # 工具系统（tools/）
 from lumen.tool import (
@@ -57,7 +56,6 @@ __all__ = [
 
     # 聊天功能
     "validate_tool_call",
-    "chat_stream",
     "chat_non_stream",
 
     # 上下文管理
@@ -78,8 +76,6 @@ __all__ = [
     # 角色提示词
     "list_characters",
     "load_character",
-    "build_system_prompt",
-    "build_messages",
 
     # 工具系统
     "execute_tool",

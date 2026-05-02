@@ -8,10 +8,6 @@ import { createPortal } from 'react-dom';
 import { useState } from 'react';
 
 // Page 组件
-import CharacterList from '../../pages/CharacterList';
-import CharacterEditor from '../../pages/CharacterEditor';
-import PersonaList from '../../pages/PersonaList';
-import PersonaEditor from '../../pages/PersonaEditor';
 import WorldBookList from '../../pages/WorldBookList';
 import WorldBookEditor from '../../pages/WorldBookEditor';
 import SkillList from '../../pages/SkillList';
@@ -19,23 +15,17 @@ import SkillEditor from '../../pages/SkillEditor';
 import AvatarManager from '../../pages/AvatarManager';
 import ConfigList from '../../pages/ConfigList';
 import ConfigEditor from '../../pages/ConfigEditor';
-import TokenInspector from '../../pages/TokenInspector';
-import KnowledgeList from '../../pages/KnowledgeList';
 import ToolTipsPage from '../../pages/ToolTipsPage';
 import ThinkingClustersPage from '../../pages/ThinkingClustersPage';
-import BufferSettingsPage from '../../pages/BufferSettingsPage';
 
 // Section 类型
 type SettingsPage =
-  | 'character-list' | 'character-editor'
-  | 'persona-list' | 'persona-editor'
   | 'worldbook-list' | 'worldbook-editor'
   | 'skill-list' | 'skill-editor'
   | 'avatar-manager'
   | 'config-list' | 'config-editor'
-  | 'token-inspector' | 'knowledge-list'
   | 'tooltips' | 'thinking-clusters'
-  | 'buffer-settings';
+;
 
 interface SettingsSection {
   page: SettingsPage;
@@ -52,8 +42,6 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: '实体管理',
     items: [
-      { page: 'character-list', label: '角色' },
-      { page: 'persona-list', label: 'Persona' },
       { page: 'worldbook-list', label: '世界书' },
       { page: 'skill-list', label: '技能' },
       { page: 'avatar-manager', label: '头像' },
@@ -63,11 +51,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: '系统配置',
     items: [
       { page: 'config-list', label: '配置' },
-      { page: 'token-inspector', label: 'Token Inspector' },
-      { page: 'knowledge-list', label: '知识库' },
       { page: 'tooltips', label: '工具提示词' },
       { page: 'thinking-clusters', label: '思维簇' },
-      { page: 'buffer-settings', label: '缓冲区' },
     ],
   },
 ];
@@ -84,7 +69,7 @@ interface SettingsOverlayProps {
 export default function SettingsOverlay({ open, onClose, initialSection }: SettingsOverlayProps) {
   const [section, setSection] = useState<SettingsSection>(() => {
     if (initialSection) return { page: initialSection as SettingsPage };
-    return { page: 'character-list' };
+    return { page: 'worldbook-list' };
   });
 
   if (!open) return null;
@@ -97,13 +82,11 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
   // 返回主列表
   const goBackToList = () => {
     const pageToSection: Record<string, SettingsPage> = {
-      'character-editor': 'character-list',
-      'persona-editor': 'persona-list',
       'worldbook-editor': 'worldbook-list',
       'skill-editor': 'skill-list',
       'config-editor': 'config-list',
     };
-    const target = pageToSection[section.page] || 'character-list';
+    const target = pageToSection[section.page] || 'persona-list';
     setSection({ page: target });
   };
 
@@ -115,14 +98,6 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
     const contentNav = { onBack: onClose, onNavigate: navigateTo };
 
     switch (section.page) {
-      case 'character-list':
-        return <CharacterList {...contentNav} />;
-      case 'character-editor':
-        return <CharacterEditor characterId={section.id} onBack={goBackToList} onNavigate={navigateTo} />;
-      case 'persona-list':
-        return <PersonaList {...contentNav} />;
-      case 'persona-editor':
-        return <PersonaEditor personaId={section.id} onBack={goBackToList} onNavigate={navigateTo} />;
       case 'worldbook-list':
         return <WorldBookList {...contentNav} />;
       case 'worldbook-editor':
@@ -137,16 +112,10 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
         return <ConfigList {...contentNav} />;
       case 'config-editor':
         return <ConfigEditor resource={section.resource} onBack={goBackToList} onNavigate={navigateTo} />;
-      case 'token-inspector':
-        return <TokenInspector {...contentNav} />;
-      case 'knowledge-list':
-        return <KnowledgeList {...contentNav} />;
       case 'tooltips':
         return <ToolTipsPage {...contentNav} />;
       case 'thinking-clusters':
         return <ThinkingClustersPage {...contentNav} />;
-      case 'buffer-settings':
-        return <BufferSettingsPage {...contentNav} />;
     }
   };
 

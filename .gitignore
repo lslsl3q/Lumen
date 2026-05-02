@@ -56,7 +56,13 @@ lumen/data/daily_note/
 lumen/data/knowledge/daily_note/
 lumen/data/runtime_config.json
 lumen/data/tdb_registry.json
+lumen/data/dream_state.json
+lumen/data/gm/
 snapshot*.txt
+
+# SQLite 临时文件
+*.db-shm
+*.db-wal
 
 # ========================================
 # 用户个人数据（Persona / 世界书 / 角色 / Skills，只追踪 default 模板）
@@ -120,6 +126,11 @@ test_*.png
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ========================================
+# 本地工具配置
+# ========================================
+.mcp.json
 
 # ========================================
 # Jupyter Notebook

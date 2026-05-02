@@ -28,10 +28,24 @@ export interface CharacterDetail {
   context_size?: number;
   auto_compact: boolean;
   compact_threshold: number;
-  memory_enabled?: boolean;
-  memory_token_budget?: number;
-  memory_auto_summarize?: boolean;
-  skills?: string[];
+  memory_enabled: boolean;
+  memory_token_budget: number;
+  memory_auto_summarize: boolean;
+  knowledge_enabled: boolean;
+  knowledge_semantic_routing: boolean;
+  knowledge_top_k: number;
+  knowledge_min_score: number;
+  knowledge_token_budget: number;
+  skills: string[];
+  response_style: string;
+  accessible_knowledge: string[];
+  thinking?: ThinkingConfig;
+}
+
+/** 思考链配置 */
+export interface ThinkingConfig {
+  enabled: boolean;
+  budget_tokens: number;
 }
 
 /** 创建/编辑角色的表单数据 */
@@ -50,4 +64,6 @@ export interface CharacterFormData {
   memory_token_budget?: number;
   memory_auto_summarize?: boolean;
   skills?: string[];
+  accessible_knowledge?: string[];
+  thinking?: ThinkingConfig;
 }

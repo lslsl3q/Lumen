@@ -160,6 +160,24 @@ def _init_active_memories(conn):
     conn.commit()
 
 
+def _init_graph_edge_meta(conn):
+    """初始化图谱边元数据表（T19：TriviumDB 边无 payload，用此表存溯源信息）"""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS graph_edge_meta (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tdb TEXT NOT NULL DEFAULT 'knowledge',
+            src_id INTEGER NOT NULL,
+            dst_id INTEGER NOT NULL,
+            label TEXT NOT NULL DEFAULT 'related',
+            source_episode_id TEXT DEFAULT '',
+            owner_id TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            UNIQUE(tdb, src_id, dst_id, label)
+        );
+    """)
+    conn.commit()
+
+
 def _init_knowledge_chunks(conn):
     """初始化知识库 chunks 表 + FTS5 索引（用于知识库 BM25 搜索）"""
     cursor = conn.cursor()
@@ -439,6 +457,7 @@ def _init_db():
     _init_fts5(conn)
     _init_active_memories(conn)
     _init_knowledge_chunks(conn)
+    _init_graph_edge_meta(conn)
 
 
 # 程序启动时自动初始化数据库
@@ -1032,3 +1051,57 @@ def get_message_context(session_id: str, center_id: int, window: int = 2) -> lis
     """, (session_id, center_id - window, center_id + window)).fetchall()
 
     return [{"role": row["role"], "content": row["content"]} for row in rows]
+
+
+# ========================================
+# T19 图谱边元数据（TriviumDB 边无 payload，用此表存溯源信息）
+# ========================================
+
+def save_edge_meta(tdb: str, src_id: int, dst_id: int, label: str,
+                   source_episode_id: str = "", owner_id: str = "") -> None:
+    """保存边元数据（INSERT OR IGNORE，重复插入不报错）"""
+    now = datetime.now().isoformat()
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            """INSERT OR IGNORE INTO graph_edge_meta
+               (tdb, src_id, dst_id, label, source_episode_id, owner_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (tdb, src_id, dst_id, label, source_episode_id, owner_id, now),
+        )
+        conn.commit()
+
+
+def get_edge_meta(tdb: str, src_id: int, dst_id: int) -> Optional[Dict[str, Any]]:
+    """获取单条边元数据"""
+    conn = _get_conn()
+    row = conn.execute(
+        """SELECT * FROM graph_edge_meta
+           WHERE tdb = ? AND src_id = ? AND dst_id = ?""",
+        (tdb, src_id, dst_id),
+    ).fetchone()
+    if row:
+        return dict(row)
+    return None
+
+
+def get_edges_by_owner(owner_id: str, tdb: str = "knowledge") -> List[Dict[str, Any]]:
+    """获取某个 owner 的所有边元数据"""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM graph_edge_meta WHERE owner_id = ? AND tdb = ?",
+        (owner_id, tdb),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def delete_edge_meta(tdb: str, src_id: int, dst_id: int) -> bool:
+    """删除单条边元数据，返回是否成功"""
+    with _write_lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "DELETE FROM graph_edge_meta WHERE tdb = ? AND src_id = ? AND dst_id = ?",
+            (tdb, src_id, dst_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0

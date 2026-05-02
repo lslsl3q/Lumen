@@ -51,20 +51,51 @@ async def lifespan(app):
     t = threading.Thread(target=_preload, daemon=True, name="preload")
     t.start()
 
-    # 预加载完成后，异步触发知识库自动重建（如果 TDB 为空）
+    # 预加载完成后，异步触发知识库自动重建（如果 TDB 为空）+ registry 孤儿清理
     async def _auto_rebuild():
         # 等预加载线程完成（最多等 30 秒）
         t.join(timeout=30)
         try:
-            from lumen.services.knowledge import rebuild_if_empty
+            from lumen.services.knowledge import rebuild_if_empty, cleanup_orphan_registry
             await rebuild_if_empty()
+            orphans = cleanup_orphan_registry()
+            if orphans:
+                logger.info(f"Registry 孤儿清理: {orphans} 条")
         except Exception as e:
-            logger.warning(f"知识库自动重建失败: {e}")
+            logger.warning(f"知识库启动检查失败: {e}")
 
     import asyncio
     asyncio.ensure_future(_auto_rebuild())
 
+    # T22: 启动反思管道后台消费者
+    try:
+        from lumen.core.reflection import init_reflection_queue
+        init_reflection_queue()
+    except Exception as e:
+        logger.warning(f"反思管道启动失败: {e}")
+
+    # T22 Step 4: 启动深梦境调度器
+    try:
+        from lumen.core.dream import init_dream_scheduler
+        init_dream_scheduler()
+    except Exception as e:
+        logger.warning(f"深梦境调度器启动失败: {e}")
+
     yield  # 应用运行中...
+
+    # T22: 优雅停止反思管道
+    try:
+        from lumen.core.reflection import shutdown_reflection_queue
+        await shutdown_reflection_queue()
+    except Exception as e:
+        logger.warning(f"反思管道停止失败: {e}")
+
+    # T22 Step 4: 优雅停止深梦境调度器
+    try:
+        from lumen.core.dream import shutdown_dream_scheduler
+        await shutdown_dream_scheduler()
+    except Exception as e:
+        logger.warning(f"深梦境调度器停止失败: {e}")
 
     # 退出清理
     from lumen.services import history, vector_store, knowledge
@@ -97,7 +128,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, buffer, graph, tdb
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -114,9 +145,9 @@ app.include_router(skills.router, prefix="/skills", tags=["Skills"])
 app.include_router(knowledge.router, prefix="/knowledge", tags=["知识库"])
 app.include_router(memories.router, prefix="/memories", tags=["日记"])
 app.include_router(thinking_clusters.router, prefix="/thinking-clusters", tags=["思维簇"])
-app.include_router(buffer.router, prefix="/buffer", tags=["缓冲区"])
 app.include_router(graph.router, prefix="/graph", tags=["图谱"])
 app.include_router(tdb.router, prefix="/tdb", tags=["TDB浏览"])
+app.include_router(system.router, prefix="/api/system", tags=["系统管理"])
 
 # 挂载头像静态文件目录
 avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"

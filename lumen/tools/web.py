@@ -6,7 +6,7 @@ AI 调用这个工具来搜索互联网信息或获取指定 URL 的网页正文
 
 import logging
 from lumen.tool import success_result, error_result, ErrorCode
-from lumen.services.search import search
+from lumen.services.search import search_async
 from lumen.services.fetch import fetch_url, DEFAULT_MAX_LENGTH, MAX_LENGTH_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 # ── 子命令实现 ──────────────────────────────────────────────
 
-def _cmd_search(params: dict) -> dict:
-    """执行网页搜索
+async def _cmd_search(params: dict) -> dict:
+    """执行网页搜索（含语义重排序）
 
     Args:
         params: {"query": "搜索关键词", "max_results": 5}
@@ -38,7 +38,7 @@ def _cmd_search(params: dict) -> dict:
         max_results = 5
 
     try:
-        results = search(query, max_results=max_results)
+        results = await search_async(query, max_results=max_results, rerank=True)
 
         if not results:
             return success_result("web", f"搜索 '{query}' 未找到结果")
@@ -125,7 +125,7 @@ _COMMAND_MAP = {
 
 # ── 统一入口 ────────────────────────────────────────────────
 
-def execute(params: dict, command: str = "") -> dict:
+async def execute(params: dict, command: str = "") -> dict:
     """统一入口：根据 command 分发到 search / fetch
 
     Args:
@@ -140,4 +140,8 @@ def execute(params: dict, command: str = "") -> dict:
             f"未知子命令 '{command}'，可选: {', '.join(_COMMAND_MAP)}",
             {"command": command}
         )
-    return handler(params)
+    import inspect
+    result = handler(params)
+    if inspect.iscoroutine(result):
+        result = await result
+    return result

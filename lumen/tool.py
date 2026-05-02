@@ -11,7 +11,7 @@ import importlib
 import logging
 from datetime import datetime
 from typing import List, Dict, Optional, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from lumen.types.tools import ToolResult, ErrorCode
 
@@ -185,8 +185,10 @@ def _load_mcp_tools():
 # 工具执行
 # ========================================
 
-def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
-    """执行工具调用，返回标准化结果"""
+async def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
+    """执行工具调用，返回标准化结果（支持同步和异步 handler）"""
+    import asyncio
+    import inspect
     start_time = time.perf_counter()
 
     if not isinstance(params, dict):
@@ -201,7 +203,10 @@ def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
 
     handler = _TOOL_HANDLERS.get(name)
     if handler:
-        result = handler(params, command=command)
+        if inspect.iscoroutinefunction(handler):
+            result = await handler(params, command=command)
+        else:
+            result = handler(params, command=command)
         if "execution_time" not in result:
             result["execution_time"] = round((time.perf_counter() - start_time) * 1000, 2)
         return result
@@ -213,8 +218,10 @@ def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
     )
 
 
-def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
-    """并发执行多个工具调用"""
+async def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
+    """并发执行多个工具调用（支持同步和异步 handler）"""
+    import asyncio
+
     if not calls:
         return []
 
@@ -227,50 +234,17 @@ def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Opt
         if "tool" not in call:
             raise ValueError(f"calls[{i}] 缺少必需的 'tool' 字段")
 
-    results = []
+    # 用 asyncio.gather 并发执行
+    async def _safe_execute(i: int, call: dict) -> tuple:
+        try:
+            result = await execute_tool(call["tool"], call.get("params", {}), call.get("command", ""))
+            return (i, result)
+        except Exception as e:
+            return (i, error_result(call["tool"], ErrorCode.EXEC_FAILED, f"工具执行异常: {type(e).__name__}: {e}"))
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_index = {}
-        for i, call in enumerate(calls):
-            try:
-                future = executor.submit(execute_tool, call["tool"], call.get("params", {}), call.get("command", ""))
-                future_to_index[future] = i
-            except Exception as e:
-                results.append(error_result(
-                    call["tool"],
-                    ErrorCode.EXEC_FAILED,
-                    f"工具提交失败: {e}",
-                ))
+    tasks = [_safe_execute(i, call) for i, call in enumerate(calls)]
+    completed = await asyncio.gather(*tasks)
 
-        index_to_result = {}
-        for future in as_completed(future_to_index):
-            index = future_to_index[future]
-            try:
-                result = future.result(timeout=timeout)
-                index_to_result[index] = result
-            except TimeoutError:
-                index_to_result[index] = error_result(
-                    calls[index]["tool"],
-                    ErrorCode.EXEC_TIMEOUT,
-                    f"工具执行超时（{timeout}秒）"
-                )
-            except Exception as e:
-                index_to_result[index] = error_result(
-                    calls[index]["tool"],
-                    ErrorCode.EXEC_FAILED,
-                    f"工具执行异常: {type(e).__name__}: {e}"
-                )
-
-        for i, call in enumerate(calls):
-            if i < len(results):
-                continue
-            if i in index_to_result:
-                results.append(index_to_result[i])
-            else:
-                results.append(error_result(
-                    call["tool"],
-                    ErrorCode.EXEC_FAILED,
-                    "未知错误"
-                ))
-
-    return results
+    # 按原始顺序排列
+    index_to_result = dict(completed)
+    return [index_to_result[i] for i in range(len(calls))]

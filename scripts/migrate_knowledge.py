@@ -40,14 +40,14 @@ def migrate():
             files_data = _json.load(f)
         # ensure_manifest_for_existing_kb 会创建 _manifest.json，
         # 然后我们把旧 registry 的 files 写进去
-        from lumen.services.manifest import load_kb_manifest, save_kb_manifest
+        from lumen.services.knowledge import load_kb_manifest, save_kb_manifest
         manifest = load_kb_manifest("knowledge")
         if manifest is not None:
             manifest["files"] = files_data
             save_kb_manifest("knowledge", manifest)
 
     # 5. 生成 _manifest.json
-    from lumen.services.manifest import ensure_manifest_for_existing_kb
+    from lumen.services.knowledge import ensure_manifest_for_existing_kb
     ensure_manifest_for_existing_kb("knowledge")
     ensure_manifest_for_existing_kb("agent_knowledge")
 

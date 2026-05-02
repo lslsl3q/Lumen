@@ -314,7 +314,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                 <textarea
                   value={editContent}
                   onChange={e => setEditContent(e.target.value)}
-                  className="flex-1 w-full bg-[#141413] border border-[#2a2926] rounded-lg
+                  className="flex-1 w-full bg-[#1C1B19] border border-[#2a2926] rounded-lg
                     p-4 text-sm text-slate-300 leading-relaxed
                     resize-none outline-none font-mono
                     focus:border-[#CC7C5E]/20 transition-colors
@@ -382,7 +382,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               <textarea
                 value={chainsContent}
                 onChange={e => setChainsContent(e.target.value)}
-                className="flex-1 w-full bg-[#141413] border border-[#2a2926] rounded-lg
+                className="flex-1 w-full bg-[#1C1B19] border border-[#2a2926] rounded-lg
                   p-4 text-sm text-slate-300 leading-relaxed font-mono
                   resize-none outline-none
                   focus:border-[#CC7C5E]/20 transition-colors
@@ -431,7 +431,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               onChange={e => setNewModuleName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
               placeholder="模块名称（自动加 .txt）"
-              className="w-full px-3 py-2 bg-[#141413] border border-[#2a2926] rounded-lg
+              className="w-full px-3 py-2 bg-[#1C1B19] border border-[#2a2926] rounded-lg
                 text-sm text-slate-300 outline-none focus:border-[#CC7C5E]/20
                 placeholder:text-slate-700 mb-4"
               autoFocus

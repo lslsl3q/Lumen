@@ -14,7 +14,6 @@ from lumen.prompt.character import load_character, list_characters
 from lumen.services.character import (
     create_character, update_character, delete_character, save_avatar
 )
-from lumen.prompt.builder import build_system_prompt
 
 
 # ========================================
@@ -22,7 +21,7 @@ from lumen.prompt.builder import build_system_prompt
 # ========================================
 
 class CharacterInfo(BaseModel):
-    """角色信息"""
+    """角色信息 — 与 CharacterCard 字段对齐"""
     id: str
     name: str
     description: Optional[str] = None
@@ -35,6 +34,18 @@ class CharacterInfo(BaseModel):
     context_size: Optional[int] = None
     auto_compact: bool = False
     compact_threshold: float = 0.7
+    memory_enabled: bool = True
+    memory_token_budget: int = 300
+    memory_auto_summarize: bool = False
+    knowledge_enabled: bool = True
+    knowledge_semantic_routing: bool = True
+    knowledge_top_k: int = 3
+    knowledge_min_score: float = 0.3
+    knowledge_token_budget: int = 500
+    skills: List[str] = []
+    response_style: Optional[str] = "balanced"
+    accessible_knowledge: List[str] = []
+    thinking: Optional[dict] = None
 
 
 # ========================================
@@ -100,6 +111,17 @@ async def get_character(character_id: str) -> CharacterInfo:
             context_size=char.get("context_size"),
             auto_compact=char.get("auto_compact", False),
             compact_threshold=char.get("compact_threshold", 0.7),
+            memory_enabled=char.get("memory_enabled", True),
+            memory_token_budget=char.get("memory_token_budget", 300),
+            memory_auto_summarize=char.get("memory_auto_summarize", False),
+            knowledge_enabled=char.get("knowledge_enabled", True),
+            knowledge_semantic_routing=char.get("knowledge_semantic_routing", True),
+            knowledge_top_k=char.get("knowledge_top_k", 3),
+            knowledge_min_score=char.get("knowledge_min_score", 0.3),
+            knowledge_token_budget=char.get("knowledge_token_budget", 500),
+            skills=char.get("skills", []),
+            response_style=char.get("response_style", "balanced"),
+            accessible_knowledge=char.get("accessible_knowledge", []),
         )
 
     except FileNotFoundError:
