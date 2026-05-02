@@ -3,6 +3,7 @@ T19 图谱核心服务
 实体 Upsert / 边管理 / 邻居召回（在 TriviumDB 之上）
 """
 
+import json
 import random
 import logging
 from typing import Optional, List, Dict
@@ -28,16 +29,16 @@ def find_entity_by_name(tdb_name: str, name: str, owner_id: str = "") -> Optiona
     """按 name 精确查找实体，返回 node_id 或 None"""
     db = _get_tdb(tdb_name)
     try:
-        nodes = db.filter_where({"name": name})
+        nodes = db.tql(f'FIND {{name: {json.dumps(name)}}} RETURN *')
         for node in nodes:
-            payload = node.payload if hasattr(node, "payload") else {}
+            payload = node.get("payload", {})
             if "type" not in payload:
                 continue
             if owner_id and payload.get("owner_id", "") != owner_id:
                 continue
-            return node.id if hasattr(node, "id") else None
+            return node.get("id")
     except Exception as e:
-        logger.warning(f"filterWhere 查找实体失败 ({name}): {e}")
+        logger.warning(f"TQL FIND 查找实体失败 ({name}): {e}")
     return None
 
 

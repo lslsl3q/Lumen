@@ -362,17 +362,13 @@ async def _route_card_to_store(card, content: str, character_id: str) -> str:
 
 
 def _resolve_entity_id(db, name: str) -> Optional[int]:
-    """根据实体名查找节点 ID"""
-    for nid in db.all_node_ids():
-        try:
-            node = db.get(nid)
-        except Exception:
-            continue
-        if not node:
-            continue
-        payload = node.payload if hasattr(node, "payload") else {}
-        if payload.get("name", "").lower() == name.lower():
-            return nid
+    """根据实体名查找节点 ID（TQL FIND O(1) 索引查询）"""
+    try:
+        rows = db.tql(f'FIND {{name: {json.dumps(name)}}} RETURN id')
+        if rows:
+            return rows[0]["id"]
+    except Exception:
+        pass
     return None
 
 

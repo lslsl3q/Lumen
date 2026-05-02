@@ -195,9 +195,9 @@ def _enrich_sparse_content(db, sparse_hits: list[dict]):
         if not fid:
             continue
         try:
-            nodes = db.filter_where({"file_id": fid})
+            nodes = db.tql(f'FIND {{file_id: {json.dumps(fid)}}} RETURN *')
             for node in nodes:
-                payload = node.payload if hasattr(node, "payload") else {}
+                payload = node.get("payload", {})
                 if payload.get("chunk_index") == ci:
                     hit["content"] = payload.get("content", "")
                     hit["source_path"] = payload.get("source_path", "")
@@ -566,13 +566,13 @@ async def refine_with_sentences(
     file_ids = {fid for fid, _ in target_chunks}
     for fid in file_ids:
         try:
-            nodes = sdb.filter_where({"file_id": fid})
+            nodes = sdb.tql(f'FIND {{file_id: {json.dumps(fid)}}} RETURN *')
             for node in nodes:
-                payload = node.payload if hasattr(node, "payload") else {}
+                payload = node.get("payload", {})
                 ci = payload.get("chunk_index", 0)
                 if (fid, ci) not in target_chunks:
                     continue
-                vec = node.vector if hasattr(node, "vector") else None
+                vec = node.get("vector")
                 all_sentences.append({
                     "content": payload.get("content", ""),
                     "file_id": fid,
@@ -924,13 +924,8 @@ async def delete_file(file_id: str) -> None:
 
     # 1. 删向量（chunk 级）
     db = _get_db()
-    nodes = db.filter_where({"file_id": file_id})
-    count = 0
-    for node in nodes:
-        db.delete(node.id)
-        count += 1
-    if count:
-        db.flush()
+    result = db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
+    count = result.get("affected", 0) if isinstance(result, dict) else 0
 
     # 1.1 删 BM25 索引
     try:
@@ -950,14 +945,9 @@ async def delete_file(file_id: str) -> None:
     # 1.5 删句子向量（句子级）
     if _sentence_db is not None:
         try:
-            s_nodes = _sentence_db.filter_where({"file_id": file_id})
-            s_count = 0
-            for node in s_nodes:
-                _sentence_db.delete(node.id)
-                s_count += 1
-            if s_count:
-                _sentence_db.flush()
-                logger.info(f"句子级清理: {file_id}, {s_count} 句")
+            s_result = _sentence_db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
+            s_count = s_result.get("affected", 0) if isinstance(s_result, dict) else 0
+            logger.info(f"句子级清理: {file_id}, {s_count} 句")
         except Exception as e:
             logger.warning(f"句子级清理失败 ({file_id}): {e}")
 
@@ -1004,18 +994,12 @@ async def reindex_file(file_id: str) -> dict:
 
     # 1. 删除旧数据（复用 delete_file 的清理逻辑，但不删源文件和 registry 条目）
     db = _get_db()
-    nodes = db.filter_where({"file_id": file_id})
-    for node in nodes:
-        db.delete(node.id)
-    db.flush()
+    db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
 
     # 清理句子库
     if _sentence_db is not None:
         try:
-            s_nodes = _sentence_db.filter_where({"file_id": file_id})
-            for node in s_nodes:
-                _sentence_db.delete(node.id)
-            _sentence_db.flush()
+            _sentence_db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
         except Exception as e:
             logger.warning(f"重索引句子级清理失败 ({file_id}): {e}")
 
@@ -1184,8 +1168,6 @@ def cleanup_orphan_registry() -> int:
         清理的孤儿条目数
     """
     db = _get_db()
-    all_ids = set(db.all_node_ids())
-
     registry = _load_registry()
     orphans = []
 
@@ -1193,14 +1175,11 @@ def cleanup_orphan_registry() -> int:
         # 检查 knowledge.tdb 中是否有至少一条属于此 file_id 的节点
         has_chunk = False
         try:
-            nodes = db.filter_where({"file_id": file_id})
-            for node in nodes:
-                nid = node.id if hasattr(node, "id") else None
-                if nid and nid in all_ids:
-                    has_chunk = True
-                    break
+            rows = db.tql(f'FIND {{file_id: {json.dumps(file_id)}}} RETURN id')
+            if rows:
+                has_chunk = True
         except Exception:
-            # filter_where 失败 → 保守策略，不删
+            # TQL FIND 失败 → 保守策略，不删
             continue
 
         if not has_chunk:

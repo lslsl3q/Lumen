@@ -267,18 +267,14 @@ def _scan_time_range(
     db = _get_agent_db()
     candidates: list[dict] = []
 
-    for nid in db.all_node_ids():
-        try:
-            node = db.get(nid)
-            payload = node.payload if hasattr(node, "payload") else {}
-        except Exception:
-            continue
+    # TQL FIND 过滤：只拉 daily_note + 指定角色的节点，不再全表扫描
+    if character_id:
+        rows = db.tql(f'FIND {{source: "daily_note", owner_id: {json.dumps(character_id)}}} RETURN *')
+    else:
+        rows = db.tql('FIND {source: "daily_note"} RETURN *')
 
-        if payload.get("source") != "daily_note":
-            continue
-        if character_id and payload.get("owner_id", "") != character_id:
-            continue
-
+    for row in rows:
+        payload = row.get("payload", {})
         created_at = payload.get("created_at", "")
         if not created_at:
             continue
@@ -295,7 +291,7 @@ def _scan_time_range(
             continue
 
         candidates.append({
-            "node_id": nid,
+            "node_id": row.get("id"),
             "content": content,
             "created_at": created_at,
             "importance": payload.get("importance", 3),
@@ -311,17 +307,12 @@ def _get_characters_with_diaries() -> list[str]:
 
     try:
         db = _get_agent_db()
+        rows = db.tql('FIND {source: "daily_note"} RETURN payload')
         owners: set[str] = set()
-        for nid in db.all_node_ids():
-            try:
-                node = db.get(nid)
-                payload = node.payload if hasattr(node, "payload") else {}
-            except Exception:
-                continue
-            if payload.get("source") == "daily_note":
-                owner = payload.get("owner_id", "")
-                if owner:
-                    owners.add(owner)
+        for row in rows:
+            owner = row.get("payload", {}).get("owner_id", "")
+            if owner:
+                owners.add(owner)
         return list(owners)
     except Exception:
         return []
