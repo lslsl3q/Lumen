@@ -7,10 +7,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import ModeSwitch from './ModeSwitch';
+import { useModeStore } from '../stores/useModeStore';
+import type { AppMode } from '../stores/useModeStore';
 
-const MODES = [
-  { key: 'chat', label: 'Chat', available: true },
-  { key: 'workbench', label: 'Workbench', available: false },
+const MODES: { key: AppMode; label: string }[] = [
+  { key: 'chat', label: '聊天' },
+  { key: 'base', label: '基地' },
+  { key: 'writing', label: '写作' },
 ];
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -38,7 +41,7 @@ function TitleBar() {
   const appWindow = useMemo(() => isTauri ? getCurrentWindow() : null, []);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
-  const [activeMode, setActiveMode] = useState('chat');
+  const { activeMode, switchMode } = useModeStore();
 
   useEffect(() => {
     if (!appWindow) return;
@@ -85,7 +88,7 @@ function TitleBar() {
         <ModeSwitch
           modes={MODES}
           activeMode={activeMode}
-          onSwitch={setActiveMode}
+          onSwitch={switchMode}
         />
       </div>
 
