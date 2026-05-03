@@ -33,6 +33,7 @@ class StreamRequest(BaseModel):
     session_id: str = "default"
     memory_debug: bool = False  # /tokens 命令开启记忆调试
     response_style: str = "balanced"
+    rpg_mode: bool = False  # RPG 模式：玩家输入直达 GM Agent
 
 
 class ChatResponse(BaseModel):
@@ -104,16 +105,35 @@ async def stream_chat(req: StreamRequest):
     session = manager.get_or_create(req.session_id)
 
     async def generate():
-        """生成 SSE 事件流（chat_stream 本身已是异步生成器，无需线程池翻译）"""
+        """生成 SSE 事件流"""
         try:
-            async for event in agent_chat_stream(req.message, session, memory_debug=req.memory_debug, response_style=req.response_style):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            if req.rpg_mode:
+                # RPG 模式：玩家输入 → GM Agent → 叙事 SSE
+                from lumen.core.environments.gm_agent import gm_chat_stream as _gm_stream
+
+                character_id = session.character_id or "player"
+
+                async for event in _gm_stream(
+                    source_id=character_id,
+                    action_content=req.message,
+                    session_id=session.session_id,
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            else:
+                # 普通聊天模式
+                async for event in agent_chat_stream(
+                    req.message, session,
+                    memory_debug=req.memory_debug,
+                    response_style=req.response_style,
+                ):
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
         finally:
-            # 清理可能残留的取消标志，防止下次对话被误判为已取消
             from lumen.components.react_acting import _clear_cancel
             _clear_cancel(session.session_id)
+            if req.rpg_mode:
+                _clear_cancel(f"gm_{session.session_id}")
 
         # SSE 连接关闭信号
         yield "data: [DONE]\n\n"
