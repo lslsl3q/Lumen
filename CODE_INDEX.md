@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-05-02（T29 System Prompt 动静分离 + 缓存统计 hook + Buffer/Consolidation 清理）
+**最后更新**：2026-05-03（T25 GM Agent 完整构建 + T11 Phase D 三模式状态机）
 
 ---
 
@@ -27,6 +27,9 @@ Lumen/
 │   │   ├── thinking_cluster.py   # 思维簇管道注入（priority=60）
 │   │   ├── tool.py               # 工具说明+角色保持指令（priority=90）
 │   │   ├── room_context.py       # T25 房间上下文注入（当前房间实体映射，priority=25，Gemini Trap 1 防御）
+│   │   ├── gm_identity.py        # T25 GM DM 人格组件（STATIC, priority=10, 从 data/gm/identity.md 热加载）
+│   │   ├── gm_world_context.py   # T25 GM 世界上下文组件（DYNAMIC, priority=30, 房间+实体+近期事件）
+│   │   ├── gm_resolution.py      # T25 GM 裁决规则组件（STATIC, priority=50, 4步裁决法+JSON schema）
 │   │   └── react_acting.py       # ReAct 决策循环（LLM→工具→结果→再LLM + _yield_rpg_state + 思考链双轨处理 + T29双system消息构建 + 流式缓存统计）
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
 │   │   ├── default.json           # 默认助手（calculate/web/file_manager/daily_note）
@@ -43,7 +46,9 @@ Lumen/
 │   │   ├── message_bus.py        # T25 消息总线（send_to/broadcast/rooms + 全局单例）
 │   │   ├── environments/         # T25 模式环境
 │   │   │   ├── base.py           # BaseEnvironment 抽象基类（register_agent + process_message）
-│   │   │   └── gm.py             # GMEnvironment（4步裁决链 + 斜杠旁路 + 降级广播 + 观察投递）
+│   │   │   ├── gm.py             # GMEnvironment（4步裁决链 + GM Agent ReAct + AsyncGenerator SSE + NPC异步广播）
+│   │   │   ├── gm_agent.py       # T25 GM Agent 构建器（无状态临时Agent + 4组件 + gm_chat_stream核心入口）
+│   │   │   └── narrative_parser.py # T25 叙事解析器（markdown剥离 + JSON解析 + 降级兜底）
 │   │   └── reflection_README.md  # T22 反思系统模块说明书（架构+数据流+扩展指南）
 │   │
 │   ├── tools/                    # 双手 — 每个工具一个 .py（基类在根目录 tool.py）
@@ -86,7 +91,7 @@ Lumen/
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
 │   │   ├── history.py            # SQLite持久化（会话、消息、摘要、FTS5全文索引、向量级联删除）
-│   │   ├── world_state.py        # T25 RPG 世界状态黑板（SQLite：位置/HP/属性/房间，线程安全）
+│   │   ├── world_state.py        # T25 RPG 世界状态黑板（SQLite：位置/HP/属性/房间/rpg_events事件记录，线程安全）
 │   │   ├── vector_store.py       # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除 + .dim 一致性检查）
 │   │   ├── embedding.py          # 文本嵌入（两阵营架构 + 稀疏向量 encode_with_sparse + instruction_type 预留）
 │   │   ├── sparse_store.py       # 稀疏向量存储（SQLite + In-memory 缓存 + Dot Product 搜索，T25）
