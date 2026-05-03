@@ -57,6 +57,19 @@ def _init_tables(conn: sqlite3.Connection):
             name      TEXT NOT NULL DEFAULT '',
             metadata  TEXT NOT NULL DEFAULT '{}'
         );
+
+        CREATE TABLE IF NOT EXISTS rpg_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id TEXT NOT NULL DEFAULT '',
+            room_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            event_type TEXT NOT NULL CHECK(event_type IN ('action', 'narrative', 'state_change')),
+            summary TEXT NOT NULL,
+            created_at REAL NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_rpg_events_room_time
+            ON rpg_events(room_id, created_at DESC);
     """)
 
     # 迁移：给已有表加 name 列
@@ -248,6 +261,47 @@ def list_agents_in_room(room_id: str) -> list[str]:
         "SELECT agent_id FROM agent_state WHERE room_id = ?", (room_id,)
     ).fetchall()
     return [row["agent_id"] for row in rows]
+
+
+# ── RPG 事件记录 ──
+
+def record_event(
+    room_id: str,
+    source_id: str,
+    event_type: str,
+    summary: str,
+    campaign_id: str = "",
+) -> int:
+    """记录一条 RPG 事件，返回插入的 row id"""
+    with _write_lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            "INSERT INTO rpg_events (campaign_id, room_id, source_id, event_type, summary) VALUES (?, ?, ?, ?, ?)",
+            (campaign_id, room_id, source_id, event_type, summary),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_recent_events(room_id: str, limit: int = 5, campaign_id: str = "") -> list[dict]:
+    """获取某个房间最近 N 条事件摘要（按时间正序返回）"""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id, source_id, event_type, summary, created_at FROM rpg_events "
+        "WHERE room_id = ? AND campaign_id = ? "
+        "ORDER BY created_at DESC LIMIT ?",
+        (room_id, campaign_id, limit),
+    ).fetchall()
+    return [
+        {
+            "id": row["id"],
+            "source_id": row["source_id"],
+            "event_type": row["event_type"],
+            "summary": row["summary"],
+            "created_at": row["created_at"],
+        }
+        for row in reversed(rows)
+    ]
 
 
 # ── 属性查询快捷方法 ──
