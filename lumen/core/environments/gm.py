@@ -4,7 +4,7 @@ T25 GMEnvironment — RPG 跑团 DM 环境
 4 步裁决链：
 1. 拦截/初筛（零 Token）— 斜杠指令直接执行，非法行动拒绝
 2. 工具判定（零/低 Token）— 掷骰、属性检定、战斗结算
-3. LLM 叙事（高 Token）— 生成 DM 描述文本
+3. LLM 叙事（高 Token）— GM Agent ReAct 循环生成裁决和叙事
 4. 广播（零 Token）— 向同一房间的 Agent 投递观察消息
 
 意图提取策略（混合模式）：
@@ -18,9 +18,10 @@ T25 GMEnvironment — RPG 跑团 DM 环境
 - 降级广播：把工具结果直接转为系统文本发出
 """
 
-import re
+import asyncio
 import logging
-from typing import Optional
+import re
+from typing import AsyncGenerator, Optional
 
 from lumen.core.environments.base import BaseEnvironment
 from lumen.types.agent_message import AgentMessage, MsgType
@@ -120,7 +121,8 @@ class GMEnvironment(BaseEnvironment):
         source_id: str,
         target_id: str | None,
         msg: AgentMessage,
-    ) -> None:
+    ) -> AsyncGenerator[dict, None]:
+        """处理玩家消息，yield SSE 事件"""
         content = msg.get("content", "")
         if not content:
             return
@@ -128,29 +130,27 @@ class GMEnvironment(BaseEnvironment):
         # Step 0: 斜杠指令 → 直接执行，零 Token
         slash = _parse_slash(content)
         if slash:
-            await self._handle_slash(source_id, slash[0], slash[1])
+            async for event in self._handle_slash(source_id, slash[0], slash[1]):
+                yield event
             return
 
         # Step 1: 规则初筛（零 Token）
         validation = self._validate_action(source_id, msg)
         if not validation["ok"]:
-            await self.message_bus.send_to(source_id, {
-                "type": MsgType.SYSTEM,
-                "sender_id": "gm",
-                "content": validation["reason"],
-            })
+            yield {"type": "text", "content": validation["reason"]}
+            yield {"type": "done", "exit_reason": "rejected"}
             return
 
-        # Step 2-3: 自然语言 → 交给 GM Agent 的 ReAct 循环
-        # （GM Agent 有 RPG 工具可用，LLM 自己决定是否调工具）
-        # 注：当前 MVP 阶段走简化路径，直接广播玩家消息
-        # 完整版会创建 GM Agent 并走 agent.act()
-        await self._relay_to_gm(source_id, msg)
+        # Step 2-3: 自然语言 → GM Agent
+        async for event in self._relay_to_gm(source_id, msg):
+            yield event
 
     # ── 斜杠指令处理（Step 0）──
 
-    async def _handle_slash(self, source_id: str, command: str, params: dict) -> None:
-        """斜杠指令：直接调工具 → 生成叙事 → 广播"""
+    async def _handle_slash(
+        self, source_id: str, command: str, params: dict
+    ) -> AsyncGenerator[dict, None]:
+        """斜杠指令：直接调工具 → 生成叙事 → yield SSE 事件"""
         params["agent_id"] = source_id
 
         # 执行工具
@@ -160,19 +160,35 @@ class GMEnvironment(BaseEnvironment):
             logger.error(f"斜杠指令执行失败: {command}, {e}")
             result = {"success": False, "error_message": str(e)}
 
-        # 生成叙事（降级模式：直接用工具结果文本）
         narrative = _degraded_narrative(result, command)
 
-        # 发送结果给执行者
-        await self.message_bus.send_to(source_id, {
-            "type": MsgType.SYSTEM,
-            "sender_id": "gm",
-            "content": narrative,
-            "metadata": {"tool_result": result, "slash_command": command},
-        })
+        # 工具结果事件
+        yield {
+            "type": "tool_result",
+            "tool": command,
+            "success": result.get("success", False),
+            "data": result.get("data"),
+        }
 
-        # 广播观察给同房间的其他 Agent
+        # 叙事文本事件
+        yield {"type": "text", "content": narrative}
+
+        # RPG 状态快照
+        if result.get("success"):
+            async for evt in self._yield_room_state(source_id):
+                yield evt
+
+        # 广播观察给同房间其他 Agent
         await self._broadcast_observation(source_id, narrative, result)
+
+        # 记录事件
+        state = self.world_state.get_agent_state(source_id)
+        room_id = state.get("room_id", "") if state else ""
+        if room_id:
+            self.world_state.record_event(room_id, source_id, "action", f"/{command}")
+            self.world_state.record_event(room_id, "gm", "narrative", narrative[:100])
+
+        yield {"type": "done", "exit_reason": "slash_command"}
 
     # ── 规则初筛（Step 1）──
 
@@ -187,32 +203,68 @@ class GMEnvironment(BaseEnvironment):
 
         return {"ok": True}
 
-    # ── 消息中继（Step 2-3，MVP 简化版）──
+    # ── GM Agent 裁决（Step 2-3）──
 
-    async def _relay_to_gm(self, source_id: str, msg: AgentMessage) -> None:
-        """将玩家消息广播给同房间的其他 Agent
+    async def _relay_to_gm(
+        self, source_id: str, msg: AgentMessage
+    ) -> AsyncGenerator[dict, None]:
+        """自然语言 → GM Agent ReAct → 叙事 SSE 流"""
+        from lumen.core.environments.gm_agent import gm_chat_stream
 
-        完整版会：
-        1. 创建/获取 GM Agent
-        2. GM Agent.act() 通过 ReAct 循环处理消息
-        3. GM 可能调用 RPG 工具
-        4. GM 生成叙事
-        5. 叙事广播给观察者
-        """
         content = msg.get("content", "")
+
+        # 获取 session_id（从 metadata 传入，或用空字符串）
+        session_id = msg.get("metadata", {}).get("session_id", "")
+
+        async for event in gm_chat_stream(
+            source_id=source_id,
+            action_content=content,
+            session_id=session_id,
+        ):
+            yield event
+
+        # GM 完成后，异步广播观察给同房间 NPC
         state = self.world_state.get_agent_state(source_id)
-        if not state:
-            return
+        if state and state.get("room_id"):
+            room_id = state["room_id"]
 
-        room_id = state.get("room_id", "")
+            async def _safe_broadcast():
+                try:
+                    await self.message_bus.broadcast(room_id, {
+                        "type": MsgType.OBSERVATION,
+                        "sender_id": source_id,
+                        "room_id": room_id,
+                        "content": content,
+                    })
+                except Exception as e:
+                    logger.error(f"NPC 广播失败: {e}")
 
-        # 广播玩家行动给同房间其他 Agent（观察消息）
-        await self.message_bus.broadcast(room_id, {
-            "type": MsgType.OBSERVATION,
-            "sender_id": source_id,
-            "room_id": room_id,
-            "content": content,
-        })
+            task = asyncio.create_task(_safe_broadcast())
+            task.add_done_callback(
+                lambda t: t.exception() if not t.cancelled() else None
+            )
+
+    # ── RPG 状态快照 ──
+
+    async def _yield_room_state(
+        self, source_id: str
+    ) -> AsyncGenerator[dict, None]:
+        """yield rpg_state SSE 事件"""
+        try:
+            state = self.world_state.get_agent_state(source_id)
+            if not state or not state.get("room_id"):
+                return
+            room_id = state["room_id"]
+            room = self.world_state.get_room(room_id)
+            entities = self.world_state.get_room_entities(room_id)
+            yield {
+                "type": "rpg_state",
+                "room_id": room_id,
+                "room_name": room.get("name", room_id) if room else room_id,
+                "entities": entities,
+            }
+        except Exception as e:
+            logger.debug(f"rpg_state 生成跳过: {e}")
 
     # ── 广播观察（Step 4）──
 
