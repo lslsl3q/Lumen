@@ -108,16 +108,17 @@ export async function sendMessageStream(
   signal?: AbortSignal,
   memoryDebugMode?: boolean,
   responseStyle?: string,
+  rpgMode?: boolean,
 ): Promise<void> {
   try {
-    console.log('[API] 发送流式消息请求:', { message, sessionId, memoryDebugMode, responseStyle });
+    console.log('[API] 发送流式消息请求:', { message, sessionId, memoryDebugMode, responseStyle, rpgMode });
 
     const response = await fetch(`${API_BASE_URL}/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false, response_style: responseStyle || 'balanced' }),
+      body: JSON.stringify({ message, session_id: sessionId || 'default', memory_debug: memoryDebugMode || false, response_style: responseStyle || 'balanced', rpg_mode: rpgMode || false }),
       signal,
     });
 

@@ -166,6 +166,7 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [responseStyle, setResponseStyle] = useState<string>('balanced');
+  const [rpgMode, setRpgMode] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -395,6 +396,7 @@ export function useChat() {
         abortControllerRef.current.signal,
         debugMode,
         responseStyle,
+        rpgMode,
       );
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
@@ -427,7 +429,7 @@ export function useChat() {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [currentSessionId]);
+  }, [currentSessionId, responseStyle, rpgMode]);
 
   const resetChat = useCallback(() => {
     setMessages([]);
@@ -528,5 +530,7 @@ export function useChat() {
     branchFromMessage,
     responseStyle,
     setResponseStyle,
+    rpgMode,
+    setRpgMode,
   };
 }

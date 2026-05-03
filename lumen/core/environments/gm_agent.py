@@ -43,7 +43,10 @@ def _build_gm_agent(
     temp_session = SimpleNamespace(
         session_id=gm_session_id,
         character_id="gm",
-        messages=[{"role": "user", "content": action_content}],
+        messages=[
+            {"role": "system", "content": ""},  # 占位，被 Agent.act() 的 static_prompt 替换
+            {"role": "user", "content": action_content},
+        ],
     )
 
     # ActingComponent — ReAct 循环

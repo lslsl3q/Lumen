@@ -72,6 +72,8 @@ function ChatMode({ debug, floating }: ChatModeProps) {
         onBranchFromMessage={d.handleBranch}
         responseStyle={d.chat.responseStyle}
         onResponseStyleChange={d.chat.setResponseStyle}
+        rpgMode={d.chat.rpgMode}
+        onRpgModeChange={d.chat.setRpgMode}
         authorNoteConfig={d.authorNote.config}
         onAuthorNoteSaveContent={d.authorNote.saveContent}
         onAuthorNoteSetPosition={d.authorNote.setPosition}
