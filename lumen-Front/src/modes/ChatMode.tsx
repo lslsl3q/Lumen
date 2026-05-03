@@ -86,14 +86,18 @@ function ChatMode({ debug, floating }: ChatModeProps) {
           onClose={() => d.setSysPromptEditor(null)}
         />
       )}
-      <MemoryWindow
-        open={d.memoryWindowOpen}
-        onClose={() => d.setMemoryWindowOpen(false)}
-      />
-      <GraphWindow
-        open={d.graphWindowOpen}
-        onClose={() => d.setGraphWindowOpen(false)}
-      />
+      {d.memoryWindowOpen && (
+        <MemoryWindow
+          open
+          onClose={() => d.setMemoryWindowOpen(false)}
+        />
+      )}
+      {d.graphWindowOpen && (
+        <GraphWindow
+          open
+          onClose={() => d.setGraphWindowOpen(false)}
+        />
+      )}
       {d.rpgPanelOpen && d.rpg.roomState.roomId && (
         <RpgPanel
           roomState={d.rpg.roomState}

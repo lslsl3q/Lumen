@@ -121,6 +121,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
     },
   };
 
+  const destroyedRef = useRef(false);
+
   /* ── 加载数据 ── */
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -130,19 +132,21 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         graphApi.listEdges(tdb),
         getTdbFileTree(tdb).catch(() => ({ folders: [] as TdbFileFolder[], total_files: 0 })),
       ]);
+      if (destroyedRef.current) return;
+
       setEntities(entData.entities);
       setEdges(edgeData.edges);
       setFileFolders(treeData.folders);
 
       const graph = graphRef.current;
-      if (graph) {
+      if (graph && !destroyedRef.current) {
         const data = {
           nodes: entData.entities.map(toG6Node),
           edges: edgeData.edges.map(toG6Edge),
         };
         graph.clear();
         graph.setData(data);
-        graph.render();
+        graph.render().catch(() => {});
       }
     } catch (err) {
       console.error('加载图谱数据失败:', err);
@@ -298,6 +302,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
     graphRef.current = graph;
 
     return () => {
+      destroyedRef.current = true;
       graph.destroy();
       graphRef.current = null;
     };

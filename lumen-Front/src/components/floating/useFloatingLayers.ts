@@ -2,7 +2,7 @@
  * 浮动层状态管理 hook
  *
  * 统一管理 SettingsOverlay / FloatingWindow 两级浮动层的开关状态。
- * 不使用 Context Provider — 在 ChatInterface 中实例化，通过 props 向下传递。
+ * 不使用 Context Provider — 在 MainLayout 中实例化，通过 props 向下传递。
  */
 import { useCallback, useState } from 'react';
 

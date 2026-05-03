@@ -124,7 +124,7 @@ function MainLayout() {
         )}
       </div>
 
-      <div id="overlay-root" className="pointer-events-none fixed inset-0 z-50" />
+      <div id="overlay-root" />
       <FloatingLayerHost floating={floating} />
       <PushNotification notifications={notifications} onDismiss={dismissNotification} />
     </div>

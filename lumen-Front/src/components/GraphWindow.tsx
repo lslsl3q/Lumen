@@ -34,13 +34,13 @@ function GraphWindow({ open, onClose }: GraphWindowProps) {
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="absolute inset-0 bg-[#1C1B19]/80 backdrop-blur-sm animate-overlay-fade-in" />
+      <div className="absolute inset-0 bg-[#1C1B19]/80 animate-overlay-fade-in" />
 
       <div
         className={`relative flex flex-col overflow-hidden
           bg-[#1a1a18] border border-[#2a2926]
           shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(204,124,94,0.05)]
-          animate-modal-in transition-all duration-200
+          animate-modal-in
           ${isFullscreen ? 'rounded-none' : 'rounded-xl'}`}
         style={isFullscreen ? { width: '100%', height: '100%' } : { width: 1152, height: 768 }}
       >
@@ -84,7 +84,7 @@ function GraphWindow({ open, onClose }: GraphWindowProps) {
               )}
             </button>
             <button
-              onClick={onClose}
+              onClick={(e) => { e.stopPropagation(); onClose(); }}
               className="w-6 h-6 rounded flex items-center justify-center cursor-pointer
                 text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
             >

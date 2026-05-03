@@ -2,7 +2,7 @@
  * useDebugState — 调试监控状态管理
  *
  * 拥有：debugMode（窗口开关）、debugInfo（token 层数据）、reactTrace（ReAct 追踪）
- * 不依赖 useChat，由 ChatInterface 通过 onDebugEvent 回调桥接 SSE 事件
+ * 不依赖 useChat，由 useChatMode 通过 onDebugEvent 回调桥接 SSE 事件
  */
 import { useState, useCallback } from 'react';
 import type { MemoryDebugLayer } from '../types/debug';

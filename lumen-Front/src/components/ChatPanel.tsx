@@ -2,7 +2,7 @@
  * 聊天面板 — 纯渲染组件
  *
  * 职责：消息列表 + 输入框，所有状态来自 props
- * 从原 ChatInterface.tsx 提取而来
+ * 从原 ChatInterface 提取而来（T11 Phase D 拆入 useChatMode + ChatMode）
  */
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
