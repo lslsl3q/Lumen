@@ -17,17 +17,17 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
   return (
     <div className="flex-1 overflow-hidden relative">
       {mounted.has('chat') && (
-        <div className={activeMode === 'chat' ? 'flex flex-1 overflow-hidden' : 'hidden'}>
+        <div className={activeMode === 'chat' ? 'absolute inset-0 flex' : 'hidden'}>
           <ChatMode debug={debug} floating={floating} />
         </div>
       )}
       {mounted.has('base') && (
-        <div className={activeMode === 'base' ? 'flex flex-1 overflow-hidden' : 'hidden'}>
+        <div className={activeMode === 'base' ? 'absolute inset-0 flex' : 'hidden'}>
           <BaseMode />
         </div>
       )}
       {mounted.has('writing') && (
-        <div className={activeMode === 'writing' ? 'flex flex-1 overflow-hidden' : 'hidden'}>
+        <div className={activeMode === 'writing' ? 'absolute inset-0 flex' : 'hidden'}>
           <WritingMode />
         </div>
       )}
