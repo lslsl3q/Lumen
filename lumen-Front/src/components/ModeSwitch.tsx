@@ -4,19 +4,19 @@
  * 用于标题栏居中位置，切换 Chat / Workbench / RPG 等模式。
  * Phase B: 仅 Chat 可用，其他为占位。
  */
-interface Mode {
-  key: string;
+interface Mode<T extends string = string> {
+  key: T;
   label: string;
   available?: boolean;
 }
 
-interface ModeSwitchProps {
-  modes: Mode[];
-  activeMode: string;
-  onSwitch: (mode: string) => void;
+interface ModeSwitchProps<T extends string = string> {
+  modes: Mode<T>[];
+  activeMode: T;
+  onSwitch: (mode: T) => void;
 }
 
-function ModeSwitch({ modes, activeMode, onSwitch }: ModeSwitchProps) {
+function ModeSwitch<T extends string = string>({ modes, activeMode, onSwitch }: ModeSwitchProps<T>) {
   return (
     <div className="inline-flex rounded-full bg-slate-800/50 p-0.5 gap-0.5">
       {modes.map(mode => {
