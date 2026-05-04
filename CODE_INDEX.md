@@ -158,12 +158,21 @@ Lumen/
 │   └── src/
 │       ├── App.tsx               # 应用入口（MainLayout 持有跨模式资源 + ModeContainer 替代旧 ChatInterface）
 │       ├── stores/               # Zustand 全局状态
-│       │   └── useModeStore.ts   # 模式状态（activeMode + mounted 懒加载追踪）
+│       │   ├── useModeStore.ts   # 模式状态（activeMode + mounted 懒加载追踪）
+│       │   └── useBaseStore.ts   # T11 基地模式状态（频道/消息/成员 CRUD + mock 数据）
 │       ├── modes/                # T11 Phase D 三模式容器
 │       │   ├── ModeContainer.tsx # 懒挂载 + display:none 容器（读 useModeStore）
 │       │   ├── ChatMode.tsx      # 聊天模式 UI 编排（纯渲染，逻辑在 useChatMode）
-│       │   ├── BaseMode.tsx      # 基地模式骨架（占位）
-│       │   └── WritingMode.tsx   # 写作模式骨架（占位）
+│       │   ├── BaseMode.tsx      # T11 基地模式三栏 Discord 骨架
+│       │   ├── WritingMode.tsx   # 写作模式骨架（占位）
+│       │   └── base/             # T11 基地模式组件
+│       │       ├── types.ts      # 频道/消息/成员类型 + ChannelType 枚举(chat|rpg|board|manage)
+│       │       ├── mockData.ts   # 预设频道 + mock 消息/成员数据
+│       │       ├── ChannelSidebar.tsx  # 左栏：频道导航 + 创建/删除右键菜单
+│       │       ├── ChannelContent.tsx  # 中栏：消息流 + 输入框
+│       │       ├── ChannelMessage.tsx  # 单条消息渲染（系统/角色/用户三样式）
+│       │       ├── InfoPanel.tsx       # 右栏：在线/离线成员列表
+│       │       └── CreateChannelModal.tsx # 创建频道弹窗（名称+类型+描述）
 │       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills, knowledge, graph, tdb）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
 │       ├── hooks/                # 状态管理（useChat, useChatMode[聊天逻辑层], useDebugState, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useRPG, useResizableWidth[可拖拽宽度]）
