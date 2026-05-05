@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type AppMode = 'chat' | 'base' | 'writing';
+export type AppMode = 'chat' | 'base' | 'rpg' | 'writing';
 
 interface ModeState {
   activeMode: AppMode;

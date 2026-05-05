@@ -5,11 +5,12 @@
  * 改为有序 steps 数组，每个 step 是一个独立视觉阶段（思考/工具/文本）。
  * 后端零改动，前端从现有 SSE 事件构建 steps。
  */
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { sendMessageStream, getHistory, cancelChat, editMessage as editMessageAPI, deleteMessage as deleteMessageAPI, regenerateMessage as regenerateMessageAPI, branchSession as branchSessionAPI, StreamEvent } from '../api/chat';
+import { useState, useCallback, useRef } from 'react';
+import { getHistory, editMessage as editMessageAPI, deleteMessage as deleteMessageAPI, regenerateMessage as regenerateMessageAPI, branchSession as branchSessionAPI, StreamEvent } from '../api/chat';
 import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
 import { toast } from '../utils/toast';
+import { useWebSocket } from './useWebSocket';
 
 // ── Steps 类型定义 ──
 
@@ -125,17 +126,6 @@ function updateLastStep<T extends MessageStep>(
   return steps;
 }
 
-/** 追加文本到最后一个 text step，没有则新建 */
-function appendText(steps: MessageStep[], text: string): MessageStep[] {
-  const last = steps[steps.length - 1];
-  if (last && last.type === 'text') {
-    return updateLastStep(steps, 'text', (s: TextStep) => ({
-      ...s, content: s.content + text,
-    }));
-  }
-  return pushStep(steps, { type: 'text', id: _nextStepId++, content: text });
-}
-
 /** 清空最后一个 text step */
 function clearText(steps: MessageStep[]): MessageStep[] {
   const last = steps[steps.length - 1];
@@ -167,11 +157,111 @@ export function useChat() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [responseStyle, setResponseStyle] = useState<string>('balanced');
   const [rpgMode, setRpgMode] = useState<boolean>(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    return () => { abortControllerRef.current?.abort(); };
-  }, []);
+  // 当前流式中的 assistant 消息 ID
+  const streamingMsgIdRef = useRef<string | null>(null);
+  // 外部 debug 回调
+  const debugCallbackRef = useRef<((event: StreamEvent) => void) | null>(null);
+
+  // T26: WebSocket 替代 SSE
+  const { sendMessage: wsSend } = useWebSocket((event: StreamEvent) => {
+    // 没有正在流的消息则忽略
+    const msgId = streamingMsgIdRef.current;
+    if (!msgId) return;
+
+    setMessages(prev => {
+      const updated = [...prev];
+      const lastIdx = updated.length - 1;
+      const last = updated[lastIdx];
+      if (!last || last.id !== msgId) return prev;
+
+      let steps = last.steps || [];
+
+      switch (event.type) {
+        case 'think_start':
+          steps = pushStep(steps, { type: 'think', id: _nextStepId++, content: '', done: false });
+          break;
+        case 'think_content':
+          steps = updateLastStep(steps, 'think', (s: ThinkStep) => ({ ...s, content: s.content + (event.content || '') }));
+          break;
+        case 'think_end':
+          steps = updateLastStep(steps, 'think', (s: ThinkStep) => ({ ...s, done: true }));
+          break;
+        case 'tool_start': {
+          const raw = event.tool;
+          const toolNames = (Array.isArray(raw) ? raw : [raw]).filter((n): n is string => typeof n === 'string');
+          const toolCommands = Array.isArray(event.command) ? event.command : toolNames.map(() => typeof event.command === 'string' ? event.command : '');
+          for (let i = 0; i < toolNames.length; i++) {
+            steps = pushStep(steps, { type: 'tool', id: _nextStepId++, name: toolNames[i], command: toolCommands[i] || '', status: 'running' as const, params: event.params });
+          }
+          break;
+        }
+        case 'tool_result':
+          for (let i = steps.length - 1; i >= 0; i--) {
+            const s = steps[i];
+            if (s.type === 'tool' && s.status === 'running' && s.name === event.tool && (!event.command || s.command === event.command)) {
+              const u2 = [...steps];
+              u2[i] = { ...s, status: 'done', success: event.success, error: event.error, data: event.data };
+              steps = u2;
+              break;
+            }
+          }
+          break;
+        case 'text_clear':
+          steps = clearText(steps);
+          break;
+        case 'text': {
+          // 增量文本：追加到最后一个 TextStep，没有则新建
+          const lastStep = steps[steps.length - 1];
+          if (lastStep && lastStep.type === 'text') {
+            steps = updateLastStep(steps, 'text', (s: TextStep) => ({ ...s, content: s.content + (event.content || '') }));
+          } else if (event.content) {
+            steps = pushStep(steps, { type: 'text', id: _nextStepId++, content: event.content });
+          }
+          break;
+        }
+        case 'text_set':
+          steps = setText(steps, event.content || '');
+          break;
+        case 'status':
+          debugCallbackRef.current?.(event);
+          if (rpgMode && event.status === 'rpg_resolution' && event.message) {
+            return [...updated, { id: crypto.randomUUID(), role: 'system' as const, content: event.message, timestamp: Date.now() }];
+          }
+          return prev;
+        case 'memory_debug':
+        case 'react_trace':
+        case 'rpg_state':
+          debugCallbackRef.current?.(event);
+          return prev;
+        case 'msg_saved':
+          if (event.role && event.db_id !== undefined) {
+            const idx = updated.map((m, i) => ({ m, i })).reverse().find(({ m }) => m.role === event.role && !m.dbId);
+            if (idx) {
+              const nu = [...updated];
+              nu[idx.i] = { ...idx.m, dbId: event.db_id };
+              return nu;
+            }
+          }
+          return prev;
+        case 'error':
+          steps = setText(steps, `Error: ${event.message || '未知错误'}`);
+          setIsLoading(false);
+          return [...updated.slice(0, -1), { ...last, steps, isStreaming: false }];
+        case 'done': {
+          const updates: Partial<Message> = { isStreaming: false, steps };
+          if (event.assistant_db_id) updates.dbId = event.assistant_db_id;
+          streamingMsgIdRef.current = null;
+          setIsLoading(false);
+          return [...updated.slice(0, -1), { ...last, ...updates }];
+        }
+        default:
+          return prev;
+      }
+
+      return [...updated.slice(0, -1), { ...last, steps }];
+    });
+  });
 
   /** 加载指定会话的历史消息 */
   const loadHistory = useCallback(async (sessionId: string, characterId?: string) => {
@@ -221,7 +311,7 @@ export function useChat() {
   /** 发送消息（核心逻辑 — Steps 版） */
   const sendMessageToAPI = useCallback(async (
     messageContent: string,
-    debugMode: boolean = false,
+    _debugMode: boolean = false,
     onDebugEvent?: ((event: StreamEvent) => void) | null,
   ) => {
     if (!messageContent.trim()) return;
@@ -259,177 +349,17 @@ export function useChat() {
     setIsLoading(true);
     setError(null);
 
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    streamingMsgIdRef.current = assistantId;
+    debugCallbackRef.current = onDebugEvent || null;
 
-    try {
-      await sendMessageStream(
-        messageContent,
-        // onText → 追加到最后一个 text step
-        (text) => {
-          setMessages(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last.id === assistantId) {
-              updated[updated.length - 1] = {
-                ...last,
-                content: last.content + text,
-                steps: appendText(last.steps || [], text),
-              };
-            }
-            return updated;
-          });
-        },
-        // onEvent → 构建 steps 数组
-        (event: StreamEvent) => {
-          setMessages(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last.id !== assistantId) return prev;
-
-            let steps = last.steps || [];
-
-            switch (event.type) {
-              case 'think_start': {
-                steps = pushStep(steps, {
-                  type: 'think', id: _nextStepId++, content: '', done: false,
-                });
-                break;
-              }
-              case 'think_content': {
-                steps = updateLastStep(steps, 'think', (s: ThinkStep) => ({
-                  ...s, content: s.content + (event.content || ''),
-                }));
-                break;
-              }
-              case 'think_end': {
-                steps = updateLastStep(steps, 'think', (s: ThinkStep) => ({
-                  ...s, done: true,
-                }));
-                break;
-              }
-              case 'tool_start': {
-                const raw = event.tool;
-                const toolNames = (Array.isArray(raw) ? raw : [raw]).filter((n): n is string => typeof n === 'string');
-                const toolCommands = Array.isArray(event.command) ? event.command : toolNames.map(() => typeof event.command === 'string' ? event.command : '');
-                for (let i = 0; i < toolNames.length; i++) {
-                  steps = pushStep(steps, {
-                    type: 'tool',
-                    id: _nextStepId++,
-                    name: toolNames[i],
-                    command: toolCommands[i] || '',
-                    status: 'running' as const,
-                    params: event.params,
-                  });
-                }
-                break;
-              }
-              case 'tool_result': {
-                // 找最后一个匹配的 running tool step
-                for (let i = steps.length - 1; i >= 0; i--) {
-                  const s = steps[i];
-                  if (s.type === 'tool' && s.status === 'running' && s.name === event.tool
-                    && (!event.command || s.command === event.command)) {
-                    const updated2 = [...steps];
-                    updated2[i] = {
-                      ...s,
-                      status: 'done',
-                      success: event.success,
-                      error: event.error,
-                      data: event.data,
-                    };
-                    steps = updated2;
-                    break;
-                  }
-                }
-                break;
-              }
-              case 'text_clear': {
-                steps = clearText(steps);
-                break;
-              }
-              case 'text_set': {
-                steps = setText(steps, event.content || '');
-                break;
-              }
-              case 'status': {
-                onDebugEvent?.(event);
-                return prev;
-              }
-              case 'memory_debug':
-              case 'react_trace':
-              case 'rpg_state': {
-                onDebugEvent?.(event);
-                return prev;
-              }
-              case 'msg_saved': {
-                const role = event.role;
-                const dbId = event.db_id;
-                if (!role || dbId === undefined) return prev;
-                const idx = updated.map((m, i) => ({ m, i }))
-                  .reverse()
-                  .find(({ m }) => m.role === role && !m.dbId);
-                if (idx) {
-                  const newUpdated = [...updated];
-                  newUpdated[idx.i] = { ...idx.m, dbId };
-                  return newUpdated;
-                }
-                return prev;
-              }
-              case 'error': {
-                steps = setText(steps, `❌ 服务错误：${event.message || '未知错误'}`);
-                return [...updated.slice(0, -1), { ...last, steps, isStreaming: false }];
-              }
-              case 'done': {
-                const updates: Partial<Message> = { isStreaming: false, steps };
-                if (event.assistant_db_id) updates.dbId = event.assistant_db_id;
-                return [...updated.slice(0, -1), { ...last, ...updates }];
-              }
-              default:
-                return prev;
-            }
-
-            return [...updated.slice(0, -1), { ...last, steps }];
-          });
-        },
-        sessionId,
-        abortControllerRef.current.signal,
-        debugMode,
-        responseStyle,
-        rpgMode,
-      );
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        setMessages(prev => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.id === assistantId) {
-            updated[updated.length - 1] = { ...last, isStreaming: false };
-          }
-          return updated;
-        });
-        setIsLoading(false);
-        return;
-      }
-      console.error('Stream failed:', err);
-      setMessages(prev => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last.id === assistantId && !last.content) {
-          return updated.slice(0, -1);
-        }
-        if (last.id === assistantId) {
-          updated[updated.length - 1] = { ...last, isStreaming: false };
-        }
-        return updated;
-      });
-      setError('流式连接失败，请检查后端是否启动');
-      setInput(messageContent);
-    } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
-    }
-  }, [currentSessionId, responseStyle, rpgMode]);
+    wsSend({
+      type: 'chat',
+      content: messageContent,
+      session_id: sessionId,
+      response_style: responseStyle,
+      rpg_mode: rpgMode,
+    });
+  }, [currentSessionId, responseStyle, rpgMode, wsSend]);
 
   const resetChat = useCallback(() => {
     setMessages([]);
@@ -444,16 +374,11 @@ export function useChat() {
     }]);
   }, []);
 
-  const abort = useCallback(async () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    if (currentSessionId) {
-      try { await cancelChat(currentSessionId); } catch { /* ignore */ }
-    }
+  const abort = useCallback(() => {
+    wsSend({ type: 'cancel', session_id: currentSessionId || 'default' });
+    streamingMsgIdRef.current = null;
     setIsLoading(false);
-  }, [currentSessionId]);
+  }, [currentSessionId, wsSend]);
 
   const editMessage = useCallback(async (messageId: string, newContent: string) => {
     const msg = messages.find(m => m.id === messageId);

@@ -9,11 +9,12 @@
  * - CharacterInfo 缺失字段导致保存覆盖（已在后端修复）
  * - 工具排序：添加上移/下移按钮
  */
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { CharacterListItem, CharacterFormData } from '../../types/character';
-import { getCharacter, updateCharacter, createCharacter, getAvatarUrl } from '../../api/character';
-import { listModels, ModelInfo } from '../../api/models';
+import { getCharacter, updateCharacter, createCharacter } from '../../api/character';
+import { getAvatarUrl } from '../../utils/url';
 import { useSkills } from '../../hooks/useSkills';
+import { useModels } from '../../hooks/useModels';
 import { BackButton } from './shared/BackButton';
 import { AvatarUpload } from './shared/AvatarUpload';
 import { SectionHeader } from './shared/SectionHeader';
@@ -108,13 +109,8 @@ export default function CharacterPanel({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
-  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
+  const { models: availableModels } = useModels();
   const { skills: availableSkills } = useSkills();
-
-  // 加载模型列表
-  useEffect(() => {
-    listModels().then(data => setAvailableModels(data.models)).catch(() => {});
-  }, []);
 
   const updateForm = useCallback((patch: Partial<CharacterFormData>) => {
     setForm(prev => ({ ...prev, ...patch }));

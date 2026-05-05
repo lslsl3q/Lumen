@@ -80,8 +80,4 @@ export async function deleteCharacter(id: string): Promise<{ message: string }> 
   return res.json();
 }
 
-/** 获取头像 URL */
-export function getAvatarUrl(avatar?: string | null): string | null {
-  if (!avatar) return null;
-  return `${API_BASE_URL}/avatars/${avatar}`;
-}
+// getAvatarUrl 已迁移至 utils/url.ts

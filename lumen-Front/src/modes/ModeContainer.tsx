@@ -4,6 +4,7 @@ import type { useDebugState } from '../hooks/useDebugState';
 import type { UseFloatingLayersReturn } from '../components/floating/useFloatingLayers';
 import ChatMode from './ChatMode';
 import BaseMode from './BaseMode';
+import RpgMode from './RpgMode';
 import WritingMode from './WritingMode';
 
 interface ModeContainerProps {
@@ -24,6 +25,11 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
       {mounted.has('base') && (
         <div className={activeMode === 'base' ? 'absolute inset-0 flex' : 'hidden'}>
           <BaseMode />
+        </div>
+      )}
+      {mounted.has('rpg') && (
+        <div className={activeMode === 'rpg' ? 'absolute inset-0 flex' : 'hidden'}>
+          <RpgMode />
         </div>
       )}
       {mounted.has('writing') && (

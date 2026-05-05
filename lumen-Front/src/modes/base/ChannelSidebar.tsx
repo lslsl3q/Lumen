@@ -2,12 +2,14 @@
 import { useState } from 'react';
 import { Settings, Plus, Hash, Trash2 } from 'lucide-react';
 import { useBaseStore } from '../../stores/useBaseStore';
+import { useModeStore } from '../../stores/useModeStore';
 import { CHANNEL_TYPE_ICONS } from './types';
 import type { Channel } from './types';
 import CreateChannelModal from './CreateChannelModal';
 
 function ChannelSidebar() {
   const { channels, activeChannelId, setActiveChannel, deleteChannel } = useBaseStore();
+  const switchMode = useModeStore(s => s.switchMode);
   const [showCreate, setShowCreate] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
@@ -69,7 +71,12 @@ function ChannelSidebar() {
             {items.map((channel) => (
               <div
                 key={channel.id}
-                onClick={() => setActiveChannel(channel.id)}
+                onClick={() => {
+                  setActiveChannel(channel.id);
+                  if (channel.type === 'rpg') {
+                    switchMode('rpg');
+                  }
+                }}
                 onContextMenu={(e) => handleContextMenu(e, channel.id)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer
                   transition-colors duration-150 group

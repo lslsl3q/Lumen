@@ -4,8 +4,8 @@
  * 显示当前模型名，点击弹出 Command 列表切换。
  * 使用 Shadcn Popover + Command 组件，紧凑布局适合驾驶舱底栏。
  */
-import { useState, useEffect } from 'react';
-import { listModels, ModelInfo } from '../api/models';
+import { useState } from 'react';
+import { useModels } from '../hooks/useModels';
 import { CheckIcon, ChevronsUpDownIcon } from 'lucide-react';
 import {
   Popover,
@@ -34,15 +34,7 @@ function displayName(id: string): string {
 
 function CockpitModelSelect({ value, onChange }: CockpitModelSelectProps) {
   const [open, setOpen] = useState(false);
-  const [models, setModels] = useState<ModelInfo[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    listModels()
-      .then(data => { if (!cancelled) setModels(data.models); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const { models } = useModels();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

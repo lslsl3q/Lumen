@@ -14,7 +14,7 @@ import TokenRing from './TokenRing';
 import { executeCommand, getCommand, getAllCommands, parseCommand } from '../commands/registry';
 import '../commands/builtin'; // 副作用：注册内置命令
 import { CommandResult } from '../commands/registry';
-import { getAvatarUrl } from '../api/character';
+import { getAvatarUrl } from '../utils/url';
 import { toast } from '../utils/toast';
 import Tooltip from './Tooltip';
 import type { AuthorsNoteConfig } from '../types/authorNote';
@@ -687,8 +687,7 @@ interface ChatPanelProps {
   onBranchFromMessage?: (messageId: string) => Promise<string | null>;
   responseStyle?: string;
   onResponseStyleChange?: (style: string) => void;
-  rpgMode?: boolean;
-  onRpgModeChange?: (enabled: boolean) => void;
+
   authorNoteConfig?: AuthorsNoteConfig | null;
   onAuthorNoteSaveContent?: (content: string) => void;
   onAuthorNoteSetPosition?: (position: 'before_user' | 'after_user') => void;
@@ -724,8 +723,6 @@ function ChatPanel({
   onBranchFromMessage,
   responseStyle = 'balanced',
   onResponseStyleChange,
-  rpgMode = false,
-  onRpgModeChange,
   authorNoteConfig,
   onAuthorNoteSaveContent,
   onAuthorNoteSetPosition,
@@ -1106,19 +1103,6 @@ function ChatPanel({
                           transition-all duration-150 cursor-pointer"
                       >
                         <span className="text-xs font-mono">{RESPONSE_STYLES.find(s => s.key === responseStyle)?.icon || '≈'}</span>
-                      </button>
-                    </Tooltip>
-                    {/* RPG 模式开关（临时，T11 Phase D 后删除） */}
-                    <Tooltip text={rpgMode ? 'RPG 模式: 开' : 'RPG 模式: 关'}>
-                      <button
-                        type="button"
-                        onClick={() => onRpgModeChange?.(!rpgMode)}
-                        className={`w-6 h-6 rounded flex items-center justify-center transition-all duration-150 cursor-pointer
-                          ${rpgMode
-                            ? 'text-purple-400 bg-purple-500/15'
-                            : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'}`}
-                      >
-                        <span className="text-xs">⚔</span>
                       </button>
                     </Tooltip>
                     <div className="flex-1" />

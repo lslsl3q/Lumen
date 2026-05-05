@@ -4,8 +4,7 @@
  * 从后端 API 拉取可用模型列表，支持搜索过滤和自定义输入。
  * API 失败时降级为纯文本输入。
  */
-import { useState, useEffect } from 'react';
-import { listModels, ModelInfo } from '../api/models';
+import { useModels } from '../hooks/useModels';
 import {
   Combobox,
   ComboboxInput,
@@ -23,20 +22,7 @@ interface ModelSelectProps {
 }
 
 function ModelSelect({ value, onChange, placeholder = '选择或输入模型名', allowEmpty = true }: ModelSelectProps) {
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [loadError, setLoadError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    listModels()
-      .then(data => {
-        if (!cancelled) setModels(data.models);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadError(true);
-      });
-    return () => { cancelled = true; };
-  }, []);
+  const { models, error: loadError } = useModels();
 
   if (loadError) {
     return (

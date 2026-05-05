@@ -13,7 +13,7 @@
 
 import { PushEvent } from '../types/push';
 
-const WS_URL = 'ws://127.0.0.1:8888/ws/push';
+const WS_URL = 'ws://127.0.0.1:8888/ws';
 
 type EventHandler<T extends PushEvent = PushEvent> = (event: T) => void;
 

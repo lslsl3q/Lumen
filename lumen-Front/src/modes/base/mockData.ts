@@ -6,6 +6,8 @@ export const DEFAULT_CHANNELS: Channel[] = [
   { id: 'ch-tavern', name: '酒馆', type: 'chat', locationId: 'loc-tavern', description: '饮品与闲谈', order: 2, group: 'base' },
   { id: 'ch-training', name: '训练场', type: 'chat', locationId: 'loc-training', description: '切磋武艺', order: 3, group: 'base' },
   { id: 'ch-library', name: '图书馆', type: 'chat', locationId: 'loc-library', description: '静谧的阅读空间', order: 4, group: 'base' },
+  { id: 'ch-dungeon', name: '暗影地牢', type: 'rpg', locationId: 'loc-dungeon', description: '探索地下城的秘密', order: 1, group: 'adventure' },
+  { id: 'ch-forest', name: '迷雾森林', type: 'rpg', locationId: 'loc-forest', description: '穿越被诅咒的森林', order: 2, group: 'adventure' },
 ];
 
 export const MOCK_MESSAGES: Record<string, ChannelMessage[]> = {
@@ -26,6 +28,12 @@ export const MOCK_MESSAGES: Record<string, ChannelMessage[]> = {
   ],
   'ch-library': [
     { id: 'm10', type: 'system', content: '图书馆里安静得只能听到翻书声', timestamp: Date.now() - 300000 },
+  ],
+  'ch-dungeon': [
+    { id: 'md1', type: 'system', content: '冒险开始', timestamp: Date.now() - 5000 },
+  ],
+  'ch-forest': [
+    { id: 'mf1', type: 'system', content: '冒险开始', timestamp: Date.now() - 5000 },
   ],
 };
 

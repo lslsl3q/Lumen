@@ -70,6 +70,9 @@ function TitleBar() {
     setIsPinned(next);
   };
 
+  // RPG 模式时高亮基地按钮
+  const displayMode = activeMode === 'rpg' ? 'base' : activeMode;
+
   return (
     <div className="h-9 flex items-center bg-slate-950/80 border-b border-slate-800/40 select-none relative">
       {/* 左侧品牌 — 拖拽区 */}
@@ -87,7 +90,7 @@ function TitleBar() {
       <div className="absolute left-1/2 -translate-x-1/2">
         <ModeSwitch
           modes={MODES}
-          activeMode={activeMode}
+          activeMode={displayMode}
           onSwitch={switchMode}
         />
       </div>
