@@ -272,7 +272,10 @@ def record_event(
     summary: str,
     campaign_id: str = "",
 ) -> int:
-    """记录一条 RPG 事件，返回插入的 row id"""
+    """记录一条 RPG 事件，返回插入的 row id
+
+    仅 state_change 和 narrative 事件会触发图谱提取（action 不入队）。
+    """
     with _write_lock:
         conn = _get_conn()
         cursor = conn.execute(
@@ -280,7 +283,25 @@ def record_event(
             (campaign_id, room_id, source_id, event_type, summary),
         )
         conn.commit()
-        return cursor.lastrowid
+        event_id = cursor.lastrowid
+
+    # 重要事件触发图谱提取（调用方过滤：action 不入队）
+    if event_type in ("state_change", "narrative"):
+        try:
+            from lumen.core.event_processor import enqueue_event
+            enqueue_event(
+                content=summary,
+                event_type="rpg",
+                character_id=source_id,
+                session_id=campaign_id,
+                source_id=str(event_id),
+                campaign_id=campaign_id,
+                metadata={"room_id": room_id, "event_type": event_type},
+            )
+        except Exception:
+            pass
+
+    return event_id
 
 
 def get_recent_events(room_id: str, limit: int = 5, campaign_id: str = "") -> list[dict]:
@@ -302,6 +323,60 @@ def get_recent_events(room_id: str, limit: int = 5, campaign_id: str = "") -> li
         }
         for row in reversed(rows)
     ]
+
+
+# ── 认知状态 ──
+
+def _ensure_cognitive_table(conn: sqlite3.Connection):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS cognitive_states (
+            agent_id   TEXT PRIMARY KEY,
+            state_json TEXT NOT NULL DEFAULT '{}',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+
+
+def get_cognitive_state(agent_id: str) -> dict | None:
+    """获取 Agent 的认知状态（不存在返回 None）"""
+    conn = _get_conn()
+    _ensure_cognitive_table(conn)
+    row = conn.execute(
+        "SELECT state_json FROM cognitive_states WHERE agent_id = ?", (agent_id,)
+    ).fetchone()
+    if not row:
+        return None
+    return json.loads(row["state_json"])
+
+
+def update_cognitive_state(agent_id: str, state: dict, merge: bool = True):
+    """更新 Agent 认知状态
+
+    Args:
+        merge: True=read-modify-write 浅合并（不覆盖已有顶层 key）；False=全量覆盖
+    """
+    with _write_lock:
+        conn = _get_conn()
+        _ensure_cognitive_table(conn)
+
+        if merge:
+            row = conn.execute(
+                "SELECT state_json FROM cognitive_states WHERE agent_id = ?", (agent_id,)
+            ).fetchone()
+            if row:
+                existing = json.loads(row["state_json"])
+                # 浅合并：新 key 补充，已存在的 key 保留（不覆盖 LLM 生成的值）
+                for k, v in state.items():
+                    if k not in existing:
+                        existing[k] = v
+                state = existing
+
+        conn.execute(
+            "INSERT OR REPLACE INTO cognitive_states (agent_id, state_json, updated_at) "
+            "VALUES (?, ?, datetime('now'))",
+            (agent_id, json.dumps(state, ensure_ascii=False)),
+        )
+        conn.commit()
 
 
 # ── 属性查询快捷方法 ──

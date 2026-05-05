@@ -388,19 +388,16 @@ async def run_deep_dream(character_id: str) -> Optional[DreamResult]:
         logger.warning("梦境叙事为空，跳过")
         return None
 
-    # Step 3: 投入热反思管道（Step 3 自动完成 Call 2 五维分类）
+    # Step 3: 投入事件处理器 — 图谱提取（实体 + 关系边）
     cards_count = 0
     try:
-        from lumen.core.reflection import enqueue_reflection
-        from lumen.events.schema import ReflectionEvent, SourceType
+        from lumen.core.event_processor import enqueue_event
 
-        event = ReflectionEvent(
-            source_type=SourceType.DIARY_ENTRY,
-            timestamp=time.time(),
+        if enqueue_event(
             content=narrative,
-            summary=f"[梦境] {narrative[:200]}",
-            session_id="dream",
+            event_type="dream",
             character_id=character_id,
+            session_id="dream",
             source_id=dream_id,
             metadata={
                 "source": "deep_dream",
@@ -408,12 +405,11 @@ async def run_deep_dream(character_id: str) -> Optional[DreamResult]:
                 "recalled_fragments": len(fragments),
                 "emotional_tone": emotional_tone,
             },
-        )
-        if enqueue_reflection(event):
+        ):
             cards_count = -1
-            logger.info(f"梦境叙事已投入热反思管道: {dream_id}")
+            logger.info(f"梦境叙事已投入事件处理器: {dream_id}")
     except Exception as e:
-        logger.error(f"梦境叙事投入反思管道失败: {e}")
+        logger.error(f"梦境叙事投入事件处理器失败: {e}")
 
     duration_ms = (time.perf_counter() - t0) * 1000
 

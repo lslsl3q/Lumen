@@ -120,21 +120,17 @@ async def _async_store(content: str, character_id: str, session_id: str,
     except Exception:
         pass
 
-    # T22: 反射触发器 — 日记保存后自动送入反思管道
+    # 图谱提取 — 通过事件处理器异步提取实体和关系
     try:
-        from lumen.core.reflection import enqueue_reflection
-        from lumen.events.schema import ReflectionEvent, SourceType
-        event = ReflectionEvent(
-            source_type=SourceType.DIARY_ENTRY,
-            timestamp=time.time(),
+        from lumen.core.event_processor import enqueue_event
+        enqueue_event(
             content=content,
-            summary=content[:200],
-            session_id=session_id,
+            event_type="diary",
             character_id=character_id,
+            session_id=session_id,
             source_id=note_id,
             metadata={"category": category, "importance": importance, "tags": tags},
         )
-        enqueue_reflection(event)
     except Exception:
         pass
 

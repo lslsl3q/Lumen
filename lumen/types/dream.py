@@ -2,7 +2,7 @@
 T22 Step 4 深梦境系统类型定义
 
 梦境调度器状态 + 涟漪召回 + 梦境运行结果。
-与 lumen/types/reflection.py（Step 3 热反思）隔离。
+梦境叙事产出后投入事件处理器（core/event_processor.py）做图谱提取。
 """
 
 from pydantic import BaseModel, Field

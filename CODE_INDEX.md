@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-05-03（T25 GM Agent 完整构建 + T11 Phase D 三模式状态机）
+**最后更新**：2026-05-05（T22 反思管道退役 + 事件处理器替代 + events/ 目录删除）
 
 ---
 
@@ -14,9 +14,8 @@ Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
 │   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、两阵营嵌入、SPARSE_EMBEDDING_ENABLED、日记目录）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
-│   ├── query.py                  # [DEPRECATED: T24] 查询引擎（旧 ReAct 循环入口，保留供非流式 chat_non_stream 使用）
+│   ├── query.py                  # [DEPRECATED: T24] 查询引擎（旧 ReAct 循环入口，仅保留 chat_non_stream + validate_tool_call）
 │   ├── agent.py                  # T24 Agent 容器（组件列表 + 信箱 + state + act() 流式决策）
-│   ├── agent_chat.py             # T24 Agent Chat 入口（创建 Agent → 注册 Components → agent.act() → yield SSEEvent）
 │   │
 │   ├── components/               # T24 Component 包 — Concordia 风格可插拔组件
 │   │   ├── base.py               # ContextComponent（pre_act→str）+ ActingComponent（decide→AsyncGenerator[dict]）+ PromptZone枚举（STATIC/DYNAMIC）+ zone属性
@@ -29,6 +28,8 @@ Lumen/
 │   │   ├── room_context.py       # T25 房间上下文注入（当前房间实体映射，priority=25，Gemini Trap 1 防御）
 │   │   ├── gm_identity.py        # T25 GM DM 人格组件（STATIC, priority=10, 从 data/gm/identity.md 热加载）
 │   │   ├── gm_world_context.py   # T25 GM 世界上下文组件（DYNAMIC, priority=30, 房间+实体+近期事件）
+│   │   ├── cognitive_state.py    # T25 认知状态组件（DYNAMIC, priority=35, goals/attention/emotions LLM自动更新 + T26 emotion_scores）
+│   │   ├── time_context.py       # T26 时间上下文组件（DYNAMIC, priority=25, 当前时间+星期+会话时长）
 │   │   ├── gm_resolution.py      # T25 GM 裁决规则组件（STATIC, priority=50, 4步裁决法+JSON schema）
 │   │   └── react_acting.py       # ReAct 决策循环（LLM→工具→结果→再LLM + _yield_rpg_state + 思考链双轨处理 + T29双system消息构建 + 流式缓存统计）
 │   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
@@ -39,17 +40,17 @@ Lumen/
 │   ├── skills/                   # Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter，含 README.md 开发指南）
 │   ├── data/                     # 运行时数据（history.db、thinking_clusters/、vectors/、graph/extract_prompt.md 等）
 │   │
-│   ├── core/                     # 大脑 — 会话状态 + 反思管道 + 深梦境 + RPG 环境
+│   ├── core/                     # 大脑 — 会话状态 + 事件处理器 + 深梦境 + RPG 环境
 │   │   ├── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
-│   │   ├── reflection.py         # T22 Step 3 反思管道编排器（asyncio.Queue消费者 + 三步触发 + LLM五维分类 + 存储路由）
-│   │   ├── dream.py              # T22 Step 4 深梦境系统（涟漪召回+梦境叙事生成+定时调度+投入热反思管道）
+│   │   ├── agent_chat.py         # T24 Agent Chat 入口（创建 Agent → 注册 Components → agent.act() → yield SSEEvent）
+│   │   ├── event_processor.py    # T22 事件处理器（日记/梦境/RPG事件 → 图谱提取，asyncio.Queue + 毒药药丸停机）
+│   │   ├── dream.py              # T22 Step 4 深梦境系统（涟漪召回+梦境叙事生成+定时调度+投入事件处理器）
 │   │   ├── message_bus.py        # T25 消息总线（send_to/broadcast/rooms + 全局单例）
 │   │   ├── environments/         # T25 模式环境
 │   │   │   ├── base.py           # BaseEnvironment 抽象基类（register_agent + process_message）
 │   │   │   ├── gm.py             # GMEnvironment（4步裁决链 + GM Agent ReAct + AsyncGenerator SSE + NPC异步广播）
-│   │   │   ├── gm_agent.py       # T25 GM Agent 构建器（无状态临时Agent + 4组件 + gm_chat_stream核心入口）
+│   │   │   ├── gm_agent.py       # T25/T26 GM Agent 构建器（无状态临时Agent + 6组件链 + gm_chat_stream + 叙事提取+text_set替换+检定摘要+认知状态更新 + T26 语义组情绪检测）
 │   │   │   └── narrative_parser.py # T25 叙事解析器（markdown剥离 + JSON解析 + 降级兜底）
-│   │   └── reflection_README.md  # T22 反思系统模块说明书（架构+数据流+扩展指南）
 │   │
 │   ├── tools/                    # 双手 — 每个工具一个 .py（基类在根目录 tool.py）
 │   │   ├── parse.py              # AI输出 → 工具调用 解析（JSON修复层 + 结构检测 + 花括号提取）
@@ -60,7 +61,7 @@ Lumen/
 │   │   ├── file_manager.py       # 文件读写合并（read/write/edit/list/glob/grep/copy/move/delete等）
 │   │   ├── web.py                # 网页搜索+抓取合并（search→DuckDuckGo, fetch→httpx异步）
 │   │   ├── calculate.py          # 计算器
-│   │   ├── daily_note.py         # AI 日记工具（YAML frontmatter + agent_knowledge.tdb 阵营B写入 + 按Agent分目录 + 反思触发器 + 梦境通知）
+│   │   ├── daily_note.py         # AI 日记工具（YAML frontmatter + agent_knowledge.tdb 阵营B写入 + 按Agent分目录 + 事件处理器入队 + 梦境通知）
 │   │   ├── dice.py               # T25 掷骰工具（NdS[+M] 表达式解析）
 │   │   ├── rpg.py                # T25 RPG 工具集（move_to/roll_check/resolve_attack，WorldState+MessageBus联动）
 │   │   ├── skill_script.py       # Skill 脚本安全执行器（子进程+超时+输出截断+哈希白名单）
@@ -73,7 +74,7 @@ Lumen/
 │   │   ├── memory/               # T24 记忆子目录（_core.py=原memory.py, simhash.py）
 │   │   │   ├── __init__.py       # 导出：generate_summary, get_memory_context, vectorize_message, get_relevant_memories, compute, hamming_distance...
 │   │   │   ├── _core.py          # 记忆系统核心（异步摘要、记忆注入、向量+BM25 RRF混合检索）
-│   │   │   └── simhash.py        # T22 SimHash 64位指纹（jieba分词+SHA-256+TF加权投票+8维情绪位元）
+│   │   │   └── simhash.py        # T22 SimHash 64位指纹（jieba分词+SHA-256+TF加权投票，情绪位元 DEPRECATED → SemanticGroupService）
 │   │   ├── knowledge/            # T24 知识库子目录（_core.py=原knowledge.py, scanner/manifest/chunker）
 │   │   │   ├── __init__.py       # 导出：search, upload, list_files, scan, _get_db, _get_agent_db...
 │   │   │   ├── _core.py          # 知识库存储核心（双库、access_list、导入/切分/搜索/删除）
@@ -85,13 +86,14 @@ Lumen/
 │   │   │   ├── _core.py          # T19 图谱核心服务（实体Upsert、边管理、邻居文本召回）
 │   │   │   ├── extract.py        # T19 图谱提取管道（文本→LLM抽取→batch_upsert）
 │   │   │   └── backup.py         # 图谱备份/恢复（JSON导出+Git提交）
-│   │   ├── ws_manager.py         # WebSocket连接管理器（单例、广播、心跳）
+│   │   ├── ws_manager.py         # T26 WebSocket连接管理器（单例、广播、频道订阅+过滤推送、心跳）
+│   │   ├── semantic_group.py     # T26 语义组服务（SQLite+向量文件，emotion量尺/topic调味料双模式，余弦相似度+加权平均混合）
 │   │   ├── mcp_client.py         # MCP 客户端服务（连接外部MCP服务器、发现工具、调用工具）
 │   │   ├── llm.py                # LLM适配器（AsyncOpenAI + build_thinking_params 跨模型翻译 + extra_body/reasoning_effort 透传 + 缓存统计日志）
 │   │   ├── search.py             # 搜索服务（DuckDuckGo）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
-│   │   ├── history.py            # SQLite持久化（会话、消息、摘要、FTS5全文索引、向量级联删除）
-│   │   ├── world_state.py        # T25 RPG 世界状态黑板（SQLite：位置/HP/属性/房间/rpg_events事件记录，线程安全）
+│   │   ├── history.py            # SQLite持久化（会话、消息、摘要、FTS5全文索引、向量级联删除 + T26 channels表+CRUD）
+│   │   ├── world_state.py        # T25 RPG 世界状态黑板（SQLite：位置/HP/属性/房间/rpg_events事件记录 + T26 update_cognitive_state merge模式，线程安全）
 │   │   ├── vector_store.py       # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除 + .dim 一致性检查）
 │   │   ├── embedding.py          # 文本嵌入（两阵营架构 + 稀疏向量 encode_with_sparse + instruction_type 预留）
 │   │   ├── sparse_store.py       # 稀疏向量存储（SQLite + In-memory 缓存 + Dot Product 搜索，T25）
@@ -99,11 +101,6 @@ Lumen/
 │   │   ├── thinking_clusters.py  # 思维簇引擎（VCP MetaThinkingManager 重实现：索引、链式检索、向量融合、降级模式、token 预算）
 │   │   ├── knowledge_resolver.py # 知识库占位符解析器（正则匹配 {{}}/[[]]，RAG/全文检索，替换注入 system prompt）
 │   │   └── emotion.py            # 【预留】情感引擎
-│   │
-│   ├── events/                   # T22 事件总线 — 后端心智引擎内部事件流转
-│   │   ├── __init__.py           # 包导出（ReflectionEvent, SourceType, EventBus）
-│   │   ├── schema.py             # 事件Schema（ReflectionEvent + SourceType 5种数据源 + ReflectionTrigger）
-│   │   └── bus.py                # 极简pub/sub（单例EventBus，同步/异步handler分发）
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
 │   │   ├── builder.py            # 系统提示词拼接（角色+Persona+Skills+工具+世界书+动态注入，三明治结构）+ 分层调试构建
@@ -131,13 +128,12 @@ Lumen/
 │       └── skills.py             # Skills 类型（SkillCard + SkillCreateRequest + SkillUpdateRequest Pydantic 模型）
 │       └── knowledge.py          # 知识库类型（KnowledgeFileCard + access_list/owner_id/file_id + KnowledgeSearchRequest/Result）
 │       └── thinking_clusters.py  # 思维簇类型（ChainStep/ChainConfig Pydantic + RetrievedModule/PipelineResult TypedDict）
-│       └── reflection.py         # T22 反思输出类型（五维分类+存储路由+卡片状态[active/needs_resolution/draft]+ReflectionOutput数组）
 │       └── dream.py              # T22 Step 4 深梦境类型（DreamState+DreamResult+RippleEntry）
 │
 ├── api/                          # FastAPI HTTP接口
-│   ├── main.py                   # 应用入口、CORS、路由注册（含反思管道+深梦境调度器lifespan）
+│   ├── main.py                   # 应用入口、CORS、路由注册（含事件处理器+深梦境调度器lifespan）
 │   └── routes/
-│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel/message-edit-delete + memory_debug + Think事件 + response_style）
+│       ├── chat.py               # 聊天（send/stream/history/compact/token-usage/cancel/message-edit-delete + memory_debug + Think事件 + response_style）DEPRECATED stream → T26 WS替代
 │       ├── session.py            # 会话（new/load/list/delete/reset）
 │       ├── character.py          # 角色（list/get/switch/create/update/delete/upload-avatar + thinking 思考链配置）
 │       ├── persona.py            # Persona（list/get/active/create/update/delete/switch）
@@ -150,7 +146,10 @@ Lumen/
 │       ├── avatar.py             # 头像管理（upload/list/delete，文件存储到 characters/avatars/）
 │       ├── models.py             # 模型（list，从 LiteLLM 代理获取可用模型）
 │       ├── config.py             # 配置（list/read/update）+ TDB 列表 + 图谱提示词编辑 API
-│       └── ws.py                 # WebSocket 推送端点（/ws/push）
+│       ├── ws.py                 # T26 WebSocket 端点（/ws，完整消息分发：chat/subscribe/unsubscribe/cancel → ws_handler）
+│       ├── ws_handler.py         # T26 WS消息→Agent.act()桥梁（handle_chat/handle_subscribe/handle_cancel，ReAct循环不动只换传输层）
+│       ├── channel.py            # T26 频道 REST API（CRUD + 消息查询，支持 since_id 断线补拉）
+│       ├── semantic_group.py     # T26 语义组 REST API（CRUD + 重算向量 + 便捷 compute-scores）
 │       └── system.py             # T22 系统管理（手动触发反思 + 反思状态 + 手动触发梦境 + 梦境状态）
 │
 ├── lumen-Front/                  # 前端（Tauri 2 桌面应用）
@@ -158,13 +157,18 @@ Lumen/
 │   └── src/
 │       ├── App.tsx               # 应用入口（MainLayout 持有跨模式资源 + ModeContainer 替代旧 ChatInterface）
 │       ├── stores/               # Zustand 全局状态
-│       │   ├── useModeStore.ts   # 模式状态（activeMode + mounted 懒加载追踪）
-│       │   └── useBaseStore.ts   # T11 基地模式状态（频道/消息/成员 CRUD + mock 数据）
-│       ├── modes/                # T11 Phase D 三模式容器
+│       │   ├── useModeStore.ts   # 模式状态（activeMode[chat|base|rpg|writing] + mounted 懒加载追踪）
+│       │   └── useBaseStore.ts   # T11/T26 基地模式状态（频道/消息/成员 CRUD + 后端 API 对接）
+│       ├── modes/                # T11 Phase D 四模式容器
 │       │   ├── ModeContainer.tsx # 懒挂载 + display:none 容器（读 useModeStore）
 │       │   ├── ChatMode.tsx      # 聊天模式 UI 编排（纯渲染，逻辑在 useChatMode）
 │       │   ├── BaseMode.tsx      # T11 基地模式三栏 Discord 骨架
+│       │   ├── RpgMode.tsx       # RPG 全屏沉浸式面板（两栏：状态面板 + 叙事流，从基地 RPG 频道进入）
 │       │   ├── WritingMode.tsx   # 写作模式骨架（占位）
+│       │   ├── rpg/              # RPG 模式组件
+│       │   │   ├── RpgStatusPanel.tsx  # 停靠版状态面板（实体列表+血条，从浮动 RpgPanel 改造）
+│       │   │   ├── NarrativeStream.tsx  # 叙事流主视区（顶部渐隐遮罩 + 自动滚动）
+│       │   │   └── NarrativeMessage.tsx # 三种消息样式（GM叙事/玩家行动/系统通知）
 │       │   └── base/             # T11 基地模式组件
 │       │       ├── types.ts      # 频道/消息/成员类型 + ChannelType 枚举(chat|rpg|board|manage)
 │       │       ├── mockData.ts   # 预设频道 + mock 消息/成员数据
@@ -175,7 +179,9 @@ Lumen/
 │       │       └── CreateChannelModal.tsx # 创建频道弹窗（名称+类型+描述）
 │       ├── api/                  # HTTP 客户端（chat, session, character, config, ws, persona, authorNote, worldbook, avatar, models, skills, knowledge, graph, tdb）
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
-│       ├── hooks/                # 状态管理（useChat, useChatMode[聊天逻辑层], useDebugState, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useRPG, useResizableWidth[可拖拽宽度]）
+│       ├── api/                  # 后端 API 客户端（chat, channel[T26], session, character, config, persona, authorsNote, worldbook, ws[T26 WebSocket推送], skills, knowledge, tdb, graph, avatar, memories）
+│       │   └── channel.ts        # T26 频道 REST API（list/create/delete + 消息查询 since_id 补拉）
+│       ├── hooks/                # 状态管理（useChat[T26 SSE→WS], useWebSocket[T26 WS单例+重连+补拉], useChatMode[聊天逻辑层], useRpgMode[RPG模式逻辑层], useModels[模型列表缓存], useDebugState, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useRPG, useResizableWidth[可拖拽宽度]）
 │       ├── components/           # UI 组件（ChatPanel, ActivityBar, SidePanel, Popover, MarkdownContent, CommandPalette, MemoryWindow, GraphWindow, GraphEditor, RpgPanel[RPG房间状态面板], FloatingLayerHost, TdbFileTree[共享文件树], ResizablePanel[可拖拽面板], panels/[CharacterPanel 思考链UI]）
 │       ├── pages/                # 页面组件（WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, DebugWindowPage[独立监控窗口+localStorage持久化], ToolTipsPage, ThinkingClustersPage）
 │       ├── types/                # 类型定义（session, character+ThinkingConfig, persona, authorNote, worldbook, avatar, config, push, skills, knowledge）
@@ -193,7 +199,7 @@ Lumen/
 ## 核心依赖链（T24 Agent 组件化 + T25 RPG）
 
 ```
-api/routes/chat.py ──→ lumen/agent_chat.py（Agent 入口）
+api/routes/chat.py ──→ lumen/core/agent_chat.py（Agent 入口）
                           ├── agent.py（Agent 容器：组件排序 → pre_act → decide + mailbox[AgentMessage]）
                           ├── components/
                           │   ├── identity.py      → prompt/persona.py, prompt/character.py
@@ -211,14 +217,29 @@ api/routes/chat.py ──→ lumen/agent_chat.py（Agent 入口）
 T25 RPG 链路：
 core/environments/gm.py（GMEnvironment 4步裁决链）
     ├── core/message_bus.py（send_to / broadcast / rooms）
-    ├── services/world_state.py（SQLite 状态黑板）
+    ├── services/world_state.py（SQLite 状态黑板 + T26 merge 认知状态）
     ├── tools/dice.py（掷骰，零依赖）
     └── tools/rpg.py（move_to/roll_check/resolve_attack）
           ├── services/world_state.py（状态读写）
           └── core/message_bus.py（房间订阅联动）
 
+T26 WebSocket + 语义组链路：
+api/routes/ws.py（WS端点）
+    ├── api/routes/ws_handler.py（消息分发 → Agent.act()）
+    ├── services/ws_manager.py（频道订阅 + 过滤推送）
+    └── lumen-Front/src/hooks/useWebSocket.ts（前端单例+重连+补拉）
+
+lumen/services/semantic_group.py（语义组服务）
+    ├── services/embedding.py::get_service("knowledge")（API嵌入）
+    ├── api/routes/semantic_group.py（CRUD REST API）
+    ├── services/knowledge/_core.py::search()（topic 语义组搜索偏置）
+    └── core/environments/gm_agent.py::_detect_emotion_and_merge()（情绪检测 → 认知状态）
+
+Component 链更新（gm_agent.py）：
+GMIdentity(10) → TimeContext(25) → GMWorldContext(30) → CognitiveState(35) → GMResolution(50) → Tool(90)
+
 旧路径（保留兼容）：
-api/routes/chat.py ──→ lumen/query.py::chat_non_stream()（非流式，仍用旧注入）
+api/routes/chat.py ──→ lumen/query.py::chat_non_stream()（[DEPRECATED] 非流式，内部已转发 core/agent_chat.py）
                           └── prompt/builder.py（session 初始化 system prompt）
 ```
 
@@ -308,7 +329,18 @@ api/routes/chat.py ──→ lumen/query.py::chat_non_stream()（非流式，仍
 | `GET` | `/tdb/{name}/file-tree` | 源文件目录树 |
 | `POST` | `/tdb/{name}/import-file` | 从磁盘导入文件（去重） |
 | `WS` | `/ws/push` | WebSocket 推送通道（心跳 + AI 主动消息 + 通知） |
-| `POST` | `/api/system/force_reflect` | 手动触发反思（扫描最近N小时日记送入反思管道） |
-| `GET` | `/api/system/reflection_status` | 查看最近一次反思运行状态 |
-| `POST` | `/api/system/trigger_dream` | 手动触发深梦境（涟漪召回→梦境叙事→热反思管道） |
+| `POST` | `/api/system/force_extract` | 手动触发图谱提取（扫描最近N小时日记送入事件处理器） |
 | `GET` | `/api/system/dream_status` | 查看深梦境调度器状态 |
+| `POST` | `/api/system/trigger_dream` | 手动触发深梦境（涟漪召回→梦境叙事→投入事件处理器） |
+| `GET` | `/api/system/dream_status` | 查看深梦境调度器状态 |
+| `GET` | `/rpg/rooms` | RPG 房间列表 |
+| `GET` | `/rpg/rooms/{id}` | 房间详情（含实体列表） |
+| `POST` | `/rpg/rooms` | 创建房间 |
+| `PUT` | `/rpg/rooms/{id}` | 更新房间 |
+| `DELETE` | `/rpg/rooms/{id}` | 删除房间 |
+| `GET` | `/rpg/agents` | 实体列表（可选 room_id/name 过滤） |
+| `GET` | `/rpg/agents/{id}` | 实体完整状态（含属性和状态效果） |
+| `POST` | `/rpg/agents` | 创建实体 |
+| `PUT` | `/rpg/agents/{id}` | 更新实体（HP/属性/位置/状态） |
+| `DELETE` | `/rpg/agents/{id}` | 删除实体 |
+| `GET` | `/rpg/rooms/{id}/events` | 房间最近事件 |

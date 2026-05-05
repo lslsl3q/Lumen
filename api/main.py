@@ -67,12 +67,19 @@ async def lifespan(app):
     import asyncio
     asyncio.ensure_future(_auto_rebuild())
 
-    # T22: 启动反思管道后台消费者
+    # 事件处理器：图谱提取后台消费者
     try:
-        from lumen.core.reflection import init_reflection_queue
-        init_reflection_queue()
+        from lumen.core.event_processor import init_event_processor
+        init_event_processor()
     except Exception as e:
-        logger.warning(f"反思管道启动失败: {e}")
+        logger.warning(f"事件处理器启动失败: {e}")
+
+    # T26: 初始化语义组默认表（情绪 + topic 示例）
+    try:
+        from lumen.services.semantic_group import init_default_groups
+        await init_default_groups()
+    except Exception as e:
+        logger.warning(f"语义组默认初始化失败: {e}")
 
     # T22 Step 4: 启动深梦境调度器
     try:
@@ -83,12 +90,12 @@ async def lifespan(app):
 
     yield  # 应用运行中...
 
-    # T22: 优雅停止反思管道
+    # 事件处理器：优雅停机
     try:
-        from lumen.core.reflection import shutdown_reflection_queue
-        await shutdown_reflection_queue()
+        from lumen.core.event_processor import shutdown_event_processor
+        await shutdown_event_processor()
     except Exception as e:
-        logger.warning(f"反思管道停止失败: {e}")
+        logger.warning(f"事件处理器停止失败: {e}")
 
     # T22 Step 4: 优雅停止深梦境调度器
     try:
@@ -128,7 +135,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -148,6 +155,9 @@ app.include_router(thinking_clusters.router, prefix="/thinking-clusters", tags=[
 app.include_router(graph.router, prefix="/graph", tags=["图谱"])
 app.include_router(tdb.router, prefix="/tdb", tags=["TDB浏览"])
 app.include_router(system.router, prefix="/api/system", tags=["系统管理"])
+app.include_router(rpg.router, prefix="/rpg", tags=["RPG世界状态"])
+app.include_router(channel.router, tags=["频道管理"])
+app.include_router(semantic_group.router, tags=["语义组"])
 
 # 挂载头像静态文件目录
 avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"
