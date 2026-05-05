@@ -1,9 +1,6 @@
 """
-Lumen - 查询引擎
-
-T24 清理后：流式路径已迁至 agent_chat.py，本文件只保留：
-- chat_non_stream: 非流式入口（委托给 Agent 路径）
-- validate_tool_call: 工具验证（公共函数）
+DEPRECATED: T24 Agent 组件化后，流式路径已迁至 core/agent_chat.py
+本文件只保留 chat_non_stream 和 validate_tool_call，最终将删除。
 """
 
 import logging
@@ -50,7 +47,7 @@ def validate_tool_call(tool_name: str, tool_params: dict, command: str = "") -> 
 
 async def chat_non_stream(user_input: str, session: ChatSession, response_style: str = "balanced") -> str:
     """非流式：复用 Agent 路径，收集所有 text 事件拼接成完整回复"""
-    from lumen.agent_chat import agent_chat_stream
+    from lumen.core.agent_chat import agent_chat_stream
 
     reply_parts = []
     async for event in agent_chat_stream(user_input, session, response_style=response_style):

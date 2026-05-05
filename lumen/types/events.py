@@ -95,6 +95,7 @@ class RpgStateEvent(TypedDict, total=False):
     room_id: str
     room_name: str
     entities: list     # list[{id, name, hp, max_hp}]
+    cognitive_state: dict  # {attention, goals, emotions, emotion_scores, context_summary}
 
 
 # chat_stream 的 yield 类型

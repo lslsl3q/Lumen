@@ -12,7 +12,7 @@ router = APIRouter()
 
 # 导入核心逻辑
 from lumen.core.session import get_session_manager, ChatSession
-from lumen.agent_chat import agent_chat_stream
+from lumen.core.agent_chat import agent_chat_stream
 from lumen.components.react_acting import request_cancel
 
 
@@ -28,12 +28,13 @@ class ChatRequest(BaseModel):
 
 
 class StreamRequest(BaseModel):
-    """流式聊天请求"""
+    """流式聊天请求 — DEPRECATED: T26 WebSocket 迁移后由 WS 替代"""
     message: str
     session_id: str = "default"
     memory_debug: bool = False  # /tokens 命令开启记忆调试
     response_style: str = "balanced"
     rpg_mode: bool = False  # RPG 模式：玩家输入直达 GM Agent
+    channel_id: str = ""  # T26: 频道 ID（过渡期兼容）
 
 
 class ChatResponse(BaseModel):

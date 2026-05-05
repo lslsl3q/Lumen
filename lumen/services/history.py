@@ -91,6 +91,43 @@ def _migrate_add_title():
         logger.info("数据库迁移: 完成")
 
 
+def _migrate_add_channels():
+    """数据库迁移：创建 channels 表 + messages 加 channel_id 字段（T26）"""
+    conn = _get_conn()
+    cursor = conn.cursor()
+
+    # 1. 创建 channels 表
+    existing = cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='channels'"
+    ).fetchone()
+    if not existing:
+        logger.info("数据库迁移: 创建 channels 表...")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS channels (
+                id          TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                type        TEXT NOT NULL DEFAULT 'chat',
+                description TEXT DEFAULT '',
+                "order"     INTEGER DEFAULT 0,
+                "group"     TEXT DEFAULT 'base',
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+        logger.info("数据库迁移: channels 表创建完成")
+
+    # 2. messages 加 channel_id 列
+    cursor.execute("PRAGMA table_info(messages)")
+    columns = [row["name"] for row in cursor.fetchall()]
+
+    if "channel_id" not in columns:
+        logger.info("数据库迁移: 添加 channel_id 字段到 messages 表...")
+        cursor.execute("ALTER TABLE messages ADD COLUMN channel_id TEXT DEFAULT NULL")
+        conn.commit()
+        logger.info("数据库迁移: 完成")
+
+
 def _init_fts5(conn):
     """初始化 FTS5 全文索引（unicode61 + jieba 分词，支持中文 BM25）"""
     cursor = conn.cursor()
@@ -454,6 +491,7 @@ def _init_db():
     _migrate_add_metadata()
     _migrate_add_authors_note()
     _migrate_add_title()
+    _migrate_add_channels()   # T26: channels 表 + channel_id
     _init_fts5(conn)
     _init_active_memories(conn)
     _init_knowledge_chunks(conn)
@@ -462,6 +500,147 @@ def _init_db():
 
 # 程序启动时自动初始化数据库
 _init_db()
+
+
+# ========================================
+# Channel CRUD（T26: Session→Channel 迁移）
+# ========================================
+
+def create_channel(name: str, channel_type: str = "chat", description: str = "",
+                   group_name: str = "base") -> str:
+    """创建新频道，返回 channel_id"""
+    import uuid
+    channel_id = f"ch-{uuid.uuid4().hex[:12]}"
+    now = datetime.now().isoformat()
+    with _write_lock:
+        conn = _get_conn()
+        conn.execute(
+            """INSERT INTO channels (id, name, type, description, "order", "group", created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (channel_id, name, channel_type, description, 0, group_name, now, now),
+        )
+        conn.commit()
+    logger.info(f"频道已创建: {channel_id} ({name}, type={channel_type})")
+    return channel_id
+
+
+def list_channels(limit: int = 50) -> list[dict]:
+    """列出所有频道，按 order ASC + created_at DESC"""
+    conn = _get_conn()
+    rows = conn.execute(
+        """SELECT id, name, type, description, "order", "group", created_at, updated_at
+           FROM channels ORDER BY "order" ASC, created_at DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def delete_channel(channel_id: str) -> bool:
+    """删除频道，同时将关联消息的 channel_id 设为 NULL"""
+    with _write_lock:
+        conn = _get_conn()
+        # 解除消息关联（不删消息）
+        conn.execute(
+            "UPDATE messages SET channel_id = NULL WHERE channel_id = ?",
+            (channel_id,),
+        )
+        cursor = conn.execute("DELETE FROM channels WHERE id = ?", (channel_id,))
+        conn.commit()
+        if cursor.rowcount > 0:
+            logger.info(f"频道已删除: {channel_id}")
+            return True
+    return False
+
+
+def get_channel_messages(channel_id: str, limit: int = 50,
+                         since_id: int = 0) -> list[dict]:
+    """获取频道的消息列表（按 id ASC）
+
+    Args:
+        channel_id: 频道 ID
+        limit: 最多返回条数
+        since_id: 断线重连补拉时用，只返回 id > since_id 的消息
+    """
+    conn = _get_conn()
+    if since_id > 0:
+        rows = conn.execute(
+            """SELECT id, role, content, metadata, channel_id, session_id, created_at
+               FROM messages
+               WHERE channel_id = ? AND id > ?
+               ORDER BY id ASC LIMIT ?""",
+            (channel_id, since_id, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT id, role, content, metadata, channel_id, session_id, created_at
+               FROM messages
+               WHERE channel_id = ?
+               ORDER BY id ASC LIMIT ?""",
+            (channel_id, limit),
+        ).fetchall()
+    return [_row_to_message_dict(row) for row in rows]
+
+
+def save_message_to_channel(channel_id: str, session_id: str, role: str,
+                            content: str, metadata: Optional[Dict[str, Any]] = None) -> int:
+    """保存消息到频道（同时关联频道和会话）
+
+    Returns:
+        消息 ID
+    """
+    now = datetime.now().isoformat()
+    metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+
+    with _write_lock:
+        conn = _get_conn()
+        cursor = conn.execute(
+            """INSERT INTO messages (session_id, channel_id, role, content, metadata, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (session_id, channel_id, role, content, metadata_json, now),
+        )
+        conn.execute(
+            "UPDATE sessions SET updated_at = ? WHERE id = ?",
+            (now, session_id),
+        )
+        conn.commit()
+        msg_id = cursor.lastrowid or 0
+        # 同步 FTS5
+        if role != "system" and content and len(content) >= 5:
+            try:
+                import jieba
+                tokens = " ".join(jieba.cut(content))
+                conn.execute(
+                    "INSERT INTO messages_fts(rowid, content) VALUES(?, ?)",
+                    (msg_id, tokens),
+                )
+                conn.commit()
+            except Exception:
+                pass
+        return msg_id
+
+
+def _row_to_message_dict(row) -> dict:
+    """将 SQLite Row 转为消息 dict（统一解析 metadata）"""
+    msg = {"id": row["id"], "role": row["role"], "content": row["content"]}
+    if row["channel_id"]:
+        msg["channel_id"] = row["channel_id"]
+    if row["session_id"]:
+        msg["session_id"] = row["session_id"]
+    if row["created_at"]:
+        msg["created_at"] = row["created_at"]
+    if row["metadata"]:
+        try:
+            msg["metadata"] = json.loads(row["metadata"])
+        except json.JSONDecodeError:
+            msg["metadata"] = {"type": "normal", "folded": False}
+    else:
+        msg["metadata"] = {"type": "normal", "folded": False}
+    return msg
+
+
+# ========================================
+# Session 管理
+# ========================================
 
 
 def new_session(character_id: str = "default") -> str:

@@ -701,10 +701,22 @@ async def search(
     if not query_vector:
         return []
 
+    # ── T26: Topic 语义组搜索偏置 ──
+    search_vector = query_vector
+    try:
+        from lumen.services.semantic_group import match_groups, enhance_query
+        activated = match_groups(query, group_type="topic")
+        if activated:
+            active_ids = list(activated.keys())
+            logger.debug(f"语义组激活: {activated}")
+            search_vector = await enhance_query(query_vector, active_ids)
+    except Exception as e:
+        logger.debug(f"语义组偏置跳过: {e}")
+
     db = _get_db()
 
     # ── Path A: 向量搜索 ──
-    results = db.search(query_vector, top_k=top_k * 3, min_score=min_score)
+    results = db.search(search_vector, top_k=top_k * 3, min_score=min_score)
     vector_hits = []
     seen = set()
     for hit in results:

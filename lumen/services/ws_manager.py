@@ -26,6 +26,7 @@ class WebSocketManager:
         self._connections: dict[str, WebSocket] = {}      # client_id -> ws
         self._queues: dict[str, asyncio.Queue] = {}       # client_id -> 发送队列
         self._tasks: dict[str, asyncio.Task] = {}          # client_id -> sender 协程
+        self._subscriptions: dict[str, set[str]] = {}      # client_id -> {channel_ids}  T26
         self._heartbeat_task: Optional[asyncio.Task] = None
 
     # ── 连接管理 ──
@@ -51,6 +52,7 @@ class WebSocketManager:
         """清理断开的连接"""
         self._connections.pop(client_id, None)
         self._queues.pop(client_id, None)
+        self._subscriptions.pop(client_id, None)  # T26: 清理频道订阅
         task = self._tasks.pop(client_id, None)
         if task:
             task.cancel()
@@ -60,6 +62,21 @@ class WebSocketManager:
         if not self._connections and self._heartbeat_task:
             self._heartbeat_task.cancel()
             self._heartbeat_task = None
+
+    # ── 频道订阅（T26）──
+
+    def subscribe(self, client_id: str, channel_id: str):
+        """订阅频道"""
+        if client_id not in self._subscriptions:
+            self._subscriptions[client_id] = set()
+        self._subscriptions[client_id].add(channel_id)
+        logger.debug(f"[WS] {client_id} 订阅频道 {channel_id}")
+
+    def unsubscribe(self, client_id: str, channel_id: str):
+        """取消订阅频道"""
+        if client_id in self._subscriptions:
+            self._subscriptions[client_id].discard(channel_id)
+            logger.debug(f"[WS] {client_id} 取消订阅频道 {channel_id}")
 
     # ── 内部协程 ──
 
@@ -92,13 +109,18 @@ class WebSocketManager:
 
     # ── 推送接口 ──
 
-    async def push(self, event: dict):
-        """广播事件给所有连接的客户端
+    async def push(self, event: dict, channel_id: str = ""):
+        """推送事件给订阅了指定频道的客户端
 
-        使用 per-client 队列避免慢消费者阻塞。
-        队列满时丢弃消息（本地应用，流量极小）。
+        channel_id 为空时广播给所有客户端（心跳、系统通知）。
+        有 channel_id 时只推送给订阅了该频道的客户端（频道消息推送）。
         """
         for client_id, queue in self._queues.items():
+            # 频道过滤：仅推送给订阅了该频道的客户端
+            if channel_id:
+                subs = self._subscriptions.get(client_id, set())
+                if channel_id not in subs:
+                    continue
             if queue.full():
                 logger.warning(f"[WS] 客户端 {client_id} 队列已满，丢弃消息")
             else:

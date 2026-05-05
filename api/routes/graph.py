@@ -460,16 +460,21 @@ async def tql_mutate(tdb: str, req: TqlRequest):
         raise HTTPException(500, f"TQL 执行失败: {e}")
 
 
-# ── Leiden 社区检测（v0.5.2+，Python 绑定待跟进）──
+# ── Leiden 社区检测（v0.7.0 Python 绑定已就绪）──
 
-# RESERVED: TriviumDB v0.5.2 内置 Leiden 聚类（graph/leiden.rs），但 Python 绑定尚未暴露。
-# 源码可用：db.leiden_cluster(min_community_size=3, max_iterations=15)
+# RESERVED: TriviumDB v0.7.0 Leiden 聚类 Python 绑定已暴露。
+# API: db.leiden_cluster(min_community_size=3, max_iterations=15, compute_centroids=True)
 # 用途：跑团章节末尾分析 world.tdb 社群结构，自动发现"盗贼公会"等涌现设定。
-# 绑定就绪后加：@router.post("/{tdb}/leiden")
+# TODO: @router.post("/{tdb}/leiden")
+#   → 调用 db.leiden_cluster() → 返回 node_to_cluster + centroids
+#   → 前端渲染社群视图（可用 G6 或 React Flow）
 
 
-# ── Dry-Run 事务（v0.6.0，Python 绑定待跟进）──
+# ── 轻量级事务（v0.7.0 Python 绑定已就绪）──
 
-# RESERVED: TriviumDB v0.6.0 内置 begin_tx() + commit() 零开销回滚事务。
+# RESERVED: TriviumDB v0.7.0 事务 Python 绑定已暴露（上下文管理器）。
+# API: with db.transaction() as tx: tx.insert(...); tx.link(...)
+# Dry-Run 预检 + WAL-first → 失败时 memtable 完全未变，零开销回滚。
 # 跑团模式关键状态变更（NPC死亡、资产转移）时使用。
-# 绑定就绪后加：api/routes/graph.py 事务端点 或 core/transaction.py
+# TODO: api/routes/graph.py 事务端点 或 core/transaction.py
+#   → batch_upsert() 内部可用事务加固（services/graph/_core.py）

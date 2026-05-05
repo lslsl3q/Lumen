@@ -76,7 +76,6 @@ def _strip_think_tags(text: str) -> str:
 
 
 
-
 # ── 消息预处理 ──
 
 def _prepare_messages(messages: list, character_id: str) -> list:
@@ -695,11 +694,20 @@ class ReActActingComponent(ActingComponent):
             room_id = state["room_id"]
             room = ws.get_room(room_id)
             entities = ws.get_room_entities(room_id)
-            yield {
+            event: dict = {
                 "type": "rpg_state",
                 "room_id": room_id,
                 "room_name": room.get("name", room_id) if room else room_id,
                 "entities": entities,
             }
+            # 附带 GM 认知状态（情绪/目标/注意力）
+            cog_state = ws.get_cognitive_state(character_id)
+            if cog_state:
+                event["cognitive_state"] = {
+                    k: cog_state[k]
+                    for k in ("attention", "goals", "emotions", "emotion_scores", "context_summary")
+                    if k in cog_state
+                }
+            yield event
         except Exception as e:
             logger.debug(f"rpg_state 生成跳过: {e}")
