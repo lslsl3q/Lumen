@@ -24,6 +24,12 @@ import re
 from typing import AsyncGenerator, Optional
 
 from lumen.core.environments.base import BaseEnvironment
+from lumen.core.hook_bus import HookBus
+from lumen.core.hook_types import (
+    RPGActionBeforePayload,
+    RPGActionCompletedPayload,
+    TurnEndedPayload,
+)
 from lumen.types.agent_message import AgentMessage, MsgType
 
 logger = logging.getLogger(__name__)
@@ -188,6 +194,19 @@ class GMEnvironment(BaseEnvironment):
             self.world_state.record_event(room_id, source_id, "action", f"/{command}")
             self.world_state.record_event(room_id, "gm", "narrative", narrative[:100])
 
+        # HookBus: 斜杠指令完成 + 回合结束
+        bus = HookBus.get()
+        await bus.emit(
+            "rpg.action.completed",
+            RPGActionCompletedPayload(
+                action_type=command,
+                actor_id=source_id,
+                room_id=room_id,
+                result_text=narrative[:200],
+            ),
+        )
+        await bus.emit("turn.ended", TurnEndedPayload())
+
         yield {"type": "done", "exit_reason": "slash_command"}
 
     # ── 规则初筛（Step 1）──
@@ -213,6 +232,18 @@ class GMEnvironment(BaseEnvironment):
 
         content = msg.get("content", "")
 
+        # HookBus: GM 裁决前触发
+        state = self.world_state.get_agent_state(source_id)
+        room_id = state.get("room_id", "") if state else ""
+        await HookBus.get().emit(
+            "rpg.action.before",
+            RPGActionBeforePayload(
+                character_id=source_id,
+                user_input=content,
+                room_id=room_id,
+            ),
+        )
+
         # 获取 session_id（从 metadata 传入，或用空字符串）
         session_id = msg.get("metadata", {}).get("session_id", "")
 
@@ -227,6 +258,22 @@ class GMEnvironment(BaseEnvironment):
         state = self.world_state.get_agent_state(source_id)
         if state and state.get("room_id"):
             room_id = state["room_id"]
+
+            # HookBus: 动作完成 + 回合结束
+            bus = HookBus.get()
+            await bus.emit(
+                "rpg.action.completed",
+                RPGActionCompletedPayload(
+                    action_type="natural_language",
+                    actor_id=source_id,
+                    room_id=room_id,
+                    result_text=content[:200],
+                ),
+            )
+            await bus.emit(
+                "turn.ended",
+                TurnEndedPayload(session_id=session_id),
+            )
 
             async def _safe_broadcast():
                 try:

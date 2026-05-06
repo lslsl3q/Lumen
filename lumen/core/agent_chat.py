@@ -33,6 +33,26 @@ from lumen.config import get_model
 
 logger = logging.getLogger(__name__)
 
+# HookBus 初始化（懒加载，首次调用时加载 YAML 规则和 PlotEngine）
+_hookbus_initialized = False
+_plot_engine: "PlotEngine | None" = None
+
+def _ensure_hookbus():
+    global _hookbus_initialized, _plot_engine
+    if _hookbus_initialized:
+        return
+    from pathlib import Path
+    from lumen.core.hook_bus import HookBus
+    from lumen.core.plot_engine import PlotEngine
+
+    bus = HookBus.get()
+    config_path = Path("lumen/hooks/rpg_hooks.yaml")
+    if config_path.exists():
+        bus.from_config(config_path)
+    _plot_engine = PlotEngine(bus)
+    _hookbus_initialized = True
+    logger.info("HookBus initialized with RPG hooks + PlotEngine")
+
 
 def _build_chat_agent(
     session: ChatSession,
@@ -88,6 +108,8 @@ async def agent_chat_stream(
     """
     character_config = load_character(session.character_id)
     character_config["response_style"] = response_style
+
+    _ensure_hookbus()
 
     agent = _build_chat_agent(session, character_config, user_input, memory_debug)
 

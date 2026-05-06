@@ -1,0 +1,17 @@
+# RPG 事件规则配置
+# 规则引擎通过 HookBus 加载，when 条件使用 simpleeval 沙箱执行
+# 注意：用 event 而非 on（on 是 YAML 布尔关键字）
+
+rules:
+  - event: "rpg.action.completed"
+    when: "payload.action_type == 'combat'"
+    do: "check_combat_foreshadowing"
+    priority: 80
+
+  - event: "rpg.scene.enter"
+    do: "inject_scene_description"
+    priority: 30
+
+  - event: "plot.foreshadow.triggered"
+    do: "inject_foreshadowing_into_prompt"
+    priority: 20
