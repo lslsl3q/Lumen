@@ -56,16 +56,25 @@ CREATE TABLE acl_rules (
     resource_type TEXT NOT NULL,     -- "knowledge" | "diary" | "writing"
     resource_id TEXT NOT NULL,       -- TDB 名称，如 "knowledge"
     folder_path TEXT DEFAULT '',     -- 空 = 根目录；"/几何" = 子文件夹
-    action TEXT NOT NULL             -- "read" | "write"
+    action TEXT NOT NULL,            -- "read" | "write"
+    access TEXT NOT NULL             -- "allow" | "deny"
 );
 CREATE UNIQUE INDEX idx_acl_unique ON acl_rules(
     character_id, resource_type, resource_id, folder_path, action
 );
 ```
 
-**没有 `access` 字段（allow/deny）。** 判断逻辑就一条：
+**判断逻辑**：
 
-> 记录在表中 = 有权限。不在表中 = 用资源类型默认值。
+1. 查最长路径匹配的 ACL 记录
+2. 命中 `allow` → 允许
+3. 命中 `deny` → 拒绝
+4. 没命中 → 资源类型默认值
+
+**`access` 字段是后端实现细节，前端只暴露勾选框**：
+- 默认公开的资源，用户取消勾选 → 后端存 `deny` 记录
+- 默认私有的资源，用户勾选 → 后端存 `allow` 记录
+- 用户永远看不到 allow/deny 字样，只看到勾/不勾
 
 ### 3.2 默认值
 
@@ -83,11 +92,22 @@ CREATE UNIQUE INDEX idx_acl_unique ON acl_rules(
 3. 查根 `""` → 命中则返回
 4. 都没命中 → 资源类型默认值
 
-### 3.4 树形继承（前端逻辑，后端只存叶子节点）
+### 3.4 树形继承（前端逻辑）
 
-- 勾 `/几何` → 存 `/几何`，前端自动全勾子节点
-- 取消 `/几何` → 删 `/几何` + 递归删所有子节点
-- 勾 `/几何/三角` → 存 `/几何/三角`；`/几何` 前端显示为半勾（灰勾）
+- 勾 `/几何` → 存 `allow /几何`，前端自动全勾子节点
+- 取消 `/几何` → 存 `deny /几何` + 递归存 deny 所有子节点
+- 勾 `/几何/三角` → 存 `allow /几何/三角`；`/几何` 前端显示为半勾（灰勾）
+
+### 3.5 路径前缀匹配（检索管道）
+
+检索时，允许的路径需要**前缀匹配**子路径：
+
+```python
+# 允许 "/地理" → "/地理/亚洲/中国" 也应放行
+for rule in matched_rules:
+    if rule.access == "allow" and folder.startswith(rule.folder_path):
+        return True
+```
 
 ---
 
@@ -143,10 +163,16 @@ class AccessControl:
 
 ```
 LoreComponent.pre_act(context)
-  → AccessControl.get_permissions(character_id, "knowledge", "knowledge.tdb")
-  → 得到 ["/地理", "/天文/太阳系", ...]
-  → TriviumDB metadata filter: folder IN (...)
-  → 检索
+  → AccessControl.get_read_scope(character_id, "knowledge", "knowledge.tdb")
+  → 返回 ScopeResult {
+       allowed: ["/地理", "/天文"],
+       denied: ["/地理/机密"]
+     }
+  → 构建过滤条件:
+     (folder LIKE '/地理%' OR folder LIKE '/天文%')
+     AND NOT (folder LIKE '/地理/机密%')
+  → TriviumDB metadata filter
+  → 检索（结果 100% 有权限，无需后过滤）
 ```
 
 ---
