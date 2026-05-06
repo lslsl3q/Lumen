@@ -79,15 +79,18 @@ class Agent:
             from lumen.core.hook_bus import HookBus
             from lumen.core.hook_types import AgentBeforeActPayload
 
-            await HookBus.get().emit("agent.before_act", AgentBeforeActPayload(
+            payload = AgentBeforeActPayload(
                 agent_id=self.id,
                 character_id=context.get("character_id", ""),
                 user_input=context.get("user_input", ""),
                 messages=context.get("messages", []),
                 context=context,
-            ))
+            )
+            await HookBus.get().emit("agent.before_act", payload)
+            # Pydantic v2 浅拷贝 dict 字段，handler 写入的是拷贝而非原始 context
+            context.update(payload.context)
         except Exception as e:
-            logger.debug(f"HookBus agent.before_act 跳过: {e}")
+            logger.warning(f"HookBus agent.before_act emit failed: {e}")
 
         # 1. 收集上下文，按 zone 分组
         static_outputs: list[str] = []
@@ -131,7 +134,7 @@ class Agent:
                 exit_reason=exit_reason,
             ))
         except Exception as e:
-            logger.debug(f"HookBus agent.after_act 跳过: {e}")
+            logger.warning(f"HookBus agent.after_act emit failed: {e}")
 
     # ── 消息 ──
 

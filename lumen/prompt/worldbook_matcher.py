@@ -174,10 +174,6 @@ def register_worldbook_hook(bus):
     LoreComponent 优先从 context 读取，不再直接调用 matcher。
     """
     async def _on_before_act(payload):
-        from lumen.core.hook_types import AgentBeforeActPayload
-        if not isinstance(payload, AgentBeforeActPayload):
-            return
-
         character_id = payload.character_id
         messages = payload.messages
         if not messages or not character_id:

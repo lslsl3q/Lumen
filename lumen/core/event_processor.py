@@ -121,16 +121,14 @@ def register_hook_handlers():
 
     async def _on_content_created(payload):
         """content.created → enqueue_event"""
-        from lumen.core.hook_types import ContentCreatedPayload
-        if isinstance(payload, ContentCreatedPayload):
-            enqueue_event(
-                content=payload.content,
-                event_type=payload.content_type,
-                character_id=payload.character_id,
-                session_id=payload.session_id,
-                source_id=payload.source_id,
-                campaign_id=payload.campaign_id,
-            )
+        enqueue_event(
+            content=payload.content,
+            event_type=payload.content_type,
+            character_id=payload.character_id,
+            session_id=payload.session_id,
+            source_id=payload.source_id,
+            campaign_id=payload.campaign_id,
+        )
 
     bus.register(
         "content.created",
@@ -141,14 +139,15 @@ def register_hook_handlers():
 
     async def _on_rpg_action_completed(payload):
         """rpg.action.completed → 自动提取图谱（RPG 场景摘要文本）"""
-        from lumen.core.hook_types import RPGActionCompletedPayload
-        if isinstance(payload, RPGActionCompletedPayload) and payload.result_text:
+        if payload.result_text:
+            # TODO: room_id 是 campaign_id 的临时替代；等 RPG session 管理完成后
+            # 应从 payload 取 campaign_id 或从 WorldState 查询
             enqueue_event(
                 content=payload.result_text,
                 event_type="rpg",
                 character_id=payload.actor_id,
                 source_id=f"rpg_{payload.actor_id}",
-                campaign_id=payload.room_id,  # 用 room_id 隔离图谱
+                campaign_id=payload.room_id,
             )
 
     bus.register(
