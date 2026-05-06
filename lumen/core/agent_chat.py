@@ -50,8 +50,17 @@ def _ensure_hookbus():
     if config_path.exists():
         bus.from_config(config_path)
     _plot_engine = PlotEngine(bus)
+
+    # T27 Phase 3: EventProcessor 订阅 HookBus 事件
+    from lumen.core.event_processor import register_hook_handlers
+    register_hook_handlers()
+
+    # T27 Phase 4: WorldBook 注册为 agent.before_act handler
+    from lumen.prompt.worldbook_matcher import register_worldbook_hook
+    register_worldbook_hook(bus)
+
     _hookbus_initialized = True
-    logger.info("HookBus initialized with RPG hooks + PlotEngine")
+    logger.info("HookBus initialized with RPG hooks + PlotEngine + EventProcessor + WorldBook")
 
 
 def _build_chat_agent(

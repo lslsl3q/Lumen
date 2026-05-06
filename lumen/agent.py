@@ -74,6 +74,21 @@ class Agent:
         Yields:
             SSEEvent dict（text/done/tool_start/tool_result/status/memory_debug）
         """
+        # 0. HookBus: 组件循环前触发（外部系统可注入/修改 context）
+        try:
+            from lumen.core.hook_bus import HookBus
+            from lumen.core.hook_types import AgentBeforeActPayload
+
+            await HookBus.get().emit("agent.before_act", AgentBeforeActPayload(
+                agent_id=self.id,
+                character_id=context.get("character_id", ""),
+                user_input=context.get("user_input", ""),
+                messages=context.get("messages", []),
+                context=context,
+            ))
+        except Exception as e:
+            logger.debug(f"HookBus agent.before_act 跳过: {e}")
+
         # 1. 收集上下文，按 zone 分组
         static_outputs: list[str] = []
         dynamic_outputs: list[str] = []
@@ -98,10 +113,25 @@ class Agent:
         if self.act_component is None:
             raise RuntimeError(f"Agent {self.id} 没有 ActingComponent")
 
+        exit_reason = ""
         async for token in self.act_component.decide(
             static_prompt, dynamic_prompt, short_term_history
         ):
+            if token.get("type") == "done":
+                exit_reason = token.get("exit_reason", "")
             yield token
+
+        # 4. HookBus: 决策循环结束后触发
+        try:
+            from lumen.core.hook_types import AgentAfterActPayload
+
+            await HookBus.get().emit("agent.after_act", AgentAfterActPayload(
+                agent_id=self.id,
+                character_id=context.get("character_id", ""),
+                exit_reason=exit_reason,
+            ))
+        except Exception as e:
+            logger.debug(f"HookBus agent.after_act 跳过: {e}")
 
     # ── 消息 ──
 

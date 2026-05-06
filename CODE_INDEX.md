@@ -44,11 +44,11 @@ Lumen/
 │   │
 │   ├── core/                     # 大脑 — 会话状态 + 事件处理器 + 深梦境 + RPG 环境 + HookBus
 │   │   ├── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
-│   │   ├── agent_chat.py         # T24 Agent Chat 入口（创建 Agent → 注册 Components → agent.act() → yield SSEEvent）+ HookBus 懒加载入口
+│   │   ├── agent_chat.py         # T24 Agent Chat 入口（创建 Agent → 注册 Components → agent.act() → yield SSEEvent）+ HookBus 懒加载入口 + Phase 3/4 注册
 │   │   ├── hook_bus.py           # T27 HookBus 统一事件调度（register/emit/from_config，全局单例，priority分组+同级并发）
-│   │   ├── hook_types.py         # T27 HookEvent Pydantic Payload 定义（RPGAction/SceneEnter/TurnEnded/Foreshadowing）
+│   │   ├── hook_types.py         # T27 HookEvent Pydantic Payload（Agent生命周期/RPG事件/ContentCreated/伏笔）
 │   │   ├── plot_engine.py        # T27 PlotEngine 伏笔倒计时状态机（监听 turn.ended + rpg.action.completed）
-│   │   ├── event_processor.py    # T22 事件处理器（日记/梦境/RPG事件 → 图谱提取，asyncio.Queue + 毒药药丸停机）
+│   │   ├── event_processor.py    # T22 事件处理器 + T27 Phase 3 HookBus 订阅（content.created + rpg.action.completed → 图谱提取）
 │   │   ├── dream.py              # T22 Step 4 深梦境系统（涟漪召回+梦境叙事生成+定时调度+投入事件处理器）
 │   │   ├── message_bus.py        # T25 消息总线（send_to/broadcast/rooms + 全局单例）
 │   │   ├── environments/         # T25 模式环境

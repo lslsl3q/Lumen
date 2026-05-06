@@ -1,8 +1,10 @@
 """
 Lumen - 世界书匹配引擎
 
-扫描聊天内容，匹配关键词，返回注入内容
+扫描聊天内容，匹配关键词，返回注入内容。
+T27 Phase 4: 注册为 agent.before_act Hook handler，匹配结果写入 context。
 """
+
 import re
 import logging
 from typing import List, Dict, Optional
@@ -161,3 +163,35 @@ def get_injection_context(
         })
 
     return contexts
+
+
+# ── T27 Phase 4: HookBus 注册 ──
+
+def register_worldbook_hook(bus):
+    """注册世界书匹配为 agent.before_act handler。
+
+    在 Agent 组件循环开始前做关键词匹配，结果写入 context["worldbook_matches"]。
+    LoreComponent 优先从 context 读取，不再直接调用 matcher。
+    """
+    async def _on_before_act(payload):
+        from lumen.core.hook_types import AgentBeforeActPayload
+        if not isinstance(payload, AgentBeforeActPayload):
+            return
+
+        character_id = payload.character_id
+        messages = payload.messages
+        if not messages or not character_id:
+            return
+
+        injection_contexts = get_injection_context(messages, character_id)
+        if injection_contexts:
+            # 写入可变的 context dict，LoreComponent 会读取
+            payload.context["worldbook_matches"] = injection_contexts
+            logger.debug(f"WorldBook hook: {len(injection_contexts)} 条目匹配")
+
+    bus.register(
+        "agent.before_act",
+        _on_before_act,
+        priority=15,  # 在 Identity(10) 和 Lore(20) 之间
+        name="worldbook.matcher",
+    )

@@ -33,6 +33,9 @@ class LoreComponent(ContextComponent):
 
         parts = []
 
+        # T27 Phase 4: 从 context 读取 WorldBook hook 预计算结果
+        self._context_worldbook_matches = context.get("worldbook_matches")
+
         # 1. 世界书（关键词匹配）
         worldbook_text = self._get_worldbook_content(messages, character_id)
         if worldbook_text:
@@ -48,7 +51,19 @@ class LoreComponent(ContextComponent):
         return "\n\n".join(parts) if parts else ""
 
     def _get_worldbook_content(self, messages: list, character_id: str) -> str:
-        """从世界书匹配关键词条目，合并所有匹配内容"""
+        """从世界书匹配关键词条目，合并所有匹配内容
+
+        T27 Phase 4: 优先从 context["worldbook_matches"] 读取（由 Hook handler 预计算），
+        回退到直接调用 matcher（兼容非 HookBus 场景）。
+        """
+        # 优先读取 Hook handler 预计算的结果
+        hook_matches = self._context_worldbook_matches
+        if hook_matches is not None:
+            if not hook_matches:
+                return ""
+            return "\n\n".join(ctx["content"] for ctx in hook_matches)
+
+        # 回退：直接调用 matcher
         try:
             from lumen.prompt.worldbook_matcher import get_injection_context
             worldbook_contexts = get_injection_context(messages, character_id)
