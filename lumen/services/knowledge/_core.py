@@ -692,6 +692,7 @@ async def search(
     top_k: int = 5,
     min_score: float = 0.3,
     category: str = None,
+    character_id: str = None,
 ) -> List[Dict]:
     """混合搜索: 向量 + BM25 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排"""
     from lumen.config import PRF_ENABLED, PRF_ALPHA, PRF_BETA
@@ -715,8 +716,27 @@ async def search(
 
     db = _get_db()
 
+    # ── ACL 前置过滤：展开为叶子文件夹精确列表 ──
+    payload_filter = None
+    if character_id:
+        try:
+            from lumen.services.access_control import get_instance
+            acl = get_instance()
+            all_folders = _get_all_folders(db)
+            allowed = acl.get_allowed_folders(character_id, "knowledge", "knowledge", all_folders)
+
+            if len(allowed) == len(all_folders):
+                payload_filter = None
+            elif len(allowed) == 0:
+                payload_filter = {"folder": {"$in": ["__BLOCK_ALL__"]}}
+            else:
+                payload_filter = {"folder": {"$in": allowed}}
+        except Exception:
+            pass
+
     # ── Path A: 向量搜索 ──
-    results = db.search(search_vector, top_k=top_k * 3, min_score=min_score)
+    results = db.search(search_vector, top_k=top_k * 3, min_score=min_score,
+                        payload_filter=payload_filter)
     vector_hits = []
     seen = set()
     for hit in results:
@@ -835,7 +855,8 @@ async def search(
     if PRF_ENABLED and hits:
         refined_vector = _prf_refine(db, query_vector, hits, PRF_ALPHA, PRF_BETA)
         if refined_vector:
-            refined_results = db.search(refined_vector, top_k=top_k * 3, min_score=min_score)
+            refined_results = db.search(refined_vector, top_k=top_k * 3, min_score=min_score,
+                                        payload_filter=payload_filter)
             refined_hits = []
             refined_seen = set()
             for hit in refined_results:
@@ -1151,6 +1172,27 @@ async def reindex_file(file_id: str) -> dict:
 
     logger.info(f"知识库重索引: {file_id} ({info.get('filename', '')}), {len(chunks)} chunks")
     return {"file_id": file_id, "chunks": len(chunks), "md5": new_md5}
+
+
+# ── 文件夹列表缓存（供 ACL 前置过滤用） ──
+_folder_cache: List[str] = []
+_folder_cache_ts: float = 0
+
+def _get_all_folders(db, max_age: float = 60.0) -> List[str]:
+    """获取知识库中所有不重复的 folder 路径（带 60 秒缓存）"""
+    global _folder_cache, _folder_cache_ts
+    now = time.time()
+    if _folder_cache and (now - _folder_cache_ts) < max_age:
+        return _folder_cache
+
+    folders = set()
+    for node_id in db.all_node_ids():
+        payload = db.get_payload(node_id)
+        if payload and "folder" in payload:
+            folders.add(payload["folder"])
+    _folder_cache = sorted(folders)
+    _folder_cache_ts = now
+    return _folder_cache
 
 
 def close():

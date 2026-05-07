@@ -209,6 +209,12 @@ class AccessControl:
         denied = [r["folder_path"] for r in read_rules if r["access"] == "deny"]
         return allowed, denied
 
+    def get_allowed_folders(self, character_id: str, resource_type: str,
+                            resource_id: str, all_folders: List[str]) -> List[str]:
+        """把权限规则展开为精确的叶子文件夹列表"""
+        return [f for f in all_folders if self.can_read(
+            character_id, resource_type, resource_id, f)]
+
     def rename_path(self, resource_type: str, resource_id: str,
                     old_path: str, new_path: str) -> None:
         """批量更新 folder_path 前缀（文件夹重命名时调用）"""

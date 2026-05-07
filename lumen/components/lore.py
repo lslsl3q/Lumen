@@ -84,13 +84,17 @@ class LoreComponent(ContextComponent):
 
         top_k = character.get("knowledge_top_k", 3)
         min_score = character.get("knowledge_min_score", 0.3)
+        character_id = character.get("id", "")
         if character.get("knowledge_token_budget"):
             token_budget = character["knowledge_token_budget"]
         else:
             from lumen.config import KNOWLEDGE_SEMANTIC_BUDGET
             token_budget = KNOWLEDGE_SEMANTIC_BUDGET
 
-        results = await knowledge_search(user_input, top_k=top_k, min_score=min_score)
+        results = await knowledge_search(
+            user_input, top_k=top_k, min_score=min_score,
+            character_id=character_id or None,
+        )
         if not results:
             return ""
 
