@@ -124,3 +124,24 @@ class AccessControl:
     def can_write(self, character_id: str, resource_type: str,
                   resource_id: str, folder_path: str = "") -> bool:
         return self._check(character_id, resource_type, resource_id, folder_path, "write")
+
+    def set_permission(self, character_id: str, resource_type: str,
+                       resource_id: str, folder_path: str,
+                       action: str, access: str) -> None:
+        """设置 ACL 规则（upsert）"""
+        if access not in ("allow", "deny"):
+            raise ValueError(f"access must be 'allow' or 'deny', got '{access}'")
+        if action not in ("read", "write"):
+            raise ValueError(f"action must be 'read' or 'write', got '{action}'")
+
+        with _write_lock:
+            conn = _get_conn()
+            conn.execute(
+                """INSERT INTO acl_rules (character_id, resource_type, resource_id, folder_path, action, access)
+                   VALUES (?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(character_id, resource_type, resource_id, folder_path, action)
+                   DO UPDATE SET access=excluded.access""",
+                (character_id, resource_type, resource_id, folder_path, action, access),
+            )
+            conn.commit()
+        self._invalidate(character_id, resource_type, resource_id)
