@@ -9,6 +9,7 @@ import SkillEditor from './pages/SkillEditor';
 import AvatarManager from './pages/AvatarManager';
 import ConfigList from './pages/ConfigList';
 import ConfigEditor from './pages/ConfigEditor';
+import PermissionPage from './pages/PermissionPage';
 import DebugWindowPage from './pages/DebugWindowPage';
 import PushNotification from './components/PushNotification';
 import FloatingLayerHost from './components/floating/FloatingLayerHost';
@@ -118,6 +119,7 @@ function MainLayout() {
             <Route path="/settings/avatars" element={<AvatarManager />} />
             <Route path="/settings/config" element={<ConfigList />} />
             <Route path="/settings/config/:resource" element={<ConfigEditor />} />
+            <Route path="/settings/permissions" element={<PermissionPage />} />
           </Routes>
         ) : (
           <ModeContainer floating={floating} debug={debug} />
