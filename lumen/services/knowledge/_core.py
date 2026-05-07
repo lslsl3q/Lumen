@@ -67,6 +67,27 @@ def _save_dim(dim_file: str, dim: int):
         pass
 
 
+def _open_tdb(path: str, dim: int, index_fields: list[str] = None) -> triviumdb.TriviumDB:
+    """创建 TriviumDB 实例的统一入口
+
+    自动处理：目录创建 + auto_compaction + 属性索引。
+    以后新建任何 TDB 都走这个函数，不用每个地方重复写。
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    db = triviumdb.TriviumDB(path, dim=dim)
+    try:
+        db.enable_auto_compaction(7200)
+    except Exception:
+        pass
+    if index_fields:
+        for field in index_fields:
+            try:
+                db.create_index(field)
+            except Exception:
+                pass
+    return db
+
+
 # ── Registry 缓存 ──
 _registry_cache: Optional[Dict[str, Dict]] = None
 _registry_lock = threading.Lock()
@@ -80,23 +101,13 @@ def _get_db() -> triviumdb.TriviumDB:
     if _db is None:
         with _db_lock:
             if _db is None:
-                os.makedirs(os.path.dirname(KNOWLEDGE_DB_PATH), exist_ok=True)
                 from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
                 dim = resolve_dimensions("knowledge")
-
-                # 维度一致性检查 — 不匹配就报错
                 err = check_dim_consistency(KNOWLEDGE_DB_PATH, dim)
                 if err:
                     raise RuntimeError(err)
-
-                _db = triviumdb.TriviumDB(KNOWLEDGE_DB_PATH, dim=dim)
+                _db = _open_tdb(KNOWLEDGE_DB_PATH, dim, ["owner_id", "type", "status", "source"])
                 _save_dim_file(KNOWLEDGE_DB_PATH, dim)
-                # v0.6.0 属性二级索引
-                for field in ["owner_id", "type", "status", "source"]:
-                    try:
-                        _db.create_index(field)
-                    except Exception:
-                        pass
                 logger.info(f"知识库 TriviumDB 已打开: {KNOWLEDGE_DB_PATH} (维度: {dim})")
     return _db
 
@@ -107,21 +118,13 @@ def _get_agent_db() -> triviumdb.TriviumDB:
     if _agent_db is None:
         with _agent_db_lock:
             if _agent_db is None:
-                os.makedirs(os.path.dirname(AGENT_KNOWLEDGE_DB_PATH), exist_ok=True)
                 from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
                 dim = resolve_dimensions("agent_knowledge")
-
                 err = check_dim_consistency(AGENT_KNOWLEDGE_DB_PATH, dim)
                 if err:
                     raise RuntimeError(err)
-
-                _agent_db = triviumdb.TriviumDB(AGENT_KNOWLEDGE_DB_PATH, dim=dim)
+                _agent_db = _open_tdb(AGENT_KNOWLEDGE_DB_PATH, dim, ["owner_id", "type", "status"])
                 _save_dim_file(AGENT_KNOWLEDGE_DB_PATH, dim)
-                for field in ["owner_id", "type", "status"]:
-                    try:
-                        _agent_db.create_index(field)
-                    except Exception:
-                        pass
                 logger.info(f"Agent 知识库 TriviumDB 已打开: {AGENT_KNOWLEDGE_DB_PATH} (维度: {dim})")
     return _agent_db
 
@@ -132,10 +135,9 @@ def _get_sentence_db() -> triviumdb.TriviumDB:
     if _sentence_db is None:
         with _sentence_db_lock:
             if _sentence_db is None:
-                os.makedirs(os.path.dirname(KNOWLEDGE_SENTENCE_DB_PATH), exist_ok=True)
                 from lumen.services.embedding import resolve_dimensions
                 dim = resolve_dimensions("knowledge_sentences")
-                _sentence_db = triviumdb.TriviumDB(KNOWLEDGE_SENTENCE_DB_PATH, dim=dim)
+                _sentence_db = _open_tdb(KNOWLEDGE_SENTENCE_DB_PATH, dim)
                 _save_dim(_SENTENCE_DIM_FILE, dim)
                 logger.info(f"句子级 TriviumDB 已打开: {KNOWLEDGE_SENTENCE_DB_PATH} (维度: {dim})")
     return _sentence_db
@@ -181,6 +183,48 @@ def _prf_refine(db, query_vector: list[float], hits: list[dict],
     return refined
 
 
+def _index_chunk_text(db, node_id: int, chunk: str, filename: str,
+                      folder: str, tags: list = None) -> None:
+    """为 chunk 建立 TriviumDB 文本索引（BM25 + AC 关键词 + 语义组联动）"""
+    try:
+        # BM25 全文索引（TriviumDB 2-Gram，语言无关，不需要 jieba）
+        db.index_text(node_id, chunk)
+
+        # AC 自动机关键词：文件名（带/不带扩展名）+ 文件夹路径
+        if filename:
+            db.index_keyword(node_id, filename)
+            name_no_ext = os.path.splitext(filename)[0]
+            if name_no_ext and name_no_ext != filename:
+                db.index_keyword(node_id, name_no_ext)
+        if folder:
+            db.index_keyword(node_id, folder)
+
+        # AC 自动机关键词：语义组联动（仅 topic 类型，emotion 用于评分不参与召回）
+        try:
+            from lumen.services.semantic_group import match_groups, get_group
+            matched = match_groups(chunk, group_type="topic")
+            for group_id in matched:
+                g = get_group(group_id)
+                if not g:
+                    continue
+                kws = json.loads(g["keywords"]) if isinstance(g["keywords"], str) else g["keywords"]
+                for kw in kws:
+                    db.index_keyword(node_id, kw)
+                # 注册组名本身作为关键词
+                if g.get("name"):
+                    db.index_keyword(node_id, g["name"])
+        except Exception:
+            pass
+
+        # AC 自动机关键词：payload tags
+        if tags:
+            for tag in tags:
+                if tag:
+                    db.index_keyword(node_id, tag)
+    except Exception as e:
+        logger.debug(f"TriviumDB 文本索引失败 (node {node_id}): {e}")
+
+
 def _enrich_sparse_content(db, sparse_hits: list[dict]):
     """从 TriviumDB 补充稀疏搜索结果的 content 字段
 
@@ -205,6 +249,72 @@ def _enrich_sparse_content(db, sparse_hits: list[dict]):
                     break
         except Exception:
             continue
+
+
+def _vector_search(db, search_vector, query_text, top_k, min_score,
+                   payload_filter=None):
+    """向量搜索调度：advanced > hybrid > 纯向量，逐级回退
+
+    返回 (results, method_used)
+    """
+    from lumen.config import SEARCH_USE_ADVANCED, SEARCH_USE_HYBRID, HYBRID_ALPHA, SEARCH_ADVANCED_TEXT_BOOST
+
+    if SEARCH_USE_ADVANCED:
+        try:
+            return db.search_advanced(
+                search_vector, top_k=top_k, expand_depth=0, min_score=min_score,
+                teleport_alpha=0.5,
+                enable_advanced_pipeline=True,
+                enable_sparse_residual=True,
+                fista_lambda=0.1,
+                fista_threshold=0.3,
+                enable_dpp=True,
+                dpp_quality_weight=1.0,
+                enable_refractory_fatigue=True,
+                enable_text_hybrid_search=True,
+                text_boost=SEARCH_ADVANCED_TEXT_BOOST,
+                custom_query_text=query_text,
+                payload_filter=payload_filter,
+            ), "advanced"
+        except Exception as e:
+            logger.debug(f"search_advanced 失败，回退: {e}")
+
+    if SEARCH_USE_HYBRID:
+        try:
+            return db.search_hybrid(
+                search_vector, query_text, top_k=top_k, expand_depth=0,
+                min_score=min_score, hybrid_alpha=HYBRID_ALPHA,
+                payload_filter=payload_filter,
+            ), "hybrid"
+        except Exception as e:
+            logger.debug(f"search_hybrid 失败，回退: {e}")
+
+    return db.search(search_vector, top_k=top_k, min_score=min_score,
+                     payload_filter=payload_filter), "vector"
+
+
+async def search_diagnostics(query: str, top_k: int = 10) -> dict:
+    """独立诊断接口：返回 TriviumDB 管线各阶段耗时
+
+    供前端监控面板调用的独立 API，与主搜索解耦。
+    使用 search_with_context 抓取 Rust 层真实计时。
+    """
+    backend = await get_embedding_service("knowledge")
+    query_vector = await backend.encode(query) if backend else None
+    if not query_vector:
+        return {"error": "embedding unavailable"}
+
+    db = _get_db()
+    try:
+        hits, ctx = db.search_with_context(query_vector, top_k=top_k, min_score=0.3)
+    except Exception as e:
+        return {"error": f"search_with_context failed: {e}"}
+
+    return {
+        "result_count": len(hits),
+        "timings": ctx.timings if hasattr(ctx, "timings") else {},
+        "custom_data": ctx.custom_data if hasattr(ctx, "custom_data") else {},
+    }
 
 
 def _rrf_merge(
@@ -440,7 +550,12 @@ async def import_file(
         }
         nid = db.insert(vector, payload)
         node_ids.append(nid)
+        _index_chunk_text(db, nid, chunk, filename, subdir)
     db.flush()
+    try:
+        db.build_text_index()
+    except Exception as e:
+        logger.debug(f"build_text_index 失败 ({fid}): {e}")
 
     # 4.1 存入稀疏向量（如果获取成功）
     if sparse_vectors:
@@ -695,8 +810,10 @@ async def search(
     category: str = None,
     character_id: str = None,
 ) -> List[Dict]:
-    """混合搜索: 向量 + BM25 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排"""
+    """混合搜索: 向量+文本 + API稀疏 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排"""
     from lumen.config import PRF_ENABLED, PRF_ALPHA, PRF_BETA
+    import time as _time
+    _t0 = _time.time()
 
     backend = await get_embedding_service("knowledge")
     query_vector = await backend.encode(query) if backend else None
@@ -735,9 +852,9 @@ async def search(
         except Exception as e:
             logger.warning(f"ACL 前置过滤失败，搜索无权限检查继续: {e}")
 
-    # ── Path A: 向量搜索 ──
-    results = db.search(search_vector, top_k=top_k * 3, min_score=min_score,
-                        payload_filter=payload_filter)
+    # ── Path A: 向量+文本搜索（advanced > hybrid > 纯向量逐级回退）──
+    results, search_method = _vector_search(
+        db, search_vector, query, top_k * 3, min_score, payload_filter)
     vector_hits = []
     seen = set()
     for hit in results:
@@ -814,34 +931,77 @@ async def search(
         except Exception as e:
             logger.debug(f"知识库 BM25 搜索跳过: {e}")
 
-    # ── Path C: 图谱召回（T19）──
+    # ── Path C: 图谱召回（ACL 过滤）──
     graph_hits = []
     try:
         from lumen.config import GRAPH_RECALL_TOP_K
-        from lumen.services.graph import get_entity_neighbors_text
-        # searchHybrid 在图谱实体中找锚点
-        graph_results = db.search(query_vector, top_k=GRAPH_RECALL_TOP_K, min_score=0.1)
-        entity_ids = []
-        for r in graph_results:
-            payload = r.payload if hasattr(r, "payload") else {}
-            if "name" in payload and "type" in payload:
-                eid = r.id if hasattr(r, "id") else 0
-                if eid:
-                    entity_ids.append(eid)
-        if entity_ids:
-            snippets = get_entity_neighbors_text("knowledge", entity_ids)
-            for eid, snippet in zip(entity_ids, snippets):
-                graph_hits.append({
-                    "entity_id": eid,
-                    "content": f"[图谱] {snippet}",
-                    "score": 0.5,
-                })
+        # 直接搜索边节点 + ACL 过滤
+        # 边节点有 fact_embedding（向量）和 source_path（ACL 依据）
+        # ACL 逻辑：
+        #   - payload_filter=None → 全部允许（角色有权访问所有文件夹）
+        #   - payload_filter={"folder":...} → 有限权限，构建图谱 ACL 过滤
+        #   - 无 character_id → 不过滤（管理后台等场景）
+        graph_acl_filter = None
+        if character_id and payload_filter is not None:
+            # payload_filter 非空意味着 ACL 限制了部分文件夹
+            # 构建边节点专用过滤：source_path 匹配允许的文件夹
+            # allowed 是上面 ACL 计算的文件夹列表
+            # 将文件夹路径映射为 source_path 前缀匹配列表
+            # 注：边节点 source_path 格式为 "category/folder/file.txt"
+            #     而 allowed 是纯 folder 路径（不含 category 前缀）
+            #     因此需要补全为完整 source_path 前缀
+            source_path_prefixes = list(allowed)
+            if source_path_prefixes:
+                graph_acl_filter = {
+                    "type": "edge",
+                    "source_path": {"$in": source_path_prefixes},
+                    "invalid_at": None,
+                }
+        elif character_id and payload_filter is None:
+            # ACL 允许所有文件夹，只过滤边节点类型
+            graph_acl_filter = {
+                "type": "edge",
+                "invalid_at": None,
+            }
+        # else: 无 character_id → graph_acl_filter 保持 None（不过滤）
+        # 注：当 allowed=[] 时，source_path_prefixes 为空，graph_acl_filter 保持 None，
+        #     加上 character_id 存在，下面的条件不满足，图谱搜索自动跳过（正确行为）
+
+        if graph_acl_filter is not None or not character_id:
+            # 有 ACL 过滤条件或无 character_id → 执行搜索
+            graph_results = db.search(
+                query_vector,
+                top_k=GRAPH_RECALL_TOP_K,
+                min_score=0.1,
+                payload_filter=graph_acl_filter,
+            )
+            for r in graph_results:
+                payload = r.payload if hasattr(r, "payload") else {}
+                # 跳过非边节点（无 ACL 过滤时可能混入实体节点）
+                if payload.get("type") != "edge":
+                    continue
+                fact = payload.get("fact", "")
+                source_name = payload.get("source_name", "")
+                target_name = payload.get("target_name", "")
+                label = payload.get("label", "")
+                if fact:
+                    if source_name:
+                        content = f"[图谱] {source_name} {label} {target_name}: {fact}"
+                    else:
+                        content = f"[图谱] {fact}"
+                    graph_hits.append({
+                        "entity_id": r.id if hasattr(r, "id") else 0,
+                        "content": content,
+                        "score": r.score if hasattr(r, "score") else 0.5,
+                    })
     except Exception as e:
         logger.debug(f"图谱召回跳过: {e}")
 
     # ── 记录搜索元数据（先于 PRF 和句子级精排）──
     global _last_search_meta
     _last_search_meta = {
+        "search_method": search_method,
+        "elapsed_ms": round((_time.time() - _t0) * 1000, 1),
         "vector_count": len(vector_hits),
         "sparse_count": len(bm25_hits) if sparse_used else 0,
         "bm25_count": 0 if sparse_used else len(bm25_hits),
@@ -856,8 +1016,8 @@ async def search(
     if PRF_ENABLED and hits:
         refined_vector = _prf_refine(db, query_vector, hits, PRF_ALPHA, PRF_BETA)
         if refined_vector:
-            refined_results = db.search(refined_vector, top_k=top_k * 3, min_score=min_score,
-                                        payload_filter=payload_filter)
+            refined_results, _ = _vector_search(
+                db, refined_vector, query, top_k * 3, min_score, payload_filter)
             refined_hits = []
             refined_seen = set()
             for hit in refined_results:
@@ -1092,6 +1252,7 @@ async def reindex_file(file_id: str) -> dict:
         return {"error": "Embedding 服务不可用，无法向量化"}
 
     # 4. 存入 TriviumDB
+    folder = os.path.dirname(source_path).replace("\\", "/") if "/" in source_path else ""
     node_ids = []
     for i, (chunk, vector) in enumerate(zip(chunks, vectors)):
         payload = {
@@ -1103,11 +1264,16 @@ async def reindex_file(file_id: str) -> dict:
             "chunk_index": i,
             "content": chunk,
             "tags": [],
-            "folder": os.path.dirname(source_path).replace("\\", "/") if "/" in source_path else "",
+            "folder": folder,
         }
         nid = db.insert(vector, payload)
         node_ids.append(nid)
+        _index_chunk_text(db, nid, chunk, info.get("filename", ""), folder)
     db.flush()
+    try:
+        db.build_text_index()
+    except Exception as e:
+        logger.debug(f"build_text_index 失败 ({file_id}): {e}")
 
     # 4.1 存入稀疏向量
     if sparse_vectors:
