@@ -204,8 +204,8 @@ def execute(params: dict, command: str = "") -> dict:
                     f"没有写入权限: {resolved_path}",
                     {"target": target, "path": resolved_path},
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"ACL 写入权限检查失败，跳过检查: {e}")
 
     # content_display: 日记按 Agent 分文件夹，不需要占位符
     content_display = content

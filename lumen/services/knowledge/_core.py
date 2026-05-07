@@ -436,6 +436,7 @@ async def import_file(
             "chunk_index": i,
             "content": chunk,
             "tags": [],
+            "folder": subdir,
         }
         nid = db.insert(vector, payload)
         node_ids.append(nid)
@@ -731,8 +732,8 @@ async def search(
                 payload_filter = {"folder": {"$in": ["__BLOCK_ALL__"]}}
             else:
                 payload_filter = {"folder": {"$in": allowed}}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"ACL 前置过滤失败，搜索无权限检查继续: {e}")
 
     # ── Path A: 向量搜索 ──
     results = db.search(search_vector, top_k=top_k * 3, min_score=min_score,
@@ -1102,6 +1103,7 @@ async def reindex_file(file_id: str) -> dict:
             "chunk_index": i,
             "content": chunk,
             "tags": [],
+            "folder": os.path.dirname(source_path).replace("\\", "/") if "/" in source_path else "",
         }
         nid = db.insert(vector, payload)
         node_ids.append(nid)

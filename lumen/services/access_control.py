@@ -144,7 +144,7 @@ class AccessControl:
                 (character_id, resource_type, resource_id, folder_path, action, access),
             )
             conn.commit()
-        self._invalidate(character_id, resource_type, resource_id)
+            self._invalidate(character_id, resource_type, resource_id)
 
     def remove_permission(self, character_id: str, resource_type: str,
                           resource_id: str, folder_path: str, action: str) -> None:
@@ -159,7 +159,7 @@ class AccessControl:
                  folder_path, folder_path + "/%"),
             )
             conn.commit()
-        self._invalidate(character_id, resource_type, resource_id)
+            self._invalidate(character_id, resource_type, resource_id)
 
     def get_permissions(self, character_id: str, resource_type: str,
                         resource_id: str) -> List[dict]:
@@ -172,6 +172,12 @@ class AccessControl:
     def batch_set_permissions(self, character_id: str, resource_type: str,
                               resource_id: str, entries: List[dict]) -> None:
         """批量设置权限"""
+        for entry in entries:
+            if entry["action"] not in ("read", "write"):
+                raise ValueError(f"action must be 'read' or 'write', got '{entry['action']}'")
+            if entry["access"] not in ("allow", "deny"):
+                raise ValueError(f"access must be 'allow' or 'deny', got '{entry['access']}'")
+
         with _write_lock:
             conn = _get_conn()
             conn.execute(
@@ -186,7 +192,7 @@ class AccessControl:
                      entry["folder_path"], entry["action"], entry["access"]),
                 )
             conn.commit()
-        self._invalidate(character_id, resource_type, resource_id)
+            self._invalidate(character_id, resource_type, resource_id)
 
     def get_characters_with_access(self, resource_type: str, resource_id: str,
                                    folder_path: str, action: str) -> List[str]:

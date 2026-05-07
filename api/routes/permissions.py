@@ -2,15 +2,15 @@
 import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 router = APIRouter()
 
 
 class PermissionEntry(BaseModel):
     folder_path: str
-    action: str  # "read" | "write"
-    access: str  # "allow" | "deny"
+    action: Literal["read", "write"]
+    access: Literal["allow", "deny"]
 
 
 class BatchPermissionRequest(BaseModel):
