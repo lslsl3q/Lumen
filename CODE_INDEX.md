@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-05-05（T11 Phase D 写作模式骨架：TipTap 3 + GhostTextExtension + WritingEnvironment + WritingContextComponent）
+**最后更新**：2026-05-07（统一权限系统：AccessControl ACL 服务 + REST API + 前端双标签管理页 + 检索管道前置过滤 + write_targets 注入）
 
 ---
 
@@ -107,6 +107,7 @@ Lumen/
 │   │   ├── thinking_clusters.py  # 思维簇引擎（VCP MetaThinkingManager 重实现：索引、链式检索、向量融合、降级模式、token 预算）
 │   │   ├── knowledge_resolver.py # 知识库占位符解析器（正则匹配 {{}}/[[]]，RAG/全文检索，替换注入 system prompt）
 │   │   └── emotion.py            # 【预留】情感引擎
+│   │   └── access_control.py    # 统一 ACL 权限服务（SQLite 表 + 最长路径前缀匹配 + 缓存 + scope 查询 + 叶文件夹展开）
 │   │
 │   ├── prompt/                   # 嘴巴 — 提示词构建
 │   │   ├── builder.py            # 系统提示词拼接（角色+Persona+Skills+工具+世界书+动态注入，三明治结构）+ 分层调试构建
@@ -147,6 +148,7 @@ Lumen/
 │       ├── worldbook.py          # 世界书（list/get/create/update/delete，文件存储）
 │       └── skills.py             # Skills（list/get/create/update/delete/upload/invoke，Markdown 目录存储）
 │       ├── knowledge.py          # 知识库（list/get/upload/create/search/delete + scan/bases/graph sync，文件切分+向量化+语义搜索）
+│       ├── permissions.py        # 权限管理（GET/PUT 按角色 + GET/PUT 按资源，asyncio.to_thread 包装同步 AccessControl）
 │       ├── tdb.py                # TDB 通用浏览（条目 CRUD + 文件树 + 从磁盘导入 + 去重 + 编辑同步源文件）
 │       ├── graph.py              # 图谱 CRUD + 重抽 API（实体/边/邻居/重抽，通用支持任意 TDB）
 │       ├── avatar.py             # 头像管理（upload/list/delete，文件存储到 characters/avatars/）
@@ -193,10 +195,10 @@ Lumen/
 │       ├── commands/             # 斜杠命令（registry 注册中心 + builtin 内置命令）
 │       ├── api/                  # 后端 API 客户端（chat, channel[T26], session, character, config, persona, authorsNote, worldbook, ws[T26 WebSocket推送], skills, knowledge, tdb, graph, avatar, memories）
 │       │   └── channel.ts        # T26 频道 REST API（list/create/delete + 消息查询 since_id 补拉）
-│       ├── hooks/                # 状态管理（useChat[T26 SSE→WS], useWebSocket[T26 WS单例+重连+补拉], useChatMode[聊天逻辑层], useRpgMode[RPG模式逻辑层], useModels[模型列表缓存], useDebugState, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useRPG, useResizableWidth[可拖拽宽度]）
-│       ├── components/           # UI 组件（ChatPanel, ActivityBar, SidePanel, Popover, MarkdownContent, CommandPalette, MemoryWindow, GraphWindow, GraphEditor, RpgPanel[RPG房间状态面板], FloatingLayerHost, TdbFileTree[共享文件树], ResizablePanel[可拖拽面板], panels/[CharacterPanel 思考链UI]）
-│       ├── pages/                # 页面组件（WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, DebugWindowPage[独立监控窗口+localStorage持久化], ToolTipsPage, ThinkingClustersPage）
-│       ├── types/                # 类型定义（session, character+ThinkingConfig, persona, authorNote, worldbook, avatar, config, push, skills, knowledge）
+│       ├── hooks/                # 状态管理（useChat[T26 SSE→WS], useWebSocket[T26 WS单例+重连+补拉], useChatMode[聊天逻辑层], useRpgMode[RPG模式逻辑层], useModels[模型列表缓存], useDebugState, useSessions, useCharacters, useConfig, usePush, usePersona, useAuthorNote, useWorldBook, useSkills, useRPG, useResizableWidth[可拖拽宽度], usePermissions[权限数据CRUD]）
+│       ├── components/           # UI 组件（ChatPanel, ActivityBar, SidePanel, Popover, MarkdownContent, CommandPalette, MemoryWindow, GraphWindow, GraphEditor, RpgPanel[RPG房间状态面板], FloatingLayerHost, TdbFileTree[共享文件树], ResizablePanel[可拖拽面板], PermissionTree[三态复选框树], panels/[CharacterPanel 思考链UI]）
+│       ├── pages/                # 页面组件（WorldBookList, WorldBookEditor, SkillList, SkillEditor, AvatarManager, ConfigList, ConfigEditor, DebugWindowPage[独立监控窗口+localStorage持久化], ToolTipsPage, ThinkingClustersPage, PermissionPage[权限管理双标签页]）
+│       ├── types/                # 类型定义（session, character+ThinkingConfig, persona, authorNote, worldbook, avatar, config, push, skills, knowledge, permissions[ACL规则+树节点+角色简要]）
 │       └── styles/               # 样式（index.css 含 CSS 变量, App.css, markdown.css, editor.css 暖灰富文本主题）
 │
 ├── tests/                        # 测试
