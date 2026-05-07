@@ -9,6 +9,7 @@ services/graph/ — 图谱存储与操作
 from lumen.services.graph._core import (
     find_entity_by_name,
     upsert_entity,
+    update_source_folders,
     upsert_edge,
     batch_upsert,
     get_entity_neighbors_text,

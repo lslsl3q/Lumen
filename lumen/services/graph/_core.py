@@ -3,10 +3,8 @@ T19 图谱核心服务
 实体 Upsert / 边管理 / 邻居召回（在 TriviumDB 之上）
 """
 
-import json
-import random
 import logging
-from typing import Optional, List, Dict
+from typing import Optional
 
 from lumen.services import history
 
@@ -25,20 +23,24 @@ def _get_tdb(tdb_name: str):
         raise ValueError(f"未知 TDB: {tdb_name}")
 
 
+def _normalize_name(name: str) -> str:
+    """名称归一化：strip + 小写 + 去空格，用于精确去重"""
+    return name.strip().lower().replace(" ", "")
+
+
 def find_entity_by_name(tdb_name: str, name: str, owner_id: str = "") -> Optional[int]:
-    """按 name 精确查找实体，返回 node_id 或 None"""
+    """按归一化名称精确查找实体，返回 node_id 或 None
+
+    owner_id 已弃用（保留参数签名兼容），内部通过 name_normalized 查找。
+    """
     db = _get_tdb(tdb_name)
+    normalized = _normalize_name(name)
     try:
-        nodes = db.tql(f'FIND {{name: {json.dumps(name)}}} RETURN *')
+        nodes = db.filter_where({"type": "entity", "name_normalized": normalized})
         for node in nodes:
-            payload = node.get("payload", {})
-            if "type" not in payload:
-                continue
-            if owner_id and payload.get("owner_id", "") != owner_id:
-                continue
-            return node.get("id")
+            return node.id
     except Exception as e:
-        logger.warning(f"TQL FIND 查找实体失败 ({name}): {e}")
+        logger.warning(f"filter_where 查找实体失败 ({name}): {e}")
     return None
 
 
@@ -47,59 +49,68 @@ def upsert_entity(tdb_name: str, name: str, entity_type: str,
                   extra: dict = None) -> int:
     """创建或更新图谱实体，返回 node_id
 
-    Upsert 逻辑：
-    1. filterWhere({"name": name}) 查已有实体
-    2. 找到 + owner 匹配 → update_payload（合并 aliases、extra）
-    3. 未找到 → insert（随机向量 + payload）
+    基于 name_normalized 精确去重：
+    1. filter_where({"name_normalized": ...}) 查已有实体
+    2. 找到 → 直接返回（实体现在是最小化模型，无需合并）
+    3. 未找到 → insert（Phase 1 零向量 + 最小化 payload）
+
+    owner_id 和 extra 已弃用（保留参数签名兼容）。
     """
     db = _get_tdb(tdb_name)
-    from lumen.services.embedding import resolve_dimensions
+    normalized = _normalize_name(name)
 
-    existing_id = find_entity_by_name(tdb_name, name, owner_id)
-
+    existing_id = find_entity_by_name(tdb_name, name)
     if existing_id is not None:
-        node = db.get(existing_id)
-        if node:
-            existing_payload = node.payload if hasattr(node, "payload") else {}
-            # 合并 aliases（去重）
-            existing_aliases = existing_payload.get("aliases", [])
-            if not isinstance(existing_aliases, list):
-                existing_aliases = []
-            if aliases:
-                for a in aliases:
-                    if a not in existing_aliases and a != name:
-                        existing_aliases.append(a)
+        logger.debug(f"图谱实体已存在: {name} (id={existing_id})")
+        return existing_id
 
-            # 合并 extra
-            merged_extra = existing_payload.get("extra", {}) or {}
-            if extra:
-                merged_extra.update(extra)
-
-            updated_payload = {
-                "name": name,
-                "type": entity_type,
-                "owner_id": owner_id,
-                "aliases": existing_aliases,
-                "extra": merged_extra,
-            }
-            db.update_payload(existing_id, updated_payload)
-            db.flush()
-            logger.debug(f"图谱实体已更新: {name} (id={existing_id})")
-            return existing_id
-
-    dim = resolve_dimensions(tdb_name)
-    vector = [random.gauss(0, 0.01) for _ in range(dim)]
+    # Phase 1: 零向量占位（后续接入 embedding 服务后替换为名称嵌入）
+    dim = db.dim()
+    vector = [0.0] * dim
     payload = {
         "name": name,
-        "type": entity_type,
-        "owner_id": owner_id,
+        "name_normalized": normalized,
+        "type": "entity",
+        "entity_type": entity_type,
         "aliases": aliases or [],
-        "extra": extra or {},
+        "source_folders": [],
     }
     node_id = db.insert(vector, payload)
     db.flush()
     logger.debug(f"图谱实体已创建: {name} (id={node_id}, type={entity_type})")
     return node_id
+
+
+def update_source_folders(entity_id: int, folder: str, action: str = "add",
+                          tdb_name: str = "knowledge") -> None:
+    """维护实体的 source_folders 列表（记录哪些文件夹提及了该实体）
+
+    Args:
+        entity_id: 实体 node_id
+        folder: 文件夹路径
+        action: "add" 添加 | "remove" 移除
+        tdb_name: TDB 实例名
+    """
+    db = _get_tdb(tdb_name)
+    node = db.get(entity_id)
+    if not node:
+        logger.warning(f"update_source_folders: 实体不存在 (id={entity_id})")
+        return
+
+    payload = node.payload if hasattr(node, "payload") else {}
+    folders = set(payload.get("source_folders", []))
+
+    if action == "add":
+        folders.add(folder)
+    elif action == "remove":
+        folders.discard(folder)
+    else:
+        logger.warning(f"update_source_folders: 未知 action={action}")
+        return
+
+    payload["source_folders"] = list(folders)
+    db.update_payload(entity_id, payload)
+    db.flush()
 
 
 def upsert_edge(tdb_name: str, src_id: int, dst_id: int, label: str = "related",
