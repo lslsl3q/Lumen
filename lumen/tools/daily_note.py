@@ -175,6 +175,38 @@ def execute(params: dict, command: str = "") -> dict:
     character_id = ctx.get("character_id", "")
     session_id = ctx.get("session_id", "")
 
+    # ── 写入权限验证（Fail-Closed：默认拒绝） ──
+    target = params.get("target", "diary")
+    character = ctx.get("character", {})
+    write_targets = character.get("write_targets", {}) if character_id else {}
+
+    # 没配置写入目标 → 直接拒绝
+    target_path_template = write_targets.get(target)
+    if not target_path_template:
+        return error_result(
+            "daily_note",
+            ErrorCode.PARAM_INVALID,
+            f"角色未配置 [{target}] 的写入目标路径",
+            {"target": target},
+        )
+
+    if character_id:
+        resolved_path = target_path_template.replace("{character_id}", character_id)
+        resource_type = "diary" if target == "diary" else "knowledge"
+        resource_id = "agent_knowledge" if resource_type == "diary" else "knowledge"
+        try:
+            from lumen.services.access_control import get_instance
+            acl = get_instance()
+            if not acl.can_write(character_id, resource_type, resource_id, resolved_path):
+                return error_result(
+                    "daily_note",
+                    ErrorCode.PARAM_INVALID,
+                    f"没有写入权限: {resolved_path}",
+                    {"target": target, "path": resolved_path},
+                )
+        except Exception:
+            pass
+
     # content_display: 日记按 Agent 分文件夹，不需要占位符
     content_display = content
 
