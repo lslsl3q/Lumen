@@ -12,8 +12,8 @@ from typing import Optional, List, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-DB_PATH = os.path.join(DATA_DIR, "permissions.db")
+from lumen.config import PERMISSIONS_DB_PATH as DB_PATH
+DATA_DIR = os.path.dirname(DB_PATH)
 
 _local = threading.local()
 _write_lock = threading.Lock()
@@ -198,3 +198,34 @@ class AccessControl:
             (resource_type, resource_id, folder_path, action),
         ).fetchall()
         return [r["character_id"] for r in rows]
+
+    def get_read_scope(self, character_id: str, resource_type: str,
+                       resource_id: str) -> Tuple[List[str], List[str]]:
+        """获取允许和拒绝的文件夹路径列表（供检索管道用）"""
+        rules = self._get_rules(character_id, resource_type, resource_id)
+        read_rules = [r for r in rules if r["action"] == "read"]
+
+        allowed = [r["folder_path"] for r in read_rules if r["access"] == "allow"]
+        denied = [r["folder_path"] for r in read_rules if r["access"] == "deny"]
+        return allowed, denied
+
+    def rename_path(self, resource_type: str, resource_id: str,
+                    old_path: str, new_path: str) -> None:
+        """批量更新 folder_path 前缀（文件夹重命名时调用）"""
+        with _write_lock:
+            conn = _get_conn()
+            rows = conn.execute(
+                """SELECT id, folder_path FROM acl_rules
+                   WHERE resource_type=? AND resource_id=?
+                     AND (folder_path=? OR folder_path LIKE ?)""",
+                (resource_type, resource_id, old_path, old_path + "/%"),
+            ).fetchall()
+
+            for row in rows:
+                new_folder = new_path + row["folder_path"][len(old_path):]
+                conn.execute(
+                    "UPDATE acl_rules SET folder_path=? WHERE id=?",
+                    (new_folder, row["id"]),
+                )
+            conn.commit()
+        self._cache.clear()

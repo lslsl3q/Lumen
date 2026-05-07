@@ -115,3 +115,41 @@ class TestPermissionManagement:
 
         chars = acl.get_characters_with_access("knowledge", "knowledge", "/地理", "read")
         assert set(chars) == {"char_a", "char_b"}
+
+
+class TestScopeAndRename:
+    """检索范围查询 + 文件夹重命名"""
+
+    def test_get_read_scope(self, acl):
+        """返回允许和拒绝的路径列表"""
+        acl.set_permission("char_a", "knowledge", "knowledge", "/地理", "read", "allow")
+        acl.set_permission("char_a", "knowledge", "knowledge", "/天文", "read", "allow")
+        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
+
+        allowed, denied = acl.get_read_scope("char_a", "knowledge", "knowledge")
+        assert "/地理" in allowed
+        assert "/天文" in allowed
+        assert "/机密" in denied
+
+    def test_get_read_scope_empty(self, acl):
+        """无规则时返回空列表"""
+        allowed, denied = acl.get_read_scope("char_a", "knowledge", "knowledge")
+        assert allowed == []
+        assert denied == []
+
+    def test_rename_path(self, acl):
+        """重命名文件夹后，ACL 路径同步更新"""
+        acl.set_permission("char_a", "knowledge", "knowledge", "/旧名", "read", "allow")
+        acl.set_permission("char_a", "knowledge", "knowledge", "/旧名/子目录", "read", "deny")
+
+        acl.rename_path("knowledge", "knowledge", "/旧名", "/新名")
+
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/新名") is True
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/新名/子目录") is False
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/旧名") is True  # 默认值
+
+    def test_cache_invalidation(self, acl):
+        """写操作后缓存失效"""
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True
+        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False

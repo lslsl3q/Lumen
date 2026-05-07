@@ -187,6 +187,9 @@ AGENT_KNOWLEDGE_DB_PATH = os.getenv(
     os.path.join(VECTOR_API_DIR, "agent_knowledge.tdb"),
 )
 
+# 权限数据库路径
+PERMISSIONS_DB_PATH = os.path.join(os.path.dirname(__file__), "data", "permissions.db")
+
 # 思维簇配置
 THINKING_CLUSTERS_DIR = os.getenv(
     "THINKING_CLUSTERS_DIR",
