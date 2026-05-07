@@ -109,6 +109,8 @@ async def lifespan(app):
     history.close_conn()
     vector_store.close()
     knowledge.close()
+    from lumen.services import access_control
+    access_control.close()
 
 
 from fastapi import FastAPI
@@ -135,7 +137,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -158,6 +160,8 @@ app.include_router(system.router, prefix="/api/system", tags=["系统管理"])
 app.include_router(rpg.router, prefix="/rpg", tags=["RPG世界状态"])
 app.include_router(channel.router, tags=["频道管理"])
 app.include_router(semantic_group.router, tags=["语义组"])
+app.include_router(writing.router, prefix="/writing", tags=["写作模式"])
+app.include_router(permissions.router, prefix="/permissions", tags=["权限管理"])
 
 # 挂载头像静态文件目录
 avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"
