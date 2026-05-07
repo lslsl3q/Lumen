@@ -145,3 +145,56 @@ class AccessControl:
             )
             conn.commit()
         self._invalidate(character_id, resource_type, resource_id)
+
+    def remove_permission(self, character_id: str, resource_type: str,
+                          resource_id: str, folder_path: str, action: str) -> None:
+        """删除 ACL 规则，递归删除子路径"""
+        with _write_lock:
+            conn = _get_conn()
+            conn.execute(
+                """DELETE FROM acl_rules
+                   WHERE character_id=? AND resource_type=? AND resource_id=?
+                     AND action=? AND (folder_path=? OR folder_path LIKE ?)""",
+                (character_id, resource_type, resource_id, action,
+                 folder_path, folder_path + "/%"),
+            )
+            conn.commit()
+        self._invalidate(character_id, resource_type, resource_id)
+
+    def get_permissions(self, character_id: str, resource_type: str,
+                        resource_id: str) -> List[dict]:
+        """获取角色的所有 ACL 规则"""
+        rules = self._get_rules(character_id, resource_type, resource_id)
+        return [{"folder_path": r["folder_path"], "action": r["action"],
+                 "access": r["access"]}
+                for r in rules]
+
+    def batch_set_permissions(self, character_id: str, resource_type: str,
+                              resource_id: str, entries: List[dict]) -> None:
+        """批量设置权限"""
+        with _write_lock:
+            conn = _get_conn()
+            conn.execute(
+                "DELETE FROM acl_rules WHERE character_id=? AND resource_type=? AND resource_id=?",
+                (character_id, resource_type, resource_id),
+            )
+            for entry in entries:
+                conn.execute(
+                    """INSERT INTO acl_rules (character_id, resource_type, resource_id, folder_path, action, access)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (character_id, resource_type, resource_id,
+                     entry["folder_path"], entry["action"], entry["access"]),
+                )
+            conn.commit()
+        self._invalidate(character_id, resource_type, resource_id)
+
+    def get_characters_with_access(self, resource_type: str, resource_id: str,
+                                   folder_path: str, action: str) -> List[str]:
+        """反查：获取某路径有权限的角色 ID 列表"""
+        conn = _get_conn()
+        rows = conn.execute(
+            """SELECT DISTINCT character_id FROM acl_rules
+               WHERE resource_type=? AND resource_id=? AND folder_path=? AND action=? AND access='allow'""",
+            (resource_type, resource_id, folder_path, action),
+        ).fetchall()
+        return [r["character_id"] for r in rows]
