@@ -104,20 +104,16 @@ async def list_entities(
         node_ids = db.all_node_ids()
         for nid in node_ids:
             try:
-                node = db.get(nid)
+                payload = db.get_payload(nid)
             except Exception:
                 continue
-            if not node:
+            if not payload:
                 continue
-            payload = node.payload if hasattr(node, "payload") else {}
             if "name" not in payload or "type" not in payload:
                 continue
             if type and payload.get("type", "") != type:
                 continue
-            entities.append({
-                "id": node.id if hasattr(node, "id") else nid,
-                "payload": payload,
-            })
+            entities.append({"id": nid, "payload": payload})
 
         return {"entities": entities, "total": len(entities)}
     except Exception as e:
@@ -149,13 +145,12 @@ async def update_entity(tdb: str, node_id: int, req: EntityUpdate):
     """更新实体 payload"""
     db = _get_tdb(tdb)
     try:
-        node = db.get(node_id)
-        if not node:
+        payload = db.get_payload(node_id)
+        if not payload:
             raise HTTPException(404, f"节点 {node_id} 不存在")
 
-        existing = node.payload if hasattr(node, "payload") else {}
-        existing.update(req.payload)
-        db.update_payload(node_id, existing)
+        payload.update(req.payload)
+        db.update_payload(node_id, payload)
         db.flush()
         _backup_after_write(tdb)
         return {"message": f"已更新: {node_id}"}
@@ -170,11 +165,10 @@ async def delete_entity(tdb: str, node_id: int):
     """删除实体 + 关联边（v0.6.0 优先 TQL DETACH DELETE）"""
     db = _get_tdb(tdb)
     try:
-        node = db.get(node_id)
-        if not node:
+        payload = db.get_payload(node_id)
+        if not payload:
             raise HTTPException(404, f"节点 {node_id} 不存在")
 
-        payload = node.payload if hasattr(node, "payload") else {}
         name = payload.get("name", "")
         etype = payload.get("type", "")
 
@@ -227,12 +221,11 @@ async def list_edges(tdb: str):
         entity_nodes = []
         for nid in db.all_node_ids():
             try:
-                node = db.get(nid)
+                payload = db.get_payload(nid)
             except Exception:
                 continue
-            if not node:
+            if not payload:
                 continue
-            payload = node.payload if hasattr(node, "payload") else {}
             if "name" in payload and "type" in payload:
                 entity_nodes.append((nid, payload))
 
@@ -248,11 +241,7 @@ async def list_edges(tdb: str):
                     continue
                 seen.add(edge_key)
 
-                try:
-                    dst_node = db.get(dst_id)
-                except Exception:
-                    continue
-                dst_payload = dst_node.payload if dst_node and hasattr(dst_node, "payload") else {}
+                dst_payload = db.get_payload(dst_id) or {}
 
                 edges.append({
                     "src": nid,
@@ -271,11 +260,11 @@ async def create_edge(tdb: str, req: EdgeCreate):
     """新建边"""
     db = _get_tdb(tdb)
     try:
-        src_node = db.get(req.src)
-        dst_node = db.get(req.dst)
-        if not src_node:
+        src_payload = db.get_payload(req.src)
+        dst_payload = db.get_payload(req.dst)
+        if not src_payload:
             raise HTTPException(404, f"源节点 {req.src} 不存在")
-        if not dst_node:
+        if not dst_payload:
             raise HTTPException(404, f"目标节点 {req.dst} 不存在")
 
         db.link(req.src, req.dst, label=req.label, weight=req.weight)
@@ -315,8 +304,7 @@ async def get_neighbors(
         neighbor_ids = db.neighbors(node_id, depth=depth)
         neighbors = []
         for nid in neighbor_ids:
-            node = db.get(nid)
-            payload = node.payload if node and hasattr(node, "payload") else {}
+            payload = db.get_payload(nid) or {}
             neighbors.append({
                 "id": nid,
                 "payload": payload,
@@ -350,12 +338,11 @@ async def re_extract_graph(tdb: str, req: ReExtractRequest):
     chunks = []
     for nid in db.all_node_ids():
         try:
-            node = db.get(nid)
+            payload = db.get_payload(nid)
         except Exception:
             continue
-        if not node:
+        if not payload:
             continue
-        payload = node.payload if hasattr(node, "payload") else {}
         content = payload.get("content", "")
         sp = payload.get("source_path", "")
         if not content or not sp:

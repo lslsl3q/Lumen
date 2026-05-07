@@ -274,7 +274,8 @@ def _scan_time_range(
         rows = db.tql('FIND {source: "daily_note"} RETURN *')
 
     for row in rows:
-        payload = row.get("payload", {})
+        node = row.row.get("_", {})
+        payload = node.get("payload", {})
         created_at = payload.get("created_at", "")
         if not created_at:
             continue
@@ -291,7 +292,7 @@ def _scan_time_range(
             continue
 
         candidates.append({
-            "node_id": row.get("id"),
+            "node_id": node.get("id"),
             "content": content,
             "created_at": created_at,
             "importance": payload.get("importance", 3),
@@ -307,10 +308,11 @@ def _get_characters_with_diaries() -> list[str]:
 
     try:
         db = _get_agent_db()
-        rows = db.tql('FIND {source: "daily_note"} RETURN payload')
+        rows = db.tql('FIND {source: "daily_note"} RETURN *')
         owners: set[str] = set()
         for row in rows:
-            owner = row.get("payload", {}).get("owner_id", "")
+            node = row.row.get("_", {})
+            owner = node.get("payload", {}).get("owner_id", "")
             if owner:
                 owners.add(owner)
         return list(owners)

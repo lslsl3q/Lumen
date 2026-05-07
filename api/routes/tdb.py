@@ -10,6 +10,7 @@ DELETE /tdb/{name}/entries/{id}  — 删除条目
 
 import os
 import logging
+from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -48,17 +49,16 @@ async def list_entries(
     """列出 TDB 条目（payload 浏览）"""
     db = _get_tdb(name)
     try:
-        # filter_where({}) 不可靠，用 all_node_ids + get 逐条读取
+        # TQL FIND 不允许空 filter {}，用 all_node_ids + get_payload 逐条读取
         node_ids = db.all_node_ids()
         entries = []
         for nid in node_ids:
             try:
-                node = db.get(nid)
+                payload = db.get_payload(nid)
             except Exception:
                 continue
-            if not node:
+            if not payload:
                 continue
-            payload = node.payload if hasattr(node, "payload") else {}
             # 跳过图谱实体（name+type 但无 content/source）
             if "name" in payload and "type" in payload and not payload.get("content"):
                 continue
@@ -71,7 +71,7 @@ async def list_entries(
                 continue
 
             entries.append({
-                "id": node.id if hasattr(node, "id") else nid,
+                "id": nid,
                 "content": payload.get("content", "")[:500],
                 "source": payload.get("source", ""),
                 "category": payload.get("category", ""),
@@ -110,12 +110,11 @@ async def tdb_stats(name: str):
 
         for nid in node_ids:
             try:
-                node = db.get(nid)
+                payload = db.get_payload(nid)
             except Exception:
                 continue
-            if not node:
+            if not payload:
                 continue
-            payload = node.payload if hasattr(node, "payload") else {}
             # 跳过图谱实体
             if "name" in payload and "type" in payload and not payload.get("content"):
                 continue
@@ -148,11 +147,14 @@ async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
     """更新 TDB 条目 payload（可选重向量化）"""
     db = _get_tdb(name)
     try:
-        node = db.get(entry_id)
-        if not node:
+        payload = db.get_payload(entry_id)
+        if not payload:
             raise HTTPException(404, f"条目不存在: {entry_id}")
 
-        payload = dict(node.payload) if hasattr(node, "payload") else {}
+        payload = dict(payload)
+
+        # 保存旧 content（更新前），用于源文件同步
+        old_content = payload.get("content", "")
 
         # 更新 payload 字段
         if body.content is not None:
@@ -181,7 +183,6 @@ async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
 
         # 内容变更时同步写回源文件
         if body.content is not None and name == "knowledge":
-            old_content = (node.payload if hasattr(node, "payload") else {}).get("content", "")
             source_path = payload.get("source_path", "")
             if old_content and body.content != old_content and source_path:
                 try:
@@ -211,16 +212,20 @@ async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
 
 @router.get("/{name}/file-tree")
 async def file_tree(name: str):
-    """返回 TDB 对应数据目录的文件树（用于源文件视图）
+    """返回 TDB 数据目录的文件树
 
-    返回格式：{ folders: [{ name, path, files: [{ name, path }] }] }
-    只列出 .md / .txt / .markdown 文件。
-    导入状态由前端根据已加载的条目 source_path 判断（不遍历 TDB）。
+    - knowledge: 从 TDB entry 的 source_path 反推文件夹结构
+    - memory: 遍历文件系统 data/{name}/
+
+    返回格式：{ folders: [{ name, path, files: [{ name, path }] }], total_files }
     """
     if name not in _ALLOWED:
         raise HTTPException(404, f"未知 TDB: {name}")
 
-    # 数据目录：data/{name}/
+    if name == "knowledge":
+        return _file_tree_from_tdb(name)
+
+    # memory: 文件系统遍历
     data_dir = os.path.join(_PROJECT_ROOT, "lumen", "data", name)
     if not os.path.isdir(data_dir):
         return {"folders": [], "total_files": 0}
@@ -230,20 +235,14 @@ async def file_tree(name: str):
     total_files = 0
 
     for dirpath, dirnames, filenames in os.walk(data_dir):
-        # 跳过隐藏目录
         dirnames[:] = [d for d in dirnames if not d.startswith(".")]
-
-        # 收集符合条件的文件
         matched_files = []
         for f in sorted(filenames):
             ext = os.path.splitext(f)[1].lower()
             if ext in ALLOWED_EXT:
                 full_path = os.path.join(dirpath, f)
                 rel_path = os.path.relpath(full_path, data_dir).replace("\\", "/")
-                matched_files.append({
-                    "name": f,
-                    "path": rel_path,
-                })
+                matched_files.append({"name": f, "path": rel_path})
                 total_files += 1
 
         if matched_files:
@@ -255,6 +254,66 @@ async def file_tree(name: str):
                 "path": rel_dir,
                 "files": matched_files,
             })
+
+    return {"folders": folders, "total_files": total_files}
+
+
+def _file_tree_from_tdb(name: str):
+    """从 TDB entry 的 source_path 反推文件夹树（知识库无独立源文件目录时使用）"""
+    db = _get_tdb(name)
+    dir_files: dict[str, list[dict]] = defaultdict(list)
+
+    for nid in db.all_node_ids():
+        try:
+            payload = db.get_payload(nid)
+        except Exception:
+            continue
+        if not payload:
+            continue
+        sp = payload.get("source_path", "").replace("\\", "/").strip("/")
+        if not sp:
+            continue
+
+        parts = sp.split("/")
+        if len(parts) == 1:
+            dir_files[""].append({"name": parts[0], "path": parts[0]})
+        else:
+            dir_path = "/".join(parts[:-1])
+            file_name = parts[-1]
+            dir_files[dir_path].append({"name": file_name, "path": sp})
+
+    # 收集所有叶子目录和它们的父目录链
+    all_dirs: dict[str, dict] = {}  # path → {name, files}
+    for dir_path, files in dir_files.items():
+        if not dir_path:
+            all_dirs[""] = {"name": name, "files": files}
+        else:
+            segments = dir_path.split("/")
+            for i in range(len(segments)):
+                prefix = "/".join(segments[:i + 1])
+                if prefix not in all_dirs:
+                    all_dirs[prefix] = {
+                        "name": segments[i],
+                        "files": files if prefix == dir_path else [],
+                    }
+                elif prefix == dir_path:
+                    all_dirs[prefix]["files"].extend(files)
+
+    # 去重文件
+    for d in all_dirs.values():
+        seen = set()
+        unique = []
+        for f in d["files"]:
+            if f["path"] not in seen:
+                seen.add(f["path"])
+                unique.append(f)
+        d["files"] = sorted(unique, key=lambda x: x["name"])
+
+    folders = [
+        {"name": v["name"], "path": k, "files": v["files"]}
+        for k, v in sorted(all_dirs.items())
+    ]
+    total_files = sum(len(f["files"]) for f in folders)
 
     return {"folders": folders, "total_files": total_files}
 
@@ -319,12 +378,11 @@ async def _import_or_reimport(
     old_node_ids = []
     for nid in db.all_node_ids():
         try:
-            node = db.get(nid)
+            payload = db.get_payload(nid)
         except Exception:
             continue
-        if not node:
+        if not payload:
             continue
-        payload = node.payload if hasattr(node, "payload") else {}
         sp = payload.get("source_path", "")
         if sp.endswith(req_path) or sp == req_path:
             old_node_ids.append(nid)

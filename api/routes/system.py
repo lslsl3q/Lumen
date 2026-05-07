@@ -32,8 +32,7 @@ async def force_extract(req: ForceExtractRequest):
 
     for nid in db.all_node_ids():
         try:
-            node = db.get(nid)
-            payload = node.payload if hasattr(node, "payload") else {}
+            payload = db.get_payload(nid)
         except Exception:
             continue
 

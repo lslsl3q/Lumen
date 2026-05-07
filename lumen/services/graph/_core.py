@@ -29,19 +29,34 @@ def _normalize_name(name: str) -> str:
     return name.strip().lower().replace(" ", "")
 
 
+def _tql_escape(value: str) -> str:
+    """转义 TQL 字符串值中的特殊字符，防止注入"""
+    return (value
+            .replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t"))
+
+
 def find_entity_by_name(tdb_name: str, name: str, owner_id: str = "") -> Optional[int]:
     """按归一化名称精确查找实体，返回 node_id 或 None
 
     owner_id 已弃用（保留参数签名兼容），内部通过 name_normalized 查找。
     """
+    if not name or not name.strip():
+        return None
     db = _get_tdb(tdb_name)
     normalized = _normalize_name(name)
+    safe = _tql_escape(normalized)
     try:
-        nodes = db.filter_where({"type": "entity", "name_normalized": normalized})
-        for node in nodes:
-            return node.id
+        rows = db.tql(f'FIND {{type: "entity", name_normalized: "{safe}"}} RETURN *')
+        for row in rows:
+            node = row.row.get("_")
+            if node and "id" in node:
+                return node["id"]
     except Exception as e:
-        logger.warning(f"filter_where 查找实体失败 ({name}): {e}")
+        logger.warning(f"TQL 查找实体失败 ({name}): {e}")
     return None
 
 
@@ -51,7 +66,7 @@ def upsert_entity(tdb_name: str, name: str, entity_type: str,
     """创建或更新图谱实体，返回 node_id
 
     基于 name_normalized 精确去重：
-    1. filter_where({"name_normalized": ...}) 查已有实体
+    1. TQL FIND {name_normalized: ...} 查已有实体
     2. 找到 → 直接返回（实体现在是最小化模型，无需合并）
     3. 未找到 → insert（Phase 1 零向量 + 最小化 payload）
 
@@ -93,12 +108,10 @@ def update_source_folders(entity_id: int, folder: str, action: str = "add",
         tdb_name: TDB 实例名
     """
     db = _get_tdb(tdb_name)
-    node = db.get(entity_id)
-    if not node:
+    payload = db.get_payload(entity_id)
+    if not payload:
         logger.warning(f"update_source_folders: 实体不存在 (id={entity_id})")
         return
-
-    payload = node.payload if hasattr(node, "payload") else {}
     folders = set(payload.get("source_folders", []))
 
     if action == "add":
@@ -297,12 +310,11 @@ def get_entity_neighbors_text(tdb_name: str, entity_ids: list[int],
 
     for entity_id in entity_ids:
         try:
-            src_node = db.get(entity_id)
+            src_payload = db.get_payload(entity_id)
         except Exception:
             continue
-        if not src_node:
+        if not src_payload:
             continue
-        src_payload = src_node.payload if hasattr(src_node, "payload") else {}
         src_name = src_payload.get("name", "")
         if not src_name:
             continue
@@ -319,12 +331,11 @@ def get_entity_neighbors_text(tdb_name: str, entity_ids: list[int],
             seen_pairs.add(pair_key)
 
             try:
-                dst_node = db.get(dst_id)
+                dst_payload = db.get_payload(dst_id)
             except Exception:
                 continue
-            if not dst_node:
+            if not dst_payload:
                 continue
-            dst_payload = dst_node.payload if hasattr(dst_node, "payload") else {}
             dst_name = dst_payload.get("name", "")
             if not dst_name:
                 continue

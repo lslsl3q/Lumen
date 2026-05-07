@@ -43,7 +43,10 @@ def _get_db() -> triviumdb.TriviumDB:
 
         _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
         _save_dim_file(_DB_PATH, dim)
-
+        try:
+            _db.enable_auto_compaction(7200)
+        except Exception:
+            pass
         # v0.6.0 属性二级索引：O(1) 等值过滤
         for field in _INDEX_FIELDS:
             try:
@@ -65,6 +68,10 @@ def init_with_dimensions(dim: int):
         return
     os.makedirs(_DATA_DIR, exist_ok=True)
     _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
+    try:
+        _db.enable_auto_compaction(7200)
+    except Exception:
+        pass
     logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
 
 
@@ -119,18 +126,17 @@ def search_similar(
         [{"role", "content", "session_id", "created_at", "score"}, ...]
     """
     db = _get_db()
-    results = db.search(query_vector, top_k=top_k * 2, min_score=min_score)
+    # DB 侧预过滤：只搜同角色的结果
+    search_filter = {"character_id": character_id}
+    if exclude_session_id:
+        search_filter["session_id"] = {"$ne": exclude_session_id}
+    results = db.search(query_vector, top_k=top_k * 2, min_score=min_score,
+                        payload_filter=search_filter)
 
     hits = []
     seen = set()
     for hit in results:
         payload = hit.payload if hasattr(hit, "payload") else {}
-        # 过滤：只保留同角色的结果
-        if payload.get("character_id") != character_id:
-            continue
-        # 排除当前会话的消息
-        if exclude_session_id and payload.get("session_id") == exclude_session_id:
-            continue
         # 去重
         key = (payload.get("session_id", ""), payload.get("content", "")[:100])
         if key in seen:
@@ -168,7 +174,7 @@ def delete_by_character(character_id: str) -> int:
     return result.get("affected", 0) if isinstance(result, dict) else 0
 
 
-def prf_refine(query_vector: list[float], search_hits: list[dict],
+def prf_refine(db, query_vector: list[float], search_hits: list[dict],
                alpha: float = 0.7, beta: float = 0.3) -> list[float] | None:
     """PRF (Pseudo-Relevance Feedback) 查询向量精炼
 
@@ -176,8 +182,9 @@ def prf_refine(query_vector: list[float], search_hits: list[dict],
     从 TriviumDB 读回已存向量算均值，零嵌入开销。
 
     Args:
+        db: TriviumDB 实例
         query_vector: 原始查询向量
-        search_hits: 第一次搜索的结果列表（需要有 id 或 node_id）
+        search_hits: 第一次搜索的结果列表（需要有 id / node_id / chunk_id）
         alpha: 原始查询权重（默认 0.7）
         beta: PRF 反馈权重（默认 0.3）
 
@@ -185,7 +192,6 @@ def prf_refine(query_vector: list[float], search_hits: list[dict],
         精炼后的查询向量，失败返回 None
     """
     from lumen.config import PRF_TOP_N
-    db = _get_db()
     if db is None:
         return None
 
@@ -196,7 +202,7 @@ def prf_refine(query_vector: list[float], search_hits: list[dict],
     # 从 TriviumDB 读回 top-N 的存储向量
     vectors = []
     for hit in top_n:
-        node_id = hit.get("id") or hit.get("node_id")
+        node_id = hit.get("id") or hit.get("node_id") or hit.get("chunk_id")
         if node_id is None:
             continue
         try:

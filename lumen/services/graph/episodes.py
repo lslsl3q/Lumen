@@ -13,7 +13,7 @@ import time
 import logging
 from typing import Optional, List
 
-from lumen.services.graph._core import _get_tdb
+from lumen.services.graph._core import _get_tdb, _tql_escape
 
 logger = logging.getLogger(__name__)
 
@@ -155,10 +155,18 @@ def find_episodes_by_doc(
     Returns:
         Episode ID 列表
     """
+    if not source_doc_id:
+        return []
     db = _get_tdb(tdb_name)
     try:
-        results = db.filter_where({"source_doc_id": source_doc_id})
-        return [r["id"] for r in results]
+        safe = _tql_escape(source_doc_id)
+        rows = db.tql(f'FIND {{type: "episode", source_doc_id: "{safe}"}} RETURN *')
+        ids = []
+        for row in rows:
+            node = row.row.get("_")
+            if node and "id" in node:
+                ids.append(node["id"])
+        return ids
     except Exception as e:
         logger.warning(f"find_episodes_by_doc 查询失败 ({source_doc_id}): {e}")
         return []
@@ -176,10 +184,18 @@ def find_episodes_by_source_path(
     Returns:
         Episode ID 列表
     """
+    if not source_path:
+        return []
     db = _get_tdb(tdb_name)
     try:
-        results = db.filter_where({"source_path": source_path})
-        return [r["id"] for r in results]
+        safe = _tql_escape(source_path)
+        rows = db.tql(f'FIND {{type: "episode", source_path: "{safe}"}} RETURN *')
+        ids = []
+        for row in rows:
+            node = row.row.get("_")
+            if node and "id" in node:
+                ids.append(node["id"])
+        return ids
     except Exception as e:
         logger.warning(
             f"find_episodes_by_source_path 查询失败 ({source_path}): {e}"

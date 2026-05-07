@@ -59,6 +59,10 @@ def _get_db():
         if dim == 0:
             dim = 512  # fallback
         _db = triviumdb.TriviumDB(THINKING_CLUSTERS_DB_PATH, dim=dim)
+        try:
+            _db.enable_auto_compaction(7200)
+        except Exception:
+            pass
         logger.info(f"思维簇 TriviumDB 已打开: {THINKING_CLUSTERS_DB_PATH} (维度: {dim})")
     return _db
 
@@ -292,21 +296,20 @@ async def run_chain(
     )
 
     for step in chain_config.steps:
-        # 向量搜索
+        # 向量搜索（DB 侧按簇预过滤）
         raw_results = db.search(
             current_vector.tolist(),
-            top_k=step.top_k * 3,  # 多搜一些，后面按簇过滤
+            top_k=step.top_k,
             min_score=step.min_score,
+            payload_filter={"cluster": step.cluster},
         )
 
-        # 过滤：只保留属于当前簇的结果
+        # 收集结果
         hits = []
         for hit in raw_results:
             payload = getattr(hit, "payload", {}) or {}
-            if payload.get("cluster") == step.cluster:
-                score = getattr(hit, "score", 0.0)
-                if score >= step.min_score:
-                    hits.append((hit, payload, score))
+            score = getattr(hit, "score", 0.0)
+            hits.append((hit, payload, score))
 
         # 按相似度排序，取 top_k
         hits.sort(key=lambda x: x[2], reverse=True)

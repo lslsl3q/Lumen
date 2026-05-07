@@ -145,42 +145,9 @@ def _get_sentence_db() -> triviumdb.TriviumDB:
 
 def _prf_refine(db, query_vector: list[float], hits: list[dict],
                 alpha: float, beta: float) -> list[float] | None:
-    """PRF 精炼查询向量（从 knowledge.tdb 读回已存向量，零嵌入开销）"""
-    from lumen.config import PRF_TOP_N
-    top_n = hits[:PRF_TOP_N]
-    if not top_n:
-        return None
-
-    vectors = []
-    for hit in top_n:
-        node_id = hit.get("chunk_id")
-        if not node_id:
-            continue
-        try:
-            node = db.get(node_id)
-            if node and hasattr(node, "vector") and node.vector:
-                vectors.append(node.vector)
-        except Exception:
-            continue
-
-    if not vectors:
-        return None
-
-    dim = len(vectors[0])
-    centroid = [0.0] * dim
-    for vec in vectors:
-        for i in range(dim):
-            centroid[i] += vec[i]
-    for i in range(dim):
-        centroid[i] /= len(vectors)
-
-    refined = [alpha * query_vector[i] + beta * centroid[i] for i in range(dim)]
-
-    norm = sum(x * x for x in refined) ** 0.5
-    if norm > 0:
-        refined = [x / norm for x in refined]
-
-    return refined
+    """PRF 精炼查询向量（委托给 vector_store.prf_refine）"""
+    from lumen.services.vector_store import prf_refine
+    return prf_refine(db, query_vector, hits, alpha, beta)
 
 
 def _index_chunk_text(db, node_id: int, chunk: str, filename: str,
@@ -241,7 +208,8 @@ def _enrich_sparse_content(db, sparse_hits: list[dict]):
         try:
             nodes = db.tql(f'FIND {{file_id: {json.dumps(fid)}}} RETURN *')
             for node in nodes:
-                payload = node.get("payload", {})
+                n = node.row.get("_", {})
+                payload = n.get("payload", {})
                 if payload.get("chunk_index") == ci:
                     hit["content"] = payload.get("content", "")
                     hit["source_path"] = payload.get("source_path", "")
@@ -582,7 +550,9 @@ async def import_file(
             from lumen.services.graph import extract_and_store
             result = await extract_and_store(
                 content=content, tdb_name="knowledge",
-                source_episode_id=fid, owner_id="",
+                source_path=subdir or category,
+                source_doc_id=fid,
+                source_type="file_chunk",
             )
             if result:
                 logger.info(f"图谱抽取完成 (fid={fid}): {result}")
@@ -684,11 +654,11 @@ async def refine_with_sentences(
         try:
             nodes = sdb.tql(f'FIND {{file_id: {json.dumps(fid)}}} RETURN *')
             for node in nodes:
-                payload = node.get("payload", {})
+                n = node.row.get("_", {})
+                payload = n.get("payload", {})
                 ci = payload.get("chunk_index", 0)
                 if (fid, ci) not in target_chunks:
                     continue
-                vec = node.get("vector")
                 all_sentences.append({
                     "content": payload.get("content", ""),
                     "file_id": fid,
@@ -697,7 +667,7 @@ async def refine_with_sentences(
                     "source_path": payload.get("source_path", ""),
                     "filename": payload.get("filename", ""),
                     "category": payload.get("category", ""),
-                    "vector": vec,
+                    "vector": n.get("vector"),
                 })
         except Exception as e:
             logger.warning(f"句子级过滤失败 ({fid}): {e}")
@@ -836,6 +806,7 @@ async def search(
 
     # ── ACL 前置过滤：展开为叶子文件夹精确列表 ──
     payload_filter = None
+    allowed = []
     if character_id:
         try:
             from lumen.services.access_control import get_instance
@@ -1073,7 +1044,14 @@ async def search_agent_knowledge(
         return []
 
     db = _get_agent_db()
-    results = db.search(query_vector, top_k=top_k * 3, min_score=min_score)
+    # DB 侧预过滤：access_list 包含 public 或包含当前 agent_id
+    # 注：$or 过滤在 TQL 中支持，但 payload_filter 可能不支持复杂 $or
+    # 简化：无 agent_id 时不加 filter（公开搜索），有 agent_id 时搜后过滤
+    search_filter = None
+    if not agent_id:
+        search_filter = {"access_list": "public"}
+    results = db.search(query_vector, top_k=top_k * 3, min_score=min_score,
+                        payload_filter=search_filter)
 
     hits = []
     seen = set()
@@ -1081,7 +1059,7 @@ async def search_agent_knowledge(
         payload = hit.payload if hasattr(hit, "payload") else {}
         access_list = payload.get("access_list", ["public"])
 
-        # 按 access_list 过滤
+        # 有 agent_id 时需二次过滤（DB 不支持 $or 复杂过滤）
         if agent_id and "public" not in access_list and agent_id not in access_list:
             continue
 

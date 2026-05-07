@@ -262,12 +262,11 @@ async def edit_message(req: MessageEditRequest):
         db = _get_db()
         for nid in db.all_node_ids():
             try:
-                node = db.get(nid)
+                payload = db.get_payload(nid)
             except Exception:
                 continue
-            if not node:
+            if not payload:
                 continue
-            payload = node.payload if hasattr(node, "payload") else {}
             if payload.get("message_id") == req.message_id:
                 # 重新向量化
                 from lumen.services.embedding import get_service
@@ -308,12 +307,11 @@ async def delete_message(req: MessageDeleteRequest):
         db = _get_db()
         for nid in db.all_node_ids():
             try:
-                node = db.get(nid)
+                payload = db.get_payload(nid)
             except Exception:
                 continue
-            if not node:
+            if not payload:
                 continue
-            payload = node.payload if hasattr(node, "payload") else {}
             if payload.get("message_id") == req.message_id:
                 db.delete(nid)
                 db.flush()

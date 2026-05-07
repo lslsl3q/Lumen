@@ -55,12 +55,11 @@ def save_graph(tdb_name: str) -> Optional[str]:
     # 收集所有图谱实体（有 name + type 的节点）
     for nid in db.all_node_ids():
         try:
-            node = db.get(nid)
+            payload = db.get_payload(nid)
         except Exception:
             continue
-        if not node:
+        if not payload:
             continue
-        payload = node.payload if hasattr(node, "payload") else {}
         if "name" not in payload or "type" not in payload:
             continue
 
@@ -81,12 +80,11 @@ def save_graph(tdb_name: str) -> Optional[str]:
             seen_edges.add(edge_key)
 
             try:
-                dst_node = db.get(dst_id)
+                dst_payload = db.get_payload(dst_id)
             except Exception:
                 continue
-            if not dst_node:
+            if not dst_payload:
                 continue
-            dst_payload = dst_node.payload if hasattr(dst_node, "payload") else {}
             dst_name = dst_payload.get("name")
             if not dst_name:
                 continue
