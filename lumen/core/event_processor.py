@@ -30,16 +30,23 @@ async def _consumer():
         try:
             from lumen.services.graph.extract import extract_and_store
 
+            metadata = event.get("metadata") or {}
             tdb_name = event.get("campaign_id") or "knowledge"
+            # source_path：优先 metadata → event_type 兜底
+            source_path = metadata.get("source_path", event.get("event_type", ""))
             result = await extract_and_store(
                 content=event["content"],
                 tdb_name=tdb_name,
+                source_path=source_path,
+                source_doc_id=event.get("source_id") or None,
+                source_type=event.get("event_type", "file_chunk"),
                 source_episode_id=event.get("source_id", ""),
                 owner_id=event.get("character_id", ""),
             )
             if result:
                 logger.info(
-                    f"图谱提取完成 [{event.get('source_id')}]: "
+                    f"图谱提取完成 [episode={result.get('episode_id')}, "
+                    f"source={event.get('source_id')}]: "
                     f"{result.get('entities_created', 0)} 实体, "
                     f"{result.get('edges_created', 0)} 关系"
                 )

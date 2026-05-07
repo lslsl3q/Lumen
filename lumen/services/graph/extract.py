@@ -1,8 +1,7 @@
 """
-T19 图谱提取管道
-文本 → LLM 抽取实体/关系 → batch_upsert 存入 TriviumDB
+T19 图谱提取管道 — Episode 事务版
+文本 → 创建 Episode → LLM 抽取实体/关系 → batch_upsert → commit/rollback
 """
-
 import json
 import re
 import logging
@@ -14,6 +13,8 @@ logger = logging.getLogger(__name__)
 MIN_CONTENT_LENGTH = 50
 MAX_CONTENT_LENGTH = 4000
 
+
+# ── JSON 解析 ──
 
 def _extract_json(text: str) -> dict | None:
     """宽松 JSON 解析：从 LLM 响应中提取第一个完整 JSON 对象"""
@@ -47,26 +48,101 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
+# ── 主管线 ──
+
 async def extract_and_store(content: str, tdb_name: str = "knowledge",
+                            source_path: str = "",
+                            source_doc_id: str | None = None,
+                            source_type: str = "file_chunk",
+                            valid_at: float | None = None,
+                            # --- 旧参数（向后兼容）---
                             source_episode_id: str = "",
                             owner_id: str = "") -> dict | None:
-    """完整提取管道：文本 → LLM 抽取 → 存储
+    """完整提取管道：文本 → 创建 Episode → LLM 抽取 → batch_upsert → commit/rollback
+
+    事务模型：
+      1. create_episode(content, source_path, ...) → Episode 状态 pending
+      2. LLM 提取实体/边
+      3. batch_upsert 存入图谱
+      4. commit_episode → 状态 active（成功）/ rollback_episode → 状态 deleted（失败）
 
     Args:
         content: 待提取的文本
         tdb_name: 目标 TDB（knowledge / memory）
-        source_episode_id: 来源标识（文件 ID / 笔记 ID）
-        owner_id: 所有者（角色 ID）
+        source_path: 来源文件路径（用于 ACL 隔离 + source_folders 维护）
+        source_doc_id: 来源文档 ID（Episode 关联外键）
+        source_type: 来源类型 — file_chunk | dream | reflection | manual
+        valid_at: 内容生效时间戳
+        source_episode_id: 旧参数（向后兼容，内容来源标识）
+        owner_id: 旧参数（向后兼容，角色 ID）
 
     Returns:
-        {"entities_created": N, "edges_created": N} 或 None（跳过/失败）
+        {"entities_created": N, "edges_created": N, "episode_id": int} 或 None（跳过/失败）
     """
     if not content or len(content.strip()) < MIN_CONTENT_LENGTH:
         return None
 
-    # 截断
-    truncated = content.strip()[:MAX_CONTENT_LENGTH]
+    # --- Step 1: 创建 Episode (pending) ---
+    from lumen.services.graph.episodes import (
+        create_episode, commit_episode, rollback_episode,
+    )
 
+    ep_id = create_episode(
+        content=content,
+        source_path=source_path,
+        source_doc_id=source_doc_id,
+        source_type=source_type,
+        valid_at=valid_at,
+        tdb_name=tdb_name,
+    )
+
+    try:
+        # --- Step 2: LLM 提取实体和边 ---
+        extraction = await _llm_extract(content)
+
+        if not extraction:
+            logger.info(f"Episode {ep_id}: LLM 提取结果为空，提交空 Episode")
+            commit_episode(ep_id, tdb_name)
+            return {"entities_created": 0, "edges_created": 0, "episode_id": ep_id}
+
+        # --- Step 3: 存入图谱（batch_upsert 带 episode_id + source_path）---
+        from lumen.services.graph._core import batch_upsert
+
+        result = batch_upsert(
+            tdb_name,
+            extraction["entities"],
+            extraction["edges"],
+            source_path=source_path,
+            episode_id=ep_id,
+            source_episode_id=source_episode_id,
+            owner_id=owner_id,
+        )
+
+        # --- Step 4: 事务提交 ---
+        commit_episode(ep_id, tdb_name)
+
+        result["episode_id"] = ep_id
+        logger.info(
+            f"Episode {ep_id}: 提取完成 — "
+            f"{result.get('entities_created', 0)} 实体, "
+            f"{result.get('edges_created', 0)} 边"
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"Episode {ep_id}: 提取失败，执行 rollback — {e}")
+        try:
+            rollback_episode(ep_id, tdb_name)
+        except Exception as rb_err:
+            logger.error(f"Episode {ep_id}: rollback 也失败 — {rb_err}")
+        raise
+
+
+# ── LLM 调用 ──
+
+async def _llm_extract(content: str) -> dict | None:
+    """LLM 提取实体和边，返回验证后的 dict 或 None"""
+    truncated = content.strip()[:MAX_CONTENT_LENGTH]
     model = GRAPH_EXTRACT_MODEL or DEFAULT_MODEL
 
     from lumen.services.llm import chat
@@ -91,13 +167,17 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
         logger.debug(f"图谱提取 JSON 解析失败，原始文本前 100 字: {truncated[:100]}")
         return None
 
+    return _validate_extraction(data)
+
+
+def _validate_extraction(data: dict) -> dict | None:
+    """验证并清洗 LLM 提取结果"""
     entities = data.get("entities", [])
     edges = data.get("edges", [])
 
     if not isinstance(entities, list) or not isinstance(edges, list):
         return None
 
-    # 验证 entity_type
     valid_entities = []
     for ent in entities:
         if not isinstance(ent, dict):
@@ -116,24 +196,19 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
     for edge in edges:
         if not isinstance(edge, dict):
             continue
+        # 支持多种字段命名: src_name/dst_name 或 source/target
+        src_name = edge.get("src_name", edge.get("source", "")).strip()
+        dst_name = edge.get("dst_name", edge.get("target", "")).strip()
+        if not src_name or not dst_name:
+            continue
         valid_edges.append({
-            "src_name": edge.get("src_name", "").strip(),
-            "dst_name": edge.get("dst_name", "").strip(),
-            "label": edge.get("label", "related").strip(),
+            "src_name": src_name,
+            "dst_name": dst_name,
+            "label": edge.get("label", edge.get("relation", "related")).strip(),
+            "fact": edge.get("fact", edge.get("label", "")),
         })
 
     if not valid_entities and not valid_edges:
         return None
 
-    try:
-        from lumen.services.graph._core import batch_upsert
-        result = batch_upsert(
-            tdb_name, valid_entities, valid_edges,
-            source_episode_id=source_episode_id,
-            owner_id=owner_id,
-        )
-        logger.debug(f"图谱提取完成: {len(valid_entities)} 实体, {len(valid_edges)} 边 → {result}")
-        return result
-    except Exception as e:
-        logger.warning(f"图谱批量存储失败: {e}")
-        return None
+    return {"entities": valid_entities, "edges": valid_edges}
