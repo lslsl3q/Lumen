@@ -47,6 +47,18 @@ class IdentityComponent(ContextComponent):
         except Exception:
             pass
 
+        # Layer 2.6: write_targets 注入
+        write_targets = character.get("write_targets", {})
+        if write_targets:
+            character_id = character.get("id", "")
+            target_lines = []
+            for target_name, path_template in write_targets.items():
+                resolved_path = path_template.replace("{character_id}", character_id)
+                target_lines.append(f"- {target_name} → `{resolved_path}`")
+            parts.append(
+                "你可以写入以下文件夹：\n" + "\n".join(target_lines)
+            )
+
         # Layer 2.7: 回复风格
         style = character.get("response_style", "balanced")
         if style in STYLE_MAP:

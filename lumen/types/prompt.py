@@ -45,6 +45,8 @@ class CharacterCard(BaseModel):
     response_style: Optional[str] = "balanced"  # brief / balanced / detailed
     # 知识库访问权限
     accessible_knowledge: List[str] = []  # ["public", "char_alice", "shared"]
+    # Agent 写入目标
+    write_targets: Dict[str, str] = {}  # {"diary": "/日记/{character_id}", ...}
     # 思考链
     thinking: Optional[ThinkingConfig] = None
 
