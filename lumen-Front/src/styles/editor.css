@@ -1,18 +1,108 @@
 /* ── 富文本编辑器暖灰主题 ── */
 
+/* 纸张容器 — 写作模式专用 */
+.writing-paper-container {
+  flex: 1;
+  overflow-y: auto;
+  background: #1a1917;
+  padding: 32px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.writing-paper {
+  width: 100%;
+  max-width: 816px;
+  min-height: 1056px;
+  background: #1e1d1a;
+  border: 1px solid #2a2926;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.15);
+  padding: 80px 72px;
+  margin: 0 24px;
+}
+
+/* 工具栏 — 跟纸张同宽居中 */
+.writing-toolbar-wrapper {
+  display: flex;
+  justify-content: center;
+  background: #141413;
+  border-bottom: 1px solid #2a2926;
+  flex-shrink: 0;
+}
+
+.writing-toolbar-inner {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 12px;
+  overflow-x: auto;
+}
+
+/* 查找替换 — 跟纸张同宽居中 */
+.writing-findreplace-wrapper {
+  display: flex;
+  justify-content: center;
+  background: #181715;
+  border-bottom: 1px solid #2a2926;
+  flex-shrink: 0;
+}
+
+.writing-findreplace-inner {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+}
+
+/* 状态栏 — 跟纸张同宽居中 */
+.writing-statusbar-wrapper {
+  display: flex;
+  justify-content: center;
+  background: #141413;
+  border-top: 1px solid #2a2926;
+  flex-shrink: 0;
+}
+
+.writing-statusbar-inner {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 20px;
+  font-size: 11px;
+  color: #5a5650;
+}
+
 /* ProseMirror 编辑区 */
 .rich-text-editor-prosemirror {
-  padding: 1rem 1.5rem;
-  max-width: 640px;
-  margin: 0 auto;
-  font-size: 0.875rem;
-  line-height: 1.75;
-  color: #94a3b8;
+  font-size: 17px;
+  line-height: 1.9;
+  color: #c8c4bc;
   caret-color: #CC7C5E;
 }
 
 .rich-text-editor-prosemirror:focus {
   outline: none;
+}
+
+/* 段落 — 首行缩进 */
+.rich-text-editor-prosemirror p {
+  margin-bottom: 0.8em;
+  text-indent: 2em;
+}
+
+/* 标题不缩进 */
+.rich-text-editor-prosemirror h1,
+.rich-text-editor-prosemirror h2,
+.rich-text-editor-prosemirror h3 {
+  text-indent: 0;
 }
 
 /* 标题 */
@@ -44,11 +134,6 @@
   margin-bottom: 0.3em;
 }
 
-/* 段落 */
-.rich-text-editor-prosemirror p {
-  margin-bottom: 0.6em;
-}
-
 /* 加粗 / 斜体 / 删除线 */
 .rich-text-editor-prosemirror strong {
   color: #E8E7E3;
@@ -72,11 +157,12 @@
   font-family: 'SF Mono', 'Cascadia Code', monospace;
   font-size: 0.85em;
   color: #CC7C5E;
+  text-indent: 0;
 }
 
 /* 代码块 */
 .rich-text-editor-prosemirror pre {
-  background: #1C1B19;
+  background: #161513;
   border: 1px solid rgba(204, 124, 94, 0.1);
   border-radius: 8px;
   padding: 0.75rem 1rem;
@@ -106,6 +192,7 @@
 
 .rich-text-editor-prosemirror blockquote p {
   margin-bottom: 0.3em;
+  text-indent: 0;
 }
 
 /* 列表 */
@@ -127,6 +214,7 @@
 
 .rich-text-editor-prosemirror li p {
   margin-bottom: 0.15em;
+  text-indent: 0;
 }
 
 /* 任务列表 */
@@ -179,6 +267,104 @@
   border: none;
   border-top: 1px solid rgba(204, 124, 94, 0.15);
   margin: 1.5em 0;
+}
+
+/* 表格 */
+.rich-text-editor-prosemirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+  overflow: hidden;
+}
+
+.rich-text-editor-prosemirror table td,
+.rich-text-editor-prosemirror table th {
+  border: 1px solid #2a2926;
+  padding: 6px 10px;
+  vertical-align: top;
+  min-width: 60px;
+  position: relative;
+  text-indent: 0;
+}
+
+.rich-text-editor-prosemirror table th {
+  background: rgba(204, 124, 94, 0.06);
+  font-weight: 500;
+  color: #E8E7E3;
+}
+
+.rich-text-editor-prosemirror table td p,
+.rich-text-editor-prosemirror table th p {
+  text-indent: 0;
+  margin-bottom: 0.15em;
+}
+
+.rich-text-editor-prosemirror .selectedCell {
+  background: rgba(204, 124, 94, 0.1);
+}
+
+.rich-text-editor-prosemirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #CC7C5E;
+  pointer-events: none;
+}
+
+.rich-text-editor-prosemirror .tableWrapper {
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+
+.rich-text-editor-prosemirror .resize-cursor {
+  cursor: ew-resize;
+  cursor: col-resize;
+}
+
+/* 图片 */
+.rich-text-editor-prosemirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  margin: 0.5em 0;
+}
+
+.rich-text-editor-prosemirror img.ProseMirror-selectednode {
+  outline: 2px solid #CC7C5E;
+  outline-offset: 2px;
+}
+
+/* ── 专注模式 ── */
+
+.rich-text-editor-prosemirror.focus-mode > :not(.fm-active) {
+  opacity: 0.25;
+  transition: opacity 0.2s;
+}
+
+.rich-text-editor-prosemirror.focus-mode > :not(.fm-active):hover {
+  opacity: 0.5;
+}
+
+.rich-text-editor-prosemirror.focus-mode > .fm-active {
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+
+/* ── 打字机模式 ── */
+
+.rich-text-editor-prosemirror.typewriter-mode {
+  caret-color: #CC7C5E;
+}
+
+.rich-text-editor-prosemirror.typewriter-mode .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #4a4540;
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
 }
 
 /* 链接 */
@@ -259,8 +445,170 @@
   min-height: 0;
 }
 
-.novel-editor-wrapper > div > div {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
+/* ── Ghost Text（AI 续写半透明文字）── */
+
+.ghost-text {
+  color: rgba(148, 163, 184, 0.45);
+  font-style: italic;
+}
+
+.rich-text-editor-prosemirror .ghost-text {
+  color: rgba(148, 163, 184, 0.45);
+  font-style: italic;
+}
+
+/* ── 设定编辑器富文本字段 ── */
+
+.rich-field-wrapper {
+  margin-top: 4px;
+  border: 1px solid #2a2926;
+  border-radius: 8px;
+  background: #1f1f1c;
+  overflow: hidden;
+}
+
+.rich-field-wrapper:focus-within {
+  border-color: rgba(204, 124, 94, 0.3);
+}
+
+.rich-field-wrapper .tiptap {
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c8c4bc;
+  min-height: inherit;
+}
+
+.rich-field-wrapper .tiptap:focus {
+  outline: none;
+}
+
+.rich-field-toolbar {
+  display: flex;
+  gap: 1px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #2a2926;
+  background: #1a1917;
+  flex-wrap: wrap;
+}
+
+.rich-field-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #5a5650;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.1s;
+}
+
+.rich-field-toolbar-btn:hover {
+  background: rgba(204, 124, 94, 0.1);
+  color: #c8c4bc;
+}
+
+.rich-field-toolbar-btn.is-active {
+  background: rgba(204, 124, 94, 0.15);
+  color: #CC7C5E;
+}
+
+.rich-field-wrapper .tiptap p {
+  margin-bottom: 0.4em;
+}
+
+.rich-field-wrapper .tiptap h1 {
+  color: #E8E7E3;
+  font-size: 1.2em;
+  font-weight: 600;
+  margin-top: 0.5em;
+  margin-bottom: 0.3em;
+}
+
+.rich-field-wrapper .tiptap h2 {
+  color: #E8E7E3;
+  font-size: 1.1em;
+  font-weight: 600;
+  margin-top: 0.4em;
+  margin-bottom: 0.2em;
+}
+
+.rich-field-wrapper .tiptap strong {
+  color: #E8E7E3;
+  font-weight: 600;
+}
+
+.rich-field-wrapper .tiptap em {
+  font-style: italic;
+}
+
+.rich-field-wrapper .tiptap s {
+  opacity: 0.5;
+}
+
+.rich-field-wrapper .tiptap code {
+  background: rgba(204, 124, 94, 0.1);
+  border: 1px solid rgba(204, 124, 94, 0.15);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  font-size: 0.85em;
+  color: #CC7C5E;
+}
+
+.rich-field-wrapper .tiptap blockquote {
+  border-left: 2px solid rgba(204, 124, 94, 0.3);
+  background: rgba(204, 124, 94, 0.03);
+  padding: 0.3em 0.6em;
+  margin: 0.4em 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.rich-field-wrapper .tiptap blockquote p {
+  margin-bottom: 0.15em;
+}
+
+.rich-field-wrapper .tiptap ul {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin-bottom: 0.4em;
+}
+
+.rich-field-wrapper .tiptap ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 0.4em;
+}
+
+.rich-field-wrapper .tiptap li {
+  margin-bottom: 0.1em;
+}
+
+.rich-field-wrapper .tiptap li p {
+  margin-bottom: 0.1em;
+}
+
+.rich-field-wrapper .tiptap a {
+  color: #CC7C5E;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.rich-field-wrapper .tiptap mark {
+  background: rgba(204, 124, 94, 0.25);
+  border-radius: 2px;
+  padding: 0.05em 0.1em;
+}
+
+.rich-field-wrapper .tiptap .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #4a4540;
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
 }

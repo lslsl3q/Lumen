@@ -1,4 +1,12 @@
-import type { SuggestionItem } from "novel";
+import type { Editor, Range } from "@tiptap/core";
+
+interface SuggestionItem {
+  title: string;
+  description?: string;
+  searchTerms?: string[];
+  icon?: JSX.Element;
+  command: (props: { editor: Editor; range: Range }) => void;
+}
 
 // 内联 SVG 图标，避免引入 lucide-react
 
@@ -151,6 +159,23 @@ export const suggestionItems: SuggestionItem[] = [
     icon: <IconLine />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHorizontalRule().run();
+    },
+  },
+  {
+    title: "表格",
+    description: "插入 3×3 表格",
+    searchTerms: ["table", "grid", "biaoge"],
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <rect x="1" y="1" width="14" height="14" rx="1" />
+        <line x1="1" y1="5.5" x2="15" y2="5.5" />
+        <line x1="1" y1="10" x2="15" y2="10" />
+        <line x1="5.5" y1="1" x2="5.5" y2="15" />
+        <line x1="10.5" y1="1" x2="10.5" y2="15" />
+      </svg>
+    ),
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
     },
   },
 ];
