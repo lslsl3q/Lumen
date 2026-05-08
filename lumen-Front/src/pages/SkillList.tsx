@@ -25,11 +25,8 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
   };
 
   const handleCreate = async () => {
-    const name = prompt('请输入 Skill 名称：');
-    if (!name) return;
-
     try {
-      const result = await create({ name, content: '', enabled: true });
+      const result = await create({ name: '新 Skill', content: '', enabled: true });
       goTo('skill-editor', { id: result.id });
     } catch (err) {
       toast(err instanceof Error ? err.message : '创建失败', 'error');

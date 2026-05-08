@@ -286,6 +286,8 @@ def record_event(
         event_id = cursor.lastrowid
 
     # 重要事件触发图谱提取（调用方过滤：action 不入队）
+    # 注意：RPG 动作的图谱提取现在由 EventProcessor 通过 HookBus
+    # 订阅 rpg.action.completed 自动处理，这里处理 world_state 自身的事件
     if event_type in ("state_change", "narrative"):
         try:
             from lumen.core.event_processor import enqueue_event

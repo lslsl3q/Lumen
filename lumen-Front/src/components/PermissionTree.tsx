@@ -1,11 +1,8 @@
 /**
- * PermissionTree — 三态复选框树组件
+ * PermissionTree — 纯白名单复选框树组件
  *
- * Props:
- * - folders: 知识库文件夹结构
- * - rules: 当前角色的 ACL 规则 (folder_path → access)
- * - defaultPublic: 资源类型是否默认公开（knowledge=true, diary=false）
- * - onChange: 勾选变化回调，返回完整规则列表
+ * rules: Set<string> — 有显式 allow 规则的路径集合
+ * 前缀继承：父路径在 rules 中 → 子路径自动视为允许
  */
 import { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react';
@@ -18,19 +15,19 @@ export interface FolderNode {
 
 interface PermissionTreeProps {
   folders: FolderNode[];
-  rules: Map<string, 'allow' | 'deny'>;
-  defaultPublic: boolean;
-  onChange: (rules: Map<string, 'allow' | 'deny'>) => void;
+  rules: Set<string>;
+  onChange: (rules: Set<string>) => void;
+  onSelect?: (path: string) => void;
+  showCheckboxes?: boolean;
 }
 
-/** 判断文件夹的勾选状态 — 通过 inheritedAccess 传递父级有效权限 */
+/** 判断节点勾选状态 */
 function getCheckState(
   node: FolderNode,
-  rules: Map<string, 'allow' | 'deny'>,
-  inheritedAccess: boolean,
+  rules: Set<string>,
+  inheritedAllowed: boolean,
 ): 'checked' | 'unchecked' | 'indeterminate' {
-  const rule = rules.get(node.path);
-  const isAllowed = rule ? rule === 'allow' : inheritedAccess;
+  const isAllowed = rules.has(node.path) || inheritedAllowed;
 
   if (node.children.length === 0) {
     return isAllowed ? 'checked' : 'unchecked';
@@ -58,30 +55,35 @@ function TreeNode({
   node,
   depth,
   rules,
-  inheritedAccess,
+  inheritedAllowed,
   onChange,
+  onSelect,
+  showCheckboxes,
 }: {
   node: FolderNode;
   depth: number;
-  rules: Map<string, 'allow' | 'deny'>;
-  inheritedAccess: boolean;
-  onChange: (rules: Map<string, 'allow' | 'deny'>) => void;
+  rules: Set<string>;
+  inheritedAllowed: boolean;
+  onChange: (rules: Set<string>) => void;
+  onSelect?: (path: string) => void;
+  showCheckboxes?: boolean;
 }) {
   const [expanded, setExpanded] = useState(depth < 2);
-  const state = getCheckState(node, rules, inheritedAccess);
-  const rule = rules.get(node.path);
-  const currentAccess = rule ? rule === 'allow' : inheritedAccess;
+  const state = getCheckState(node, rules, inheritedAllowed);
+  const isAllowed = rules.has(node.path) || inheritedAllowed;
   const hasChildren = node.children.length > 0;
 
   const handleToggle = useCallback(() => {
-    const nextAccess = state === 'checked' ? 'deny' : 'allow';
-    const newRules = new Map(rules);
-
-    newRules.set(node.path, nextAccess);
-
+    const newRules = new Set(rules);
     const allPaths = collectPaths(node);
-    for (let i = 1; i < allPaths.length; i++) {
-      newRules.delete(allPaths[i]);
+
+    if (state === 'checked') {
+      // 取消勾选：移除本节点 + 所有子节点的规则
+      for (const p of allPaths) newRules.delete(p);
+    } else {
+      // 勾选：添加本节点，清除子节点（父覆盖子）
+      newRules.add(node.path);
+      for (let i = 1; i < allPaths.length; i++) newRules.delete(allPaths[i]);
     }
 
     onChange(newRules);
@@ -104,30 +106,38 @@ function TreeNode({
           <span className="w-4" />
         )}
 
-        <button onClick={handleToggle} className="flex items-center justify-center w-4 h-4 mr-1.5">
-          {state === 'checked' && (
-            <div className="w-3.5 h-3.5 rounded bg-amber-500 flex items-center justify-center">
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <path d="M1.5 4L3 5.5L6.5 2" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          )}
-          {state === 'unchecked' && (
-            <div className="w-3.5 h-3.5 rounded border border-slate-600" />
-          )}
-          {state === 'indeterminate' && (
-            <div className="w-3.5 h-3.5 rounded border border-slate-600 bg-slate-600/50 flex items-center justify-center">
-              <div className="w-2 h-0.5 bg-slate-300 rounded" />
-            </div>
-          )}
-        </button>
+        {showCheckboxes !== false && (
+          <button
+            onClick={handleToggle}
+            className="flex items-center justify-center w-4 h-4 mr-1.5"
+          >
+            {state === 'checked' && (
+              <div className="w-3.5 h-3.5 rounded bg-amber-500 flex items-center justify-center">
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <path d="M1.5 4L3 5.5L6.5 2" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+            {state === 'unchecked' && (
+              <div className="w-3.5 h-3.5 rounded border border-slate-600" />
+            )}
+            {state === 'indeterminate' && (
+              <div className="w-3.5 h-3.5 rounded border border-slate-600 bg-slate-600/50 flex items-center justify-center">
+                <div className="w-2 h-0.5 bg-slate-300 rounded" />
+              </div>
+            )}
+          </button>
+        )}
 
         {hasChildren ? (
           expanded ? <FolderOpen size={14} className="text-amber-500/70" /> : <Folder size={14} className="text-amber-500/70" />
         ) : (
           <Folder size={14} className="text-slate-500" />
         )}
-        <span className="text-sm text-slate-300 group-hover:text-slate-100 select-none">
+        <span
+          className="text-sm text-slate-300 group-hover:text-slate-100 select-none"
+          onClick={() => onSelect?.(node.path)}
+        >
           {node.name}
         </span>
       </div>
@@ -140,8 +150,10 @@ function TreeNode({
               node={child}
               depth={depth + 1}
               rules={rules}
-              inheritedAccess={currentAccess}
+              inheritedAllowed={isAllowed}
               onChange={onChange}
+              onSelect={onSelect}
+              showCheckboxes={showCheckboxes}
             />
           ))}
         </div>
@@ -150,7 +162,7 @@ function TreeNode({
   );
 }
 
-export default function PermissionTree({ folders, rules, defaultPublic, onChange }: PermissionTreeProps) {
+export default function PermissionTree({ folders, rules, onChange, onSelect, showCheckboxes }: PermissionTreeProps) {
   return (
     <div className="py-2">
       {folders.map(node => (
@@ -159,8 +171,10 @@ export default function PermissionTree({ folders, rules, defaultPublic, onChange
           node={node}
           depth={0}
           rules={rules}
-          inheritedAccess={defaultPublic}
+          inheritedAllowed={false}
           onChange={onChange}
+          onSelect={onSelect}
+          showCheckboxes={showCheckboxes}
         />
       ))}
       {folders.length === 0 && (

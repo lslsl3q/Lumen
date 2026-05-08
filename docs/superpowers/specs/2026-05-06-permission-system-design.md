@@ -29,9 +29,10 @@ Lumen 现有 5 种独立的权限/过滤机制分散在 6 个系统中：
 
 | 资源类型 | resource_type | 读用例 | 写用例 |
 |---------|--------------|--------|--------|
-| 知识库 | `"knowledge"` | LoreComponent 检索注入 | 用户上传/管理 |
+| 知识库 | `"knowledge"` | LoreComponent 检索注入；写作模式 AI 参考 | 用户上传/管理；用户创作 |
 | 日记 | `"diary"` | 角色查阅自己日记 | Agent 写入日记 |
-| 写作资源 | `"writing"` | 写作模式 AI 参考 | 用户创作 |
+
+> **说明**：写作资源不单独成类，复用 `"knowledge"` 类型，通过文件夹路径（如 `/写作/xxx`）区分。
 
 ### 不纳入（已有独立机制，不动）
 
@@ -53,7 +54,7 @@ Lumen 现有 5 种独立的权限/过滤机制分散在 6 个系统中：
 CREATE TABLE acl_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     character_id TEXT NOT NULL,
-    resource_type TEXT NOT NULL,     -- "knowledge" | "diary" | "writing"
+    resource_type TEXT NOT NULL,     -- "knowledge" | "diary"
     resource_id TEXT NOT NULL,       -- TDB 名称，如 "knowledge"
     folder_path TEXT DEFAULT '',     -- 空 = 根目录；"/几何" = 子文件夹
     action TEXT NOT NULL,            -- "read" | "write"
@@ -82,7 +83,6 @@ CREATE UNIQUE INDEX idx_acl_unique ON acl_rules(
 |--------------|----------|-----------|
 | `"knowledge"` | 所有角色允许 | 所有角色拒绝 |
 | `"diary"` | 只有创建者允许 | 只有创建者允许 |
-| `"writing"` | 只有创建者允许 | 只有创建者允许 |
 
 ### 3.3 最长路径优先匹配
 
@@ -108,6 +108,13 @@ for rule in matched_rules:
     if rule.access == "allow" and folder.startswith(rule.folder_path):
         return True
 ```
+
+### 3.6 文件夹重命名同步
+
+用户重命名文件夹时，ACL 表中所有以该路径为前缀的 `folder_path` 需要同步更新。
+
+- 文件夹管理服务在 rename 操作时调用 `AccessControl.rename_path(old, new)`
+- 内部执行：`UPDATE acl_rules SET folder_path = REPLACE(folder_path, old, new) WHERE folder_path LIKE old || '%'`
 
 ---
 
@@ -146,7 +153,20 @@ class AccessControl:
     def batch_set_permissions(self, resource_type: str, resource_id: str,
                               entries: list[dict]) -> None:
         """批量更新（前端一次提交所有变更）"""
+
+    def rename_path(self, resource_type: str, resource_id: str,
+                    old_path: str, new_path: str) -> None:
+        """批量更新 folder_path 前缀（文件夹重命名时调用）"""
 ```
+
+### 4.1.1 缓存策略
+
+ACL 数据小（几十条规则）、读多写少（每次检索前都要查），必须缓存。
+
+- 缓存 key：`(character_id, resource_type, resource_id)` 三元组
+- 缓存内容：该角色在该资源下的完整规则列表（`get_permissions` 的返回值）
+- 失效时机：`set_permission` / `remove_permission` / `batch_set_permissions` / `rename_path` 执行后，清除相关 key
+- 实现：`lru_cache` 或模块级 dict，AccessControl 单例内部管理
 
 ### 4.2 REST API
 

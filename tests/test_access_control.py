@@ -1,10 +1,12 @@
-"""AccessControl 单元测试"""
+"""AccessControl 单元测试（纯白名单模型）"""
 import pytest
 
 
 class TestDefaultPermissions:
-    def test_knowledge_read_default_allow(self, acl):
-        assert acl.can_read("char_a", "knowledge", "knowledge") is True
+    """默认无权限"""
+
+    def test_knowledge_read_default_deny(self, acl):
+        assert acl.can_read("char_a", "knowledge", "knowledge") is False
 
     def test_knowledge_write_default_deny(self, acl):
         assert acl.can_write("char_a", "knowledge", "knowledge") is False
@@ -12,144 +14,137 @@ class TestDefaultPermissions:
     def test_diary_read_default_deny(self, acl):
         assert acl.can_read("char_a", "diary", "agent_knowledge") is False
 
-    def test_diary_write_default_deny(self, acl):
-        assert acl.can_write("char_a", "diary", "agent_knowledge") is False
-
-    def test_unknown_resource_type_default_deny(self, acl):
+    def test_unknown_resource_default_deny(self, acl):
         assert acl.can_read("char_a", "unknown", "xxx") is False
 
 
-class TestACLRules:
-    """ACL 规则覆盖默认值"""
+class TestGrant:
+    """授予权限"""
 
-    def test_deny_knowledge_read(self, acl):
-        """deny 规则覆盖 knowledge 默认的公开读"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
+    def test_grant_knowledge_read(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge") is True
 
-    def test_allow_diary_read(self, acl):
-        """allow 规则覆盖 diary 默认的私有"""
-        acl.set_permission("char_a", "diary", "agent_knowledge", "", "read", "allow")
+    def test_grant_diary_read(self, acl):
+        acl.grant("char_a", "diary", "agent_knowledge", "", "read")
         assert acl.can_read("char_a", "diary", "agent_knowledge") is True
 
-    def test_subfolder_inherits_deny(self, acl):
-        """子路径继承父路径的 deny"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密/财务") is False
+    def test_grant_write(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/notes", "write")
+        assert acl.can_write("char_a", "knowledge", "knowledge", "/notes") is True
+        # read 不受影响
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/notes") is False
 
-    def test_subfolder_inherits_allow(self, acl):
-        """子路径继承父路径的 allow"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/地理", "read", "allow")
+
+class TestPrefixInheritance:
+    """前缀继承"""
+
+    def test_child_inherits_parent(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/地理", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/地理") is True
         assert acl.can_read("char_a", "knowledge", "knowledge", "/地理/亚洲") is True
 
+    def test_grandchild_inherits(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/地理", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/地理/亚洲/中国") is True
+
+    def test_sibling_not_affected(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/地理", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/天文") is False
+
     def test_longest_path_wins(self, acl):
-        """最长路径匹配优先"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密/公开部分", "read", "allow")
-
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密/公开部分") is True
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密/其他") is False
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
-
-    def test_different_characters_isolated(self, acl):
-        """不同角色的 ACL 互不影响"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
-        assert acl.can_read("char_b", "knowledge", "knowledge", "/机密") is True
-
-    def test_different_actions_isolated(self, acl):
-        """read 和 write 互不影响"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "", "read", "allow")
-        assert acl.can_read("char_a", "knowledge", "knowledge") is True
-        assert acl.can_write("char_a", "knowledge", "knowledge") is False
-
-
-class TestPermissionManagement:
-    """权限 CRUD 操作"""
-
-    def test_remove_permission(self, acl):
-        """删除 ACL 规则后回退到默认值"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
-
-        acl.remove_permission("char_a", "knowledge", "knowledge", "/机密", "read")
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True
-
-    def test_remove_cascades_children(self, acl):
-        """删除父路径规则时，递归删除子路径规则"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密/公开部分", "read", "allow")
-
-        acl.remove_permission("char_a", "knowledge", "knowledge", "/机密", "read")
-
+        acl.grant("char_a", "knowledge", "knowledge", "/机密", "read")
+        # /机密 被显式授予
         assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True
         assert acl.can_read("char_a", "knowledge", "knowledge", "/机密/公开部分") is True
+
+
+class TestRevoke:
+    """撤销权限"""
+
+    def test_revoke_single(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/机密", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True
+
+        acl.revoke("char_a", "knowledge", "knowledge", "/机密", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
+
+    def test_revoke_cascades_children(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/机密", "read")
+        acl.grant("char_a", "knowledge", "knowledge", "/机密/公开部分", "read")
+
+        acl.revoke("char_a", "knowledge", "knowledge", "/机密", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密/公开部分") is False
+
+
+class TestCharacterIsolation:
+    """角色间隔离"""
+
+    def test_different_characters(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/机密", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True
+        assert acl.can_read("char_b", "knowledge", "knowledge", "/机密") is False
+
+
+class TestManagement:
+    """权限 CRUD"""
 
     def test_get_permissions(self, acl):
-        """获取角色的所有权限路径"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/地理", "read", "allow")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/天文", "read", "allow")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
+        acl.grant("char_a", "knowledge", "knowledge", "/地理", "read")
+        acl.grant("char_a", "knowledge", "knowledge", "/天文", "read")
 
         perms = acl.get_permissions("char_a", "knowledge", "knowledge")
-        assert len(perms) == 3
+        assert len(perms) == 2
         paths = {p["folder_path"] for p in perms}
-        assert paths == {"/地理", "/天文", "/机密"}
+        assert paths == {"/地理", "/天文"}
 
-    def test_batch_set_permissions(self, acl):
-        """批量设置权限"""
-        entries = [
-            {"folder_path": "/地理", "action": "read", "access": "allow"},
-            {"folder_path": "/天文", "action": "read", "access": "allow"},
-            {"folder_path": "/机密", "action": "read", "access": "deny"},
-        ]
-        acl.batch_set_permissions("char_a", "knowledge", "knowledge", entries)
-
+    def test_batch_set(self, acl):
+        acl.batch_set("char_a", "knowledge", "knowledge", [
+            {"folder_path": "/地理", "action": "read"},
+            {"folder_path": "/天文", "action": "read"},
+        ])
         assert acl.can_read("char_a", "knowledge", "knowledge", "/地理") is True
         assert acl.can_read("char_a", "knowledge", "knowledge", "/天文") is True
         assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
 
+    def test_batch_set_overwrites(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/旧", "read")
+        acl.batch_set("char_a", "knowledge", "knowledge", [
+            {"folder_path": "/新", "action": "read"},
+        ])
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/旧") is False
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/新") is True
+
     def test_get_characters_with_access(self, acl):
-        """反查：获取有权限的角色列表"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/地理", "read", "allow")
-        acl.set_permission("char_b", "knowledge", "knowledge", "/地理", "read", "allow")
+        acl.grant("char_a", "knowledge", "knowledge", "/地理", "read")
+        acl.grant("char_b", "knowledge", "knowledge", "/地理", "read")
 
         chars = acl.get_characters_with_access("knowledge", "knowledge", "/地理", "read")
         assert set(chars) == {"char_a", "char_b"}
 
+    def test_batch_check(self, acl):
+        acl.grant("char_a", "knowledge", "knowledge", "/地理", "read")
 
-class TestScopeAndRename:
-    """检索范围查询 + 文件夹重命名"""
+        result = acl.batch_check("knowledge", "knowledge", "/地理", "read", ["char_a", "char_b"])
+        assert result["char_a"] is True
+        assert result["char_b"] is False
 
-    def test_get_read_scope(self, acl):
-        """返回允许和拒绝的路径列表"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/地理", "read", "allow")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/天文", "read", "allow")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
 
-        allowed, denied = acl.get_read_scope("char_a", "knowledge", "knowledge")
-        assert "/地理" in allowed
-        assert "/天文" in allowed
-        assert "/机密" in denied
-
-    def test_get_read_scope_empty(self, acl):
-        """无规则时返回空列表"""
-        allowed, denied = acl.get_read_scope("char_a", "knowledge", "knowledge")
-        assert allowed == []
-        assert denied == []
+class TestRename:
+    """文件夹重命名"""
 
     def test_rename_path(self, acl):
-        """重命名文件夹后，ACL 路径同步更新"""
-        acl.set_permission("char_a", "knowledge", "knowledge", "/旧名", "read", "allow")
-        acl.set_permission("char_a", "knowledge", "knowledge", "/旧名/子目录", "read", "deny")
+        acl.grant("char_a", "knowledge", "knowledge", "/旧名", "read")
+        acl.grant("char_a", "knowledge", "knowledge", "/旧名/子目录", "read")
 
         acl.rename_path("knowledge", "knowledge", "/旧名", "/新名")
 
         assert acl.can_read("char_a", "knowledge", "knowledge", "/新名") is True
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/新名/子目录") is False
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/旧名") is True  # 默认值
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/新名/子目录") is True
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/旧名") is False
 
     def test_cache_invalidation(self, acl):
-        """写操作后缓存失效"""
-        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True
-        acl.set_permission("char_a", "knowledge", "knowledge", "/机密", "read", "deny")
         assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is False
+        acl.grant("char_a", "knowledge", "knowledge", "/机密", "read")
+        assert acl.can_read("char_a", "knowledge", "knowledge", "/机密") is True

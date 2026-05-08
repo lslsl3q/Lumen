@@ -1,7 +1,9 @@
 """
-Lumen - 统一权限服务
-ACL 表 + 最长路径前缀匹配 + 缓存
-纯同步层
+Lumen - 统一权限服务（纯白名单模型）
+
+规则表只存 allow，没有 deny。
+有匹配规则 = 允许，无匹配规则 = 拒绝。
+前缀匹配：grant "/地理" 则 "/地理/亚洲" 自动允许。
 """
 
 import sqlite3
@@ -13,15 +15,9 @@ from typing import Optional, List, Dict, Tuple
 logger = logging.getLogger(__name__)
 
 from lumen.config import PERMISSIONS_DB_PATH as DB_PATH
-DATA_DIR = os.path.dirname(DB_PATH)
 
 _local = threading.local()
 _write_lock = threading.Lock()
-
-DEFAULTS: Dict[str, Dict[str, bool]] = {
-    "knowledge": {"read": True, "write": False},
-    "diary": {"read": False, "write": False},
-}
 
 _instance: Optional["AccessControl"] = None
 
@@ -43,11 +39,13 @@ def _init_tables():
         resource_id TEXT NOT NULL,
         folder_path TEXT DEFAULT '',
         action TEXT NOT NULL,
-        access TEXT NOT NULL
+        access TEXT NOT NULL DEFAULT 'allow'
     )""")
     conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_acl_unique ON acl_rules(
         character_id, resource_type, resource_id, folder_path, action
     )""")
+    # 清理旧 deny 规则（从 allow/deny 混合模型迁移）
+    conn.execute("DELETE FROM acl_rules WHERE access = 'deny'")
     conn.commit()
 
 
@@ -68,7 +66,7 @@ def close():
 
 
 class AccessControl:
-    """统一权限服务 — 单例"""
+    """纯白名单权限服务 — 有规则即允许，无规则即拒绝"""
 
     def __init__(self):
         self._cache: Dict[Tuple[str, str, str], List[dict]] = {}
@@ -90,32 +88,24 @@ class AccessControl:
             self._cache[key] = [dict(r) for r in rows]
         return self._cache[key]
 
-    def _check(self, character_id: str, resource_type: str,
-               resource_id: str, folder_path: str, action: str) -> bool:
-        rules = self._get_rules(character_id, resource_type, resource_id)
-        action_rules = [r for r in rules if r["action"] == action]
-
+    @staticmethod
+    def _find_best_rule(action_rules: List[dict], folder_path: str):
+        """前缀匹配：找最长匹配的规则"""
         best_match = None
         best_len = -1
         for rule in action_rules:
             rp = rule["folder_path"]
-            if rp == "":
-                matched = True
-            elif folder_path == rp:
-                matched = True
-            elif folder_path.startswith(rp + "/"):
-                matched = True
-            else:
-                matched = False
+            if rp == "" or folder_path == rp or folder_path.startswith(rp + "/"):
+                if len(rp) > best_len:
+                    best_len = len(rp)
+                    best_match = rule
+        return best_match
 
-            if matched and len(rp) > best_len:
-                best_len = len(rp)
-                best_match = rule
-
-        if best_match is not None:
-            return best_match["access"] == "allow"
-
-        return DEFAULTS.get(resource_type, {}).get(action, False)
+    def _check(self, character_id: str, resource_type: str,
+               resource_id: str, folder_path: str, action: str) -> bool:
+        rules = self._get_rules(character_id, resource_type, resource_id)
+        action_rules = [r for r in rules if r["action"] == action]
+        return self._find_best_rule(action_rules, folder_path) is not None
 
     def can_read(self, character_id: str, resource_type: str,
                  resource_id: str, folder_path: str = "") -> bool:
@@ -125,12 +115,9 @@ class AccessControl:
                   resource_id: str, folder_path: str = "") -> bool:
         return self._check(character_id, resource_type, resource_id, folder_path, "write")
 
-    def set_permission(self, character_id: str, resource_type: str,
-                       resource_id: str, folder_path: str,
-                       action: str, access: str) -> None:
-        """设置 ACL 规则（upsert）"""
-        if access not in ("allow", "deny"):
-            raise ValueError(f"access must be 'allow' or 'deny', got '{access}'")
+    def grant(self, character_id: str, resource_type: str,
+              resource_id: str, folder_path: str, action: str = "read") -> None:
+        """授予权限（白名单：只写 allow）"""
         if action not in ("read", "write"):
             raise ValueError(f"action must be 'read' or 'write', got '{action}'")
 
@@ -138,17 +125,17 @@ class AccessControl:
             conn = _get_conn()
             conn.execute(
                 """INSERT INTO acl_rules (character_id, resource_type, resource_id, folder_path, action, access)
-                   VALUES (?, ?, ?, ?, ?, ?)
+                   VALUES (?, ?, ?, ?, ?, 'allow')
                    ON CONFLICT(character_id, resource_type, resource_id, folder_path, action)
-                   DO UPDATE SET access=excluded.access""",
-                (character_id, resource_type, resource_id, folder_path, action, access),
+                   DO UPDATE SET access='allow'""",
+                (character_id, resource_type, resource_id, folder_path, action),
             )
             conn.commit()
             self._invalidate(character_id, resource_type, resource_id)
 
-    def remove_permission(self, character_id: str, resource_type: str,
-                          resource_id: str, folder_path: str, action: str) -> None:
-        """删除 ACL 规则，递归删除子路径"""
+    def revoke(self, character_id: str, resource_type: str,
+               resource_id: str, folder_path: str, action: str = "read") -> None:
+        """撤销权限（删除规则 + 递归删除子路径规则）"""
         with _write_lock:
             conn = _get_conn()
             conn.execute(
@@ -163,20 +150,17 @@ class AccessControl:
 
     def get_permissions(self, character_id: str, resource_type: str,
                         resource_id: str) -> List[dict]:
-        """获取角色的所有 ACL 规则"""
+        """获取角色的所有权限规则"""
         rules = self._get_rules(character_id, resource_type, resource_id)
-        return [{"folder_path": r["folder_path"], "action": r["action"],
-                 "access": r["access"]}
+        return [{"folder_path": r["folder_path"], "action": r["action"]}
                 for r in rules]
 
-    def batch_set_permissions(self, character_id: str, resource_type: str,
-                              resource_id: str, entries: List[dict]) -> None:
-        """批量设置权限"""
+    def batch_set(self, character_id: str, resource_type: str,
+                  resource_id: str, entries: List[dict]) -> None:
+        """批量设置权限（覆盖式：先清后写）"""
         for entry in entries:
             if entry["action"] not in ("read", "write"):
                 raise ValueError(f"action must be 'read' or 'write', got '{entry['action']}'")
-            if entry["access"] not in ("allow", "deny"):
-                raise ValueError(f"access must be 'allow' or 'deny', got '{entry['access']}'")
 
         with _write_lock:
             conn = _get_conn()
@@ -187,16 +171,16 @@ class AccessControl:
             for entry in entries:
                 conn.execute(
                     """INSERT INTO acl_rules (character_id, resource_type, resource_id, folder_path, action, access)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, 'allow')""",
                     (character_id, resource_type, resource_id,
-                     entry["folder_path"], entry["action"], entry["access"]),
+                     entry["folder_path"], entry["action"]),
                 )
             conn.commit()
             self._invalidate(character_id, resource_type, resource_id)
 
     def get_characters_with_access(self, resource_type: str, resource_id: str,
                                    folder_path: str, action: str) -> List[str]:
-        """反查：获取某路径有权限的角色 ID 列表"""
+        """反查：获取某路径有显式 allow 规则的角色 ID 列表"""
         conn = _get_conn()
         rows = conn.execute(
             """SELECT DISTINCT character_id FROM acl_rules
@@ -205,19 +189,18 @@ class AccessControl:
         ).fetchall()
         return [r["character_id"] for r in rows]
 
-    def get_read_scope(self, character_id: str, resource_type: str,
-                       resource_id: str) -> Tuple[List[str], List[str]]:
-        """获取允许和拒绝的文件夹路径列表（供检索管道用）"""
-        rules = self._get_rules(character_id, resource_type, resource_id)
-        read_rules = [r for r in rules if r["action"] == "read"]
-
-        allowed = [r["folder_path"] for r in read_rules if r["access"] == "allow"]
-        denied = [r["folder_path"] for r in read_rules if r["access"] == "deny"]
-        return allowed, denied
+    def batch_check(self, resource_type: str, resource_id: str,
+                    folder_path: str, action: str,
+                    character_ids: List[str]) -> dict:
+        """批量检查：返回 {char_id: bool}"""
+        result = {}
+        for cid in character_ids:
+            result[cid] = self._check(cid, resource_type, resource_id, folder_path, action)
+        return result
 
     def get_allowed_folders(self, character_id: str, resource_type: str,
                             resource_id: str, all_folders: List[str]) -> List[str]:
-        """把权限规则展开为精确的叶子文件夹列表"""
+        """展开为精确的叶子文件夹列表"""
         return [f for f in all_folders if self.can_read(
             character_id, resource_type, resource_id, f)]
 

@@ -106,12 +106,64 @@ async def handle_cancel(ws: WebSocket, client_id: str, msg: dict):
     await ws.send_json({"type": "cancelled", "session_id": session_id})
 
 
+async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
+    """处理 writing 类型的 WS 消息
+
+    接入 WritingEnvironment / writing_chat_stream，
+    支持 chat/continue/rewrite/expand/condense 五种 AI 模式。
+
+    msg 字段：
+        ai_mode: chat/continue/rewrite/expand/condense
+        book_id: 作品 ID
+        chapter_id: 章节 ID
+        chapter_title: 章节标题
+        chapter_content: 章节全文（Markdown）
+        book_name: 作品名称
+        selected_text: 编辑器选中的文字（润色/扩写/精简用）
+        content: 用户输入文本
+        request_id: 前端生成的请求 ID（回传用于关联响应）
+    """
+    from lumen.core.environments.writing import writing_chat_stream
+
+    ai_mode = msg.get("ai_mode", "chat")
+    book_id = msg.get("book_id", "")
+    chapter_id = msg.get("chapter_id", "")
+    chapter_title = msg.get("chapter_title", "")
+    chapter_content = msg.get("chapter_content", "")
+    book_name = msg.get("book_name", "")
+    selected_text = msg.get("selected_text", "")
+    user_input = msg.get("content", "")
+    request_id = msg.get("request_id", "")
+
+    if not book_id:
+        await ws.send_json({"type": "error", "message": "未指定作品", "request_id": request_id})
+        return
+
+    try:
+        async for event in writing_chat_stream(
+            book_id=book_id,
+            chapter_id=chapter_id,
+            ai_mode=ai_mode,
+            chapter_title=chapter_title,
+            chapter_content=chapter_content,
+            book_name=book_name,
+            selected_text=selected_text,
+            user_input=user_input,
+        ):
+            event["request_id"] = request_id
+            await ws.send_json(event)
+    except Exception as e:
+        logger.error(f"[WS] 写作处理失败: {e}")
+        await ws.send_json({"type": "error", "message": str(e), "request_id": request_id})
+
+
 # 消息类型 → 处理函数映射
 HANDLERS = {
     "chat": handle_chat,
     "subscribe": handle_subscribe,
     "unsubscribe": handle_unsubscribe,
     "cancel": handle_cancel,
+    "writing": handle_writing,
 }
 
 

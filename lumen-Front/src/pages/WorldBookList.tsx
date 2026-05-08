@@ -24,12 +24,9 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
   };
 
   const handleCreate = async () => {
-    const name = prompt('请输入世界书名称：');
-    if (!name) return;
-
     try {
       const result = await create({
-        name,
+        name: '新世界书',
         keywords: [],
         content: '',
         enabled: true,
@@ -45,7 +42,6 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
         character_ids: [],
         comment: '',
       });
-      // 使用后端返回的 ID 导航
       goTo('worldbook-editor', { id: result.id });
     } catch (err) {
       toast(err instanceof Error ? err.message : '创建失败', 'error');

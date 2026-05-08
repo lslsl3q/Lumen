@@ -106,8 +106,21 @@ async def _async_store(content: str, character_id: str, session_id: str,
         "importance": importance,
         "created_at": now_str,
     }
-    db.insert(vector, payload)
+    node_id = db.insert(vector, payload)
     db.flush()
+
+    # TriviumDB 文本索引（BM25 + AC 关键词）
+    try:
+        db.index_text(node_id, content)
+        for tag in tags:
+            if tag:
+                db.index_keyword(node_id, tag)
+        if category:
+            db.index_keyword(node_id, category)
+        db.build_text_index()
+    except Exception as e:
+        logger.debug(f"日记文本索引失败 ({note_id}): {e}")
+
     logger.info(f"日记向量已存储到 agent_knowledge.tdb: {note_id}")
 
     # T19: 日记图谱抽取

@@ -12,66 +12,17 @@ import { HistoryMessage } from '../types/session';
 import { toast } from '../utils/toast';
 import { useWebSocket } from './useWebSocket';
 
-// ── Steps 类型定义 ──
-
-/** 思考阶段 */
-export interface ThinkStep {
-  type: 'think';
-  id: number;
-  content: string;
-  done: boolean;
-}
-
-/** 工具调用阶段 */
-export interface ToolStep {
-  type: 'tool';
-  id: number;
-  name: string;
-  command?: string;
-  status: 'running' | 'done';
-  success?: boolean;
-  params?: Record<string, unknown>;
-  error?: string;
-  data?: unknown;
-}
-
-/** 文本阶段 */
-export interface TextStep {
-  type: 'text';
-  id: number;
-  content: string;
-}
-
-/** 所有阶段的联合类型 */
-export type MessageStep = ThinkStep | ToolStep | TextStep;
-
-// ── 向后兼容的旧类型（ChatPanel 渐进迁移用） ──
-
-export interface ToolCall {
-  callId: number;
-  name: string;
-  command?: string;
-  status: 'running' | 'done';
-  success?: boolean;
-  params?: Record<string, unknown>;
-  error?: string;
-  data?: unknown;
-}
-
-/** 消息 */
-export interface Message {
-  id: string;
-  dbId?: number;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  isStreaming?: boolean;
-  // 新：结构化步骤（流式时构建）
-  steps?: MessageStep[];
-  // 旧字段保留，历史加载兜底 + 渐进迁移
-  toolCalls?: ToolCall[];
-  thinkingContent?: string;
-  thinkingDone?: boolean;
-}
+// ── 类型从共享文件导入，re-export 保持兼容 ──
+export type { Message, MessageStep, ThinkStep, ToolStep, TextStep, ToolCall, UseChatReturn } from '../types/chat';
+import {
+  type Message,
+  type ThinkStep, type TextStep,
+  pushStep,
+  updateLastStep,
+  clearText,
+  setText,
+  nextStepId,
+} from '../types/chat';
 
 // ── 工具函数 ──
 
@@ -101,51 +52,7 @@ function generateMessageId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
-let _nextStepId = 0;
-
-// ── Steps 辅助操作（不可变更新） ──
-
-/** push 新 step */
-function pushStep(steps: MessageStep[], step: MessageStep): MessageStep[] {
-  return [...steps, step];
-}
-
-/** 更新最后一个指定类型的 step */
-function updateLastStep<T extends MessageStep>(
-  steps: MessageStep[],
-  type: T['type'],
-  updater: (step: T) => T,
-): MessageStep[] {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].type === type) {
-      const updated = [...steps];
-      updated[i] = updater(steps[i] as T);
-      return updated;
-    }
-  }
-  return steps;
-}
-
-/** 清空最后一个 text step */
-function clearText(steps: MessageStep[]): MessageStep[] {
-  const last = steps[steps.length - 1];
-  if (last && last.type === 'text') {
-    return updateLastStep(steps, 'text', (s: TextStep) => ({ ...s, content: '' }));
-  }
-  return steps;
-}
-
-/** 设置最后一个 text step 的内容 */
-function setText(steps: MessageStep[], content: string): MessageStep[] {
-  const last = steps[steps.length - 1];
-  if (last && last.type === 'text') {
-    return updateLastStep(steps, 'text', (s: TextStep) => ({ ...s, content }));
-  }
-  if (content) {
-    return pushStep(steps, { type: 'text', id: _nextStepId++, content });
-  }
-  return steps;
-}
+// Steps 辅助操作已提取到 src/types/chat.ts（共享）
 
 // ── Hook ──
 
@@ -179,7 +86,7 @@ export function useChat() {
 
       switch (event.type) {
         case 'think_start':
-          steps = pushStep(steps, { type: 'think', id: _nextStepId++, content: '', done: false });
+          steps = pushStep(steps, { type: 'think', id: nextStepId(), content: '', done: false });
           break;
         case 'think_content':
           steps = updateLastStep(steps, 'think', (s: ThinkStep) => ({ ...s, content: s.content + (event.content || '') }));
@@ -192,7 +99,7 @@ export function useChat() {
           const toolNames = (Array.isArray(raw) ? raw : [raw]).filter((n): n is string => typeof n === 'string');
           const toolCommands = Array.isArray(event.command) ? event.command : toolNames.map(() => typeof event.command === 'string' ? event.command : '');
           for (let i = 0; i < toolNames.length; i++) {
-            steps = pushStep(steps, { type: 'tool', id: _nextStepId++, name: toolNames[i], command: toolCommands[i] || '', status: 'running' as const, params: event.params });
+            steps = pushStep(steps, { type: 'tool', id: nextStepId(), name: toolNames[i], command: toolCommands[i] || '', status: 'running' as const, params: event.params });
           }
           break;
         }
@@ -216,7 +123,7 @@ export function useChat() {
           if (lastStep && lastStep.type === 'text') {
             steps = updateLastStep(steps, 'text', (s: TextStep) => ({ ...s, content: s.content + (event.content || '') }));
           } else if (event.content) {
-            steps = pushStep(steps, { type: 'text', id: _nextStepId++, content: event.content });
+            steps = pushStep(steps, { type: 'text', id: nextStepId(), content: event.content });
           }
           break;
         }

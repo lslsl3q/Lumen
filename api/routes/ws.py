@@ -22,6 +22,7 @@ async def ws_endpoint(websocket: WebSocket):
 
     客户端→服务端消息类型：
       - chat:      发送聊天消息，启动 AI 流式回复
+      - writing:   写作模式 AI 请求（续写/润色/扩写/精简/对话）
       - cancel:    取消当前生成
       - subscribe:   订阅频道（接收推送）
       - unsubscribe: 取消订阅频道

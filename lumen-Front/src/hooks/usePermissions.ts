@@ -1,12 +1,10 @@
 /**
- * usePermissions — 权限数据管理 hook
+ * usePermissions — 权限数据管理 hook（纯白名单模型）
+ *
+ * rules: Set<string> — 有显式 allow 规则的文件夹路径集合
  */
 import { useState, useEffect, useCallback } from 'react';
-import type { AclRule } from '../types/permissions';
-import {
-  getCharacterPermissions,
-  setCharacterPermissions,
-} from '../api/permissions';
+import { getCharacterPermissions, setCharacterPermissions } from '../api/permissions';
 import { listCharacters } from '../api/character';
 
 interface CharacterBrief {
@@ -18,17 +16,13 @@ interface CharacterBrief {
 export function usePermissions() {
   const [characters, setCharacters] = useState<CharacterBrief[]>([]);
   const [selectedCharId, setSelectedCharId] = useState<string>('');
-  const [rules, setRules] = useState<Map<string, 'allow' | 'deny'>>(new Map());
+  const [rules, setRulesState] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     listCharacters().then(list => {
-      const briefs = list.map(c => ({
-        id: c.id,
-        name: c.name,
-        avatar: c.avatar,
-      }));
+      const briefs = list.map(c => ({ id: c.id, name: c.name, avatar: c.avatar }));
       setCharacters(briefs);
       if (briefs.length > 0 && !selectedCharId) {
         setSelectedCharId(briefs[0].id);
@@ -41,11 +35,7 @@ export function usePermissions() {
     setLoading(true);
     getCharacterPermissions(selectedCharId, 'knowledge', 'knowledge')
       .then(r => {
-        const map = new Map<string, 'allow' | 'deny'>();
-        for (const rule of r) {
-          map.set(rule.folder_path, rule.access as 'allow' | 'deny');
-        }
-        setRules(map);
+        setRulesState(new Set(r.map(e => e.folder_path)));
         setDirty(false);
       })
       .catch(() => {})
@@ -54,10 +44,7 @@ export function usePermissions() {
 
   const save = useCallback(async () => {
     if (!selectedCharId) return;
-    const entries: AclRule[] = [];
-    rules.forEach((access, folder_path) => {
-      entries.push({ folder_path, action: 'read', access });
-    });
+    const entries = [...rules].map(folder_path => ({ folder_path, action: 'read' as const }));
     await setCharacterPermissions(selectedCharId, {
       resource_type: 'knowledge',
       resource_id: 'knowledge',
@@ -66,14 +53,10 @@ export function usePermissions() {
     setDirty(false);
   }, [selectedCharId, rules]);
 
-  return {
-    characters,
-    selectedCharId,
-    setSelectedCharId,
-    rules,
-    setRules: (r: Map<string, 'allow' | 'deny'>) => { setRules(r); setDirty(true); },
-    loading,
-    dirty,
-    save,
-  };
+  const setRules = useCallback((r: Set<string>) => {
+    setRulesState(r);
+    setDirty(true);
+  }, []);
+
+  return { characters, selectedCharId, setSelectedCharId, rules, setRules, loading, dirty, save };
 }

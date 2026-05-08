@@ -1,34 +1,18 @@
 /**
- * 权限系统类型定义
+ * 权限系统类型定义（纯白名单模型）
  */
 
-/** 单条 ACL 规则 */
-export interface AclRule {
+/** 单条权限条目 */
+export interface AclEntry {
   folder_path: string;
   action: 'read' | 'write';
-  access: 'allow' | 'deny';
-}
-
-/** 获取角色权限的请求参数 */
-export interface CharacterPermissionParams {
-  character_id: string;
-  resource_type: 'knowledge' | 'diary';
-  resource_id: string;
 }
 
 /** 批量设置权限的请求体 */
 export interface BatchPermissionRequest {
   resource_type: 'knowledge' | 'diary';
   resource_id: string;
-  entries: AclRule[];
-}
-
-/** 资源反查参数 */
-export interface ResourcePermissionParams {
-  resource_type: 'knowledge' | 'diary';
-  resource_id: string;
-  folder_path?: string;
-  action?: 'read' | 'write';
+  entries: AclEntry[];
 }
 
 /** 树节点（知识库文件夹结构） */

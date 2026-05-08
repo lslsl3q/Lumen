@@ -1,14 +1,47 @@
 /**
  * PermissionPage — 双标签权限管理页
+ *
+ * 按角色：树形复选框，勾选=授权，取消=撤销
+ * 按知识库：选文件夹 → 查看可访问角色 → 添加/移除
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PermissionTree, { FolderNode } from '../components/PermissionTree';
 import { usePermissions } from '../hooks/usePermissions';
-import { getResourcePermissions } from '../api/permissions';
-import { getTdbFileTree } from '../api/tdb';
+import { batchCheckPermissions, grantAccess, revokeAccess } from '../api/permissions';
+import { getTdbFileTree, type TdbFileFolder } from '../api/tdb';
 
 type Tab = 'character' | 'resource';
+
+/** 从扁平文件夹列表构建递归层级树 */
+function buildFolderTree(flatFolders: TdbFileFolder[]): FolderNode[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const trie: Record<string, any> = {};
+
+  for (const f of flatFolders) {
+    if (f.path === '') continue;
+    const parts = f.path.split('/');
+    let node = trie;
+    for (const part of parts) {
+      if (!node[part]) node[part] = {};
+      node = node[part];
+    }
+  }
+
+  function toNodes(obj: Record<string, unknown>, parentPath: string): FolderNode[] {
+    return Object.entries(obj).map(([name, v]) => {
+      const path = parentPath ? `${parentPath}/${name}` : name;
+      const children = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+      return { name, path, children: toNodes(children, path) };
+    });
+  }
+
+  return [{
+    name: 'knowledge（根）',
+    path: '',
+    children: toNodes(trie, ''),
+  }];
+}
 
 export default function PermissionPage() {
   const navigate = useNavigate();
@@ -24,37 +57,72 @@ export default function PermissionPage() {
     save,
   } = usePermissions();
 
-  const [selectedPath, setSelectedPath] = useState('');
-  const [authorizedChars, setAuthorizedChars] = useState<string[]>([]);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [allowedChars, setAllowedChars] = useState<Set<string>>(new Set());
+  const [resourceLoading, setResourceLoading] = useState(false);
   const [folders, setFolders] = useState<FolderNode[]>([]);
+  const [treeLoading, setTreeLoading] = useState(true);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  const fetchCharPermissions = useCallback(async (path: string) => {
+    if (characters.length === 0) return;
+    setResourceLoading(true);
+    try {
+      const perms = await batchCheckPermissions(
+        'knowledge', 'knowledge', path,
+        characters.map(c => c.id), 'read',
+      );
+      setAllowedChars(new Set(Object.entries(perms).filter(([, v]) => v).map(([k]) => k)));
+    } catch {
+      setAllowedChars(new Set());
+    } finally {
+      setResourceLoading(false);
+    }
+  }, [characters]);
 
   useEffect(() => {
+    setTreeLoading(true);
     getTdbFileTree('knowledge')
-      .then(data => {
-        const roots: FolderNode[] = [{
-          name: 'knowledge（根）',
-          path: '',
-          children: data.folders.map(f => ({
-            name: f.name,
-            path: f.path,
-            children: [],
-          })),
-        }];
-        setFolders(roots);
-      })
-      .catch(() => setFolders([]));
+      .then(data => setFolders(buildFolderTree(data.folders)))
+      .catch(() => setFolders([]))
+      .finally(() => setTreeLoading(false));
   }, []);
 
   useEffect(() => {
-    if (tab !== 'resource' || !selectedPath) return;
-    getResourcePermissions('knowledge', 'knowledge', selectedPath, 'read')
-      .then(setAuthorizedChars)
-      .catch(() => setAuthorizedChars([]));
-  }, [tab, selectedPath]);
+    if (tab !== 'resource' || selectedPath === null) {
+      setAllowedChars(new Set());
+      return;
+    }
+    fetchCharPermissions(selectedPath);
+  }, [tab, selectedPath, fetchCharPermissions]);
+
+  const handleGrant = useCallback(async (charId: string) => {
+    if (selectedPath === null) return;
+    setShowAddMenu(false);
+    try {
+      await grantAccess(charId, 'knowledge', 'knowledge', selectedPath, 'read');
+      await fetchCharPermissions(selectedPath);
+    } catch (err) {
+      console.error('授权失败:', err);
+    }
+  }, [selectedPath, fetchCharPermissions]);
+
+  const handleRevoke = useCallback(async (charId: string) => {
+    if (selectedPath === null) return;
+    try {
+      await revokeAccess(charId, 'knowledge', 'knowledge', selectedPath, 'read');
+      await fetchCharPermissions(selectedPath);
+    } catch (err) {
+      console.error('撤销失败:', err);
+    }
+  }, [selectedPath, fetchCharPermissions]);
 
   const handleSave = useCallback(async () => {
     await save();
   }, [save]);
+
+  const allowedList = characters.filter(c => allowedChars.has(c.id));
+  const availableList = characters.filter(c => !allowedChars.has(c.id));
 
   return (
     <div className="h-full bg-slate-950 text-slate-200 flex flex-col">
@@ -119,7 +187,6 @@ export default function PermissionPage() {
                 <PermissionTree
                   folders={folders}
                   rules={rules}
-                  defaultPublic={true}
                   onChange={setRules}
                 />
               )}
@@ -128,34 +195,72 @@ export default function PermissionPage() {
         ) : (
           <>
             <div className="w-80 border-r border-[#2a2926] overflow-y-auto">
-              <PermissionTree
-                folders={folders}
-                rules={new Map()}
-                defaultPublic={true}
-                onChange={() => {}}
-              />
+              {treeLoading ? (
+                <div className="text-sm text-slate-500 text-center py-8">加载文件夹...</div>
+              ) : (
+                <PermissionTree
+                  folders={folders}
+                  rules={new Set()}
+                  onChange={() => {}}
+                  onSelect={setSelectedPath}
+                  showCheckboxes={false}
+                />
+              )}
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              {selectedPath ? (
+              {selectedPath !== null ? (
                 <>
-                  <h3 className="text-sm text-slate-400 mb-3">
-                    「{selectedPath || '根目录'}」的读取权限角色
-                  </h3>
-                  {authorizedChars.map(charId => {
-                    const char = characters.find(c => c.id === charId);
-                    return (
-                      <div key={charId} className="flex items-center justify-between py-2 px-3 rounded hover:bg-slate-800/50">
-                        <span className="text-sm text-slate-300">{char?.name || charId}</span>
-                        <button className="text-xs text-slate-500 hover:text-red-400">移除</button>
-                      </div>
-                    );
-                  })}
-                  {authorizedChars.length === 0 && (
-                    <div className="text-sm text-slate-500">无授权角色</div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm text-slate-400">
+                      「{selectedPath || '根目录'}」可访问的角色
+                    </h3>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowAddMenu(!showAddMenu)}
+                        className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-colors"
+                      >
+                        + 添加
+                      </button>
+                      {showAddMenu && availableList.length > 0 && (
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded shadow-lg z-10 max-h-60 overflow-y-auto">
+                          {availableList.map(char => (
+                            <button
+                              key={char.id}
+                              onClick={() => handleGrant(char.id)}
+                              className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                            >
+                              {char.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {resourceLoading ? (
+                    <div className="text-sm text-slate-500 py-2">加载中...</div>
+                  ) : (
+                    <>
+                      {allowedList.map(char => (
+                        <div key={char.id} className="flex items-center justify-between py-2 px-3 rounded hover:bg-slate-800/50">
+                          <div className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            <span className="text-sm text-slate-300">{char.name}</span>
+                          </div>
+                          <button
+                            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                            onClick={() => handleRevoke(char.id)}
+                          >
+                            移除
+                          </button>
+                        </div>
+                      ))}
+                      {allowedList.length === 0 && (
+                        <div className="text-sm text-slate-500 py-4 text-center">
+                          暂无角色有访问权限，点击右上角添加
+                        </div>
+                      )}
+                    </>
                   )}
-                  <button className="mt-3 text-xs text-amber-400 hover:text-amber-300">
-                    + 添加角色
-                  </button>
                 </>
               ) : (
                 <div className="text-sm text-slate-500 text-center py-8">
