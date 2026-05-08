@@ -56,6 +56,7 @@ class TurnEndedPayload(HookEvent):
     session_id: str = ""
 
 
+# RESERVED: T11 RPG 场景切换事件 — 场景进入时触发描述注入，待 RPG 面板 MVP 实现后启用
 class RPGSceneEnterPayload(HookEvent):
     event_name: str = "rpg.scene.enter"
     scene_id: str = ""

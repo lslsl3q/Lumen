@@ -1,9 +1,6 @@
 """
 Lumen - 角色文件 CRUD 服务
-角色卡片的写操作：创建、更新、删除、头像管理
-
-读操作（load_character、list_characters）留在 prompt/character.py，
-因为它们服务于提示词构建流程。
+角色卡片的完整生命周期：读取、创建、更新、删除、头像管理
 """
 
 import json
@@ -19,6 +16,10 @@ from lumen.types.prompt import CharacterCard
 logger = logging.getLogger(__name__)
 
 CHARACTERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "characters")
+
+def _avatars_dir():
+    from lumen.services.avatar import AVATARS_DIR
+    return AVATARS_DIR
 
 
 def _generate_character_id() -> str:
@@ -37,6 +38,41 @@ def _validate_char_id(char_id: str) -> str:
     if not re.match(r'^[a-zA-Z0-9_\-]+$', char_id):
         raise ValueError(f"非法的角色ID: {char_id}")
     return char_id
+
+
+def list_characters() -> list[dict]:
+    """列出所有可用角色，返回 [{"id": ..., "name": ...}, ...]"""
+    characters = []
+    if not os.path.exists(CHARACTERS_DIR):
+        return characters
+
+    for filename in os.listdir(CHARACTERS_DIR):
+        if filename.endswith(".json"):
+            filepath = os.path.join(CHARACTERS_DIR, filename)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                card = CharacterCard.model_validate(raw)
+            except Exception as e:
+                logger.warning("跳过损坏的角色文件 %s: %s", filename, e)
+                continue
+            char_id = filename[:-5]
+            characters.append({"id": char_id, "name": card.name})
+    return characters
+
+
+def load_character(char_id: str) -> dict:
+    """加载角色卡片，用 CharacterCard Pydantic 校验后返回 dict"""
+    _validate_char_id(char_id)
+    filepath = os.path.join(CHARACTERS_DIR, f"{char_id}.json")
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"角色不存在: {char_id}")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+
+    card = CharacterCard.model_validate(raw)
+    return card.model_dump(exclude_none=True)
 
 
 def create_character(char_id: str | None, data: dict) -> dict:
@@ -112,7 +148,7 @@ def delete_character(char_id: str) -> None:
 
     # 级联删除：该角色的所有会话（含 FTS5 + 向量）
     try:
-        from lumen.services import history
+        from lumen.services.storage import history
         sessions = history.list_sessions(limit=999)
         for sess in sessions:
             if sess.get("character_id") == char_id:
@@ -126,7 +162,7 @@ def delete_character(char_id: str) -> None:
 
     avatar = data.get("avatar")
     if avatar:
-        avatar_path = os.path.join(CHARACTERS_DIR, "avatars", avatar)
+        avatar_path = os.path.join(_avatars_dir(), avatar)
         if os.path.exists(avatar_path):
             os.remove(avatar_path)
             logger.info("删除头像: %s", avatar)
@@ -146,7 +182,7 @@ def save_avatar(char_id: str, filename: str, file_data: bytes) -> str:
     """
     _validate_char_id(char_id)
 
-    avatars_dir = os.path.join(CHARACTERS_DIR, "avatars")
+    avatars_dir = _avatars_dir()
     os.makedirs(avatars_dir, exist_ok=True)
 
     ext = os.path.splitext(filename)[1] or ".png"

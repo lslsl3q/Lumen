@@ -30,7 +30,7 @@ class ThinkingClusterComponent(ContextComponent):
 
         try:
             from lumen.services.thinking_clusters import run_chain, get_chain_config, ensure_indexed
-            from lumen.services.embedding import get_service
+            from lumen.services.search.embedding import get_service
         except ImportError:
             return ""
 

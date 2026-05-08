@@ -54,7 +54,7 @@ async def _rerank_results(query: str, results: list[SearchResult], top_k: int, m
     注意：首次调用会加载嵌入模型（可能耗时），有超时保护，超时则降级返回原始结果。
     """
     import asyncio
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
 
     _RERANK_TIMEOUT = float(os.getenv("SEARCH_RERANK_TIMEOUT", "15"))
 
@@ -91,7 +91,7 @@ async def _rerank_results(query: str, results: list[SearchResult], top_k: int, m
 
 async def _do_rerank(query: str, results: list[SearchResult]) -> list[tuple[float, dict]] | None:
     """执行实际的重排序编码和相似度计算，返回 [(score, result_dict), ...] 或 None"""
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
 
     backend = await get_service("memory")
     if not backend:

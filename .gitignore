@@ -58,6 +58,7 @@ lumen/data/runtime_config.json
 lumen/data/tdb_registry.json
 lumen/data/dream_state.json
 lumen/data/gm/
+lumen/data/semantic_vectors/
 snapshot*.txt
 
 # SQLite 临时文件
@@ -70,7 +71,7 @@ snapshot*.txt
 lumen/personas/*.json
 lumen/worldbooks/*.json
 lumen/characters/*.json
-lumen/characters/avatars/
+lumen/data/avatars/
 lumen/skills/*
 !lumen/skills/README.md
 

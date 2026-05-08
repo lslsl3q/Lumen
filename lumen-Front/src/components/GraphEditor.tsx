@@ -159,6 +159,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
 
   /* ── G6 初始化 ── */
   useEffect(() => {
+    destroyedRef.current = false;
     if (!containerRef.current) return;
 
     const graph = new Graph({
@@ -314,7 +315,9 @@ function GraphEditor({ tdb }: GraphEditorProps) {
     if (!graph) return;
     const layoutConfig = LAYOUTS[layoutType]?.config || LAYOUTS['d3-force'].config;
     graph.setLayout(layoutConfig as any);
-    graph.layout();
+    if (entities.length > 0) {
+      graph.layout();
+    }
   }, [layoutType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── ResizeObserver ── */

@@ -15,7 +15,7 @@ from lumen.query import validate_tool_call, chat_non_stream
 from lumen.services.context import trim_messages, fold_tool_calls, filter_for_ai
 
 # 模块引用
-from lumen.services import history
+from lumen.services.storage import history
 from lumen.services import memory
 
 # 消息类型（types/）
@@ -26,7 +26,7 @@ from lumen.types.messages import (
 )
 
 # 角色提示词（prompt/）
-from lumen.prompt.character import list_characters, load_character
+from lumen.services.character import list_characters, load_character
 
 # 工具系统（tools/）
 from lumen.tool import (

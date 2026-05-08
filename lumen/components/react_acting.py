@@ -28,6 +28,21 @@ from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_a
 from lumen.tools.parse import parse_tool_call
 from lumen.tools.registry import get_registry
 
+
+def _make_room_move_callback():
+    """创建 room move 回调（延迟导入 core.message_bus，避免模块级依赖）"""
+    def on_room_move(agent_id, old_room, new_room):
+        try:
+            from lumen.core.message_bus import get_message_bus
+            bus = get_message_bus()
+            if bus and bus.is_registered(agent_id):
+                if old_room:
+                    bus.leave_room(old_room, agent_id)
+                bus.join_room(new_room, agent_id)
+        except Exception:
+            pass
+    return on_room_move
+
 logger = logging.getLogger(__name__)
 
 # ── 取消管理（会话级） ──
@@ -114,7 +129,7 @@ def _inject_authors_note(messages: list, session_id: str) -> list:
 async def _save_and_vectorize(session_id: str, role: str, content: str,
                               character_id: str, metadata: dict = None) -> int:
     """保存消息并异步向量化"""
-    from lumen.services import history
+    from lumen.services.storage import history
     msg_id = history.save_message(session_id, role, content, metadata)
     if role in ("user", "assistant") and content and len(content) >= 5:
         from lumen.services.memory import vectorize_message
@@ -125,7 +140,7 @@ async def _save_and_vectorize(session_id: str, role: str, content: str,
 async def _auto_title(session_id: str):
     """后台 fire-and-forget：用 LLM 生成会话标题"""
     try:
-        from lumen.services import history as hist
+        from lumen.services.storage import history as hist
         from lumen.config import DEFAULT_MODEL
         from lumen.services.llm import chat as llm_chat
 
@@ -386,7 +401,7 @@ class ReActActingComponent(ActingComponent):
                     if current_reasoning_buffer:
                         msg["reasoning_content"] = current_reasoning_buffer
                     self.session.messages.append(msg)
-                    from lumen.services import history
+                    from lumen.services.storage import history
                     history.save_message(self.session.session_id, "assistant", clean_content)
                     self.session.messages.append({"role": "user", "content": error_feedback, "metadata": {"type": "system_feedback"}})
                     history.save_message(self.session.session_id, "user", error_feedback, {"type": "system_feedback"})
@@ -558,7 +573,7 @@ class ReActActingComponent(ActingComponent):
         self, tool_call: dict, iteration: int, trace_enabled: bool,
     ) -> AsyncGenerator[dict, None]:
         """执行单个工具调用"""
-        from lumen.services import history
+        from lumen.services.storage import history
 
         tool_name = tool_call.get("tool", "")
         tool_params = tool_call.get("params", {})
@@ -573,7 +588,8 @@ class ReActActingComponent(ActingComponent):
             return
 
         yield {"type": "tool_start", "tool": tool_name, "command": tool_command, "params": tool_params}
-        set_tool_context(self.session.session_id or "", self.session.character_id or "")
+        set_tool_context(self.session.session_id or "", self.session.character_id or "",
+                         on_room_move=_make_room_move_callback())
 
         tool_exec_start = time.perf_counter()
         try:
@@ -619,7 +635,7 @@ class ReActActingComponent(ActingComponent):
         self, tool_call: dict, iteration: int, trace_enabled: bool,
     ) -> AsyncGenerator[dict, None]:
         """执行多个工具并行调用"""
-        from lumen.services import history
+        from lumen.services.storage import history
 
         calls = tool_call.get("calls", [])
         all_errors = []
@@ -638,7 +654,8 @@ class ReActActingComponent(ActingComponent):
         tool_names = [c.get("tool") for c in calls]
         tool_commands = [c.get("command", "") for c in calls]
         yield {"type": "tool_start", "tool": tool_names, "command": tool_commands, "mode": "parallel"}
-        set_tool_context(self.session.session_id or "", self.session.character_id or "")
+        set_tool_context(self.session.session_id or "", self.session.character_id or "",
+                         on_room_move=_make_room_move_callback())
 
         logger.info(f"并行执行 {len(calls)} 个工具...")
         tool_exec_start = time.perf_counter()
@@ -677,7 +694,7 @@ class ReActActingComponent(ActingComponent):
         确保每次 dice/rpg 工具调用后前端都能拿到状态快照。
         """
         try:
-            from lumen.services import world_state as ws_module
+            from lumen.services.storage import world_state as ws_module
             character_id = self.session.character_id or ""
             if not character_id:
                 return

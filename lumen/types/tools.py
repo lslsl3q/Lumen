@@ -5,6 +5,7 @@ Lumen - 工具协议类型定义（Pydantic）
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, Optional, List, Dict, Union, TypedDict
+from datetime import datetime
 
 
 class ErrorCode:
@@ -71,3 +72,28 @@ class ParallelToolCall(BaseModel):
 
 
 ParsedToolCall = Union[SingleToolCall, ParallelToolCall]
+
+
+def success_result(tool: str, data: Any, **metadata) -> Dict[str, Any]:
+    """构造成功结果"""
+    result = ToolResult(
+        success=True,
+        tool=tool,
+        data=data,
+        timestamp=datetime.now().isoformat(),
+        **metadata,
+    )
+    return result.model_dump(exclude_none=True)
+
+
+def error_result(tool: str, code: str, message: str, detail: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """构造错误结果"""
+    result = ToolResult(
+        success=False,
+        tool=tool,
+        error_code=code,
+        error_message=message,
+        timestamp=datetime.now().isoformat(),
+        error_detail=detail,
+    )
+    return result.model_dump(exclude_none=True)

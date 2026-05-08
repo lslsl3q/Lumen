@@ -22,7 +22,7 @@ class RoomContextComponent(ContextComponent):
         if not character_id:
             return ""
 
-        from lumen.services import world_state as ws
+        from lumen.services.storage import world_state as ws
 
         state = ws.get_agent_state(character_id)
         if not state or not state.get("room_id"):

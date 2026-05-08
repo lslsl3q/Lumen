@@ -290,7 +290,7 @@ def record_event(
     # 订阅 rpg.action.completed 自动处理，这里处理 world_state 自身的事件
     if event_type in ("state_change", "narrative"):
         try:
-            from lumen.core.event_processor import enqueue_event
+            from lumen.services.event_queue import enqueue_event
             enqueue_event(
                 content=summary,
                 event_type="rpg",

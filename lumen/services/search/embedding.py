@@ -508,37 +508,3 @@ def check_dim_consistency(db_path: str, dim: int) -> str | None:
         pass
     return None
 
-
-# ── 向后兼容的公共 API ──
-# 旧代码直接调用 encode() / encode_batch() / is_available()，不传服务名
-# 默认使用 "memory" 服务的后端
-
-async def ensure_loaded():
-    """确保默认服务已加载（向后兼容）"""
-    await get_service("memory")
-
-
-def is_available() -> bool:
-    """检查默认嵌入服务是否可用（向后兼容）"""
-    backend = _services.get("memory")
-    if isinstance(backend, LocalBackend):
-        return backend._model is not None
-    return backend is not None
-
-
-async def encode(text: str) -> Optional[list[float]]:
-    """编码单条文本（向后兼容，使用 memory 服务）"""
-    backend = await get_service("memory")
-    if backend is None:
-        return None
-    return await backend.encode(text)
-
-
-async def encode_batch(texts: list[str]) -> Optional[list[list[float]]]:
-    """编码多条文本（向后兼容，使用 memory 服务）"""
-    if not texts:
-        return []
-    backend = await get_service("memory")
-    if backend is None:
-        return None
-    return await backend.encode_batch(texts)

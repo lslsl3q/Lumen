@@ -19,22 +19,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_ALLOWED = {"knowledge", "memory"}
-
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _get_tdb(name: str):
-    """根据名称获取 TDB 实例"""
-    if name not in _ALLOWED:
-        raise HTTPException(404, f"未知 TDB: {name}，可用: {list(_ALLOWED)}")
-
-    if name == "knowledge":
-        from lumen.services.knowledge import _get_db
-        return _get_db()
-    elif name == "memory":
-        from lumen.services.vector_store import _get_db
-        return _get_db()
+    """根据名称获取 TDB 实例（动态发现，无需白名单）"""
+    from lumen.services.tdb_registry import get_tdb, is_user_tdb
+    if not is_user_tdb(name):
+        raise HTTPException(404, f"不可用的 TDB: {name}")
+    return get_tdb(name)
 
 
 @router.get("/{name}/entries")
@@ -170,7 +163,7 @@ async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
 
         # 内容变了且需要重向量化
         if body.reindex and body.content is not None and name == "knowledge":
-            from lumen.services.embedding import get_service
+            from lumen.services.search.embedding import get_service
             backend = await get_service("knowledge")
             if backend:
                 new_vector = await backend.encode(body.content)
@@ -219,8 +212,8 @@ async def file_tree(name: str):
 
     返回格式：{ folders: [{ name, path, files: [{ name, path }] }], total_files }
     """
-    if name not in _ALLOWED:
-        raise HTTPException(404, f"未知 TDB: {name}")
+    # 验证 TDB 可用（动态发现）
+    _get_tdb(name)
 
     if name == "knowledge":
         return _file_tree_from_tdb(name)
@@ -325,8 +318,8 @@ class ImportFileRequest(BaseModel):
 @router.post("/{name}/import-file")
 async def import_file_from_disk(name: str, req: ImportFileRequest):
     """从磁盘读取文件并导入到 TDB（向量化）"""
-    if name not in _ALLOWED:
-        raise HTTPException(404, f"未知 TDB: {name}")
+    # 验证 TDB 可用（动态发现）
+    _get_tdb(name)
 
     data_dir = os.path.join(_PROJECT_ROOT, "lumen", "data", name)
     full_path = os.path.normpath(os.path.join(data_dir, req.path))
@@ -402,7 +395,7 @@ async def _import_or_reimport(
     # 清理旧 BM25 索引
     for fid in old_file_ids:
         try:
-            from lumen.services.history import delete_knowledge_chunks
+            from lumen.services.knowledge.chunks import delete_knowledge_chunks
             delete_knowledge_chunks(fid)
         except Exception:
             pass

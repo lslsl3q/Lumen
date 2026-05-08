@@ -32,14 +32,14 @@ class ChatSession:
 
     def _make_placeholder(self) -> str:
         """生成占位 system prompt（Agent 在每次 act() 时会用 Components 重建）"""
-        from lumen.prompt.character import load_character
+        from lumen.services.character import load_character
         character = load_character(self.character_id)
         name = character.get("name", "AI")
         return f"[system: {name}]"
 
     def _initialize_new(self):
         """初始化新会话"""
-        from lumen.services import history
+        from lumen.services.storage import history
 
         placeholder = self._make_placeholder()
 
@@ -50,7 +50,7 @@ class ChatSession:
 
     def _initialize_existing(self):
         """加载已有会话"""
-        from lumen.services import history
+        from lumen.services.storage import history
 
         placeholder = self._make_placeholder()
 
@@ -100,7 +100,7 @@ class SessionManager:
         - 数据库不存在 → 创建新会话
         """
         if session_id not in self._sessions:
-            from lumen.services import history as history_service
+            from lumen.services.storage import history as history_service
             info = history_service.get_session_info(session_id)
             if info:
                 self._sessions[session_id] = ChatSession(

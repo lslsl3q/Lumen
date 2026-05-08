@@ -1,7 +1,7 @@
 /**
  * 权限管理 API 客户端（纯白名单模型）
  */
-import type { AclEntry, BatchPermissionRequest } from '../types/permissions';
+import type { AclEntry } from '../types/permissions';
 
 const API_BASE_URL = 'http://127.0.0.1:8888';
 

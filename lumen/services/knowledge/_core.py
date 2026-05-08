@@ -31,9 +31,10 @@ from lumen.config import (
     KNOWLEDGE_RERANK_TOP_K,
     KNOWLEDGE_RERANK_MIN_SCORE,
 )
-from lumen.services.embedding import get_service as get_embedding_service
+from lumen.services.search.embedding import get_service as get_embedding_service
 from lumen.services.knowledge.chunker import chunk_text, split_sentences
-from lumen.services import history
+from lumen.services.knowledge import chunks as knowledge_chunks
+from lumen.services.memory import active_store
 
 logger = logging.getLogger(__name__)
 
@@ -44,52 +45,10 @@ def get_last_search_meta() -> dict:
     """返回最近一次 knowledge.search() 的元数据（副本）"""
     return _last_search_meta.copy()
 
-# ── TriviumDB 单例（独立于 memory.tdb）──
-_db: Optional[triviumdb.TriviumDB] = None
-_db_lock = threading.Lock()
+# TDB 实例管理已迁移到 lumen/services/tdb_registry.py
+# 调用 get_tdb("knowledge") / get_tdb("agent_knowledge") / get_tdb("knowledge_sentences")
 
-# ── Agent 知识库 TriviumDB 单例（阵营 B，独立于 knowledge.tdb）──
-_agent_db: Optional[triviumdb.TriviumDB] = None
-_agent_db_lock = threading.Lock()
-
-# ── 句子级 TriviumDB 单例（独立于 knowledge.tdb，不同维度）──
-_sentence_db: Optional[triviumdb.TriviumDB] = None
-_sentence_db_lock = threading.Lock()
-
-# ── 维度持久化 ──
-_KNOWLEDGE_DIM_FILE = KNOWLEDGE_DB_PATH + ".dim"
-_AGENT_KNOWLEDGE_DIM_FILE = AGENT_KNOWLEDGE_DB_PATH + ".dim"
-_SENTENCE_DIM_FILE = KNOWLEDGE_SENTENCE_DB_PATH + ".dim"
-
-
-def _save_dim(dim_file: str, dim: int):
-    try:
-        with open(dim_file, "w") as f:
-            f.write(str(dim))
-    except Exception:
-        pass
-
-
-def _open_tdb(path: str, dim: int, index_fields: list[str] = None) -> triviumdb.TriviumDB:
-    """创建 TriviumDB 实例的统一入口
-
-    自动处理：目录创建 + auto_compaction + 属性索引。
-    以后新建任何 TDB 都走这个函数，不用每个地方重复写。
-    """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    db = triviumdb.TriviumDB(path, dim=dim)
-    try:
-        db.enable_auto_compaction(7200)
-    except Exception:
-        pass
-    if index_fields:
-        for field in index_fields:
-            try:
-                db.create_index(field)
-            except Exception:
-                pass
-    return db
-
+from lumen.services.tdb_registry import get_tdb
 
 # ── Registry 缓存 ──
 _registry_cache: Optional[Dict[str, Dict]] = None
@@ -99,57 +58,24 @@ MANIFEST_PATH = os.path.join(KNOWLEDGE_SOURCE_DIR, "_manifest.json")
 
 
 def _get_db() -> triviumdb.TriviumDB:
-    """获取 knowledge.tdb 实例（单例，线程安全）"""
-    global _db
-    if _db is None:
-        with _db_lock:
-            if _db is None:
-                from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
-                dim = resolve_dimensions("knowledge")
-                err = check_dim_consistency(KNOWLEDGE_DB_PATH, dim)
-                if err:
-                    raise RuntimeError(err)
-                _db = _open_tdb(KNOWLEDGE_DB_PATH, dim, ["owner_id", "type", "status", "source"])
-                _save_dim_file(KNOWLEDGE_DB_PATH, dim)
-                logger.info(f"知识库 TriviumDB 已打开: {KNOWLEDGE_DB_PATH} (维度: {dim})")
-    return _db
+    """获取 knowledge.tdb 实例（已迁移到 tdb_registry）"""
+    return get_tdb("knowledge")
 
 
 def _get_agent_db() -> triviumdb.TriviumDB:
-    """获取 agent_knowledge.tdb 实例（单例，线程安全，阵营 B 维度）"""
-    global _agent_db
-    if _agent_db is None:
-        with _agent_db_lock:
-            if _agent_db is None:
-                from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
-                dim = resolve_dimensions("agent_knowledge")
-                err = check_dim_consistency(AGENT_KNOWLEDGE_DB_PATH, dim)
-                if err:
-                    raise RuntimeError(err)
-                _agent_db = _open_tdb(AGENT_KNOWLEDGE_DB_PATH, dim, ["owner_id", "type", "status"])
-                _save_dim_file(AGENT_KNOWLEDGE_DB_PATH, dim)
-                logger.info(f"Agent 知识库 TriviumDB 已打开: {AGENT_KNOWLEDGE_DB_PATH} (维度: {dim})")
-    return _agent_db
+    """获取 agent_knowledge.tdb 实例（已迁移到 tdb_registry）"""
+    return get_tdb("agent_knowledge")
 
 
 def _get_sentence_db() -> triviumdb.TriviumDB:
-    """获取 knowledge_sentences.tdb 实例（单例，用小模型维度）"""
-    global _sentence_db
-    if _sentence_db is None:
-        with _sentence_db_lock:
-            if _sentence_db is None:
-                from lumen.services.embedding import resolve_dimensions
-                dim = resolve_dimensions("knowledge_sentences")
-                _sentence_db = _open_tdb(KNOWLEDGE_SENTENCE_DB_PATH, dim)
-                _save_dim(_SENTENCE_DIM_FILE, dim)
-                logger.info(f"句子级 TriviumDB 已打开: {KNOWLEDGE_SENTENCE_DB_PATH} (维度: {dim})")
-    return _sentence_db
+    """获取 knowledge_sentences.tdb 实例（已迁移到 tdb_registry）"""
+    return get_tdb("knowledge_sentences")
 
 
 def _prf_refine(db, query_vector: list[float], hits: list[dict],
                 alpha: float, beta: float) -> list[float] | None:
     """PRF 精炼查询向量（委托给 vector_store.prf_refine）"""
-    from lumen.services.vector_store import prf_refine
+    from lumen.services.search.vector_store import prf_refine
     return prf_refine(db, query_vector, hits, alpha, beta)
 
 
@@ -531,7 +457,7 @@ async def import_file(
     # 4.1 存入稀疏向量（如果获取成功）
     if sparse_vectors:
         try:
-            from lumen.services.sparse_store import save_sparse_batch
+            from lumen.services.search.sparse_store import save_sparse_batch
             items = []
             for i, sv in enumerate(sparse_vectors):
                 if sv:
@@ -572,7 +498,7 @@ async def import_file(
 
     # 4.5 写入 BM25 索引（FTS5 + jieba 分词）
     try:
-        history.save_knowledge_chunks_batch(fid, rel_path, filename, category, chunks)
+        knowledge_chunks.save_knowledge_chunks_batch(fid, rel_path, filename, category, chunks)
     except Exception as e:
         logger.warning(f"知识库 BM25 索引写入失败 ({fid}): {e}")
 
@@ -857,7 +783,7 @@ async def search(
 
     if SPARSE_EMBEDDING_ENABLED and hasattr(backend, 'encode_with_sparse'):
         try:
-            from lumen.services.sparse_store import has_sparse_data, search_sparse
+            from lumen.services.search.sparse_store import has_sparse_data, search_sparse
             if has_sparse_data():
                 sparse_result = await backend.encode_with_sparse(
                     query, instruction_type="query"
@@ -877,7 +803,7 @@ async def search(
             import jieba
             keywords = [w for w in jieba.cut(query) if len(w.strip()) > 1]
             if keywords:
-                bm25_hits = history.search_knowledge_bm25(
+                bm25_hits = knowledge_chunks.search_knowledge_bm25(
                     keywords, category=category or "", limit=top_k
                 )
                 # 主动记忆（daily_note）也走 BM25，合并到同一路径进 RRF
@@ -885,7 +811,7 @@ async def search(
                     active_hits = []
                     for kw in keywords:
                         active_hits.extend(
-                            history.search_active_memories_bm25(kw, limit=top_k)
+                            active_store.search_active_memories_bm25(kw, limit=top_k)
                         )
                     # 去重
                     seen_bm25 = {(h.get("file_id", ""), h.get("chunk_index", 0)) for h in bm25_hits}
@@ -1093,7 +1019,7 @@ async def delete_file(file_id: str) -> None:
 
     # 1.1 删 BM25 索引
     try:
-        bm25_count = history.delete_knowledge_chunks(file_id)
+        bm25_count = knowledge_chunks.delete_knowledge_chunks(file_id)
         if bm25_count:
             logger.info(f"知识库 BM25 清理: {file_id}, {bm25_count} 条")
     except Exception as e:
@@ -1101,7 +1027,7 @@ async def delete_file(file_id: str) -> None:
 
     # 1.2 删稀疏向量
     try:
-        from lumen.services.sparse_store import delete_by_file as delete_sparse
+        from lumen.services.search.sparse_store import delete_by_file as delete_sparse
         delete_sparse(file_id)
     except Exception as e:
         logger.warning(f"稀疏向量清理失败 ({file_id}): {e}")
@@ -1169,13 +1095,13 @@ async def reindex_file(file_id: str) -> dict:
 
     # 清理 BM25
     try:
-        history.delete_knowledge_chunks(file_id)
+        knowledge_chunks.delete_knowledge_chunks(file_id)
     except Exception as e:
         logger.warning(f"重索引 BM25 清理失败 ({file_id}): {e}")
 
     # 清理 sparse
     try:
-        from lumen.services.sparse_store import delete_by_file as delete_sparse
+        from lumen.services.search.sparse_store import delete_by_file as delete_sparse
         delete_sparse(file_id)
     except Exception as e:
         logger.warning(f"重索引稀疏向量清理失败 ({file_id}): {e}")
@@ -1248,7 +1174,7 @@ async def reindex_file(file_id: str) -> dict:
     # 4.1 存入稀疏向量
     if sparse_vectors:
         try:
-            from lumen.services.sparse_store import save_sparse_batch
+            from lumen.services.search.sparse_store import save_sparse_batch
             items = []
             for i, sv in enumerate(sparse_vectors):
                 if sv:
@@ -1292,7 +1218,7 @@ async def reindex_file(file_id: str) -> dict:
 
     # 5. BM25 重建
     try:
-        history.save_knowledge_chunks_batch(file_id, source_path, info.get("filename", ""), category, chunks)
+        knowledge_chunks.save_knowledge_chunks_batch(file_id, source_path, info.get("filename", ""), category, chunks)
     except Exception as e:
         logger.warning(f"重索引 BM25 写入失败 ({file_id}): {e}")
 
@@ -1334,20 +1260,9 @@ def _get_all_folders(db, max_age: float = 60.0) -> List[str]:
 
 
 def close():
-    """关闭 TriviumDB"""
-    global _db, _sentence_db, _agent_db
-    if _db is not None:
-        _db.flush()
-        _db = None
-        logger.info("知识库 TriviumDB 已关闭")
-    if _agent_db is not None:
-        _agent_db.flush()
-        _agent_db = None
-        logger.info("Agent 知识库 TriviumDB 已关闭")
-    if _sentence_db is not None:
-        _sentence_db.flush()
-        _sentence_db = None
-        logger.info("句子级 TriviumDB 已关闭")
+    """关闭 TriviumDB（已迁移到 tdb_registry）"""
+    from lumen.services.tdb_registry import close_all
+    close_all()
 
 
 def cleanup_orphan_registry() -> int:

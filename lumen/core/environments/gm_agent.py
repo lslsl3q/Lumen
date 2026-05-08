@@ -14,7 +14,7 @@ from lumen.components.cognitive_state import CognitiveStateComponent
 from lumen.components.gm_resolution import GMResolutionComponent
 from lumen.components.tool import ToolComponent
 from lumen.components.react_acting import ReActActingComponent
-from lumen.services import world_state as ws
+from lumen.services.storage import world_state as ws
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ DM 裁决：{resolution_text[:300]}
 async def _detect_emotion_and_merge(source_id: str, text: str) -> None:
     """T26: 计算情绪分数并 merge 到认知状态（后台异步，不阻塞主流程）"""
     try:
-        from lumen.services.embedding import get_service
+        from lumen.services.search.embedding import get_service
         from lumen.services.semantic_group import compute_scores
 
         backend = await get_service("knowledge")

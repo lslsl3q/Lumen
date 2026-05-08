@@ -208,8 +208,7 @@ async def sync_graph(body: dict = None):
 
         content = _read_file_content(full_path)
         if content:
-            await extract_and_store(content, tdb_name="knowledge",
-                                    source_episode_id=file_id)
+            await extract_and_store(content, tdb_name="knowledge")
             update_registry_entry(kb, file_id, graph_sync_needed=False)
             synced.append(file_id)
 

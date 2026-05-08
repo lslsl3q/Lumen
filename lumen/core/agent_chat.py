@@ -28,7 +28,7 @@ from lumen.components import (
 from lumen.components.react_acting import ReActActingComponent, request_cancel, _clear_cancel
 from lumen.core.session import ChatSession
 from lumen.core.message_bus import get_message_bus
-from lumen.prompt.character import load_character
+from lumen.services.character import load_character
 from lumen.config import get_model
 
 logger = logging.getLogger(__name__)

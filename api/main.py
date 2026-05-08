@@ -38,10 +38,10 @@ async def lifespan(app):
 
         # 2. 预加载嵌入模型（~5-10秒，后续聊天时不再等待）
         try:
-            from lumen.services import embedding
+            from lumen.services.search.embedding import get_service
             loop = asyncio.new_event_loop()
             try:
-                loop.run_until_complete(embedding.ensure_loaded())
+                loop.run_until_complete(get_service("memory"))
             finally:
                 loop.close()
             logger.info("嵌入模型预加载完成")
@@ -105,7 +105,7 @@ async def lifespan(app):
         logger.warning(f"深梦境调度器停止失败: {e}")
 
     # 退出清理
-    from lumen.services import history, vector_store, knowledge
+    from lumen.services.storage import history, vector_store, knowledge
     history.close_conn()
     vector_store.close()
     knowledge.close()

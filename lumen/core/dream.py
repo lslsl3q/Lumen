@@ -261,10 +261,10 @@ def _scan_time_range(
     character_id: str, t_start: float, t_end: float, top_k: int,
 ) -> list[dict]:
     """遍历 agent_knowledge.tdb，按时间窗口过滤日记条目"""
-    from lumen.services.knowledge import _get_agent_db
+    from lumen.services.tdb_registry import get_tdb
     from datetime import datetime
 
-    db = _get_agent_db()
+    db = get_tdb("agent_knowledge")
     candidates: list[dict] = []
 
     # TQL FIND 过滤：只拉 daily_note + 指定角色的节点，不再全表扫描
@@ -304,10 +304,10 @@ def _scan_time_range(
 
 def _get_characters_with_diaries() -> list[str]:
     """获取有日记记录的角色列表"""
-    from lumen.services.knowledge import _get_agent_db
+    from lumen.services.tdb_registry import get_tdb
 
     try:
-        db = _get_agent_db()
+        db = get_tdb("agent_knowledge")
         rows = db.tql('FIND {source: "daily_note"} RETURN *')
         owners: set[str] = set()
         for row in rows:

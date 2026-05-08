@@ -41,7 +41,7 @@ TEST_PAIRS = [
 
 
 async def main():
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
 
     backend = await get_service("knowledge")
     if not backend:

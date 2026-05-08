@@ -82,7 +82,19 @@ async def _execute_tool_directly(command: str, params: dict) -> dict:
     """直接调用工具（绕过 LLM，零 Token）"""
     from lumen.tool import set_tool_context, execute_tool
 
-    set_tool_context(character_id=params.get("agent_id", ""))
+    def _on_room_move(agent_id, old_room, new_room):
+        try:
+            from lumen.core.message_bus import get_message_bus
+            bus = get_message_bus()
+            if bus and bus.is_registered(agent_id):
+                if old_room:
+                    bus.leave_room(old_room, agent_id)
+                bus.join_room(new_room, agent_id)
+        except Exception:
+            pass
+
+    set_tool_context(character_id=params.get("agent_id", ""),
+                     on_room_move=_on_room_move)
 
     if command == "dice":
         from lumen.tools.dice import execute

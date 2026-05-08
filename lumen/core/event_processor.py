@@ -1,7 +1,7 @@
 """
-事件处理器 — 从事件中提取图谱关系并更新。
+事件处理器 — 从事件队列中消费事件，提取图谱关系并更新。
 
-替代反思管道（reflection.py），只做一件事：事件 → 图谱提取 → 关系写入。
+队列由 services/event_queue.py 管理（基础设施层），本模块只负责消费。
 支持跑团隔离（campaign_id 限定图谱）和日常模式（全局 knowledge 图谱）。
 
 生命周期：绑定 FastAPI startup/shutdown，asyncio.Queue + 消费者模式。
@@ -12,18 +12,18 @@ import asyncio
 import logging
 from typing import Optional
 
+from lumen.services.event_queue import init_event_queue, get_event_queue, enqueue_event
+
 logger = logging.getLogger(__name__)
 
-# ── 队列与消费者 ──
-
-_queue: Optional[asyncio.Queue] = None
 _consumer_task: Optional[asyncio.Task] = None
 
 
 async def _consumer():
     """后台消费者：串行处理事件，调用图谱提取管道"""
+    queue = get_event_queue()
     while True:
-        event = await _queue.get()
+        event = await queue.get()
         if event is None:  # 毒药药丸：优雅停机
             logger.info("事件处理器收到停机信号")
             break
@@ -40,8 +40,6 @@ async def _consumer():
                 source_path=source_path,
                 source_doc_id=event.get("source_id") or None,
                 source_type=event.get("event_type", "file_chunk"),
-                source_episode_id=event.get("source_id", ""),
-                owner_id=event.get("character_id", ""),
             )
             if result:
                 logger.info(
@@ -53,65 +51,37 @@ async def _consumer():
         except Exception as e:
             logger.error(f"事件处理失败 [{event.get('source_id')}]: {e}")
         finally:
-            _queue.task_done()
+            queue.task_done()
+
+        # 日记事件：通知深梦境调度器（日记积累计数）
+        if event and event.get("event_type") == "diary":
+            try:
+                from lumen.core.dream import get_dream_scheduler
+                scheduler = get_dream_scheduler()
+                if scheduler:
+                    scheduler.notify_diary_saved()
+            except Exception:
+                pass
 
 
 def init_event_processor():
-    """FastAPI startup 调用，启动后台消费者"""
-    global _queue, _consumer_task
-    if _queue is None:
-        _queue = asyncio.Queue(maxsize=100)
-        _consumer_task = asyncio.create_task(_consumer())
-        logger.info("事件处理器已启动")
+    """FastAPI startup 调用，初始化队列并启动后台消费者"""
+    global _consumer_task
+    init_event_queue()
+    _consumer_task = asyncio.create_task(_consumer())
+    logger.info("事件处理器已启动")
 
 
 async def shutdown_event_processor():
     """FastAPI shutdown 调用，毒药药丸停机"""
-    global _consumer_task, _queue
-    if _consumer_task and _queue is not None:
+    global _consumer_task
+    queue = get_event_queue()
+    if _consumer_task and queue is not None:
         logger.info("事件处理器停机中...")
-        await _queue.put(None)  # 毒药药丸
+        await queue.put(None)  # 毒药药丸
         await _consumer_task
         _consumer_task = None
         logger.info("事件处理器已停止")
-
-
-def enqueue_event(content: str, event_type: str,
-                  character_id: str = "", session_id: str = "",
-                  source_id: str = "", campaign_id: str = "",
-                  metadata: dict = None) -> bool:
-    """非阻塞入队（保留向后兼容，旧调用方继续使用）。
-
-    Args:
-        content: 待提取的文本（日记/梦境叙事/RPG 事件摘要）
-        event_type: 事件类型（"diary" / "dream" / "rpg"）
-        character_id: 归属角色
-        session_id: 会话 ID
-        source_id: 来源标识（note_id / dream_id / event_id）
-        campaign_id: 跑团模式下传，关系写入跑团隔离图谱；不传则写入全局 knowledge
-        metadata: 扩展字段
-
-    Returns:
-        True 入队成功，False 队列未初始化或已满
-    """
-    if _queue is None:
-        logger.debug("事件处理器未初始化，跳过事件")
-        return False
-    try:
-        _queue.put_nowait({
-            "content": content,
-            "event_type": event_type,
-            "character_id": character_id,
-            "session_id": session_id,
-            "source_id": source_id,
-            "campaign_id": campaign_id,
-            "metadata": metadata or {},
-        })
-        logger.debug(f"事件已入队: {event_type} ({content[:60]})")
-        return True
-    except asyncio.QueueFull:
-        logger.warning(f"事件队列已满，丢弃: {event_type}")
-        return False
 
 
 # ── T27 Phase 3: HookBus 订阅 ──

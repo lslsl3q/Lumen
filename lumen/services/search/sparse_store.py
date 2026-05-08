@@ -20,7 +20,7 @@ _cache_lock = threading.Lock()
 
 def _ensure_table():
     """确保 sparse_vectors 表存在"""
-    from lumen.services.history import _get_conn
+    from lumen.services.storage.history import _get_conn
     conn = _get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sparse_vectors (
@@ -61,7 +61,7 @@ def _ensure_cache():
             return
 
         _ensure_table()
-        from lumen.services.history import _get_conn
+        from lumen.services.storage.history import _get_conn
         conn = _get_conn()
         rows = conn.execute(
             "SELECT node_id, file_id, chunk_index, category, sparse_data FROM sparse_vectors"
@@ -99,7 +99,7 @@ def save_sparse_batch(items: list[dict]):
         return
 
     _ensure_table()
-    from lumen.services.history import _get_conn
+    from lumen.services.storage.history import _get_conn
 
     with _cache_lock:
         conn = _get_conn()
@@ -180,7 +180,7 @@ def search_sparse(
 def delete_by_file(file_id: str):
     """删除指定文件的所有稀疏向量"""
     _ensure_table()
-    from lumen.services.history import _get_conn
+    from lumen.services.storage.history import _get_conn
 
     with _cache_lock:
         conn = _get_conn()

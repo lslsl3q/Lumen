@@ -38,21 +38,12 @@ router = APIRouter()
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 允许通过 API 访问的 TDB 名称
-_ALLOWED_TDBS = {"knowledge", "memory"}
-
-
 def _get_tdb(tdb_name: str):
-    """根据名称获取 TriviumDB 实例"""
-    if tdb_name not in _ALLOWED_TDBS:
-        raise HTTPException(404, f"未知 TDB: {tdb_name}")
-
-    if tdb_name == "knowledge":
-        from lumen.services.knowledge import _get_db
-        return _get_db()
-    elif tdb_name == "memory":
-        from lumen.services.vector_store import _get_db
-        return _get_db()
+    """根据名称获取 TriviumDB 实例（动态发现，无需白名单）"""
+    from lumen.services.tdb_registry import get_tdb, is_user_tdb
+    if not is_user_tdb(tdb_name):
+        raise HTTPException(404, f"不可用的 TDB: {tdb_name}")
+    return get_tdb(tdb_name)
 
 
 # ── 请求/响应模型 ──
@@ -126,7 +117,7 @@ async def create_entity(tdb: str, req: EntityCreate):
     db = _get_tdb(tdb)
     try:
         import random
-        from lumen.services.embedding import resolve_dimensions
+        from lumen.services.search.embedding import resolve_dimensions
         dim = resolve_dimensions(tdb)
         vector = [random.gauss(0, 0.01) for _ in range(dim)]
 
@@ -329,9 +320,6 @@ async def re_extract_graph(tdb: str, req: ReExtractRequest):
     2. 按 source_path 过滤（可选）
     3. 逐条调 extract_and_store（LLM 抽取 → batch_upsert）
     """
-    if tdb not in _ALLOWED_TDBS:
-        raise HTTPException(404, f"未知 TDB: {tdb}")
-
     db = _get_tdb(tdb)
 
     # 收集 chunks
@@ -385,8 +373,6 @@ async def re_extract_graph(tdb: str, req: ReExtractRequest):
             result = await extract_and_store(
                 content=full_text,
                 tdb_name=tdb,
-                source_episode_id=fid,
-                owner_id="",
             )
             if result:
                 total_entities += result.get("entities_created", 0)
@@ -452,8 +438,7 @@ async def tql_mutate(tdb: str, req: TqlRequest):
 @router.post("/{tdb}/communities/build")
 async def build_communities_endpoint(tdb: str):
     """执行社群检测：Leiden 聚类 + LLM 生成社群摘要 + 存储 CommunityNode"""
-    if tdb not in _ALLOWED_TDBS:
-        raise HTTPException(404, f"未知 TDB: {tdb}")
+    _get_tdb(tdb)  # 验证 TDB 可用
 
     try:
         from lumen.services.graph.community import build_communities
@@ -469,8 +454,7 @@ async def build_communities_endpoint(tdb: str):
 @router.get("/{tdb}/communities")
 async def list_communities(tdb: str):
     """列出所有社群节点"""
-    if tdb not in _ALLOWED_TDBS:
-        raise HTTPException(404, f"未知 TDB: {tdb}")
+    _get_tdb(tdb)  # 验证 TDB 可用
 
     try:
         from lumen.services.graph.community import list_all_communities
@@ -483,8 +467,7 @@ async def list_communities(tdb: str):
 @router.get("/{tdb}/communities/{community_id}")
 async def get_community_detail(tdb: str, community_id: int):
     """获取单个社群详情（含成员实体名称）"""
-    if tdb not in _ALLOWED_TDBS:
-        raise HTTPException(404, f"未知 TDB: {tdb}")
+    _get_tdb(tdb)  # 验证 TDB 可用
 
     try:
         from lumen.services.graph.community import get_community_detail as _get_detail

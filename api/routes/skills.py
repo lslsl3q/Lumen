@@ -13,14 +13,16 @@ import logging
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from lumen.types.skills import SkillCreateRequest, SkillUpdateRequest
-from lumen.prompt.skill_store import (
+from lumen.services.skills import (
     list_skills,
     load_skill,
     create_skill,
     update_skill,
     delete_skill,
-    invoke_skill,
     SKILLS_DIR,
+)
+from lumen.prompt.skill_store import (
+    invoke_skill,
 )
 
 logger = logging.getLogger(__name__)

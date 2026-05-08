@@ -54,10 +54,7 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
                             source_path: str = "",
                             source_doc_id: str | None = None,
                             source_type: str = "file_chunk",
-                            valid_at: float | None = None,
-                            # --- 旧参数（向后兼容）---
-                            source_episode_id: str = "",
-                            owner_id: str = "") -> dict | None:
+                            valid_at: float | None = None) -> dict | None:
     """完整提取管道：文本 → 创建 Episode → LLM 抽取 → batch_upsert → commit/rollback
 
     事务模型：
@@ -73,8 +70,6 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
         source_doc_id: 来源文档 ID（Episode 关联外键）
         source_type: 来源类型 — file_chunk | dream | reflection | manual
         valid_at: 内容生效时间戳
-        source_episode_id: 旧参数（向后兼容，内容来源标识）
-        owner_id: 旧参数（向后兼容，角色 ID）
 
     Returns:
         {"entities_created": N, "edges_created": N, "episode_id": int} 或 None（跳过/失败）
@@ -115,7 +110,7 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
 
         # Batch embed 实体名字（带重试机制）
         if GRAPH_DEDUP_ENABLED and entities_list:
-            from lumen.services.embedding import get_service
+            from lumen.services.search.embedding import get_service
             backend = await get_service(tdb_name)
             if not backend:
                 raise RuntimeError("嵌入服务不可用（未配置或连接失败），图谱去重无法执行。请在设置中检查嵌入服务连通性。")
@@ -171,8 +166,6 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
             extraction["edges"],
             source_path=source_path,
             episode_id=ep_id,
-            source_episode_id=source_episode_id,
-            owner_id=owner_id,
         )
 
         # --- Step 3.5: 处理被矛盾的旧边 ---

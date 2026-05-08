@@ -91,40 +91,9 @@ async def list_configs():
 
 @router.get("/tdbs")
 async def list_tdbs():
-    """列出用户可见的 TDB 文件（动态，前端标签页用）"""
-    data_dir = os.path.join(_PROJECT_ROOT, "lumen", "data")
-
-    # 排除的内部 TDB
-    _INTERNAL = {"knowledge_sentences.tdb", "thinking_clusters.tdb"}
-
-    tdbs = []
-    # 扫描 data/ 及子目录（vectors/api/, vectors/local/）
-    for root, dirs, files in os.walk(data_dir):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
-        for f in sorted(files):
-            if not f.endswith(".tdb"):
-                continue
-            if f in _INTERNAL:
-                continue
-
-            name = f.replace(".tdb", "")
-            path = os.path.join(root, f)
-            size = os.path.getsize(path)
-
-            tdbs.append({
-                "name": name,
-                "filename": f,
-                "size": size,
-            })
-
-    # 兜底：核心 TDB 即使文件未创建也要显示
-    _ALWAYS_SHOW = ["knowledge", "memory"]
-    existing_names = {t["name"] for t in tdbs}
-    for name in _ALWAYS_SHOW:
-        if name not in existing_names:
-            tdbs.append({"name": name, "filename": None, "size": 0})
-
-    return {"tdbs": tdbs}
+    """列出用户可见的 TDB（动态发现，通过 tdb_registry）"""
+    from lumen.services.tdb_registry import list_user_tdbs
+    return {"tdbs": list_user_tdbs()}
 
 
 # ── 通配路由（必须放最后） ──

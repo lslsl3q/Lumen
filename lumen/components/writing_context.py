@@ -129,7 +129,7 @@ class WritingContextComponent(ContextComponent):
             return self._cached_summary
 
         try:
-            from lumen.services.writing import list_settings
+            from lumen.services.storage.writing import list_settings
             settings = await asyncio.to_thread(list_settings, book_id)
         except Exception:
             logger.warning("Failed to load writing settings", exc_info=True)

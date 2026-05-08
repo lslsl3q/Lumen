@@ -7,21 +7,13 @@ import logging
 import time
 from typing import Optional
 
-from lumen.services import history
-
 logger = logging.getLogger(__name__)
 
 
 def _get_tdb(tdb_name: str):
-    """根据名称获取 TDB 实例（复用 graph_backup 模式）"""
-    if tdb_name == "knowledge":
-        from lumen.services.knowledge import _get_db
-        return _get_db()
-    elif tdb_name == "memory":
-        from lumen.services.vector_store import _get_db
-        return _get_db()
-    else:
-        raise ValueError(f"未知 TDB: {tdb_name}")
+    """根据名称获取 TDB 实例（统一走 tdb_registry）"""
+    from lumen.services.tdb_registry import get_tdb
+    return get_tdb(tdb_name)
 
 
 def _normalize_name(name: str) -> str:
@@ -39,11 +31,8 @@ def _tql_escape(value: str) -> str:
             .replace("\t", "\\t"))
 
 
-def find_entity_by_name(tdb_name: str, name: str, owner_id: str = "") -> Optional[int]:
-    """按归一化名称精确查找实体，返回 node_id 或 None
-
-    owner_id 已弃用（保留参数签名兼容），内部通过 name_normalized 查找。
-    """
+def find_entity_by_name(tdb_name: str, name: str) -> Optional[int]:
+    """按归一化名称精确查找实体，返回 node_id 或 None"""
     if not name or not name.strip():
         return None
     db = _get_tdb(tdb_name)
@@ -61,16 +50,13 @@ def find_entity_by_name(tdb_name: str, name: str, owner_id: str = "") -> Optiona
 
 
 def upsert_entity(tdb_name: str, name: str, entity_type: str,
-                  owner_id: str = "", aliases: list = None,
-                  extra: dict = None, vector: list | None = None) -> int:
+                  aliases: list = None, vector: list | None = None) -> int:
     """创建或更新图谱实体，返回 node_id
 
     基于 name_normalized 精确去重：
     1. TQL FIND {name_normalized: ...} 查已有实体
     2. 找到 → 直接返回（实体现在是最小化模型，无需合并）
     3. 未找到 → insert（Phase 1 零向量 + 最小化 payload）
-
-    owner_id 和 extra 已弃用（保留参数签名兼容）。
     """
     db = _get_tdb(tdb_name)
     normalized = _normalize_name(name)
@@ -137,43 +123,18 @@ def upsert_edge(
     episode_id: int = 0,
     valid_at: float = None,
     invalid_at: float = None,
-    # --- 旧参数（向后兼容，新代码不应使用）---
-    src_id: int = None,
-    dst_id: int = None,
-    weight: float = 1.0,
-    source_episode_id: str = "",
-    owner_id: str = "",
 ) -> int:
     """创建边：edge 作为 TriviumDB NODE 存储 + 多条 graph link
 
-    新模型：
     1. upsert source/target 实体
     2. 创建 edge NODE（payload 含 type/source_name/target_name/label/fact/source_path/episode_ids/timestamps）
     3. link: episode→edge (SUPPORTS), source→target (RELATES_TO), episode→source (MENTIONS), episode→target (MENTIONS)
     4. 更新 source/target 实体的 source_folders
-
-    旧签名兼容：传入 src_id/dst_id 时走旧路径（link + save_edge_meta）。
-    返回 edge_id（新路径）或 -1（旧路径成功）/ 0（失败）。
     """
     db = _get_tdb(tdb_name)
 
-    # ── 向后兼容：旧调用方式 ──
-    if src_id is not None and dst_id is not None:
-        try:
-            db.link(src_id, dst_id, label=label, weight=weight)
-            db.flush()
-        except Exception as e:
-            logger.debug(f"TriviumDB link 失败 ({src_id}->{dst_id}): {e}")
-            return 0
-        history.save_edge_meta(
-            tdb=tdb_name, src_id=src_id, dst_id=dst_id, label=label,
-            source_episode_id=source_episode_id, owner_id=owner_id,
-        )
-        return -1
-
-    # ── 新路径：source_name + target_name ──
     if not source_name or not target_name:
-        logger.warning("upsert_edge: 新路径需要 source_name 和 target_name")
+        logger.warning("upsert_edge: 需要 source_name 和 target_name")
         return 0
 
     now = time.time()
@@ -236,7 +197,6 @@ def upsert_edge(
 
 
 def batch_upsert(tdb_name: str, entities: list[dict], edges: list[dict],
-                 source_episode_id: str = "", owner_id: str = "",
                  source_path: str = "", episode_id: int = 0) -> dict:
     """批量处理一次 LLM 提取结果
 
@@ -265,9 +225,7 @@ def batch_upsert(tdb_name: str, entities: list[dict], edges: list[dict],
             continue
         node_id = upsert_entity(
             tdb_name, name, etype,
-            owner_id=owner_id,
             aliases=ent.get("aliases", []),
-            extra=ent.get("extra", {}),
             vector=ent.get("_vector"),
         )
         name_to_id[name] = node_id
@@ -324,9 +282,7 @@ def batch_upsert(tdb_name: str, entities: list[dict], edges: list[dict],
     return {"entities_created": entities_created, "edges_created": edges_created}
 
 
-# DEPRECATED: 将被 ACL 过滤的图谱召回替代（Task 4）
-def get_entity_neighbors_text(tdb_name: str, entity_ids: list[int],
-                              owner_id: str = "") -> list[str]:
+def get_entity_neighbors_text(tdb_name: str, entity_ids: list[int]) -> list[str]:
     """图谱召回：给定锚实体 ID → 取 1-Hop 邻居 → 序列化为文本片段
 
     输出格式：["张教授 害怕 蜘蛛", "Eric 住在 北京"]
@@ -367,17 +323,11 @@ def get_entity_neighbors_text(tdb_name: str, entity_ids: list[int],
             if not dst_name:
                 continue
 
-            if owner_id:
-                src_owner = src_payload.get("owner_id", "")
-                dst_owner = dst_payload.get("owner_id", "")
-                if src_owner and src_owner != owner_id:
-                    continue
-                if dst_owner and dst_owner != owner_id:
-                    continue
-
-            # 取边 label（从 SQLite 元数据）
-            meta = history.get_edge_meta(tdb_name, entity_id, dst_id)
-            label = meta.get("label", "related") if meta else "related"
+            # 取边 label（从 edge payload 或回退到 "related"）
+            dst_type = dst_payload.get("type", "")
+            if dst_type == "edge":
+                continue
+            label = "related"
 
             snippet = f"{src_name} {label} {dst_name}"
             snippets.append(snippet)

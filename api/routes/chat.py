@@ -192,7 +192,7 @@ async def get_history(session_id: str = "default"):
             messages = session.messages
         else:
             # 会话不在内存（后端重启或从未加载），从数据库读取（async 不阻塞事件循环）
-            from lumen.services import history as history_service
+            from lumen.services.storage import history as history_service
             messages = await asyncio.to_thread(history_service.load_session, session_id)
 
         # 过滤掉系统提示词和工具调用消息，只返回用户和助手的对话
@@ -241,7 +241,7 @@ class BranchRequest(BaseModel):
 @router.patch("/message")
 async def edit_message(req: MessageEditRequest):
     """编辑消息内容（同步更新 SQLite + memory.tdb 向量）"""
-    from lumen.services import history as history_service
+    from lumen.services.storage import history as history_service
 
     success = await asyncio.to_thread(history_service.update_message, req.message_id, req.content)
     if not success:
@@ -258,8 +258,8 @@ async def edit_message(req: MessageEditRequest):
 
     # 同步更新 memory.tdb 向量
     try:
-        from lumen.services.vector_store import _get_db
-        db = _get_db()
+        from lumen.services.tdb_registry import get_tdb
+        db = get_tdb("memory")
         for nid in db.all_node_ids():
             try:
                 payload = db.get_payload(nid)
@@ -269,7 +269,7 @@ async def edit_message(req: MessageEditRequest):
                 continue
             if payload.get("message_id") == req.message_id:
                 # 重新向量化
-                from lumen.services.embedding import get_service
+                from lumen.services.search.embedding import get_service
                 backend = await get_service("memory")
                 if backend:
                     new_vector = await backend.encode(req.content)
@@ -289,7 +289,7 @@ async def edit_message(req: MessageEditRequest):
 @router.delete("/message")
 async def delete_message(req: MessageDeleteRequest):
     """删除消息（同步删除 SQLite + memory.tdb 向量）"""
-    from lumen.services import history as history_service
+    from lumen.services.storage import history as history_service
 
     success = await asyncio.to_thread(history_service.delete_message, req.message_id)
     if not success:
@@ -303,8 +303,8 @@ async def delete_message(req: MessageDeleteRequest):
 
     # 同步删除 memory.tdb 向量
     try:
-        from lumen.services.vector_store import _get_db
-        db = _get_db()
+        from lumen.services.tdb_registry import get_tdb
+        db = get_tdb("memory")
         for nid in db.all_node_ids():
             try:
                 payload = db.get_payload(nid)
@@ -330,7 +330,7 @@ async def regenerate_message(req: RegenerateRequest):
     删除该 AI 消息及之后的所有消息，返回触发回复所需的用户消息内容。
     前端收到后用该内容重新调用流式接口。
     """
-    from lumen.services import history as history_service
+    from lumen.services.storage import history as history_service
 
     # 从内存 session 找到该 AI 消息前面的最后一条 user 消息
     manager = get_session_manager()
@@ -364,7 +364,7 @@ async def create_branch(req: BranchRequest):
 
     创建新会话并复制该消息及之前的所有消息到新会话。
     """
-    from lumen.services import history as history_service
+    from lumen.services.storage import history as history_service
 
     # 获取原会话信息
     manager = get_session_manager()
@@ -406,7 +406,7 @@ async def cancel_chat(req: CancelRequest):
 async def api_compact(req: CompactRequest):
     """手动触发上下文压缩"""
     from lumen.services.context.compact import compact_session
-    from lumen.prompt.character import load_character
+    from lumen.services.character import load_character
     from lumen.config import get_context_size
     from lumen.services.context import fold_tool_calls, filter_for_ai, estimate_messages_tokens
 
@@ -420,7 +420,7 @@ async def api_compact(req: CompactRequest):
 @router.get("/token-usage")
 async def api_token_usage(session_id: str = "default"):
     """获取当前会话 token 使用情况"""
-    from lumen.prompt.character import load_character
+    from lumen.services.character import load_character
     from lumen.config import get_context_size
     from lumen.services.context import fold_tool_calls, filter_for_ai, estimate_messages_tokens
     from lumen.services.context.token_estimator import get_session_usage

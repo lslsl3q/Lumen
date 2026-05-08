@@ -15,8 +15,8 @@ from lumen.config import get_summary_model, get_context_size
 from lumen.services.context.token_estimator import estimate_messages_tokens
 from lumen.services.context.manager import fold_tool_calls, filter_for_ai
 from lumen.services.llm import chat
-from lumen.services import history
-from lumen.prompt.character import load_character
+from lumen.services.storage import history
+from lumen.services.character import load_character
 
 if TYPE_CHECKING:
     from lumen.core.session import ChatSession

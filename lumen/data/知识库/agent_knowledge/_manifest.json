@@ -1,0 +1,10 @@
+{
+  "tdb_path": "data/vectors/api/agent_knowledge.tdb",
+  "graph_path": null,
+  "sentence_path": null,
+  "embedding_camp": "api",
+  "access_mode": "public",
+  "allowed_characters": [],
+  "created_at": "2026-05-08T20:15:51.313024",
+  "files": {}
+}

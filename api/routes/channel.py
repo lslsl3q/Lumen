@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from lumen.services.history import (
+from lumen.services.storage.history import (
     list_channels, create_channel, delete_channel,
     get_channel_messages,
 )

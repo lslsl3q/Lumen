@@ -1,0 +1,10 @@
+{
+  "tdb_path": "data/vectors/api/knowledge.tdb",
+  "graph_path": "data/graphs/kb_knowledge.tdb",
+  "sentence_path": "data/vectors/local/knowledge_sentences.tdb",
+  "embedding_camp": "api",
+  "access_mode": "public",
+  "allowed_characters": [],
+  "created_at": "2026-05-08T20:15:51.311516",
+  "files": {}
+}

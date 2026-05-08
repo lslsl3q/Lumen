@@ -11,7 +11,7 @@ router = APIRouter()
 
 # 导入核心逻辑
 from lumen.core.session import get_session_manager
-from lumen.services import history
+from lumen.services.storage import history
 
 
 # ========================================

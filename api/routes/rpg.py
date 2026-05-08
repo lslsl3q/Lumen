@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 
-from lumen.services.world_state import (
+from lumen.services.storage.world_state import (
     get_room, ensure_room, list_agents_in_room,
     get_agent_state, ensure_agent, update_agent, remove_agent,
     get_room_entities, get_recent_events, resolve_agent_id,
@@ -51,7 +51,7 @@ class AgentUpdate(BaseModel):
 async def list_rooms():
     """列出所有房间（简要信息）"""
     # WorldStateService 没有 list_rooms，通过 SQL 直查
-    from lumen.services.world_state import _get_conn
+    from lumen.services.storage.world_state import _get_conn
     conn = _get_conn()
     rows = conn.execute("SELECT room_id, name, metadata FROM rooms ORDER BY room_id").fetchall()
     return [
@@ -88,7 +88,7 @@ async def update_room(room_id: str, req: RoomUpdate):
     if not room:
         raise HTTPException(status_code=404, detail=f"房间 {room_id} 不存在")
 
-    from lumen.services.world_state import _get_conn, _write_lock
+    from lumen.services.storage.world_state import _get_conn, _write_lock
     updates = {}
     if req.name is not None:
         updates["name"] = req.name
@@ -116,7 +116,7 @@ async def delete_room(room_id: str):
     if not room:
         raise HTTPException(status_code=404, detail=f"房间 {room_id} 不存在")
 
-    from lumen.services.world_state import _get_conn, _write_lock
+    from lumen.services.storage.world_state import _get_conn, _write_lock
     with _write_lock:
         conn = _get_conn()
         conn.execute("DELETE FROM rooms WHERE room_id = ?", (room_id,))
@@ -142,7 +142,7 @@ async def list_agents(
                  "hp": e["hp"], "max_hp": e["max_hp"]} for e in entities]
 
     # 无过滤时列出全部
-    from lumen.services.world_state import _get_conn
+    from lumen.services.storage.world_state import _get_conn
     conn = _get_conn()
     rows = conn.execute(
         "SELECT agent_id, name, room_id, hp, max_hp FROM agent_state ORDER BY agent_id"

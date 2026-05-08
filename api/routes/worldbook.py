@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 
 from lumen.types.worldbook import WorldBookCreateRequest, WorldBookUpdateRequest
-from lumen.prompt.worldbook_store import (
+from lumen.services.worldbook import (
     list_worldbooks,
     load_worldbook,
     create_worldbook,

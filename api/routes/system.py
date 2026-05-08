@@ -23,8 +23,8 @@ class ForceExtractRequest(BaseModel):
 async def force_extract(req: ForceExtractRequest):
     """手动触发图谱提取：扫描最近 N 小时的日记，送入事件处理器"""
     from lumen.core.event_processor import enqueue_event
-    from lumen.services.knowledge import _get_agent_db
-    db = _get_agent_db()
+    from lumen.services.tdb_registry import get_tdb
+    db = get_tdb("agent_knowledge")
 
     cutoff = time.time() - req.lookback_hours * 3600
     events_enqueued = 0
@@ -122,7 +122,7 @@ async def dream_status():
 @router.get("/embedding-health")
 async def check_embedding_health():
     """测试嵌入服务连通性（前端设置页 / 导入前可调用）"""
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
     backend = await get_service("knowledge")
     if not backend:
         return {"status": "error", "message": "嵌入服务未配置，请在设置中检查嵌入服务配置。"}

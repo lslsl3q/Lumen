@@ -10,7 +10,7 @@ from typing import List, Optional, Dict
 router = APIRouter()
 
 # 导入核心逻辑
-from lumen.prompt.character import load_character, list_characters
+from lumen.services.character import load_character, list_characters
 from lumen.services.character import (
     create_character, update_character, delete_character, save_avatar
 )

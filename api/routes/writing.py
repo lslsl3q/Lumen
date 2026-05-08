@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from lumen.services.writing import (
+from lumen.services.storage.writing import (
     create_project, list_projects, get_project, update_project, delete_project,
     create_chapter, list_chapters, get_chapter, update_chapter, delete_chapter, reorder_chapters,
     create_setting, list_settings, get_setting, update_setting, delete_setting, reorder_settings,

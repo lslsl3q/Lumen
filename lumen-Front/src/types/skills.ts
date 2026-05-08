@@ -15,16 +15,6 @@ export interface SkillCard {
   script: string;
 }
 
-export interface SkillListItem {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  when_to_use: string;
-  priority: number;
-  script: string;
-}
-
 export interface SkillCreatePayload {
   id?: string;
   name: string;

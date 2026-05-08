@@ -33,7 +33,7 @@ def _get_db() -> triviumdb.TriviumDB:
     global _db
     if _db is None:
         os.makedirs(_DATA_DIR, exist_ok=True)
-        from lumen.services.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
+        from lumen.services.search.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
         dim = resolve_dimensions("memory")
 
         # 维度一致性检查 — 不匹配就报错，不自动修
@@ -56,23 +56,6 @@ def _get_db() -> triviumdb.TriviumDB:
 
         logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
     return _db
-
-
-def init_with_dimensions(dim: int):
-    """用指定维度初始化数据库（供外部精确控制时使用）
-
-    如果数据库已打开，此函数无效。
-    """
-    global _db
-    if _db is not None:
-        return
-    os.makedirs(_DATA_DIR, exist_ok=True)
-    _db = triviumdb.TriviumDB(_DB_PATH, dim=dim)
-    try:
-        _db.enable_auto_compaction(7200)
-    except Exception:
-        pass
-    logger.info(f"TriviumDB 已打开: {_DB_PATH} (维度: {dim})")
 
 
 def insert_vector(

@@ -14,7 +14,7 @@ import sys
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from lumen.services import history
+from lumen.services.memory import active_store
 from lumen.config import DAILY_NOTE_DIR
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ async def api_list_memories(
     limit: int = 50,
 ):
     """列出所有主动记忆条目"""
-    return history.list_active_memories(
+    return active_store.list_active_memories(
         character_id=character_id, category=category, limit=limit,
     )
 
@@ -58,7 +58,7 @@ async def api_list_memories(
 @router.post("/items/search")
 async def api_search_memories(req: MemorySearchRequest):
     """BM25 关键词搜索主动记忆"""
-    results = history.search_active_memories_bm25(
+    results = active_store.search_active_memories_bm25(
         req.query, character_id=req.character_id, limit=req.limit,
     )
     return {"query": req.query, "results": results, "total": len(results)}
@@ -67,10 +67,10 @@ async def api_search_memories(req: MemorySearchRequest):
 @router.delete("/items/{memory_id}")
 async def api_delete_memory(memory_id: str):
     """删除单条主动记忆（SQLite + FTS5 + 关联 MD 文件）"""
-    memories = history.list_active_memories(limit=1000)
+    memories = active_store.list_active_memories(limit=1000)
     target = next((m for m in memories if m["memory_id"] == memory_id), None)
 
-    deleted = history.delete_active_memory(memory_id)
+    deleted = active_store.delete_active_memory(memory_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"记忆不存在: {memory_id}")
 

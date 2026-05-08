@@ -147,7 +147,7 @@ def get_injection_context(
         }]
     """
     if entries is None:
-        from lumen.prompt.worldbook_store import list_worldbooks
+        from lumen.services.worldbook import list_worldbooks
         entries = list_worldbooks()
 
     matched = match_worldbooks(messages, character_id, entries)

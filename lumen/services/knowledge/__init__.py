@@ -24,9 +24,6 @@ from lumen.services.knowledge._core import (
     MANIFEST_PATH,
     KNOWLEDGE_SOURCE_DIR,
     # 内部接口（外部模块直接引用，待 T24 清理）
-    _get_db,
-    _get_agent_db,
-    _get_sentence_db,
     _load_registry,
     _save_registry,
     _read_file_content,

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 
-from lumen.types.tools import ToolResult, ErrorCode
+from lumen.types.tools import ToolResult, ErrorCode, success_result, error_result
 
 logger = logging.getLogger(__name__)
 
@@ -24,48 +24,31 @@ logger = logging.getLogger(__name__)
 _current_context = threading.local()
 
 
-def set_tool_context(session_id: str = "", character_id: str = ""):
-    """设置当前工具执行的上下文（在 query.py 调用 execute_tool 前设置）"""
+def set_tool_context(session_id: str = "", character_id: str = "",
+                     on_room_move=None):
+    """设置当前工具执行的上下文（在 execute_tool 前设置）
+
+    Args:
+        on_room_move: 可选回调 (agent_id, old_room, new_room)，
+                      由上层注入，工具层通过 get_tool_context 获取
+    """
     _current_context.session_id = session_id
     _current_context.character_id = character_id
+    _current_context.on_room_move = on_room_move
 
 
-def get_tool_context() -> Dict[str, str]:
+def get_tool_context() -> Dict[str, Any]:
     """获取当前工具执行的上下文"""
     return {
         "session_id": getattr(_current_context, "session_id", ""),
         "character_id": getattr(_current_context, "character_id", ""),
+        "on_room_move": getattr(_current_context, "on_room_move", None),
     }
 
 
 # ========================================
-# 返回值辅助函数（Pydantic 校验 → 返回 dict）
+# 工具结果格式化
 # ========================================
-
-def success_result(tool: str, data: Any, **metadata) -> Dict[str, Any]:
-    """构造成功结果（Pydantic 校验后返回 dict）"""
-    result = ToolResult(
-        success=True,
-        tool=tool,
-        data=data,
-        timestamp=datetime.now().isoformat(),
-        **metadata,
-    )
-    return result.model_dump(exclude_none=True)
-
-
-def error_result(tool: str, code: str, message: str, detail: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """构造错误结果（Pydantic 校验后返回 dict）"""
-    result = ToolResult(
-        success=False,
-        tool=tool,
-        error_code=code,
-        error_message=message,
-        timestamp=datetime.now().isoformat(),
-        error_detail=detail,
-    )
-    return result.model_dump(exclude_none=True)
-
 
 def _format_data_readable(data: Any) -> str:
     """将工具返回的 data 字段格式化为可读文本（递归处理常见结构）"""

@@ -160,7 +160,7 @@ def _l2_normalize(v: list[float]) -> list[float]:
 
 async def precompute_vector(group_id: str) -> Optional[str]:
     """为语义组预计算向量并持久化"""
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
 
     conn = _get_conn()
     row = conn.execute("SELECT * FROM semantic_groups WHERE group_id = ?", (group_id,)).fetchone()

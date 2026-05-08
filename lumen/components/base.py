@@ -36,7 +36,7 @@ class ContextComponent(ABC):
 
     name: str = ""
     priority: int = 50  # 越小越靠前：Identity=10, Lore=20, Memory=30, Skills=50, Tool=90
-    zone: PromptZone = PromptZone.STATIC  # 默认静态，向后兼容
+    zone: PromptZone = PromptZone.STATIC
 
     def __init__(self, name: str = "", priority: int | None = None, zone: PromptZone | None = None):
         if name:

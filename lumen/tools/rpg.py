@@ -25,13 +25,8 @@ def _get_agent_id() -> str:
 
 
 def _ensure_world_state():
-    from lumen.services import world_state
+    from lumen.services.storage import world_state
     return world_state
-
-
-def _get_message_bus():
-    from lumen.core.message_bus import get_message_bus
-    return get_message_bus()
 
 
 def _resolve_target(id_or_name: str, room_id: str = "") -> str | None:
@@ -71,13 +66,11 @@ async def _move_to(params: dict) -> dict:
     # 更新 WorldState
     ws.update_agent(agent_id, room_id=target_room)
 
-    # 联动 MessageBus 房间订阅
+    # 联动 MessageBus 房间订阅（通过上层注入的回调）
     try:
-        bus = _get_message_bus()
-        if bus.is_registered(agent_id):
-            if old_room:
-                bus.leave_room(old_room, agent_id)
-            bus.join_room(target_room, agent_id)
+        on_room_move = get_tool_context().get("on_room_move")
+        if on_room_move:
+            on_room_move(agent_id, old_room, target_room)
     except Exception as e:
         logger.warning(f"MessageBus 房间联动失败（不影响移动）: {e}")
 

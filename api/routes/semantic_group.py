@@ -111,7 +111,7 @@ async def api_recompute_vector(group_id: str):
 async def api_compute_scores(query: str, group_type: str = "emotion"):
     """便捷端点：对文本计算情绪/语义组分数"""
     try:
-        from lumen.services.embedding import get_service
+        from lumen.services.search.embedding import get_service
         backend = await get_service("knowledge")
         vec = await backend.encode(query)
         if not vec:

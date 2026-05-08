@@ -20,15 +20,9 @@ BACKUP_VERSION = 1
 
 
 def _get_tdb(tdb_name: str):
-    """根据名称获取 TDB 实例（与 graph route 共用逻辑）"""
-    if tdb_name == "knowledge":
-        from lumen.services.knowledge import _get_db
-        return _get_db()
-    elif tdb_name == "memory":
-        from lumen.services.vector_store import _get_db
-        return _get_db()
-    else:
-        raise ValueError(f"未知 TDB: {tdb_name}")
+    """根据名称获取 TDB 实例（统一走 tdb_registry）"""
+    from lumen.services.tdb_registry import get_tdb
+    return get_tdb(tdb_name)
 
 
 def get_backup_path(tdb_name: str) -> str:
@@ -143,7 +137,7 @@ def restore_graph(tdb_name: str) -> int:
         logger.warning(f"获取 TDB 失败，跳过图谱恢复: {e}")
         return 0
 
-    from lumen.services.embedding import resolve_dimensions
+    from lumen.services.search.embedding import resolve_dimensions
     import random
 
     dim = resolve_dimensions(tdb_name)

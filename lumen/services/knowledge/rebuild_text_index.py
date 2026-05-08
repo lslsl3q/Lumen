@@ -111,18 +111,18 @@ def _rebuild_db(db, db_name: str):
 
 def rebuild_all():
     """重建所有 TDB 的文本索引"""
-    from lumen.services.knowledge._core import _get_db, _get_agent_db
+    from lumen.services.tdb_registry import get_tdb
 
     # knowledge.tdb
     try:
-        db = _get_db()
+        db = get_tdb("knowledge")
         _rebuild_db(db, "knowledge.tdb")
     except Exception as e:
         logger.error(f"knowledge.tdb 重建失败: {e}")
 
     # agent_knowledge.tdb
     try:
-        agent_db = _get_agent_db()
+        agent_db = get_tdb("agent_knowledge")
         _rebuild_db(agent_db, "agent_knowledge.tdb")
     except Exception as e:
         logger.error(f"agent_knowledge.tdb 重建失败: {e}")

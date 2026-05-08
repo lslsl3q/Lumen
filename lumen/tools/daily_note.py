@@ -77,7 +77,7 @@ async def _async_store(content: str, character_id: str, session_id: str,
                        tags: list[str], importance: int, category: str,
                        note_id: str, now_str: str, metadata: dict):
     """异步：大模型向量化 → 存入 agent_knowledge.tdb（阵营 B）"""
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
     backend = await get_service("agent_knowledge")
     if not backend:
         logger.warning("Agent 知识库嵌入服务不可用，跳过向量存储")
@@ -88,8 +88,8 @@ async def _async_store(content: str, character_id: str, session_id: str,
         logger.warning("嵌入编码失败，跳过向量存储")
         return
 
-    from lumen.services.knowledge import _get_agent_db
-    db = _get_agent_db()
+    from lumen.services.tdb_registry import get_tdb
+    db = get_tdb("agent_knowledge")
     payload = {
         "file_id": note_id,
         "source_path": md_filename,
@@ -128,14 +128,13 @@ async def _async_store(content: str, character_id: str, session_id: str,
         from lumen.services.graph import extract_and_store
         await extract_and_store(
             content=content, tdb_name="knowledge",
-            source_episode_id=note_id, owner_id=character_id,
         )
     except Exception:
         pass
 
     # 图谱提取 — 通过事件处理器异步提取实体和关系
     try:
-        from lumen.core.event_processor import enqueue_event
+        from lumen.services.event_queue import enqueue_event
         enqueue_event(
             content=content,
             event_type="diary",
@@ -147,14 +146,8 @@ async def _async_store(content: str, character_id: str, session_id: str,
     except Exception:
         pass
 
-    # T22 Step 4: 通知深梦境调度器（日记积累计数）
-    try:
-        from lumen.core.dream import get_dream_scheduler
-        scheduler = get_dream_scheduler()
-        if scheduler:
-            scheduler.notify_diary_saved()
-    except Exception:
-        pass
+    # T22 Step 4: 通知深梦境调度器（通过事件队列，由 event_processor 消费者处理）
+    # diary 事件的 dream 通知已在 core/event_processor _consumer 中处理
 
 
 def execute(params: dict, command: str = "") -> dict:
@@ -236,8 +229,8 @@ def execute(params: dict, command: str = "") -> dict:
     rel_md_path = f"{character_id}/diary/{md_filename}" if character_id else f"_shared/{md_filename}"
 
     # 2. 存 SQLite + FTS5
-    from lumen.services import history
-    history.save_active_memory(
+    from lumen.services.memory import active_store
+    active_store.save_active_memory(
         memory_id=note_id,
         character_id=character_id,
         content=content,

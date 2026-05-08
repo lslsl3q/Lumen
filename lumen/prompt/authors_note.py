@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Optional
 
-from lumen.services import history
+from lumen.services.storage import history
 from lumen.types.authors_note import AuthorsNoteConfig
 
 logger = logging.getLogger(__name__)

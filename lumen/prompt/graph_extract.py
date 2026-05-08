@@ -106,7 +106,3 @@ def get_prompt_file_path() -> str:
 def get_default_prompts() -> tuple[str, str]:
     """返回内置默认提示词（API 用，用于重置）"""
     return _DEFAULT_SYSTEM, _DEFAULT_USER
-
-
-# 向后兼容：模块级常量（首次加载时的值）
-GRAPH_EXTRACT_SYSTEM, GRAPH_EXTRACT_USER = load_prompts()

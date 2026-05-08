@@ -54,7 +54,7 @@ def _get_db():
     if _db is None:
         import triviumdb
         # 从嵌入服务获取维度
-        from lumen.services.embedding import get_dimensions
+        from lumen.services.search.embedding import get_dimensions
         dim = get_dimensions("thinking_clusters")
         if dim == 0:
             dim = 512  # fallback
@@ -134,7 +134,7 @@ async def _do_index():
     global _index_cache, _loaded
 
     # 确保嵌入服务可用
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
     backend = await get_service("thinking_clusters")
     if backend is None:
         logger.warning("嵌入服务不可用，思维簇索引跳过")
@@ -376,7 +376,7 @@ async def _fuse_vector(
     因为 TriviumDB 不返回原始向量，所以对命中文本重新编码取均值。
     只对 3-5 条命中文本编码，开销约 50ms。
     """
-    from lumen.services.embedding import get_service
+    from lumen.services.search.embedding import get_service
 
     texts = []
     for hit in hits:
