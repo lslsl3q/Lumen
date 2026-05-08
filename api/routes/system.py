@@ -117,3 +117,19 @@ async def dream_status():
     status = scheduler.get_status()
     status["status"] = "running"
     return status
+
+
+@router.get("/embedding-health")
+async def check_embedding_health():
+    """测试嵌入服务连通性（前端设置页 / 导入前可调用）"""
+    from lumen.services.embedding import get_service
+    backend = await get_service("knowledge")
+    if not backend:
+        return {"status": "error", "message": "嵌入服务未配置，请在设置中检查嵌入服务配置。"}
+    try:
+        vec = await backend.encode("连通性测试")
+        if vec and len(vec) > 0:
+            return {"status": "ok", "dimensions": len(vec)}
+        return {"status": "error", "message": "嵌入服务返回空向量，请检查模型配置。"}
+    except Exception as e:
+        return {"status": "error", "message": f"嵌入服务连接失败: {e}"}

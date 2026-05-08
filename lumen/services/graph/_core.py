@@ -62,7 +62,7 @@ def find_entity_by_name(tdb_name: str, name: str, owner_id: str = "") -> Optiona
 
 def upsert_entity(tdb_name: str, name: str, entity_type: str,
                   owner_id: str = "", aliases: list = None,
-                  extra: dict = None) -> int:
+                  extra: dict = None, vector: list | None = None) -> int:
     """创建或更新图谱实体，返回 node_id
 
     基于 name_normalized 精确去重：
@@ -80,9 +80,9 @@ def upsert_entity(tdb_name: str, name: str, entity_type: str,
         logger.debug(f"图谱实体已存在: {name} (id={existing_id})")
         return existing_id
 
-    # Phase 1: 零向量占位（后续接入 embedding 服务后替换为名称嵌入）
+    # 向量：优先用预计算的，否则零向量
     dim = db.dim()
-    vector = [0.0] * dim
+    entity_vector = vector if vector is not None else [0.0] * dim
     payload = {
         "name": name,
         "name_normalized": normalized,
@@ -91,7 +91,7 @@ def upsert_entity(tdb_name: str, name: str, entity_type: str,
         "aliases": aliases or [],
         "source_folders": [],
     }
-    node_id = db.insert(vector, payload)
+    node_id = db.insert(entity_vector, payload)
     db.flush()
     logger.debug(f"图谱实体已创建: {name} (id={node_id}, type={entity_type})")
     return node_id
@@ -229,7 +229,7 @@ def upsert_edge(
         update_source_folders(target_id, source_path, "add", tdb_name)
 
     logger.debug(
-        f"边已创建: {source_name} -[{label]-> {target_name} "
+        f"边已创建: " + source_name + " -[" + label + "]-> " + target_name + " "
         f"(edge_id={edge_id}, source_path={source_path})"
     )
     return edge_id
@@ -259,14 +259,26 @@ def batch_upsert(tdb_name: str, entities: list[dict], edges: list[dict],
         etype = ent.get("type", "Concept")
         if etype not in ("Character", "Location", "Item", "Organization", "Event", "Concept"):
             etype = "Concept"
+        # 去重已解析 → 复用已有实体
+        if ent.get("_resolved") and ent.get("_existing_id"):
+            name_to_id[name] = ent["_existing_id"]
+            continue
         node_id = upsert_entity(
             tdb_name, name, etype,
             owner_id=owner_id,
             aliases=ent.get("aliases", []),
             extra=ent.get("extra", {}),
+            vector=ent.get("_vector"),
         )
         name_to_id[name] = node_id
         entities_created += 1
+        # 增量更新去重索引
+        try:
+            from lumen.services.graph.dedup import get_entity_index
+            idx = get_entity_index(tdb_name)
+            idx.add(node_id, _normalize_name(name), ent.get("aliases", []))
+        except Exception:
+            pass
 
     edges_created = 0
     for edge in edges:
@@ -279,6 +291,19 @@ def batch_upsert(tdb_name: str, entities: list[dict], edges: list[dict],
         edge_label = edge.get("label", edge.get("relation", "related"))
         fact_text = edge.get("fact", edge.get("label", ""))
 
+        # 边去重：合并 episode_ids 到已有边
+        if edge.get("_duplicate_of"):
+            old_id = edge["_duplicate_of"]
+            db = _get_tdb(tdb_name)
+            merged_episodes = edge.get("_merged_episode_ids", [])
+            if episode_id and episode_id not in merged_episodes:
+                merged_episodes.append(episode_id)
+            payload = db.get_payload(old_id)
+            if payload:
+                payload["episode_ids"] = merged_episodes
+                db.update_payload(old_id, payload)
+            continue
+
         edge_id = upsert_edge(
             tdb_name,
             source_name=src_name,
@@ -287,6 +312,8 @@ def batch_upsert(tdb_name: str, entities: list[dict], edges: list[dict],
             fact=fact_text,
             source_path=source_path,
             episode_id=episode_id,
+            valid_at=edge.get("valid_at"),
+            invalid_at=edge.get("invalid_at"),
         )
         if edge_id:
             edges_created += 1

@@ -149,6 +149,16 @@ GRAPH_RECALL_WEIGHT = float(os.getenv("GRAPH_RECALL_WEIGHT", "0.3"))
 GRAPH_RECALL_TOP_K = int(os.getenv("GRAPH_RECALL_TOP_K", "10"))
 GRAPH_RECALL_EXPAND_DEPTH = int(os.getenv("GRAPH_RECALL_EXPAND_DEPTH", "2"))
 
+# ── 图谱质量 Phase 2 配置 ──
+GRAPH_DEDUP_ENABLED = os.getenv("GRAPH_DEDUP_ENABLED", "True").lower() in ("true", "1")
+GRAPH_DEDUP_VECTOR_ENABLED = os.getenv("GRAPH_DEDUP_VECTOR_ENABLED", "True").lower() in ("true", "1")
+GRAPH_DEDUP_VECTOR_TOP_K = int(os.getenv("GRAPH_DEDUP_VECTOR_TOP_K", "5"))
+GRAPH_DEDUP_VECTOR_FLOOR_SCORE = float(os.getenv("GRAPH_DEDUP_VECTOR_FLOOR_SCORE", "0.3"))
+GRAPH_DEDUP_LLM_ENABLED = os.getenv("GRAPH_DEDUP_LLM_ENABLED", "True").lower() in ("true", "1")
+GRAPH_DEDUP_LLM_MAX_CANDIDATES = int(os.getenv("GRAPH_DEDUP_LLM_MAX_CANDIDATES", "5"))
+GRAPH_CONTRADICTION_ENABLED = os.getenv("GRAPH_CONTRADICTION_ENABLED", "True").lower() in ("true", "1")
+GRAPH_EXTRACT_TIMESTAMPS = os.getenv("GRAPH_EXTRACT_TIMESTAMPS", "True").lower() in ("true", "1")
+
 KNOWLEDGE_CHUNK_SIZE = int(os.getenv("KNOWLEDGE_CHUNK_SIZE", "300"))
 KNOWLEDGE_CHUNK_OVERLAP = int(os.getenv("KNOWLEDGE_CHUNK_OVERLAP", "60"))
 
@@ -157,6 +167,14 @@ PRF_ENABLED = os.getenv("PRF_ENABLED", "True").lower() in ("true", "1")
 PRF_TOP_N = int(os.getenv("PRF_TOP_N", "5"))          # 取前 N 条结果的向量算均值
 PRF_ALPHA = float(os.getenv("PRF_ALPHA", "0.7"))       # 原始查询向量权重
 PRF_BETA = float(os.getenv("PRF_BETA", "0.3"))         # PRF 均值向量权重
+
+# ── search_hybrid 双路检索（TriviumDB 原生向量+文本混合）──
+SEARCH_USE_HYBRID = os.getenv("SEARCH_USE_HYBRID", "True").lower() in ("true", "1")
+HYBRID_ALPHA = float(os.getenv("HYBRID_ALPHA", "0.7"))  # 向量权重，1-alpha 为文本权重
+
+# ── search_advanced 认知管线（FISTA 残差寻隐 + DPP 多样性 + 不应期疲劳）──
+SEARCH_USE_ADVANCED = os.getenv("SEARCH_USE_ADVANCED", "True").lower() in ("true", "1")
+SEARCH_ADVANCED_TEXT_BOOST = float(os.getenv("SEARCH_ADVANCED_TEXT_BOOST", "1.5"))
 
 # ── 稀疏向量（T25: doubao sparse embedding）──
 SPARSE_EMBEDDING_ENABLED = os.getenv("SPARSE_EMBEDDING_ENABLED", "True").strip().lower() in ("true", "1", "yes")

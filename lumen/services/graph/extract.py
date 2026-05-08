@@ -105,6 +105,63 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
             commit_episode(ep_id, tdb_name)
             return {"entities_created": 0, "edges_created": 0, "episode_id": ep_id}
 
+        # --- Step 2.5: 去重 + 矛盾检测 ---
+        from lumen.config import (
+            GRAPH_DEDUP_ENABLED, GRAPH_CONTRADICTION_ENABLED,
+        )
+
+        entities_list = extraction.get("entities", [])
+        edges_list = extraction.get("edges", [])
+
+        # Batch embed 实体名字（带重试机制）
+        if GRAPH_DEDUP_ENABLED and entities_list:
+            from lumen.services.embedding import get_service
+            backend = await get_service(tdb_name)
+            if not backend:
+                raise RuntimeError("嵌入服务不可用（未配置或连接失败），图谱去重无法执行。请在设置中检查嵌入服务连通性。")
+
+            names = [e.get("name", "") for e in entities_list if e.get("name")]
+            vectors = None
+            max_retries = 3
+
+            for attempt in range(max_retries):
+                try:
+                    vectors = await backend.encode_batch(names)
+                    if vectors and len(vectors) == len(names):
+                        break
+                except Exception as ex:
+                    logger.warning(f"实体名字 embed 第 {attempt + 1} 次失败: {ex}")
+                    if attempt < max_retries - 1:
+                        import asyncio as _aio
+                        await _aio.sleep(2 ** attempt)  # 指数退避: 1s, 2s
+                    else:
+                        logger.error("实体名字 embed 达到最大重试次数，管线熔断。")
+
+            if not vectors or len(vectors) != len(names):
+                raise RuntimeError("嵌入服务调用失败（重试3次均未恢复），图谱提取已中止。请检查嵌入服务连通性后重试。")
+
+            vi = 0
+            for e in entities_list:
+                if e.get("name") and vi < len(vectors):
+                    e["_vector"] = vectors[vi]
+                    vi += 1
+
+        # 实体去重
+        if GRAPH_DEDUP_ENABLED and entities_list:
+            from lumen.services.graph.dedup import dedup_entities, get_entity_index
+            index = get_entity_index(tdb_name)
+            entities_list = await dedup_entities(entities_list, index, tdb_name)
+            extraction["entities"] = entities_list
+
+        # 边矛盾检测
+        invalidated_edge_ids = []
+        if GRAPH_CONTRADICTION_ENABLED and edges_list:
+            from lumen.services.graph.dedup import resolve_edge_duplicates
+            edges_list, invalidated_edge_ids = await resolve_edge_duplicates(
+                edges_list, tdb_name
+            )
+            extraction["edges"] = edges_list
+
         # --- Step 3: 存入图谱（batch_upsert 带 episode_id + source_path）---
         from lumen.services.graph._core import batch_upsert
 
@@ -117,6 +174,12 @@ async def extract_and_store(content: str, tdb_name: str = "knowledge",
             source_episode_id=source_episode_id,
             owner_id=owner_id,
         )
+
+        # --- Step 3.5: 处理被矛盾的旧边 ---
+        if invalidated_edge_ids:
+            from lumen.services.graph.dedup import apply_edge_invalidations
+            valid_at_ts = extraction["edges"][0].get("valid_at") if extraction.get("edges") else None
+            await apply_edge_invalidations(invalidated_edge_ids, valid_at_ts, tdb_name)
 
         # --- Step 4: 事务提交 ---
         commit_episode(ep_id, tdb_name)
@@ -170,6 +233,23 @@ async def _llm_extract(content: str) -> dict | None:
     return _validate_extraction(data)
 
 
+def _parse_timestamp(value: str | None) -> float | None:
+    """解析 ISO 8601 时间戳为 Unix 时间戳"""
+    if not value or value.strip().lower() in ("null", "none", ""):
+        return None
+    from datetime import datetime, timezone
+    try:
+        text = value.strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        dt = datetime.fromisoformat(text)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.timestamp()
+    except Exception:
+        return None
+
+
 def _validate_extraction(data: dict) -> dict | None:
     """验证并清洗 LLM 提取结果"""
     entities = data.get("entities", [])
@@ -206,6 +286,8 @@ def _validate_extraction(data: dict) -> dict | None:
             "dst_name": dst_name,
             "label": edge.get("label", edge.get("relation", "related")).strip(),
             "fact": edge.get("fact", edge.get("label", "")),
+            "valid_at": _parse_timestamp(edge.get("valid_at")),
+            "invalid_at": _parse_timestamp(edge.get("invalid_at")),
         })
 
     if not valid_entities and not valid_edges:
