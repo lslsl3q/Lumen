@@ -16,9 +16,10 @@ import threading
 import uuid
 import time
 
+from lumen.config import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 
 _local = threading.local()

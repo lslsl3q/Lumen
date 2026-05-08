@@ -108,6 +108,9 @@ KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "") o
 
 
 
+# 数据根目录（所有运行时数据统一入口）
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+
 # 知识库配置
 VECTOR_STORE_DIR = os.getenv(
     "VECTOR_STORE_DIR",

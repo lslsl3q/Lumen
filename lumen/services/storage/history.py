@@ -16,11 +16,10 @@ from typing import Dict, Any, Optional, List
 
 from lumen.types.messages import Message
 from lumen.services.types import SessionInfo
+from lumen.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-# 数据库文件路径（lumen/data/）
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 
 # 线程局部存储：每个线程独立连接，避免多线程并发写冲突
