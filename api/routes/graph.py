@@ -447,14 +447,55 @@ async def tql_mutate(tdb: str, req: TqlRequest):
         raise HTTPException(500, f"TQL 执行失败: {e}")
 
 
-# ── Leiden 社区检测（v0.7.0 Python 绑定已就绪）──
+# ── 社群检测 ──
 
-# RESERVED: TriviumDB v0.7.0 Leiden 聚类 Python 绑定已暴露。
-# API: db.leiden_cluster(min_community_size=3, max_iterations=15, compute_centroids=True)
-# 用途：跑团章节末尾分析 world.tdb 社群结构，自动发现"盗贼公会"等涌现设定。
-# TODO: @router.post("/{tdb}/leiden")
-#   → 调用 db.leiden_cluster() → 返回 node_to_cluster + centroids
-#   → 前端渲染社群视图（可用 G6 或 React Flow）
+@router.post("/{tdb}/communities/build")
+async def build_communities_endpoint(tdb: str):
+    """执行社群检测：Leiden 聚类 + LLM 生成社群摘要 + 存储 CommunityNode"""
+    if tdb not in _ALLOWED_TDBS:
+        raise HTTPException(404, f"未知 TDB: {tdb}")
+
+    try:
+        from lumen.services.graph.community import build_communities
+        result = await build_communities(tdb)
+        if result.get("num_communities", 0) > 0:
+            _backup_after_write(tdb)
+        return result
+    except Exception as e:
+        logger.error(f"社群检测失败: {e}")
+        raise HTTPException(500, f"社群检测失败: {e}")
+
+
+@router.get("/{tdb}/communities")
+async def list_communities(tdb: str):
+    """列出所有社群节点"""
+    if tdb not in _ALLOWED_TDBS:
+        raise HTTPException(404, f"未知 TDB: {tdb}")
+
+    try:
+        from lumen.services.graph.community import list_all_communities
+        communities = list_all_communities(tdb)
+        return {"communities": communities, "total": len(communities)}
+    except Exception as e:
+        raise HTTPException(500, f"查询社群失败: {e}")
+
+
+@router.get("/{tdb}/communities/{community_id}")
+async def get_community_detail(tdb: str, community_id: int):
+    """获取单个社群详情（含成员实体名称）"""
+    if tdb not in _ALLOWED_TDBS:
+        raise HTTPException(404, f"未知 TDB: {tdb}")
+
+    try:
+        from lumen.services.graph.community import get_community_detail as _get_detail
+        detail = _get_detail(community_id, tdb)
+        if not detail:
+            raise HTTPException(404, f"社群 {community_id} 不存在")
+        return detail
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"查询社群详情失败: {e}")
 
 
 # ── 轻量级事务（v0.7.0 Python 绑定已就绪）──

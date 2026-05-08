@@ -27,6 +27,9 @@ from lumen.config import (
     KNOWLEDGE_SENTENCE_TOP_N,
     KNOWLEDGE_SENTENCE_WINDOW,
     SPARSE_EMBEDDING_ENABLED,
+    KNOWLEDGE_RERANK_ENABLED,
+    KNOWLEDGE_RERANK_TOP_K,
+    KNOWLEDGE_RERANK_MIN_SCORE,
 )
 from lumen.services.embedding import get_service as get_embedding_service
 from lumen.services.knowledge.chunker import chunk_text, split_sentences
@@ -940,31 +943,14 @@ async def search(
 
         if graph_acl_filter is not None or not character_id:
             # 有 ACL 过滤条件或无 character_id → 执行搜索
-            graph_results = db.search(
-                query_vector,
-                top_k=GRAPH_RECALL_TOP_K,
-                min_score=0.1,
-                payload_filter=graph_acl_filter,
+            from lumen.services.graph.search import search_graph
+            # source_path_prefixes 只在部分 ACL 分支定义，统一安全取值
+            _folders = source_path_prefixes if "source_path_prefixes" in dir() else list(allowed)
+            graph_hits = await search_graph(
+                query_vector, query, tdb_name="knowledge",
+                top_k=GRAPH_RECALL_TOP_K, acl_filter=graph_acl_filter,
+                allowed_folders=_folders, character_id=character_id,
             )
-            for r in graph_results:
-                payload = r.payload if hasattr(r, "payload") else {}
-                # 跳过非边节点（无 ACL 过滤时可能混入实体节点）
-                if payload.get("type") != "edge":
-                    continue
-                fact = payload.get("fact", "")
-                source_name = payload.get("source_name", "")
-                target_name = payload.get("target_name", "")
-                label = payload.get("label", "")
-                if fact:
-                    if source_name:
-                        content = f"[图谱] {source_name} {label} {target_name}: {fact}"
-                    else:
-                        content = f"[图谱] {fact}"
-                    graph_hits.append({
-                        "entity_id": r.id if hasattr(r, "id") else 0,
-                        "content": content,
-                        "score": r.score if hasattr(r, "score") else 0.5,
-                    })
     except Exception as e:
         logger.debug(f"图谱召回跳过: {e}")
 
@@ -982,6 +968,12 @@ async def search(
 
     # ── RRF 合并（三路）──
     hits = _rrf_merge(vector_hits, bm25_hits, graph_hits, top_k=top_k)
+
+    # ── Cross-Encoder Rerank（RRF 后、PRF 前的精排层）──
+    if KNOWLEDGE_RERANK_ENABLED and hits:
+        from lumen.services.knowledge.rerank import rerank_knowledge_results
+        hits = await rerank_knowledge_results(query, hits, KNOWLEDGE_RERANK_TOP_K, KNOWLEDGE_RERANK_MIN_SCORE)
+        _last_search_meta["reranked"] = True
 
     # ── PRF 精炼：用 top-N 结果的向量修正查询，再搜一次 ──
     if PRF_ENABLED and hits:

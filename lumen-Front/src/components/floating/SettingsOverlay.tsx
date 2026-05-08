@@ -17,6 +17,8 @@ import ConfigList from '../../pages/ConfigList';
 import ConfigEditor from '../../pages/ConfigEditor';
 import ToolTipsPage from '../../pages/ToolTipsPage';
 import ThinkingClustersPage from '../../pages/ThinkingClustersPage';
+import PermissionPage from '../../pages/PermissionPage';
+import RerankSettingsPage from '../../pages/RerankSettingsPage';
 
 // Section 类型
 type SettingsPage =
@@ -24,7 +26,7 @@ type SettingsPage =
   | 'skill-list' | 'skill-editor'
   | 'avatar-manager'
   | 'config-list' | 'config-editor'
-  | 'tooltips' | 'thinking-clusters'
+  | 'tooltips' | 'thinking-clusters' | 'permissions' | 'rerank-settings'
 ;
 
 interface SettingsSection {
@@ -53,6 +55,8 @@ const NAV_GROUPS: NavGroup[] = [
       { page: 'config-list', label: '配置' },
       { page: 'tooltips', label: '工具提示词' },
       { page: 'thinking-clusters', label: '思维簇' },
+      { page: 'permissions', label: '权限' },
+      { page: 'rerank-settings', label: '重排' },
     ],
   },
 ];
@@ -116,6 +120,10 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
         return <ToolTipsPage {...contentNav} />;
       case 'thinking-clusters':
         return <ThinkingClustersPage {...contentNav} />;
+      case 'permissions':
+        return <PermissionPage />;
+      case 'rerank-settings':
+        return <RerankSettingsPage {...contentNav} />;
     }
   };
 
