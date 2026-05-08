@@ -20,7 +20,7 @@ from lumen.services.types import SessionInfo
 logger = logging.getLogger(__name__)
 
 # 数据库文件路径（lumen/data/）
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 
 # 线程局部存储：每个线程独立连接，避免多线程并发写冲突
@@ -581,8 +581,8 @@ def delete_session(session_id: str):
 
     # 清理 TriviumDB 向量（失败不影响主流程）
     try:
-        from lumen.services.search import vector_store
-        count = vector_store.delete_by_session(session_id)
+        from lumen.services.search.vector_store import delete_by_session
+        count = delete_by_session(session_id)
         if count:
             logger.info(f"已删除会话 {session_id} 的 {count} 条向量")
     except Exception as e:
