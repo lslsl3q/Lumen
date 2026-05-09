@@ -38,11 +38,7 @@ def _theme_list(params: dict) -> dict:
         for theme in themes:
             theme["is_current"] = theme["id"] == current_id
 
-        return success_result(
-            "theme",
-            f"共 {len(themes)} 个主题，当前: {current_id}",
-            {"themes": themes}
-        )
+        return success_result("theme", {"themes": themes, "current_id": current_id})
     except Exception as e:
         return error_result(
             "theme",
@@ -66,16 +62,12 @@ def _theme_get(params: dict) -> dict:
         if not full_theme:
             return error_result(
                 "theme",
-                ErrorCode.NOT_FOUND,
+                ErrorCode.EXEC_FAILED,
                 f"主题不存在: {theme_id}",
                 {"theme_id": theme_id}
             )
 
-        return success_result(
-            "theme",
-            f"主题 {theme_id} 的完整 token 值",
-            {"theme_id": theme_id, "tokens": full_theme}
-        )
+        return success_result("theme", {"theme_id": theme_id, "tokens": full_theme})
     except Exception as e:
         return error_result(
             "theme",
@@ -100,20 +92,14 @@ def _theme_apply(params: dict) -> dict:
         # 模式 1 & 3：切换主题
         if theme_id:
             full_theme = theme_service.apply_theme_switch(theme_id)
-            result_msg = f"已切换到主题: {theme_id}"
 
             # 模式 3：切换后再微调
             if tokens:
                 override_result = theme_service.apply_token_overrides(tokens)
-                if override_result["errors"]:
-                    result_msg += f"，部分 token 微调失败"
-                else:
-                    result_msg += f"，已应用 {len(override_result['applied'])} 个 token 微调"
-
                 return success_result(
                     "theme",
-                    result_msg,
                     {
+                        "action": "switch_and_override",
                         "theme_id": theme_id,
                         "tokens": full_theme,
                         "overrides_applied": override_result["applied"],
@@ -123,8 +109,7 @@ def _theme_apply(params: dict) -> dict:
 
             return success_result(
                 "theme",
-                result_msg,
-                {"theme_id": theme_id, "tokens": full_theme}
+                {"action": "switch", "theme_id": theme_id, "tokens": full_theme}
             )
 
         # 模式 2：仅微调
@@ -132,15 +117,10 @@ def _theme_apply(params: dict) -> dict:
             override_result = theme_service.apply_token_overrides(tokens)
             current_id = theme_storage.get_current_theme_id()
 
-            if override_result["errors"]:
-                msg = f"部分 token 微调失败: {len(override_result['errors'])} 个"
-            else:
-                msg = f"已应用 {len(override_result['applied'])} 个 token 微调"
-
             return success_result(
                 "theme",
-                msg,
                 {
+                    "action": "override",
                     "theme_id": current_id,
                     "overrides_applied": override_result["applied"],
                     "errors": override_result["errors"],
@@ -186,11 +166,7 @@ def _theme_save(params: dict) -> dict:
 
     try:
         new_theme = theme_service.save_as_new_theme(name, description)
-        return success_result(
-            "theme",
-            f"已保存为新主题: {new_theme['id']}",
-            {"theme": new_theme}
-        )
+        return success_result("theme", {"action": "save", "theme": new_theme})
     except Exception as e:
         return error_result(
             "theme",
