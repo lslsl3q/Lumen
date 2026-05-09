@@ -87,19 +87,19 @@ def ensure_manifest_for_existing_kb(name: str) -> dict:
 
     defaults = {
         "knowledge": {
-            "tdb_path": "data/vectors/api/knowledge.tdb",
-            "graph_path": "data/graphs/kb_knowledge.tdb",
-            "sentence_path": "data/vectors/local/knowledge_sentences.tdb",
+            "tdb_path": "data/tdb/api/knowledge.tdb",
+            "graph_path": "data/graph/kb_knowledge.tdb",
+            "sentence_path": "data/tdb/local/knowledge_sentences.tdb",
         },
         "agent_knowledge": {
-            "tdb_path": "data/vectors/api/agent_knowledge.tdb",
+            "tdb_path": "data/tdb/api/agent_knowledge.tdb",
             "graph_path": None,
             "sentence_path": None,
         },
     }
     info = defaults.get(name, {
-        "tdb_path": f"data/vectors/api/kb_{name}.tdb",
-        "graph_path": f"data/graphs/kb_{name}.tdb",
-        "sentence_path": f"data/vectors/local/knowledge_sentences_{name}.tdb",
+        "tdb_path": f"data/tdb/api/kb_{name}.tdb",
+        "graph_path": f"data/graph/kb_{name}.tdb",
+        "sentence_path": f"data/tdb/local/knowledge_sentences_{name}.tdb",
     })
     return create_kb(name, **info)

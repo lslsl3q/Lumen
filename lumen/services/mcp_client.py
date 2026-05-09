@@ -11,14 +11,12 @@ import os
 import threading
 from typing import Any
 
-from lumen.config import DATA_DIR
+from lumen.config import MCP_CONFIG_PATH
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 logger = logging.getLogger(__name__)
-
-MCP_CONFIG_PATH = os.path.join(DATA_DIR, "mcp_servers.json")
 
 # 缓存：{server_name: {"tools": [...], "config": {...}}}
 _discovered: dict[str, dict] = {}

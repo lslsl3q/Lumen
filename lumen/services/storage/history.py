@@ -16,11 +16,11 @@ from typing import Dict, Any, Optional, List
 
 from lumen.types.messages import Message
 from lumen.services.types import SessionInfo
-from lumen.config import DATA_DIR
+from lumen.config import HISTORY_DB
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(DATA_DIR, "history.db")
+DB_PATH = HISTORY_DB
 
 # 线程局部存储：每个线程独立连接，避免多线程并发写冲突
 _local = threading.local()
@@ -31,7 +31,7 @@ _write_lock = threading.Lock()
 def _get_conn():
     """获取数据库连接（每个线程独立连接，避免 SQLite 线程安全问题）"""
     if not hasattr(_local, "conn") or _local.conn is None:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True)
         _local.conn.row_factory = sqlite3.Row
     return _local.conn

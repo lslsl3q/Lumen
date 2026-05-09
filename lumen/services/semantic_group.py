@@ -18,9 +18,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from lumen.config import DATA_DIR
-VECTORS_DIR = os.path.join(DATA_DIR, "semantic_vectors")
-DB_PATH = os.path.join(DATA_DIR, "history.db")
+from lumen.config import SEMANTIC_VECTORS_DIR, HISTORY_DB
+VECTORS_DIR = SEMANTIC_VECTORS_DIR
+DB_PATH = HISTORY_DB
 
 # 默认情绪关键词表（中英文混合，每组 20+ 词）
 DEFAULT_EMOTION_KEYWORDS = {
@@ -70,7 +70,7 @@ DEFAULT_TOPIC_KEYWORDS = {
 
 def _get_conn():
     import sqlite3
-    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")

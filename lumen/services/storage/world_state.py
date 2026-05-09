@@ -14,11 +14,11 @@ import logging
 import threading
 from typing import Optional
 
-from lumen.config import DATA_DIR
+from lumen.config import WORLD_STATE_DB
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(DATA_DIR, "world_state.db")
+DB_PATH = WORLD_STATE_DB
 
 _local = threading.local()
 _write_lock = threading.Lock()
@@ -26,7 +26,7 @@ _write_lock = threading.Lock()
 
 def _get_conn() -> sqlite3.Connection:
     if not hasattr(_local, "conn") or _local.conn is None:
-        os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True)
         _local.conn.row_factory = sqlite3.Row
         _local.conn.execute("PRAGMA journal_mode=WAL")

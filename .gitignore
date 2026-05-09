@@ -42,23 +42,23 @@ env/
 *.sqlite3
 *.log
 data/
-# 思维簇系统模板（文档 + 默认模块 + 链配置）需要入库
-!lumen/data/
-!lumen/data/thinking_clusters/
-!lumen/data/thinking_clusters/SPECIFICATION.md
-!lumen/data/thinking_clusters/chains.json
-!lumen/data/thinking_clusters/task_context/
-!lumen/data/thinking_clusters/reasoning_patterns/
-!lumen/data/thinking_clusters/self_correction/
 
-# 运行时数据（用户日记、配置、缓存）
+# lumen/data/ 下的可追踪内容（按新目录结构）
+!lumen/data/
+!lumen/data/config/thinking_clusters/
+!lumen/data/config/thinking_clusters/SPECIFICATION.md
+!lumen/data/config/thinking_clusters/chains.json
+!lumen/data/config/thinking_clusters/task_context/
+!lumen/data/config/thinking_clusters/reasoning_patterns/
+!lumen/data/config/thinking_clusters/self_correction/
+
+# 运行时数据（用户日记、状态、缓存）
 lumen/data/daily_note/
 lumen/data/knowledge/daily_note/
-lumen/data/runtime_config.json
-lumen/data/tdb_registry.json
-lumen/data/dream_state.json
+lumen/data/config/runtime_config.json
+lumen/data/state/dream_state.json
 lumen/data/gm/
-lumen/data/semantic_vectors/
+lumen/data/state/semantic_vectors/
 snapshot*.txt
 
 # SQLite 临时文件
@@ -71,7 +71,7 @@ snapshot*.txt
 lumen/personas/*.json
 lumen/worldbooks/*.json
 lumen/characters/*.json
-lumen/data/avatars/
+lumen/data/assets/avatars/
 lumen/skills/*
 !lumen/skills/README.md
 

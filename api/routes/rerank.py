@@ -18,9 +18,11 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from lumen.config import RERANK_CONFIG_PATH
+
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "rerank_providers.json"
+CONFIG_PATH = Path(RERANK_CONFIG_PATH)
 
 _DEFAULT_CONFIG = {
     "enabled": False,

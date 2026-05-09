@@ -1,0 +1,9 @@
+{
+  "tdb_path": "data/tdb/api/knowledge.tdb",
+  "graph_path": "data/graph/kb_knowledge.tdb",
+  "sentence_path": "data/tdb/local/knowledge_sentences.tdb",
+  "embedding_camp": "api",
+  "access_mode": "public",
+  "allowed_characters": [],
+  "files": {}
+}

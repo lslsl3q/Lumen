@@ -3,14 +3,12 @@
 import os
 import logging
 
+from lumen.config import DATA_DIR
 from lumen.components.base import ContextComponent, PromptZone
 
 logger = logging.getLogger(__name__)
 
-_IDENTITY_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "gm", "identity.md"
-)
+_IDENTITY_FILE = os.path.join(DATA_DIR, "gm", "identity.md")
 
 _DEFAULT_IDENTITY = """\
 你是一位经验丰富的游戏主持人（Game Master）。

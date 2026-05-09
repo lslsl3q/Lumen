@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
 
+from lumen.config import FILE_WORKSPACES_PATH
+
 
 class PathValidationResult(TypedDict):
     """路径验证结果 — file_security → file_read/file_write 内部传递"""
@@ -72,7 +74,7 @@ _WINDOWS_DEVICE_NAMES = {
 
 def _get_workspaces_path() -> Path:
     """获取工作区配置文件路径"""
-    return Path(__file__).parent.parent / "data" / "file_workspaces.json"
+    return Path(FILE_WORKSPACES_PATH)
 
 
 def load_workspaces() -> Dict:

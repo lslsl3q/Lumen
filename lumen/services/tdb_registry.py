@@ -143,7 +143,7 @@ def list_user_tdbs() -> List[dict]:
         # 找文件路径和大小
         filename = f"{sys_name}.tdb"
         size = 0
-        for subdir in ("lumen/data/vectors/local", "lumen/data/vectors/api"):
+        for subdir in ("lumen/data/tdb/local", "lumen/data/tdb/api"):
             candidate = os.path.join(_PROJECT_ROOT, subdir, filename)
             if os.path.exists(candidate):
                 size = os.path.getsize(candidate)

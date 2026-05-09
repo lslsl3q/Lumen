@@ -1,5 +1,5 @@
 {
-  "tdb_path": "data/vectors/api/agent_knowledge.tdb",
+  "tdb_path": "data/tdb/api/agent_knowledge.tdb",
   "graph_path": null,
   "sentence_path": null,
   "embedding_camp": "api",

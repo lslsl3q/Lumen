@@ -9,6 +9,8 @@ from typing import Optional, List
 import json
 import os
 
+from lumen.config import FILE_WORKSPACES_PATH
+
 router = APIRouter()
 
 # ========================================
@@ -22,7 +24,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 _RESOURCE_FILES = {
     "env": os.path.join(_PROJECT_ROOT, ".env"),
     "tools": os.path.join(_PROJECT_ROOT, "lumen", "tools", "registry.json"),
-    "workspaces": os.path.join(_PROJECT_ROOT, "lumen", "data", "file_workspaces.json"),
+    "workspaces": FILE_WORKSPACES_PATH,
 }
 
 

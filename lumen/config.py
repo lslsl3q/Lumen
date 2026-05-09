@@ -108,38 +108,63 @@ KNOWLEDGE_EMBEDDING_API_MODEL = os.getenv("KNOWLEDGE_EMBEDDING_API_MODEL", "") o
 
 
 
-# 数据根目录（所有运行时数据统一入口）
+# ── 数据目录（按用途分层）──
+# data/ 下的结构：db/ tdb/ config/ assets/ state/ graph/ gm/ logs/
+
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
-# 知识库配置
-VECTOR_STORE_DIR = os.getenv(
-    "VECTOR_STORE_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "vectors"),
-)
-VECTOR_LOCAL_DIR = os.getenv(
-    "VECTOR_LOCAL_DIR",
-    os.path.join(VECTOR_STORE_DIR, "local"),
-)
-VECTOR_API_DIR = os.getenv(
-    "VECTOR_API_DIR",
-    os.path.join(VECTOR_STORE_DIR, "api"),
-)
-KNOWLEDGE_DB_PATH = os.getenv(
-    "KNOWLEDGE_DB_PATH",
-    os.path.join(VECTOR_API_DIR, "knowledge.tdb"),
-)
-KNOWLEDGE_SOURCE_DIR = os.getenv(
-    "KNOWLEDGE_SOURCE_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "知识库", "knowledge"),
-)
+# 子目录
+DB_DIR = os.path.join(DATA_DIR, "db")                       # SQLite 数据库
+TDB_DIR = os.path.join(DATA_DIR, "tdb")                     # TriviumDB 向量库
+TDB_API_DIR = os.path.join(TDB_DIR, "api")                  # API 嵌入阵营
+TDB_LOCAL_DIR = os.path.join(TDB_DIR, "local")              # 本地嵌入阵营
+CONFIG_DIR = os.path.join(DATA_DIR, "config")               # 可编辑配置
+ASSETS_DIR = os.path.join(DATA_DIR, "assets")               # 用户资源
+STATE_DIR = os.path.join(DATA_DIR, "state")                 # 运行时状态
 
-# ── T23 动态知识库 ──
-KNOWLEDGE_LIB_DIR = os.path.join(os.path.dirname(__file__), "data", "知识库")
+# SQLite 数据库
+HISTORY_DB = os.path.join(DB_DIR, "history.db")
+PERMISSIONS_DB = os.path.join(DB_DIR, "permissions.db")
+WORLD_STATE_DB = os.path.join(DB_DIR, "world_state.db")
 
-GRAPH_BACKUP_DIR = os.getenv(
-    "GRAPH_BACKUP_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "graph"),
-)
+# TriviumDB
+KNOWLEDGE_DB_PATH = os.getenv("KNOWLEDGE_DB_PATH", os.path.join(TDB_API_DIR, "knowledge.tdb"))
+AGENT_KNOWLEDGE_DB_PATH = os.getenv("AGENT_KNOWLEDGE_DB_PATH", os.path.join(TDB_API_DIR, "agent_knowledge.tdb"))
+
+# 知识库源文件
+KNOWLEDGE_SOURCE_DIR = os.getenv("KNOWLEDGE_SOURCE_DIR", os.path.join(ASSETS_DIR, "knowledge", "knowledge"))
+KNOWLEDGE_LIB_DIR = os.path.join(ASSETS_DIR, "knowledge")
+
+# 配置文件
+MCP_CONFIG_PATH = os.path.join(CONFIG_DIR, "mcp_servers.json")
+RUNTIME_CONFIG_PATH = os.path.join(CONFIG_DIR, "runtime_config.json")
+USER_DICT_PATH = os.path.join(CONFIG_DIR, "user_dict.txt")
+RERANK_CONFIG_PATH = os.path.join(CONFIG_DIR, "rerank_providers.json")
+THINKING_CLUSTERS_DIR = os.getenv("THINKING_CLUSTERS_DIR", os.path.join(CONFIG_DIR, "thinking_clusters"))
+THINKING_CLUSTERS_DB_PATH = os.getenv("THINKING_CLUSTERS_DB_PATH", os.path.join(TDB_LOCAL_DIR, "thinking_clusters.tdb"))
+
+# 用户资源
+AVATARS_DIR = os.path.join(ASSETS_DIR, "avatars")
+
+# 运行时状态
+ACTIVE_PERSONA_FILE = os.path.join(STATE_DIR, "active_persona.json")
+DREAM_STATE_FILE = os.path.join(STATE_DIR, "dream_state.json")
+SEMANTIC_VECTORS_DIR = os.path.join(STATE_DIR, "semantic_vectors")
+FILE_WORKSPACES_PATH = os.path.join(STATE_DIR, "file_workspaces.json")
+
+# 图谱
+GRAPH_BACKUP_DIR = os.getenv("GRAPH_BACKUP_DIR", os.path.join(DATA_DIR, "graph"))
+
+# 日记按 Agent 分文件夹：assets/knowledge/agent_knowledge/{agent_id}/diary/
+DAILY_NOTE_DIR = os.getenv("DAILY_NOTE_DIR", os.path.join(ASSETS_DIR, "knowledge", "agent_knowledge"))
+
+# 句子级检索
+KNOWLEDGE_SENTENCE_DB_PATH = os.getenv("KNOWLEDGE_SENTENCE_DB_PATH", os.path.join(TDB_LOCAL_DIR, "knowledge_sentences.tdb"))
+
+# 兼容旧名（逐步淘汰，新代码用 TDB_API_DIR / TDB_LOCAL_DIR）
+VECTOR_STORE_DIR = TDB_DIR
+VECTOR_LOCAL_DIR = TDB_LOCAL_DIR
+VECTOR_API_DIR = TDB_API_DIR
 
 # T19 图谱系统
 GRAPH_ENTITY_TYPES = ["Character", "Location", "Item", "Organization", "Event", "Concept"]
@@ -197,11 +222,7 @@ SEARCH_ADVANCED_TEXT_BOOST = float(os.getenv("SEARCH_ADVANCED_TEXT_BOOST", "1.5"
 # ── 稀疏向量（T25: doubao sparse embedding）──
 SPARSE_EMBEDDING_ENABLED = os.getenv("SPARSE_EMBEDDING_ENABLED", "True").strip().lower() in ("true", "1", "yes")
 
-# 句子级检索配置（T18 Stage 3+4）
-KNOWLEDGE_SENTENCE_DB_PATH = os.getenv(
-    "KNOWLEDGE_SENTENCE_DB_PATH",
-    os.path.join(VECTOR_LOCAL_DIR, "knowledge_sentences.tdb"),
-)
+# 句子级检索配置
 KNOWLEDGE_SENTENCE_LEVEL = os.getenv("KNOWLEDGE_SENTENCE_LEVEL", "True").lower() in ("true", "1")
 KNOWLEDGE_SENTENCE_TOP_N = int(os.getenv("KNOWLEDGE_SENTENCE_TOP_N", "5"))
 KNOWLEDGE_SENTENCE_WINDOW = int(os.getenv("KNOWLEDGE_SENTENCE_WINDOW", "1"))
@@ -210,31 +231,8 @@ KNOWLEDGE_SENTENCE_WINDOW = int(os.getenv("KNOWLEDGE_SENTENCE_WINDOW", "1"))
 KNOWLEDGE_PLACEHOLDER_BUDGET = int(os.getenv("KNOWLEDGE_PLACEHOLDER_BUDGET", "800"))   # 占位符 {{}}/[[]] 共享预算
 KNOWLEDGE_SEMANTIC_BUDGET = int(os.getenv("KNOWLEDGE_SEMANTIC_BUDGET", "500"))          # 语义路由自动注入预算
 
-# AI 日记/档案配置（daily_note 工具系列）
-# 日记按 Agent 分文件夹：data/知识库/agent_knowledge/{agent_id}/diary/
-DAILY_NOTE_DIR = os.getenv(
-    "DAILY_NOTE_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "知识库", "agent_knowledge"),
-)
-
-# Agent 知识库配置（阵营 B，大模型向量）
-AGENT_KNOWLEDGE_DB_PATH = os.getenv(
-    "AGENT_KNOWLEDGE_DB_PATH",
-    os.path.join(VECTOR_API_DIR, "agent_knowledge.tdb"),
-)
-
-# 权限数据库路径
-PERMISSIONS_DB_PATH = os.path.join(os.path.dirname(__file__), "data", "permissions.db")
-
-# 思维簇配置
-THINKING_CLUSTERS_DIR = os.getenv(
-    "THINKING_CLUSTERS_DIR",
-    os.path.join(os.path.dirname(__file__), "data", "thinking_clusters"),
-)
-THINKING_CLUSTERS_DB_PATH = os.getenv(
-    "THINKING_CLUSTERS_DB_PATH",
-    os.path.join(VECTOR_LOCAL_DIR, "thinking_clusters.tdb"),
-)
+# 兼容旧名（逐步淘汰）
+PERMISSIONS_DB_PATH = PERMISSIONS_DB
 
 def get_model(character_config: dict = None) -> str:
     """获取当前应该使用的模型
@@ -283,7 +281,7 @@ def get_context_size(character_config: dict = None) -> int:
 
 # ── 日志配置 ──
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_DIR = os.path.join(os.path.dirname(__file__), "data", "logs")
+LOG_DIR = os.path.join(DATA_DIR, "logs")
 LOG_MAX_BYTES = int(os.getenv("LOG_MAX_BYTES", "5242880"))    # 默认 5MB
 LOG_BACKUP_COUNT = int(os.getenv("LOG_BACKUP_COUNT", "3"))   # 保留 3 个轮转文件
 

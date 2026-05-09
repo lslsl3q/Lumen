@@ -20,8 +20,7 @@ logger = logging.getLogger(__name__)
 PERSONAS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "personas")
 
 # 激活状态文件（lumen/data/active_persona.json）
-from lumen.config import DATA_DIR
-ACTIVE_PERSONA_FILE = os.path.join(DATA_DIR, "active_persona.json")
+from lumen.config import ACTIVE_PERSONA_FILE
 
 # 模块级缓存
 _cached_active: dict | None = None

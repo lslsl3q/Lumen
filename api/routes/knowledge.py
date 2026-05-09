@@ -166,9 +166,9 @@ async def create_base(body: dict):
 
     entry = create_kb(
         name,
-        tdb_path=f"data/vectors/api/kb_{name}.tdb",
-        graph_path=f"data/graphs/kb_{name}.tdb",
-        sentence_path=f"data/vectors/local/knowledge_sentences_{name}.tdb",
+        tdb_path=f"data/tdb/api/kb_{name}.tdb",
+        graph_path=f"data/graph/kb_{name}.tdb",
+        sentence_path=f"data/tdb/local/knowledge_sentences_{name}.tdb",
     )
     return entry
 

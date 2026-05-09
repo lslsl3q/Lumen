@@ -6,12 +6,11 @@ T19 图谱提取 Prompt
 import os
 import logging
 
+from lumen.config import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-_PROMPT_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "graph", "extract_prompt.md"
-)
+_PROMPT_FILE = os.path.join(DATA_DIR, "graph", "extract_prompt.md")
 
 # 内置默认值（文件不存在时回退）
 _DEFAULT_SYSTEM = """你是一个知识图谱抽取器。从给定的文本中识别实体和实体之间的关系。

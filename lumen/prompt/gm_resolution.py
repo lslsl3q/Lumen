@@ -8,12 +8,11 @@ Concordia 4 步链式思考浓缩为单次 JSON 输出。
 import os
 import logging
 
+from lumen.config import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-_PROMPT_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "gm", "resolution_prompt.md"
-)
+_PROMPT_FILE = os.path.join(DATA_DIR, "gm", "resolution_prompt.md")
 
 # ── 内置默认值（文件不存在时回退）──
 

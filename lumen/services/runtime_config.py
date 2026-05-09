@@ -12,8 +12,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from lumen.config import DATA_DIR as _DATA_DIR
-_CONFIG_PATH = os.path.join(_DATA_DIR, "runtime_config.json")
+from lumen.config import RUNTIME_CONFIG_PATH as _CONFIG_PATH
 
 _lock = threading.Lock()
 _cache: dict | None = None
@@ -42,7 +41,7 @@ def _load() -> dict:
 
 def _save(config: dict) -> None:
     """立即写盘"""
-    os.makedirs(_DATA_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(_CONFIG_PATH), exist_ok=True)
     with open(_CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 

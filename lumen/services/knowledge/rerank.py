@@ -21,13 +21,14 @@ from lumen.config import (
     KNOWLEDGE_RERANK_MIN_SCORE,
     ZHIPU_API_KEY,
     SILICONFLOW_API_KEY,
+    RERANK_CONFIG_PATH,
 )
 
 logger = logging.getLogger(__name__)
 
 # ── 运行时配置 ──
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "rerank_providers.json"
+_CONFIG_PATH = Path(RERANK_CONFIG_PATH)
 _runtime_config: dict | None = None
 
 
