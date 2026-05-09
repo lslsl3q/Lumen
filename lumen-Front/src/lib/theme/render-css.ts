@@ -6,7 +6,7 @@ import { TOKEN_REGISTRY } from "./token-registry";
 export function renderThemeCSS(id: string, t: ThemeTokens): string {
   const customVars = Object.entries(TOKEN_REGISTRY)
     .map(([key, meta]) => {
-      const value = (t as Record<string, string>)[key];
+      const value = (t as unknown as Record<string, string>)[key];
       return value ? `  --${meta.cssVar}: ${value};` : "";
     })
     .filter(Boolean)
