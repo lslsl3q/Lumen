@@ -18,7 +18,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+from lumen.config import DATA_DIR
 VECTORS_DIR = os.path.join(DATA_DIR, "semantic_vectors")
 DB_PATH = os.path.join(DATA_DIR, "history.db")
 

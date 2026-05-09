@@ -11,9 +11,11 @@ import time
 import random
 import string
 
+from lumen.config import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
-AVATARS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "avatars")
+AVATARS_DIR = os.path.join(DATA_DIR, "avatars")  # TODO: 改用 config.DATA_DIR
 
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 MAX_SIZE = 5 * 1024 * 1024  # 5MB

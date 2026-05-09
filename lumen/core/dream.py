@@ -22,6 +22,7 @@ import uuid
 from typing import Optional
 
 from lumen.types.dream import DreamState, DreamResult
+from lumen.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ _DIARY_BONUS = float(os.getenv("DREAM_DIARY_BONUS", "0.05"))
 _MAX_PROBABILITY = float(os.getenv("DREAM_MAX_PROBABILITY", "0.8"))
 _STATE_FILE = os.getenv(
     "DREAM_STATE_FILE",
-    os.path.join(os.path.dirname(__file__), "..", "data", "dream_state.json"),
+    os.path.join(DATA_DIR, "dream_state.json"),
 )
 
 # ── 梦境 Prompt（Call 1：高温度感性叙事）──

@@ -12,7 +12,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+from lumen.config import DATA_DIR as _DATA_DIR
 _CONFIG_PATH = os.path.join(_DATA_DIR, "runtime_config.json")
 
 _lock = threading.Lock()
