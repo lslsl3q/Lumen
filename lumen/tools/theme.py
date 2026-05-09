@@ -3,9 +3,38 @@
 AI 可通过此工具查看、切换、微调、保存视觉主题。
 """
 
+import asyncio
+import logging
+
 from lumen.tool import success_result, error_result, ErrorCode
 from lumen.services.storage import theme as theme_storage
 from lumen.services import theme as theme_service
+
+logger = logging.getLogger(__name__)
+
+
+async def _push_theme_update(tokens: dict, theme_id: str = ""):
+    """通过 WebSocket 推送主题更新到前端"""
+    try:
+        from lumen.services.ws_manager import get_ws_manager
+        wsm = get_ws_manager()
+        await wsm.push({
+            "type": "theme_update",
+            "theme_id": theme_id,
+            "tokens": tokens,
+        })
+    except Exception as e:
+        logger.warning(f"Failed to push theme update: {e}")
+
+
+def _schedule_push(tokens: dict, theme_id: str = ""):
+    """调度异步推送（从同步上下文调用）"""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(_push_theme_update(tokens, theme_id))
+    except RuntimeError:
+        pass
 
 
 def execute(params: dict, command: str = "") -> dict:
@@ -96,6 +125,7 @@ def _theme_apply(params: dict) -> dict:
             # 模式 3：切换后再微调
             if tokens:
                 override_result = theme_service.apply_token_overrides(tokens)
+                _schedule_push(override_result["applied"], theme_id)
                 return success_result(
                     "theme",
                     {
@@ -107,6 +137,7 @@ def _theme_apply(params: dict) -> dict:
                     }
                 )
 
+            _schedule_push(full_theme, theme_id)
             return success_result(
                 "theme",
                 {"action": "switch", "theme_id": theme_id, "tokens": full_theme}
@@ -116,6 +147,7 @@ def _theme_apply(params: dict) -> dict:
         elif tokens:
             override_result = theme_service.apply_token_overrides(tokens)
             current_id = theme_storage.get_current_theme_id()
+            _schedule_push(override_result["applied"], current_id)
 
             return success_result(
                 "theme",
@@ -166,6 +198,7 @@ def _theme_save(params: dict) -> dict:
 
     try:
         new_theme = theme_service.save_as_new_theme(name, description)
+        _schedule_push(new_theme.get("tokens", {}), new_theme.get("id", ""))
         return success_result("theme", {"action": "save", "theme": new_theme})
     except Exception as e:
         return error_result(
