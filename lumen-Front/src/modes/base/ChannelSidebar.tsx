@@ -104,7 +104,7 @@ function ChannelSidebar() {
         <>
           <div className="fixed inset-0 z-40" onClick={closeContextMenu} />
           <div
-            className="fixed z-50 bg-[#1a1a19] border border-[#2a2a28] rounded-lg
+            className="fixed z-50 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
               shadow-[0_4px_16px_rgba(0,0,0,0.4)] py-1 min-w-[120px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}

@@ -49,7 +49,7 @@ function PushNotification({ notifications, onDismiss }: PushNotificationProps) {
             key={n.id}
             className={`
               flex items-start gap-3 px-4 py-3 rounded-lg
-              bg-slate-900/95 backdrop-blur-sm
+              bg-[var(--color-bg-deep)] backdrop-blur-sm
               border ${styles.border}
               shadow-lg shadow-black/20
               animate-slide-in
@@ -62,14 +62,14 @@ function PushNotification({ notifications, onDismiss }: PushNotificationProps) {
 
             {/* 内容 */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200">{n.title}</p>
-              <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.body}</p>
+              <p className="text-sm font-medium text-[var(--color-text-primary)]">{n.title}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 line-clamp-2">{n.body}</p>
             </div>
 
             {/* 关闭按钮 */}
             <button
               onClick={() => onDismiss(n.id)}
-              className="text-slate-500 hover:text-slate-300 text-xs shrink-0 mt-0.5 transition-colors"
+              className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-xs shrink-0 mt-0.5 transition-colors"
             >
               ✕
             </button>

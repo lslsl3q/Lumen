@@ -59,7 +59,7 @@ function ChannelContent() {
 
       {/* 输入框 */}
       <div className="px-4 pb-3 flex-shrink-0">
-        <div className="flex items-center gap-2 bg-[#141413] border border-[#2a2a28] rounded-lg px-3 py-2">
+        <div className="flex items-center gap-2 bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-lg px-3 py-2">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}

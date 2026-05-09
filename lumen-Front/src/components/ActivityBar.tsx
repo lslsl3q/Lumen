@@ -147,7 +147,7 @@ function ActivityBar({
       <button
         onClick={() => { onOpenSettings(); setMoreOpen(false); }}
         className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left cursor-pointer
-          text-slate-400 hover:text-slate-200 hover:bg-[#2a2926]
+          text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[#2a2926]
           transition-colors duration-100 text-xs"
       >
         设置...
@@ -156,7 +156,7 @@ function ActivityBar({
   );
 
   return (
-    <div className="w-12 flex flex-col items-center bg-surface-rail border-r border-slate-800/30
+    <div className="w-12 flex flex-col items-center bg-surface-rail border-r border-[var(--color-border-subtle)]
       select-none py-2 flex-shrink-0"
     >
       {/* 面板图标（动态配置） */}
@@ -170,9 +170,9 @@ function ActivityBar({
               className={`${iconSlot}
                 ${isActive
                   ? 'text-amber-400 bg-amber-500/10'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                 }
-                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-slate-800/40`}
+                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
               title={title}
             >
               {isActive && <ActiveIndicator />}
@@ -183,38 +183,38 @@ function ActivityBar({
       </div>
 
       {/* 分隔线 */}
-      <div className="h-px w-6 bg-slate-800/40 my-2" />
+      <div className="h-px w-6 bg-[var(--color-border-subtle)] my-2" />
 
       {/* 动作图标 */}
       <div className="flex flex-col items-center gap-0.5">
         <button
           onClick={onOpenMemoryWindow}
-          className={`${iconSlot} text-slate-500 hover:text-slate-300 hover:bg-slate-800/40
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-slate-800/40`}
+          className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="知识运维"
         >
           <Database className="w-4 h-4" />
         </button>
         <button
           onClick={onOpenGraphEditor}
-          className={`${iconSlot} text-slate-500 hover:text-slate-300 hover:bg-slate-800/40
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-slate-800/40`}
+          className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="图谱编辑器"
         >
           <GraphIcon />
         </button>
         <button
           onClick={onManageWorldBooks}
-          className={`${iconSlot} text-slate-500 hover:text-slate-300 hover:bg-slate-800/40
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-slate-800/40`}
+          className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="世界书"
         >
           <WorldBookIcon />
         </button>
         <button
           onClick={onToggleDebug}
-          className={`${iconSlot} text-slate-500 hover:text-slate-300 hover:bg-slate-800/40
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-slate-800/40`}
+          className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="监控面板"
         >
           <DebugIcon />
@@ -225,12 +225,12 @@ function ActivityBar({
       <div className="flex-1" />
 
       {/* 底部 ⋯ 更多 */}
-      <div className="flex flex-col items-center gap-0.5 pt-2 border-t border-slate-800/40 w-full">
+      <div className="flex flex-col items-center gap-0.5 pt-2 border-t border-[var(--color-border)] w-full">
         <Popover
           trigger={
             <button
-              className={`${iconSlot} text-slate-600 hover:text-slate-400 hover:bg-slate-800/40
-                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-slate-800/40`}
+              className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-subtle)]
+                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
               title="更多"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

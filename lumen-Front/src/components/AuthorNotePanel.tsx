@@ -32,7 +32,7 @@ function AuthorNotePanel({
                 d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
             </svg>
           </div>
-          <span className="text-sm text-slate-500">加载中...</span>
+          <span className="text-sm text-[var(--color-text-muted)]">加载中...</span>
         </div>
       </div>
     );
@@ -46,7 +46,7 @@ function AuthorNotePanel({
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
-          hover:bg-slate-800/40 transition-all duration-150 cursor-pointer"
+          hover:bg-[var(--color-primary-subtle)] transition-all duration-150 cursor-pointer"
       >
         <div className="w-8 h-8 rounded-full bg-amber-500/10 flex-shrink-0 flex items-center justify-center">
           <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -55,8 +55,8 @@ function AuthorNotePanel({
           </svg>
         </div>
         <div className="flex-1 text-left min-w-0">
-          <div className="text-[10px] text-slate-600">Author's Note</div>
-          <div className="text-sm text-slate-300 truncate">
+          <div className="text-[10px] text-[var(--color-text-muted)]">Author's Note</div>
+          <div className="text-sm text-[var(--color-text-primary)] truncate">
             {hasContent ? config.content.slice(0, 30) + (config.content.length > 30 ? '...' : '') : '点击编辑'}
           </div>
         </div>
@@ -64,7 +64,7 @@ function AuthorNotePanel({
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
         )}
         <svg
-          className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-[var(--color-text-muted)] transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor"
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -79,8 +79,8 @@ function AuthorNotePanel({
             onChange={(e) => onSaveContent(e.target.value)}
             placeholder="输入临时提示词..."
             rows={4}
-            className="w-full bg-slate-900/60 border border-slate-700/40 rounded-lg
-              px-3 py-2 text-sm text-slate-300 placeholder-slate-600 leading-relaxed
+            className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg
+              px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-slate-600 leading-relaxed
               focus:outline-hidden focus:border-amber-500/40
               focus:shadow-[0_0_8px_rgba(204,124,94,0.08)]
               resize-none transition-all duration-200"
@@ -92,7 +92,7 @@ function AuthorNotePanel({
                 className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-all duration-150 cursor-pointer
                   ${config.injection_position === 'before_user'
                     ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-                    : 'bg-slate-800/40 text-slate-500 border border-slate-700/40 hover:border-slate-600'
+                    : 'bg-[var(--color-border-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border)]'
                   }`}
               >
                 用户消息前
@@ -102,7 +102,7 @@ function AuthorNotePanel({
                 className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-all duration-150 cursor-pointer
                   ${config.injection_position === 'after_user'
                     ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-                    : 'bg-slate-800/40 text-slate-500 border border-slate-700/40 hover:border-slate-600'
+                    : 'bg-[var(--color-border-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border)]'
                   }`}
               >
                 用户消息后

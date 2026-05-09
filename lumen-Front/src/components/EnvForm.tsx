@@ -134,7 +134,7 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
 
         return (
           <div key={key}>
-            <label className="block text-sm text-slate-400 mb-1.5">{meta.label}</label>
+            <label className="block text-sm text-[var(--color-text-secondary)] mb-1.5">{meta.label}</label>
             <div className="relative">
               <input
                 type={isPassword && !showKey ? 'password' : 'text'}
@@ -143,8 +143,8 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
                 placeholder={meta.placeholder}
                 className="
                   w-full px-4 py-2.5 rounded-lg text-sm
-                  bg-slate-800/40 border border-slate-700/40
-                  text-slate-200 placeholder-slate-600
+                  bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)]
+                  text-[var(--color-text-primary)] placeholder-slate-600
                   focus:outline-hidden focus:border-amber-500/40
                   transition-all duration-200
                 "
@@ -156,7 +156,7 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
 
       {/* 显示/隐藏密钥 */}
       {values['API_KEY'] && (
-        <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-[var(--color-text-muted)] cursor-pointer">
           <input
             type="checkbox"
             checked={showKey}
@@ -168,7 +168,7 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
       )}
 
       {/* 保存按钮 */}
-      <div className="flex justify-end pt-4 border-t border-slate-800/40">
+      <div className="flex justify-end pt-4 border-t border-[var(--color-border)]">
         <button
           onClick={handleSave}
           disabled={isSaving || !hasChanges}

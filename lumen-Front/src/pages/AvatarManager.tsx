@@ -67,12 +67,12 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
   };
 
   return (
-    <div className="h-full bg-slate-950 text-slate-200">
+    <div className="h-full bg-[var(--color-bg-deep)] text-[var(--color-text-primary)]">
       {/* 顶栏 */}
       <div className="flex items-center gap-4 mb-8 px-6 py-4">
         <button
           onClick={goBack}
-          className="text-slate-400 hover:text-slate-200 transition-colors"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
         >
           ← 返回设置
         </button>
@@ -94,11 +94,11 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
 
       {/* 上传区域 */}
       <div className="max-w-6xl mx-auto px-6 mb-8">
-        <div className="p-6 rounded-xl bg-slate-900/60 border border-dashed border-amber-500/30">
+        <div className="p-6 rounded-xl bg-[var(--color-bg-elevated)] border border-dashed border-amber-500/30">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-medium text-slate-200 mb-1">上传新头像</h3>
-              <p className="text-sm text-slate-500">支持 PNG、JPG、GIF、WebP 格式，最大 5MB</p>
+              <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-1">上传新头像</h3>
+              <p className="text-sm text-[var(--color-text-muted)]">支持 PNG、JPG、GIF、WebP 格式，最大 5MB</p>
             </div>
             <label className="
               px-4 py-2 rounded-lg text-sm font-medium
@@ -122,9 +122,9 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
       {/* 头像列表 */}
       <div className="max-w-6xl mx-auto px-6">
         {isLoading ? (
-          <div className="text-center py-16 text-slate-600">加载中...</div>
+          <div className="text-center py-16 text-[var(--color-text-muted)]">加载中...</div>
         ) : avatars.length === 0 ? (
-          <div className="text-center py-16 text-slate-600">
+          <div className="text-center py-16 text-[var(--color-text-muted)]">
             <p className="mb-4">还没有上传头像</p>
             <p className="text-sm">点击上方「选择文件」上传第一个头像</p>
           </div>
@@ -133,10 +133,10 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
             {avatars.map((avatar) => (
               <div
                 key={avatar.id}
-                className="group relative p-3 rounded-xl bg-slate-900/60 border border-slate-800/40 hover:border-amber-500/30 transition-all"
+                className="group relative p-3 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-amber-500/30 transition-all"
               >
                 {/* 头像图片 */}
-                <div className="aspect-square rounded-lg overflow-hidden bg-slate-800/40 mb-2">
+                <div className="aspect-square rounded-lg overflow-hidden bg-[var(--color-primary-subtle)] mb-2">
                   <img
                     src={avatar.url}
                     alt={avatar.filename}
@@ -145,12 +145,12 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
                 </div>
 
                 {/* 文件名 */}
-                <div className="text-xs text-slate-500 truncate mb-1" title={avatar.filename}>
+                <div className="text-xs text-[var(--color-text-muted)] truncate mb-1" title={avatar.filename}>
                   {avatar.filename}
                 </div>
 
                 {/* 大小 */}
-                <div className="text-[10px] text-slate-600">
+                <div className="text-[10px] text-[var(--color-text-muted)]">
                   {(avatar.size / 1024).toFixed(1)} KB
                 </div>
 

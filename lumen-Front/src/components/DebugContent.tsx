@@ -45,12 +45,12 @@ function TokenTab({ layers, totalTokens, contextSize }: {
       {/* 总进度条 */}
       <div>
         <div className="flex items-center justify-between text-xs mb-1.5">
-          <span className="text-slate-400">上下文使用</span>
-          <span className="font-mono text-slate-300">
+          <span className="text-[var(--color-text-secondary)]">上下文使用</span>
+          <span className="font-mono text-[var(--color-text-primary)]">
             {totalTokens} / {contextSize} ({percent}%)
           </span>
         </div>
-        <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+        <div className="w-full h-2 rounded-full bg-[var(--color-bg-elevated)] overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-300 ${getBarColor(percent)}`}
             style={{ width: `${Math.min(percent, 100)}%` }}
@@ -61,19 +61,19 @@ function TokenTab({ layers, totalTokens, contextSize }: {
       {/* 各层列表 */}
       <div className="space-y-1">
         {layers.map((layer) => (
-          <div key={layer.name} className="rounded border border-slate-800/60 overflow-hidden">
+          <div key={layer.name} className="rounded border border-[var(--color-border)] overflow-hidden">
             <button
               onClick={() => setExpandedLayer(expandedLayer === layer.name ? null : layer.name)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-slate-800/40 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-[var(--color-primary-subtle)] transition-colors cursor-pointer"
             >
-              <span className="text-slate-400">{layer.name}</span>
+              <span className="text-[var(--color-text-secondary)]">{layer.name}</span>
               <div className="flex items-center gap-2">
                 <span className={`font-mono ${getTokenTextColor(layer.tokens)}`}>{layer.tokens}</span>
-                <span className={`text-slate-600 transition-transform duration-200 ${expandedLayer === layer.name ? 'rotate-90' : ''}`}>▶</span>
+                <span className={`text-[var(--color-text-muted)] transition-transform duration-200 ${expandedLayer === layer.name ? 'rotate-90' : ''}`}>▶</span>
               </div>
             </button>
             {expandedLayer === layer.name && (
-              <pre className="px-3 py-2 text-xs text-slate-500 bg-slate-950/50 whitespace-pre-wrap break-words max-h-60 overflow-y-auto border-t border-slate-800/40">
+              <pre className="px-3 py-2 text-xs text-[var(--color-text-muted)] bg-[var(--color-bg-deep)] whitespace-pre-wrap break-words max-h-60 overflow-y-auto border-t border-[var(--color-border)]">
                 {layer.content}
               </pre>
             )}
@@ -92,7 +92,7 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
 
   if (!recallLog || recallLog.length === 0) {
     return (
-      <div className="p-4 text-center text-slate-600 text-sm">
+      <div className="p-4 text-center text-[var(--color-text-muted)] text-sm">
         没有匹配的记忆召回
       </div>
     );
@@ -120,8 +120,8 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
 
       {/* 预算统计 */}
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-500">召回统计</span>
-        <span className="font-mono text-slate-400">
+        <span className="text-[var(--color-text-muted)]">召回统计</span>
+        <span className="font-mono text-[var(--color-text-secondary)]">
           {totalMessages} 条消息 · {totalTokens} tokens
         </span>
       </div>
@@ -129,10 +129,10 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
       {/* 每个关键词的召回组 */}
       <div className="space-y-2">
         {recallLog.map((entry) => (
-          <div key={entry.keyword} className="rounded border border-slate-800/60 overflow-hidden">
+          <div key={entry.keyword} className="rounded border border-[var(--color-border)] overflow-hidden">
             <button
               onClick={() => setExpandedKeyword(expandedKeyword === entry.keyword ? null : entry.keyword)}
-              className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-slate-800/40 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-[var(--color-primary-subtle)] transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-2">
                 {entry.source === 'knowledge' || entry.source === 'knowledge_placeholder' ? (
@@ -152,37 +152,37 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
                     {entry.source === 'sqlite' ? '搜索' : entry.source === 'hybrid' ? '混合检索' : entry.source === 'summary' ? '摘要' : entry.source === 'thinking_clusters' ? '思维簇' : '摘要'}
                   </span>
                 )}
-                <span className="text-slate-300">{entry.keyword}</span>
+                <span className="text-[var(--color-text-primary)]">{entry.keyword}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-slate-500">{entry.results} 条</span>
-                <span className={`text-slate-600 transition-transform duration-200 ${expandedKeyword === entry.keyword ? 'rotate-90' : ''}`}>▶</span>
+                <span className="font-mono text-[var(--color-text-muted)]">{entry.results} 条</span>
+                <span className={`text-[var(--color-text-muted)] transition-transform duration-200 ${expandedKeyword === entry.keyword ? 'rotate-90' : ''}`}>▶</span>
               </div>
             </button>
 
             {expandedKeyword === entry.keyword && entry.messages && entry.messages.length > 0 && (
-              <div className="border-t border-slate-800/40">
+              <div className="border-t border-[var(--color-border)]">
                 {entry.messages.map((msg, idx) => {
                   const msgKey = `${entry.keyword}-${idx}`;
                   const isExpanded = expandedMsg === msgKey;
                   return (
-                    <div key={msgKey} className="border-b border-slate-800/30 last:border-b-0">
+                    <div key={msgKey} className="border-b border-[var(--color-border-subtle)] last:border-b-0">
                       <button
                         onClick={() => setExpandedMsg(isExpanded ? null : msgKey)}
-                        className="w-full px-3 py-2 text-left hover:bg-slate-800/20 transition-colors cursor-pointer"
+                        className="w-full px-3 py-2 text-left hover:bg-[var(--color-bg-elevated)]/20 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2 text-xs">
                           <span className={`px-1 py-0.5 rounded text-[10px] ${
-                            msg.role === 'user' ? 'bg-slate-700 text-slate-300' : 'bg-indigo-500/10 text-indigo-400'
+                            msg.role === 'user' ? 'bg-slate-700 text-[var(--color-text-primary)]' : 'bg-indigo-500/10 text-indigo-400'
                           }`}>
                             {msg.role === 'user' ? '用户' : 'AI'}
                           </span>
-                          <span className="text-slate-600 font-mono">{msg.session_id.slice(0, 8)}</span>
-                          <span className="text-slate-700 text-[10px]">
+                          <span className="text-[var(--color-text-muted)] font-mono">{msg.session_id.slice(0, 8)}</span>
+                          <span className="text-[var(--color-text-dim)] text-[10px]">
                             {msg.created_at ? new Date(msg.created_at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
                           </span>
                         </div>
-                        <p className={`text-xs text-slate-500 mt-1 ${isExpanded ? '' : 'line-clamp-2'}`}>
+                        <p className={`text-xs text-[var(--color-text-muted)] mt-1 ${isExpanded ? '' : 'line-clamp-2'}`}>
                           {msg.content}
                         </p>
                       </button>
@@ -193,28 +193,28 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
             )}
 
             {expandedKeyword === entry.keyword && (!entry.messages || entry.messages.length === 0) && (
-              <div className="px-3 py-2 text-xs text-slate-500 border-t border-slate-800/40 space-y-1">
+              <div className="px-3 py-2 text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)] space-y-1">
                 {entry.source === 'sqlite' ? (
-                  <span className="text-slate-600">该关键词无匹配结果</span>
+                  <span className="text-[var(--color-text-muted)]">该关键词无匹配结果</span>
                 ) : entry.source === 'knowledge' || entry.source === 'knowledge_placeholder' ? (
                   <>
                     <div className="flex items-center gap-3">
-                      <span className="text-slate-600">稠密向量</span>
-                      <span className="font-mono text-slate-400">{entry.vector_count ?? '?'} 条</span>
+                      <span className="text-[var(--color-text-muted)]">稠密向量</span>
+                      <span className="font-mono text-[var(--color-text-secondary)]">{entry.vector_count ?? '?'} 条</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-slate-600">{entry.method === 'sparse' ? '稀疏向量' : 'BM25'}</span>
-                      <span className="font-mono text-slate-400">{entry.sparse_count ?? '?'} 条</span>
+                      <span className="text-[var(--color-text-muted)]">{entry.method === 'sparse' ? '稀疏向量' : 'BM25'}</span>
+                      <span className="font-mono text-[var(--color-text-secondary)]">{entry.sparse_count ?? '?'} 条</span>
                     </div>
                     {(entry.graph_count ?? 0) > 0 && (
                       <div className="flex items-center gap-3">
-                        <span className="text-slate-600">图谱召回</span>
-                        <span className="font-mono text-slate-400">{entry.graph_count} 条</span>
+                        <span className="text-[var(--color-text-muted)]">图谱召回</span>
+                        <span className="font-mono text-[var(--color-text-secondary)]">{entry.graph_count} 条</span>
                       </div>
                     )}
                   </>
                 ) : (
-                  <span className="text-slate-600">检索结果已注入 prompt</span>
+                  <span className="text-[var(--color-text-muted)]">检索结果已注入 prompt</span>
                 )}
               </div>
             )}
@@ -230,7 +230,7 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
 function TraceTab({ trace }: { trace: ReactTraceStep[] }) {
   if (trace.length === 0) {
     return (
-      <div className="p-4 text-center text-slate-600 text-sm">
+      <div className="p-4 text-center text-[var(--color-text-muted)] text-sm">
         发送消息后显示 AI 的思考过程
       </div>
     );
@@ -264,48 +264,48 @@ function TraceTab({ trace }: { trace: ReactTraceStep[] }) {
       error: 'bg-red-500/10 text-red-400',
       cancelled: 'bg-amber-500/10 text-amber-400',
     };
-    return map[action] || 'bg-slate-500/10 text-slate-400';
+    return map[action] || 'bg-slate-500/10 text-[var(--color-text-secondary)]';
   }
 
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-500">ReAct 循环追踪</span>
-        <span className="font-mono text-slate-400">{trace.length} 步</span>
+        <span className="text-[var(--color-text-muted)]">ReAct 循环追踪</span>
+        <span className="font-mono text-[var(--color-text-secondary)]">{trace.length} 步</span>
       </div>
 
       {[...iterations.entries()].map(([iter, steps]) => (
         <div key={iter} className="space-y-1">
-          <div className="text-[10px] text-slate-600 font-mono px-1">
+          <div className="text-[10px] text-[var(--color-text-muted)] font-mono px-1">
             ── 第 {iter + 1} 轮 ──
           </div>
           {steps.map((step, idx) => (
-            <div key={idx} className="rounded border border-slate-800/60 overflow-hidden">
+            <div key={idx} className="rounded border border-[var(--color-border)] overflow-hidden">
               <div className="flex items-center justify-between px-3 py-1.5 text-xs">
                 <div className="flex items-center gap-2">
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${actionColor(step.action)}`}>
                     {actionLabel(step.action)}
                   </span>
                   {step.tool && (
-                    <span className="font-mono text-slate-300">{step.tool}</span>
+                    <span className="font-mono text-[var(--color-text-primary)]">{step.tool}</span>
                   )}
                   {step.error && (
                     <span className="text-red-400 truncate max-w-40">{step.error}</span>
                   )}
                 </div>
                 {step.duration_ms != null && (
-                  <span className={`font-mono ${step.duration_ms > 5000 ? 'text-red-400' : step.duration_ms > 1000 ? 'text-amber-400' : 'text-slate-500'}`}>
+                  <span className={`font-mono ${step.duration_ms > 5000 ? 'text-red-400' : step.duration_ms > 1000 ? 'text-amber-400' : 'text-[var(--color-text-muted)]'}`}>
                     {step.duration_ms >= 1000 ? `${(step.duration_ms / 1000).toFixed(1)}s` : `${Math.round(step.duration_ms)}ms`}
                   </span>
                 )}
               </div>
               {step.thinking && (
-                <div className="px-3 py-1.5 text-xs text-slate-500 bg-slate-950/50 border-t border-slate-800/40 italic truncate">
+                <div className="px-3 py-1.5 text-xs text-[var(--color-text-muted)] bg-[var(--color-bg-deep)] border-t border-[var(--color-border)] italic truncate">
                   {step.thinking}
                 </div>
               )}
               {step.action === 'tool_result' && step.success != null && (
-                <div className="px-3 py-1 text-[10px] border-t border-slate-800/30">
+                <div className="px-3 py-1 text-[10px] border-t border-[var(--color-border-subtle)]">
                   <span className={step.success ? 'text-emerald-500' : 'text-red-400'}>
                     {step.success ? '成功' : '失败'}
                   </span>
@@ -329,7 +329,7 @@ export default function DebugContent({ layers, totalTokens, contextSize, recallL
   return (
     <>
       {/* 标签栏 */}
-      <div className="flex border-b border-slate-800/40">
+      <div className="flex border-b border-[var(--color-border)]">
         {([
           { key: 'token' as TabKey, label: 'Token 分析' },
           { key: 'recall' as TabKey, label: '记忆召回' },
@@ -341,7 +341,7 @@ export default function DebugContent({ layers, totalTokens, contextSize, recallL
             className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors cursor-pointer ${
               activeTab === tab.key
                 ? 'text-teal-400 border-b-2 border-teal-400'
-                : 'text-slate-500 hover:text-slate-400'
+                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
             }`}
           >
             {tab.label}

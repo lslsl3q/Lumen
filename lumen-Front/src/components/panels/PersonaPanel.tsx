@@ -134,7 +134,7 @@ export default function PersonaPanel({
       return (
         <div className="flex flex-col h-full">
           <BackButton label="Persona 列表" onClick={() => setView('list')} />
-          <div className="flex-1 flex items-center justify-center text-xs text-slate-600">加载中...</div>
+          <div className="flex-1 flex items-center justify-center text-xs text-[var(--color-text-muted)]">加载中...</div>
         </div>
       );
     }
@@ -156,22 +156,22 @@ export default function PersonaPanel({
               value={form.name}
               onChange={e => updateForm({ name: e.target.value })}
               placeholder="Persona 名字"
-              className="border-0 border-b border-slate-700/40 rounded-none bg-transparent
-                focus:border-amber-500/40 focus-visible:ring-0 text-sm text-slate-200 placeholder-slate-700"
+              className="border-0 border-b border-[var(--color-border-subtle)] rounded-none bg-transparent
+                focus:border-amber-500/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-slate-700"
             />
           </div>
 
-          <Separator className="mx-3 bg-slate-800/40" />
+          <Separator className="mx-3 bg-[var(--color-bg-elevated)]/40" />
 
           {/* 描述 */}
           <div className="px-3 pt-3 space-y-2.5">
             <div>
-              <Label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">描述</Label>
+              <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">描述</Label>
               <Input
                 value={form.description}
                 onChange={e => updateForm({ description: e.target.value })}
                 placeholder="描述这个身份的特点..."
-                className="mt-0.5 bg-slate-900/60 border-slate-700/60 text-xs text-slate-300
+                className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
                   placeholder-slate-700 focus:border-amber-500/40 h-8"
               />
             </div>
@@ -179,7 +179,7 @@ export default function PersonaPanel({
 
           {/* Traits */}
           <div className="px-3 pt-3 space-y-2">
-            <Label className="text-[10px] text-slate-600 uppercase tracking-wider">特质标签</Label>
+            <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">特质标签</Label>
             <div className="flex flex-wrap gap-1.5">
               {form.traits.map(trait => (
                 <Badge
@@ -199,7 +199,7 @@ export default function PersonaPanel({
                 onChange={e => setTraitInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
                 placeholder="添加特质..."
-                className="flex-1 bg-slate-900/60 border-slate-700/60 text-xs text-slate-300
+                className="flex-1 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
                   placeholder-slate-700 focus:border-amber-500/40 h-7"
               />
               <Button
@@ -207,7 +207,7 @@ export default function PersonaPanel({
                 size="xs"
                 onClick={addTrait}
                 disabled={!traitInput.trim()}
-                className="text-slate-500 hover:text-slate-300"
+                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
               >
                 +
               </Button>
@@ -216,7 +216,7 @@ export default function PersonaPanel({
         </ScrollArea>
 
         {/* 保存 */}
-        <div className="border-t border-slate-800/40 px-3 py-2.5">
+        <div className="border-t border-[var(--color-border)] px-3 py-2.5">
           <Button
             onClick={handleSave}
             disabled={isSaving || !form.name.trim()}
@@ -235,12 +235,12 @@ export default function PersonaPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
-        <span className="text-[10px] text-slate-600 font-medium tracking-wider uppercase">Personas</span>
+        <span className="text-[10px] text-[var(--color-text-muted)] font-medium tracking-wider uppercase">Personas</span>
         <Button
           variant="ghost"
           size="icon-xs"
           onClick={openNewPersona}
-          className="text-slate-500 hover:text-slate-300"
+          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
@@ -259,11 +259,11 @@ export default function PersonaPanel({
               transition-colors duration-100 ${navItemClass}
               ${activePersonaId === null
                 ? 'bg-amber-500/10 text-amber-300'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
               }`}
           >
-            <div className="w-6 h-6 rounded-full bg-slate-800 flex-shrink-0 flex items-center justify-center">
-              <span className="text-[9px] text-slate-500">—</span>
+            <div className="w-6 h-6 rounded-full bg-[var(--color-bg-elevated)] flex-shrink-0 flex items-center justify-center">
+              <span className="text-[9px] text-[var(--color-text-muted)]">—</span>
             </div>
             <span className="text-xs">不使用</span>
           </button>
@@ -283,7 +283,7 @@ export default function PersonaPanel({
                   transition-colors duration-100 ${navItemClass}
                   ${isActive
                     ? 'bg-amber-500/10 text-amber-300'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
+                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                   }`}
               >
                 <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
@@ -293,7 +293,7 @@ export default function PersonaPanel({
                 <button
                   onClick={(e) => { e.stopPropagation(); openSettings(p.id); }}
                   className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0
-                    text-slate-700 hover:text-slate-400 opacity-0 group-hover:opacity-100
+                    text-[var(--color-text-dim)] hover:text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-100
                     transition-opacity duration-150 cursor-pointer"
                   title="设置"
                 >

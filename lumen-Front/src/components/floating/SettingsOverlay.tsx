@@ -131,26 +131,26 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
     <div className="fixed inset-0 z-50 pointer-events-auto animate-overlay-fade-in">
       {/* 遮罩 */}
       <div
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-[var(--color-bg-deep)] backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* 内容面板 */}
       <div className="absolute inset-4 flex rounded-xl overflow-hidden
-        bg-slate-900/98 border border-slate-700/40 shadow-[0_16px_48px_rgba(0,0,0,0.5)]
+        bg-[var(--color-bg-deep)] border border-[var(--color-border-subtle)] shadow-[0_16px_48px_rgba(0,0,0,0.5)]
         animate-overlay-content-in"
       >
         {/* 左导航 */}
-        <nav className="w-56 flex-shrink-0 border-r border-slate-800/40 bg-slate-950/40
+        <nav className="w-56 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-deep)]
           flex flex-col overflow-y-auto scrollbar-lumen"
         >
           {/* 顶部 */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/40">
-            <span className="text-sm font-medium text-slate-300 font-display">设置</span>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
+            <span className="text-sm font-medium text-[var(--color-text-primary)] font-display">设置</span>
             <button
               onClick={onClose}
               className="w-6 h-6 rounded flex items-center justify-center
-                text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
+                text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
                 transition-all duration-150 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,7 +163,7 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
           <div className="flex-1 py-3">
             {NAV_GROUPS.map(group => (
               <div key={group.label} className="mb-4">
-                <div className="px-5 mb-1.5 text-[10px] uppercase tracking-widest text-slate-600 font-medium">
+                <div className="px-5 mb-1.5 text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-medium">
                   {group.label}
                 </div>
                 {group.items.map(item => (
@@ -173,7 +173,7 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
                     className={`w-full text-left px-5 py-2 text-sm transition-all duration-150 cursor-pointer
                       ${activeNav === item.page
                         ? 'text-amber-400 bg-amber-500/8 rounded mr-2'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                        : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                       }`}
                   >
                     {item.label}

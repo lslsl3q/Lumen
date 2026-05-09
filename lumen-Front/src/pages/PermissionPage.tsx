@@ -125,10 +125,10 @@ export default function PermissionPage() {
   const availableList = characters.filter(c => !allowedChars.has(c.id));
 
   return (
-    <div className="h-full bg-slate-950 text-slate-200 flex flex-col">
+    <div className="h-full bg-[var(--color-bg-deep)] text-[var(--color-text-primary)] flex flex-col">
       <div className="flex items-center justify-between px-6 py-4 shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/')} className="text-slate-400 hover:text-slate-200 text-sm">
+          <button onClick={() => navigate('/')} className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] text-sm">
             ← 返回
           </button>
           <h1 className="text-xl font-bold">权限管理</h1>
@@ -143,11 +143,11 @@ export default function PermissionPage() {
         )}
       </div>
 
-      <div className="border-t border-b border-[#2a2926] flex shrink-0">
+      <div className="border-t border-b border-[var(--color-border)] flex shrink-0">
         <button
           onClick={() => setTab('character')}
           className={`flex-1 py-2.5 text-xs tracking-wide transition-colors ${
-            tab === 'character' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-slate-500 hover:text-slate-300'
+            tab === 'character' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
           }`}
         >
           按角色
@@ -155,7 +155,7 @@ export default function PermissionPage() {
         <button
           onClick={() => setTab('resource')}
           className={`flex-1 py-2.5 text-xs tracking-wide transition-colors ${
-            tab === 'resource' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-slate-500 hover:text-slate-300'
+            tab === 'resource' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
           }`}
         >
           按知识库
@@ -165,7 +165,7 @@ export default function PermissionPage() {
       <div className="flex flex-1 overflow-hidden">
         {tab === 'character' ? (
           <>
-            <div className="w-56 border-r border-[#2a2926] overflow-y-auto">
+            <div className="w-56 border-r border-[var(--color-border)] overflow-y-auto">
               {characters.map(char => (
                 <button
                   key={char.id}
@@ -173,7 +173,7 @@ export default function PermissionPage() {
                   className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                     selectedCharId === char.id
                       ? 'bg-slate-800/80 text-amber-400'
-                      : 'text-slate-400 hover:bg-slate-900/50 hover:text-slate-200'
+                      : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >
                   {char.name}
@@ -182,7 +182,7 @@ export default function PermissionPage() {
             </div>
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="text-sm text-slate-500 text-center py-8">加载中...</div>
+                <div className="text-sm text-[var(--color-text-muted)] text-center py-8">加载中...</div>
               ) : (
                 <PermissionTree
                   folders={folders}
@@ -194,9 +194,9 @@ export default function PermissionPage() {
           </>
         ) : (
           <>
-            <div className="w-80 border-r border-[#2a2926] overflow-y-auto">
+            <div className="w-80 border-r border-[var(--color-border)] overflow-y-auto">
               {treeLoading ? (
-                <div className="text-sm text-slate-500 text-center py-8">加载文件夹...</div>
+                <div className="text-sm text-[var(--color-text-muted)] text-center py-8">加载文件夹...</div>
               ) : (
                 <PermissionTree
                   folders={folders}
@@ -211,13 +211,13 @@ export default function PermissionPage() {
               {selectedPath !== null ? (
                 <>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm text-slate-400">
+                    <h3 className="text-sm text-[var(--color-text-secondary)]">
                       「{selectedPath || '根目录'}」可访问的角色
                     </h3>
                     <div className="relative">
                       <button
                         onClick={() => setShowAddMenu(!showAddMenu)}
-                        className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition-colors"
+                        className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-[var(--color-text-primary)] rounded transition-colors"
                       >
                         + 添加
                       </button>
@@ -227,7 +227,7 @@ export default function PermissionPage() {
                             <button
                               key={char.id}
                               onClick={() => handleGrant(char.id)}
-                              className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                              className="w-full text-left px-3 py-2 text-sm text-[var(--color-text-primary)] hover:bg-slate-700 transition-colors"
                             >
                               {char.name}
                             </button>
@@ -237,17 +237,17 @@ export default function PermissionPage() {
                     </div>
                   </div>
                   {resourceLoading ? (
-                    <div className="text-sm text-slate-500 py-2">加载中...</div>
+                    <div className="text-sm text-[var(--color-text-muted)] py-2">加载中...</div>
                   ) : (
                     <>
                       {allowedList.map(char => (
                         <div key={char.id} className="flex items-center justify-between py-2 px-3 rounded hover:bg-slate-800/50">
                           <div className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                            <span className="text-sm text-slate-300">{char.name}</span>
+                            <span className="text-sm text-[var(--color-text-primary)]">{char.name}</span>
                           </div>
                           <button
-                            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+                            className="text-xs text-[var(--color-text-muted)] hover:text-red-400 transition-colors"
                             onClick={() => handleRevoke(char.id)}
                           >
                             移除
@@ -255,7 +255,7 @@ export default function PermissionPage() {
                         </div>
                       ))}
                       {allowedList.length === 0 && (
-                        <div className="text-sm text-slate-500 py-4 text-center">
+                        <div className="text-sm text-[var(--color-text-muted)] py-4 text-center">
                           暂无角色有访问权限，点击右上角添加
                         </div>
                       )}
@@ -263,7 +263,7 @@ export default function PermissionPage() {
                   )}
                 </>
               ) : (
-                <div className="text-sm text-slate-500 text-center py-8">
+                <div className="text-sm text-[var(--color-text-muted)] text-center py-8">
                   请在左侧选择一个文件夹
                 </div>
               )}

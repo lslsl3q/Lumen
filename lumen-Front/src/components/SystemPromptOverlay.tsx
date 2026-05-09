@@ -43,32 +43,32 @@ export default function SystemPromptOverlay({
 
   return createPortal(
     <div
-      className="fixed top-0 bottom-0 right-0 z-50 bg-slate-950
-        flex flex-col border-l border-slate-800/40 pointer-events-auto
+      className="fixed top-0 bottom-0 right-0 z-50 bg-[var(--color-bg-deep)]
+        flex flex-col border-l border-[var(--color-border)] pointer-events-auto
         animate-overlay-fade-in"
       style={{ left: 304 }}
       onKeyDown={handleKeyDown}
     >
       {/* 顶栏 */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/40">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+            className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors cursor-pointer"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          <span className="text-sm text-slate-300">
+          <span className="text-sm text-[var(--color-text-primary)]">
             系统提示词
           </span>
           {characterName && (
-            <span className="text-xs text-slate-600">— {characterName}</span>
+            <span className="text-xs text-[var(--color-text-muted)]">— {characterName}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-600">Ctrl+S 保存 · Esc 关闭</span>
+          <span className="text-[10px] text-[var(--color-text-muted)]">Ctrl+S 保存 · Esc 关闭</span>
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -90,15 +90,15 @@ export default function SystemPromptOverlay({
           onChange={e => setContent(e.target.value)}
           placeholder="你的角色设定、行为准则、说话风格..."
           className="w-full h-full px-4 py-3 rounded-lg text-sm
-            bg-slate-900/60 border border-slate-700/40 text-slate-200 placeholder-slate-700
+            bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]
             focus:outline-none focus:border-amber-500/40 resize-none
             font-mono leading-relaxed"
         />
       </div>
 
       {/* 底部提示 */}
-      <div className="px-5 py-2 border-t border-slate-800/40">
-        <span className="text-[10px] text-slate-700">
+      <div className="px-5 py-2 border-t border-[var(--color-border)]">
+        <span className="text-[10px] text-[var(--color-text-dim)]">
           name 和 description 会自动拼入提示词，不需要在这里重复
         </span>
       </div>

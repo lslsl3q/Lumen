@@ -31,7 +31,7 @@ function CreateChannelModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-[#1a1a19] border border-[#2a2a28] rounded-xl w-80 p-5
+        className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl w-80 p-5
           shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -50,7 +50,7 @@ function CreateChannelModal({ onClose }: Props) {
               onChange={(e) => setName(e.target.value)}
               placeholder="新频道"
               autoFocus
-              className="w-full bg-[#141413] border border-[#2a2a28] rounded-md px-3 py-2
+              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-md px-3 py-2
                 text-sm text-[#ccc] placeholder-[#555] outline-none
                 focus:border-[#CC7C5E55] transition-colors"
             />
@@ -67,7 +67,7 @@ function CreateChannelModal({ onClose }: Props) {
                   className={`px-3 py-2 rounded-md border text-left transition-colors cursor-pointer
                     ${type === ct.value
                       ? 'border-[#CC7C5E55] bg-[#CC7C5E15] text-[#CC7C5E]'
-                      : 'border-[#2a2a28] text-[#888] hover:border-[#3a3a38]'
+                      : 'border-[var(--color-border)] text-[#888] hover:border-[#3a3a38]'
                     }`}
                 >
                   <div className="text-xs font-medium">{ct.label}</div>
@@ -83,7 +83,7 @@ function CreateChannelModal({ onClose }: Props) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="频道用途..."
-              className="w-full bg-[#141413] border border-[#2a2a28] rounded-md px-3 py-2
+              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-md px-3 py-2
                 text-sm text-[#ccc] placeholder-[#555] outline-none
                 focus:border-[#CC7C5E55] transition-colors"
             />

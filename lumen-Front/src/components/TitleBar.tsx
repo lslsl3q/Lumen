@@ -76,11 +76,11 @@ function TitleBar() {
   const displayMode = activeMode === 'rpg' ? 'base' : activeMode;
 
   return (
-    <div className="h-9 flex items-center bg-surface-rail/80 border-b border-slate-800/40 select-none relative">
+    <div className="h-9 flex items-center bg-surface-rail/80 border-b border-[var(--color-border)] select-none relative">
       {/* 左侧品牌 — 拖拽区 */}
       <div data-tauri-drag-region className="flex items-center gap-2 pl-4 h-full cursor-default">
         <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
-        <span className="text-sm font-light tracking-widest text-slate-400 uppercase font-display">
+        <span className="text-sm font-light tracking-widest text-[var(--color-text-secondary)] uppercase font-display">
           Lumen
         </span>
       </div>
@@ -111,7 +111,7 @@ function TitleBar() {
           <span className="w-6 h-6 flex items-center justify-center rounded-md
             hover:bg-slate-700/40 transition-all duration-200">
             <svg
-              className={`w-3 h-3 text-slate-500 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isPinned ? 'rotate-45' : 'rotate-0'}`}
+              className={`w-3 h-3 text-[var(--color-text-muted)] transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isPinned ? 'rotate-45' : 'rotate-0'}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -132,12 +132,12 @@ function TitleBar() {
           <span className="w-6 h-6 flex items-center justify-center rounded-md
             hover:bg-slate-700/40 transition-all duration-200">
             {isDark ? (
-              <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
               </svg>
             ) : (
-              <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
               </svg>
@@ -152,7 +152,7 @@ function TitleBar() {
         >
           <span className="w-6 h-6 flex items-center justify-center rounded-md
             hover:bg-slate-700/40 transition-all duration-150">
-            <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3 h-3 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
               />
@@ -168,7 +168,7 @@ function TitleBar() {
         <button
           onClick={handleMinimize}
           className="w-11 h-full flex items-center justify-center
-            text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
+            text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
             active:soft-pressed transition-all duration-150 cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -180,7 +180,7 @@ function TitleBar() {
         <button
           onClick={handleMaximize}
           className="w-11 h-full flex items-center justify-center
-            text-slate-500 hover:text-slate-300 hover:bg-slate-800/60
+            text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
             active:soft-pressed transition-all duration-150 cursor-pointer"
         >
           {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
@@ -190,7 +190,7 @@ function TitleBar() {
         <button
           onClick={handleClose}
           className="w-11 h-full flex items-center justify-center
-            text-slate-500 hover:text-red-400 hover:bg-red-500/10
+            text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-500/10
             active:soft-pressed transition-all duration-150 cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

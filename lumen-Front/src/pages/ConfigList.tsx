@@ -43,7 +43,7 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
   }, [loadList]);
 
   return (
-    <div className="h-full bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-[var(--color-text-primary)]">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center justify-between mb-8">
@@ -51,8 +51,8 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
             <button
               onClick={() => goBack()}
               className="
-                px-3 py-1.5 rounded-lg text-sm text-slate-400
-                hover:text-slate-200 hover:bg-slate-800/60
+                px-3 py-1.5 rounded-lg text-sm text-[var(--color-text-secondary)]
+                hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
                 transition-all duration-150
               "
             >
@@ -71,21 +71,21 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
 
         {/* 加载状态 */}
         {isLoading ? (
-          <div className="text-center py-16 text-slate-600">加载中...</div>
+          <div className="text-center py-16 text-[var(--color-text-muted)]">加载中...</div>
         ) : (
           <>
             {/* 配置卡片列表 */}
             <div className="space-y-4">
               {configs.map(config => {
-                const meta = TYPE_META[config.type] || { icon: '?', color: 'text-slate-400' };
+                const meta = TYPE_META[config.type] || { icon: '?', color: 'text-[var(--color-text-secondary)]' };
                 return (
                   <div
                     key={config.name}
                     onClick={() => goTo('config-editor', { resource: config.name })}
                     className="
                       group relative p-5 rounded-xl cursor-pointer
-                      bg-slate-900/60 border border-slate-800/40
-                      hover:border-teal-500/30 hover:bg-slate-900/80
+                      bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
+                      hover:border-teal-500/30 hover:bg-[var(--color-bg-elevated)]
                       transition-all duration-200
                     "
                   >
@@ -96,12 +96,12 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
                       </div>
                       {/* 信息 */}
                       <div className="flex-1">
-                        <div className="text-base text-slate-200">{config.name}</div>
-                        <div className="text-sm text-slate-500 mt-0.5">{config.description}</div>
+                        <div className="text-base text-[var(--color-text-primary)]">{config.name}</div>
+                        <div className="text-sm text-[var(--color-text-muted)] mt-0.5">{config.description}</div>
                       </div>
                       {/* 箭头 */}
                       <svg
-                        className="w-4 h-4 text-slate-600 group-hover:text-teal-400 transition-colors"
+                        className="w-4 h-4 text-[var(--color-text-muted)] group-hover:text-teal-400 transition-colors"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -113,23 +113,23 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
             </div>
 
             {/* 其他功能入口 */}
-            <div className="mt-8 pt-6 border-t border-slate-800/40">
-              <h3 className="text-sm text-slate-500 mb-4">其他功能</h3>
+            <div className="mt-8 pt-6 border-t border-[var(--color-border)]">
+              <h3 className="text-sm text-[var(--color-text-muted)] mb-4">其他功能</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div
                   onClick={() => window.dispatchEvent(new CustomEvent('lumen:open-knowledge'))}
                   className="
                     group p-4 rounded-xl cursor-pointer
-                    bg-slate-900/60 border border-slate-800/40
-                    hover:border-amber-500/30 hover:bg-slate-900/80
+                    bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
+                    hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)]
                     transition-all duration-200
                   "
                 >
                   <div className="flex items-center gap-3">
                     <div className="text-2xl text-amber-400">&#128218;</div>
                     <div>
-                      <div className="text-base text-slate-200">知识库</div>
-                      <div className="text-sm text-slate-500">导入文档，语义检索注入对话</div>
+                      <div className="text-base text-[var(--color-text-primary)]">知识库</div>
+                      <div className="text-sm text-[var(--color-text-muted)]">导入文档，语义检索注入对话</div>
                     </div>
                   </div>
                 </div>
@@ -137,16 +137,16 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
                   onClick={() => goTo('skill-list')}
                   className="
                     group p-4 rounded-xl cursor-pointer
-                    bg-slate-900/60 border border-slate-800/40
-                    hover:border-amber-500/30 hover:bg-slate-900/80
+                    bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
+                    hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)]
                     transition-all duration-200
                   "
                 >
                   <div className="flex items-center gap-3">
                     <div className="text-2xl text-amber-400">&#9889;</div>
                     <div>
-                      <div className="text-base text-slate-200">Skills 管理</div>
-                      <div className="text-sm text-slate-500">定义 AI 的工作方式</div>
+                      <div className="text-base text-[var(--color-text-primary)]">Skills 管理</div>
+                      <div className="text-sm text-[var(--color-text-muted)]">定义 AI 的工作方式</div>
                     </div>
                   </div>
                 </div>
@@ -154,16 +154,16 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
                   onClick={() => goTo('avatar-manager')}
                   className="
                     group p-4 rounded-xl cursor-pointer
-                    bg-slate-900/60 border border-slate-800/40
-                    hover:border-amber-500/30 hover:bg-slate-900/80
+                    bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
+                    hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)]
                     transition-all duration-200
                   "
                 >
                   <div className="flex items-center gap-3">
                     <div className="text-2xl">&#128444;&#65039;</div>
                     <div>
-                      <div className="text-base text-slate-200">头像管理</div>
-                      <div className="text-sm text-slate-500">上传和管理头像</div>
+                      <div className="text-base text-[var(--color-text-primary)]">头像管理</div>
+                      <div className="text-sm text-[var(--color-text-muted)]">上传和管理头像</div>
                     </div>
                   </div>
                 </div>

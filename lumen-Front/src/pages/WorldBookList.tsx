@@ -49,13 +49,13 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
   };
 
   return (
-    <div className="h-full bg-slate-950 text-slate-200">
+    <div className="h-full bg-[var(--color-bg-deep)] text-[var(--color-text-primary)]">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-8 px-6 py-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => goBack()}
-            className="text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
           >
             ← 返回聊天
           </button>
@@ -72,9 +72,9 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
       {/* 内容区 */}
       <div className="max-w-6xl mx-auto px-6">
         {isLoading ? (
-          <div className="text-center py-16 text-slate-600">加载中...</div>
+          <div className="text-center py-16 text-[var(--color-text-muted)]">加载中...</div>
         ) : entries.length === 0 ? (
-          <div className="text-center py-16 text-slate-600">
+          <div className="text-center py-16 text-[var(--color-text-muted)]">
             <p className="mb-4">还没有世界书条目</p>
             <button onClick={handleCreate} className="text-amber-400 hover:underline">
               创建第一个世界书
@@ -86,7 +86,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
               <div
                 key={entry.id}
                 onClick={() => goTo('worldbook-editor', { id: entry.id })}
-                className="group relative p-5 rounded-xl cursor-pointer bg-slate-900/60 border border-slate-800/40 hover:border-amber-500/30 hover:bg-slate-900/80 transition-all"
+                className="group relative p-5 rounded-xl cursor-pointer bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)] transition-all"
               >
                 {/* 删除按钮 */}
                 <button
@@ -94,13 +94,13 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
                     e.stopPropagation();
                     handleDelete(entry.id, entry.name);
                   }}
-                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all"
+                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-red-400 transition-all"
                 >
                   ×
                 </button>
 
                 {/* 内容 */}
-                <h3 className="text-lg font-medium text-slate-200 mb-2 pr-6">{entry.name}</h3>
+                <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-2 pr-6">{entry.name}</h3>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {entry.keywords.map((kw) => (
                     <span key={kw} className="px-2 py-1 rounded text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -108,11 +108,11 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
                     </span>
                   ))}
                   {entry.keywords.length === 0 && (
-                    <span className="text-slate-600 text-sm">无关键词</span>
+                    <span className="text-[var(--color-text-muted)] text-sm">无关键词</span>
                   )}
                 </div>
                 {entry.comment && (
-                  <p className="text-sm text-slate-500 line-clamp-2">{entry.comment}</p>
+                  <p className="text-sm text-[var(--color-text-muted)] line-clamp-2">{entry.comment}</p>
                 )}
               </div>
             ))}

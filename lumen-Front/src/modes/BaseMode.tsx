@@ -12,7 +12,7 @@ function BaseMode() {
   }, [initializeFromBackend]);
 
   return (
-    <div className="flex h-full w-full bg-[#141413]">
+    <div className="flex h-full w-full bg-[var(--color-bg-deep)]">
       <ChannelContent />
       <InfoPanel />
     </div>

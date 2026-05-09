@@ -30,7 +30,7 @@ function CommandPalette({ input, visible, selectedIndex, onSelect, onHover }: Co
     <div
       className="
         absolute bottom-full left-0 right-0 mb-1
-        bg-slate-900 border border-slate-700/60 rounded-lg
+        bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
         shadow-xl shadow-black/40 overflow-hidden z-50
         max-h-48 overflow-y-auto
       "
@@ -45,12 +45,12 @@ function CommandPalette({ input, visible, selectedIndex, onSelect, onHover }: Co
             transition-all duration-75
             ${idx === safeIndex
               ? 'bg-amber-500/10 text-amber-300'
-              : 'text-slate-400 hover:bg-slate-800/60'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]'
             }
           `}
         >
           <span className="font-mono text-xs">/{cmd.name}</span>
-          <span className="text-slate-500 text-xs flex-1 truncate">{cmd.description}</span>
+          <span className="text-[var(--color-text-muted)] text-xs flex-1 truncate">{cmd.description}</span>
         </button>
       ))}
     </div>
