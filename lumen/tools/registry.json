@@ -278,5 +278,50 @@
         }
       }
     }
+  },
+  "theme": {
+    "description": "主题系统控制工具，支持查看/切换/微调/保存视觉主题",
+    "usage_guide": "通过 command 选择操作：list 列出所有主题、get 获取主题详情、apply 切换主题或微调 token、save 保存为新主题。微调时提供 tokens 对象，键为 token 名（如 primary、surfaceDeep），值为 CSS 值（如 #FF0000、8px）。",
+    "commands": {
+      "list": {
+        "description": "列出所有可用主题",
+        "parameters": { "type": "object", "properties": {}, "required": [] }
+      },
+      "get": {
+        "description": "获取主题的全部 token 值",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "theme_id": { "type": "string", "description": "主题 ID，默认当前主题" }
+          },
+          "required": []
+        }
+      },
+      "apply": {
+        "description": "应用主题（切换/微调/生成）",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "theme_id": { "type": "string", "description": "目标主题 ID" },
+            "tokens": {
+              "type": "object",
+              "description": "Token 键值对",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        }
+      },
+      "save": {
+        "description": "保存当前主题为新主题",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "description": "新主题显示名" },
+            "description": { "type": "string", "description": "主题描述" }
+          },
+          "required": ["name"]
+        }
+      }
+    }
   }
 }
