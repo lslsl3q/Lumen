@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import ModeSwitch from './ModeSwitch';
 import { useModeStore } from '../stores/useModeStore';
+import { useTheme } from '../lib/theme/context';
 import type { AppMode } from '../stores/useModeStore';
 
 const MODES: { key: AppMode; label: string }[] = [
@@ -42,6 +43,7 @@ function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const { activeMode, switchMode } = useModeStore();
+  const { theme, themes, setTheme, isDark } = useTheme();
 
   useEffect(() => {
     if (!appWindow) return;
@@ -74,7 +76,7 @@ function TitleBar() {
   const displayMode = activeMode === 'rpg' ? 'base' : activeMode;
 
   return (
-    <div className="h-9 flex items-center bg-slate-950/80 border-b border-slate-800/40 select-none relative">
+    <div className="h-9 flex items-center bg-surface-rail/80 border-b border-slate-800/40 select-none relative">
       {/* 左侧品牌 — 拖拽区 */}
       <div data-tauri-drag-region className="flex items-center gap-2 pl-4 h-full cursor-default">
         <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
@@ -118,18 +120,28 @@ function TitleBar() {
             </svg>
           </span>
         </button>
-        {/* 主题（预留） */}
+        {/* 主题切换 */}
         <button
-          onClick={() => {/* TODO: Phase D 主题切换 */}}
+          onClick={() => {
+            const next = themes.find(t => t.id !== theme.id);
+            if (next) setTheme(next.id);
+          }}
           className="h-full flex items-center justify-center px-1 cursor-pointer"
-          title="主题（即将推出）"
+          title={isDark ? '切换到浅色' : '切换到暗色'}
         >
           <span className="w-6 h-6 flex items-center justify-center rounded-md
             hover:bg-slate-700/40 transition-all duration-200">
-            <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
-            </svg>
+            {isDark ? (
+              <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+              </svg>
+            ) : (
+              <svg className="w-3 h-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+              </svg>
+            )}
           </span>
         </button>
         {/* 设置 */}

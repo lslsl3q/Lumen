@@ -1,18 +1,19 @@
 /**
  * SidePanel — 挤出式侧面板（可拖拽调宽）
  *
- * ActivityBar 右侧的 flex 子元素，打开时 ChatPanel 自然缩小
- * 内容根据 activePanelId 切换：sessions / character / persona
+ * ActivityBar 右侧的 flex 子元素，打开时内容区自然缩小
+ * 内容根据 activePanelId 切换：sessions / character / persona / channels
  * 右边缘拖拽手柄调宽，双击恢复默认，宽度存 localStorage
  */
 import type { PanelId } from './ActivityBar';
 import { useResizableWidth } from '../hooks/useResizableWidth';
-import { SessionListItem } from '../types/session';
-import { CharacterListItem } from '../types/character';
-import { PersonaListItem } from '../types/persona';
+import { useSessionStore } from '../stores/useSessionStore';
+import { useCharacterStore } from '../stores/useCharacterStore';
+import { usePersonaStore } from '../stores/usePersonaStore';
 import SessionPanel from './panels/SessionPanel';
 import CharacterPanel from './panels/CharacterPanel';
 import PersonaPanel from './panels/PersonaPanel';
+import ChannelsPanel from './panels/ChannelsPanel';
 
 const DEFAULT_WIDTH = 256;
 const MIN_WIDTH = 200;
@@ -21,47 +22,12 @@ const STORAGE_KEY = 'lumen_sidepanel_width';
 
 interface SidePanelProps {
   activePanelId: PanelId | null;
-  // Session
-  sessions: SessionListItem[];
-  currentSessionId: string | null;
-  isLoading: boolean;
-  onSelectSession: (sessionId: string) => void;
-  onNewSession: () => void;
-  onDeleteSession: (sessionId: string) => void;
-  onRenameSession: (sessionId: string, title: string) => void;
-  formatLabel: (sessionId: string) => string;
-  characters: CharacterListItem[];
-  // Character
-  currentCharacterId: string;
-  onSwitchCharacter: (characterId: string) => void;
-  onRefreshCharacters: () => void;
   onEditSystemPrompt?: (content: string, onSave: (newContent: string) => void) => void;
-  // Persona
-  personas: PersonaListItem[];
-  activePersonaId: string | null;
-  onSwitchPersona: (personaId: string | null) => void;
-  onRefreshPersonas: () => void;
 }
 
 function SidePanel({
   activePanelId,
-  sessions,
-  currentSessionId,
-  isLoading,
-  onSelectSession,
-  onNewSession,
-  onDeleteSession,
-  onRenameSession,
-  formatLabel,
-  characters,
-  currentCharacterId,
-  onSwitchCharacter,
-  onRefreshCharacters,
   onEditSystemPrompt,
-  personas,
-  activePersonaId,
-  onSwitchPersona,
-  onRefreshPersonas,
 }: SidePanelProps) {
   const { width, isDragging, handleMouseDown, handleDoubleClick } = useResizableWidth({
     defaultWidth: DEFAULT_WIDTH,
@@ -72,43 +38,56 @@ function SidePanel({
 
   const isOpen = !!activePanelId;
 
+  // 从 stores 获取面板数据
+  const sessions = useSessionStore();
+  const characters = useCharacterStore();
+  const personas = usePersonaStore();
+
   return (
     <div
-      className="flex-shrink-0 overflow-hidden bg-slate-900 relative
+      className="flex-shrink-0 overflow-hidden bg-surface-panel relative
         transition-[width] duration-200 ease-out"
       style={{ width: isOpen ? width : 0 }}
     >
       {/* 内层固定宽度，防止内容塌缩 */}
       <div className="h-full flex flex-col relative" style={{ width, minWidth: MIN_WIDTH }}>
+        <div key={activePanelId} className="h-full flex flex-col animate-fade-in">
         {activePanelId === 'sessions' && (
           <SessionPanel
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            isLoading={isLoading}
-            onSelectSession={onSelectSession}
-            onNewSession={onNewSession}
-            onDeleteSession={onDeleteSession}
-            onRenameSession={onRenameSession}
-            formatLabel={formatLabel}
-            characters={characters}
+            sessions={sessions.sessions}
+            currentSessionId={sessions.currentSessionId}
+            isLoading={sessions.isLoading}
+            onSelectSession={(id) => sessions.switchSession(id)}
+            onNewSession={() => sessions.createNewSession(characters.currentCharacterId)}
+            onDeleteSession={(id) => sessions.deleteSession(id)}
+            onRenameSession={async (sessionId, title) => {
+              const { renameSession } = await import('../api/session');
+              await renameSession(sessionId, title);
+              sessions.refreshSessions();
+            }}
+            formatLabel={sessions.formatSessionLabel}
+            characters={characters.characters}
           />
         )}
         {activePanelId === 'character' && (
           <CharacterPanel
-            characters={characters}
-            currentCharacterId={currentCharacterId}
-            onSwitchCharacter={onSwitchCharacter}
-            onRefreshCharacters={onRefreshCharacters}
+            characters={characters.characters}
+            currentCharacterId={characters.currentCharacterId}
+            onSwitchCharacter={characters.setCurrentCharacterId}
+            onRefreshCharacters={characters.refreshCharacters}
             onEditSystemPrompt={onEditSystemPrompt}
           />
         )}
         {activePanelId === 'persona' && (
           <PersonaPanel
-            personas={personas}
-            activePersonaId={activePersonaId}
-            onSwitchPersona={onSwitchPersona}
-            onRefreshPersonas={onRefreshPersonas}
+            personas={personas.personas}
+            activePersonaId={personas.activeId}
+            onSwitchPersona={personas.switchTo}
+            onRefreshPersonas={personas.refresh}
           />
+        )}
+        {activePanelId === 'channels' && (
+          <ChannelsPanel />
         )}
 
         {/* 拖拽手柄 */}
@@ -125,6 +104,7 @@ function SidePanel({
             title="拖拽调整宽度 · 双击恢复默认"
           />
         )}
+        </div>
       </div>
     </div>
   );

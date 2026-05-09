@@ -1,8 +1,7 @@
 /**
  * 胶囊式模式切换器
  *
- * 用于标题栏居中位置，切换 Chat / Workbench / RPG 等模式。
- * Phase B: 仅 Chat 可用，其他为占位。
+ * 用于标题栏居中位置，切换 Chat / Base / Writing 等模式。
  */
 interface Mode<T extends string = string> {
   key: T;

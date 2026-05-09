@@ -1,0 +1,36 @@
+{
+  "id": "lumen-light",
+  "label": "Lumen 浅色",
+  "tokens": {
+    "primary": "#CC7C5E",
+    "primaryDim": "#B86A4A",
+    "primaryDeep": "#A05838",
+    "primarySubtle": "rgba(204, 124, 94, 0.1)",
+    "primaryForeground": "#FDFBF7",
+
+    "success": "#10b981",
+    "successLight": "#34d399",
+    "error": "#ef4444",
+    "errorLight": "#f87171",
+
+    "bgDeep": "#FDFBF7",
+    "bgBase": "#F5F0E8",
+    "bgSurface": "#EDE8DF",
+    "bgElevated": "#E2DCD2",
+
+    "bgRail": "#EDE8DF",
+    "bgPanel": "#F5F0E8",
+    "bgCanvas": "#FDFBF7",
+
+    "textPrimary": "#3D3832",
+    "textSecondary": "#6B635A",
+    "textMuted": "#948E84",
+    "textDim": "#B5AFA5",
+
+    "border": "rgba(60, 56, 50, 0.15)",
+    "borderSubtle": "rgba(60, 56, 50, 0.08)",
+
+    "glowPrimary": "rgba(204, 124, 94, 0.12)",
+    "glowSubtle": "rgba(204, 124, 94, 0.06)"
+  }
+}

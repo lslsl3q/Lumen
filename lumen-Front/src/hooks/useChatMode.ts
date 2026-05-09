@@ -1,16 +1,15 @@
 // src/hooks/useChatMode.ts
 import { useState, useCallback, useEffect } from 'react';
 import { useChat } from './useChat';
-import { useSessions } from './useSessions';
-import { useCharacters } from './useCharacters';
-import { usePersona } from './usePersona';
+import { useCharacterStore } from '../stores/useCharacterStore';
+import { usePersonaStore } from '../stores/usePersonaStore';
+import { useSessionStore } from '../stores/useSessionStore';
 import { useAuthorNote } from './useAuthorNote';
 import { useRPG } from './useRPG';
 import { getTokenUsage } from '../api/chat';
 import type { StreamEvent } from '../api/chat';
 import { toast } from '../utils/toast';
 import type { CommandResult } from '../commands/registry';
-import type { PanelId } from '../components/ActivityBar';
 import type { useDebugState } from './useDebugState';
 
 const MEMORY_DEBUG_STORAGE_KEY = 'lumen_memory_debug';
@@ -24,9 +23,9 @@ interface UseChatModeParams {
 
 export function useChatMode({ debug, floating }: UseChatModeParams) {
   const chat = useChat();
-  const sessions = useSessions();
-  const characters = useCharacters();
-  const persona = usePersona();
+  const characters = useCharacterStore();
+  const persona = usePersonaStore();
+  const sessions = useSessionStore();
   const authorNote = useAuthorNote(sessions.currentSessionId);
   const rpg = useRPG();
 
@@ -38,7 +37,6 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
   } | null>(null);
   const [rpgPanelOpen, setRpgPanelOpen] = useState(false);
   const [currentModel, setCurrentModel] = useState('');
-  const [activePanelId, setActivePanelId] = useState<PanelId | null>('sessions');
   const [tokenUsage, setTokenUsage] = useState<{
     current_tokens: number; context_size: number; usage_percent: number
   } | null>(null);
@@ -80,7 +78,7 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
     refreshTokenUsage();
   }, [chat, debug, rpg, refreshTokenUsage]);
 
-  // 初始化同步
+  // 初始化同步：会话加载后加载聊天历史
   useEffect(() => {
     if (!sessions.isLoading && sessions.currentSessionId && !chat.currentSessionId) {
       const lastCharId = localStorage.getItem('lastCharacterId') || undefined;
@@ -247,11 +245,6 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
     return newId;
   };
 
-  // 面板切换
-  const handlePanelSelect = useCallback((id: PanelId) => {
-    setActivePanelId(prev => prev === id ? null : id);
-  }, []);
-
   // Debug toggle（仅打开）
   const handleToggleDebug = useCallback(() => {
     if (!debug.debugMode) {
@@ -261,12 +254,12 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
 
   return {
     chat, sessions, characters, persona, authorNote, rpg,
-    activePanelId, tokenUsage, currentModel,
+    tokenUsage, currentModel,
     memoryWindowOpen, graphWindowOpen, sysPromptEditor, rpgPanelOpen,
     setMemoryWindowOpen, setGraphWindowOpen, setSysPromptEditor, setRpgPanelOpen, setCurrentModel,
     handleSendMessage, handleNewSession, handleSwitchSession, handleDeleteSession,
     handleRenameSession, handleSwitchCharacter, handleSwitchPersona, handleCommandResult,
-    handlePanelSelect, handleToggleDebug, handleCompact, handleRegenerate, handleBranch,
+    handleToggleDebug, handleCompact, handleRegenerate, handleBranch,
     refreshTokenUsage,
   };
 }

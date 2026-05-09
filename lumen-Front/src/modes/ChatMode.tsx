@@ -2,8 +2,6 @@
 import { useChatMode } from '../hooks/useChatMode';
 import type { useDebugState } from '../hooks/useDebugState';
 import type { UseFloatingLayersReturn } from '../components/floating/useFloatingLayers';
-import ActivityBar from '../components/ActivityBar';
-import SidePanel from '../components/SidePanel';
 import ChatPanel from '../components/ChatPanel';
 import SystemPromptOverlay from '../components/SystemPromptOverlay';
 import MemoryWindow from '../components/MemoryWindow';
@@ -20,35 +18,6 @@ function ChatMode({ debug, floating }: ChatModeProps) {
 
   return (
     <div className="flex h-full w-full">
-      <ActivityBar
-        activePanelId={d.activePanelId}
-        onPanelSelect={d.handlePanelSelect}
-        onOpenMemoryWindow={() => d.setMemoryWindowOpen(true)}
-        onOpenGraphEditor={() => d.setGraphWindowOpen(true)}
-        onManageWorldBooks={() => floating.openSettings('worldbook-list')}
-        onToggleDebug={d.handleToggleDebug}
-        onOpenSettings={() => floating.openSettings('config-list')}
-      />
-      <SidePanel
-        activePanelId={d.activePanelId}
-        sessions={d.sessions.sessions}
-        currentSessionId={d.sessions.currentSessionId}
-        isLoading={d.sessions.isLoading}
-        onSelectSession={d.handleSwitchSession}
-        onNewSession={d.handleNewSession}
-        onDeleteSession={d.handleDeleteSession}
-        onRenameSession={d.handleRenameSession}
-        formatLabel={d.sessions.formatSessionLabel}
-        characters={d.characters.characters}
-        currentCharacterId={d.characters.currentCharacterId}
-        onSwitchCharacter={d.handleSwitchCharacter}
-        onRefreshCharacters={() => d.characters.refreshCharacters()}
-        onEditSystemPrompt={(content, onSave) => d.setSysPromptEditor({ content, onSave })}
-        personas={d.persona.personas}
-        activePersonaId={d.persona.activeId}
-        onSwitchPersona={d.handleSwitchPersona}
-        onRefreshPersonas={() => d.persona.refresh()}
-      />
       <ChatPanel
         messages={d.chat.messages}
         isLoading={d.chat.isLoading}

@@ -56,6 +56,11 @@
   --color-surface: var(--color-bg-surface);
   --color-surface-elevated: var(--color-bg-elevated);
 
+  /* 区域色（ActivityBar / SidePanel / ChatPanel）*/
+  --color-surface-rail: var(--color-bg-rail);
+  --color-surface-panel: var(--color-bg-panel);
+  --color-surface-canvas: var(--color-bg-canvas);
+
   /* === 自定义边框颜色 === */
   --border-color-theme: var(--color-border);
   --border-color-theme-subtle: var(--color-border-subtle);
@@ -94,6 +99,11 @@
   --color-bg-base: #262422;         /* ~15% 亮度，从 #1F1F1E 提亮 */
   --color-bg-surface: #363432;      /* ~21% 亮度，从 #333230 微调 */
   --color-bg-elevated: #4C4A47;     /* ~30% 亮度，从 #4A4744 微调 */
+
+  /* 区域背景色 — 2-4% 明度差（ActivityBar 最深 → ChatPanel 最亮）*/
+  --color-bg-rail: #171614;          /* ActivityBar — 最深 */
+  --color-bg-panel: #262422;         /* SidePanel — 中间 */
+  --color-bg-canvas: #2E2C2A;        /* ChatPanel — 最亮 */
 
   /* 文字色 — 次要文字微调，提升可读性 */
   --color-text-primary: #EBEAE6;    /* 从 #E8E7E3 微亮 */
@@ -158,6 +168,15 @@
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+}
+
+/* SidePanel 面板切换淡入 */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
 }
 
 /* ContextPanel 退出 */

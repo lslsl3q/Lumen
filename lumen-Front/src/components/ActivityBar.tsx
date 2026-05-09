@@ -2,14 +2,22 @@
  * ActivityBar — VS Code 风格活动图标条
  *
  * 左侧 w-12 窄条：面板图标（点击打开/切换面板）+ 动作图标（点击触发事件）+ ⋯更多
+ * 支持动态面板配置（panels prop），由 ModeContainer 根据当前模式传入。
  */
 import { useState } from 'react';
 import { Database } from 'lucide-react';
 import Popover from './Popover';
 
-export type PanelId = 'sessions' | 'character' | 'persona';
+export type PanelId = 'sessions' | 'character' | 'persona' | 'channels';
 
+export interface PanelConfig {
+  id: PanelId;
+  title: string;
+}
+
+/** 面板图标配置（按模式动态传入）*/
 interface ActivityBarProps {
+  panels: PanelConfig[];
   activePanelId: PanelId | null;
   onPanelSelect: (id: PanelId) => void;
   onOpenMemoryWindow: () => void;
@@ -18,13 +26,6 @@ interface ActivityBarProps {
   onToggleDebug: () => void;
   onOpenSettings: () => void;
 }
-
-/** 面板图标配置 */
-const PANEL_ICONS: { id: PanelId; title: string }[] = [
-  { id: 'sessions', title: '会话' },
-  { id: 'character', title: '角色' },
-  { id: 'persona', title: '身份' },
-];
 
 /** 统一图标按钮容器 */
 const iconSlot = `w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer
@@ -62,7 +63,17 @@ function PersonaIcon() {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.375 3.375 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+    </svg>
+  );
+}
+
+/** 频道图标 */
+function ChannelsIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
     </svg>
   );
 }
@@ -115,10 +126,12 @@ function getPanelIcon(id: PanelId) {
     case 'sessions': return <SessionsIcon />;
     case 'character': return <CharacterIcon />;
     case 'persona': return <PersonaIcon />;
+    case 'channels': return <ChannelsIcon />;
   }
 }
 
 function ActivityBar({
+  panels,
   activePanelId,
   onPanelSelect,
   onOpenMemoryWindow,
@@ -143,12 +156,12 @@ function ActivityBar({
   );
 
   return (
-    <div className="w-12 flex flex-col items-center bg-slate-950 border-r border-slate-800/30
+    <div className="w-12 flex flex-col items-center bg-surface-rail border-r border-slate-800/30
       select-none py-2 flex-shrink-0"
     >
-      {/* 面板图标 */}
+      {/* 面板图标（动态配置） */}
       <div className="flex flex-col items-center gap-0.5">
-        {PANEL_ICONS.map(({ id, title }) => {
+        {panels.map(({ id, title }) => {
           const isActive = activePanelId === id;
           return (
             <button

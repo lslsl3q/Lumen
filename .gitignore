@@ -107,6 +107,7 @@ dist/
 *.egg
 .eggs/
 lib/
+!lumen-Front/src/lib/
 lib64/
 parts/
 sdist/

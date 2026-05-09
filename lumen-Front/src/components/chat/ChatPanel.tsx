@@ -805,7 +805,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
   );
 
   return (
-    <div className={`flex-1 flex flex-col bg-slate-950 ${className || ''}`}>
+    <div className={`flex-1 flex flex-col bg-surface-canvas ${className || ''}`}>
       {/* 消息区域 */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-lumen" onContextMenu={e => e.preventDefault()}>
         {messages.length === 0 ? (
