@@ -212,28 +212,28 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-xs text-[var(--color-text-muted)]">
+      <div className="flex items-center justify-center h-full text-xs text-text-muted">
         加载中...
       </div>
     );
   }
 
   return (
-    <div className="flex h-full bg-[var(--color-bg-deep)]">
+    <div className="flex h-full bg-surface-deep">
       {/* ── 左栏：簇+模块树 ── */}
-      <div className="w-48 flex-shrink-0 border-r border-[var(--color-border)] bg-[var(--color-bg-panel)] flex flex-col">
+      <div className="w-48 flex-shrink-0 border-r border-border-default bg-surface-panel flex flex-col">
         <div className="px-3 pt-4 pb-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-[var(--color-text-primary)]">思维簇</h2>
+            <h2 className="text-sm font-medium text-text-primary">思维簇</h2>
             <button
               onClick={handleReindex}
-              className="text-[10px] text-[var(--color-text-muted)] hover:text-slate-400 cursor-pointer transition-colors"
+              className="text-[10px] text-text-muted hover:text-slate-400 cursor-pointer transition-colors"
               title="重建向量索引"
             >
               重建索引
             </button>
           </div>
-          <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+          <p className="text-[10px] text-text-muted mt-0.5">
             编辑 AI 的思维模式模块
           </p>
         </div>
@@ -241,7 +241,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
         <div className="flex-1 overflow-y-auto scrollbar-lumen">
           {clusters.map(cluster => (
             <div key={cluster.name}>
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-medium">
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-text-muted font-medium">
                 {cluster.name}
               </div>
               {cluster.modules.map(mod => {
@@ -253,8 +253,8 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                     onClick={() => selectModule(fullPath)}
                     className={`w-full text-left px-3 pl-5 py-1 text-xs cursor-pointer transition-colors duration-100
                       ${isActive
-                        ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
-                        : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]'
+                        ? 'bg-primary/8 text-text-primary'
+                        : 'text-text-muted hover:text-text-primary hover:bg-surface-elevated'
                       }`}
                   >
                     {mod.replace('.txt', '')}
@@ -263,7 +263,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               })}
               <button
                 onClick={() => { setShowNewModule({ cluster: cluster.name }); setNewModuleName(''); }}
-                className="w-full text-left px-3 pl-5 py-1 text-[10px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] cursor-pointer transition-colors"
+                className="w-full text-left px-3 pl-5 py-1 text-[10px] text-text-dim hover:text-text-muted cursor-pointer transition-colors"
               >
                 + 新模块
               </button>
@@ -272,18 +272,18 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
         </div>
 
         {/* Tab 切换 */}
-        <div className="border-t border-[var(--color-border)] flex">
+        <div className="border-t border-border-default flex">
           <button
             onClick={() => setTab('modules')}
             className={`flex-1 py-2 text-[10px] cursor-pointer transition-colors
-              ${tab === 'modules' ? 'text-[var(--color-text-primary)] bg-[var(--color-bg-elevated)]' : 'text-[var(--color-text-muted)] hover:text-slate-400'}`}
+              ${tab === 'modules' ? 'text-text-primary bg-surface-elevated' : 'text-text-muted hover:text-slate-400'}`}
           >
             模块
           </button>
           <button
             onClick={() => setTab('chains')}
             className={`flex-1 py-2 text-[10px] cursor-pointer transition-colors
-              ${tab === 'chains' ? 'text-[var(--color-text-primary)] bg-[var(--color-bg-elevated)]' : 'text-[var(--color-text-muted)] hover:text-slate-400'}`}
+              ${tab === 'chains' ? 'text-text-primary bg-surface-elevated' : 'text-text-muted hover:text-slate-400'}`}
           >
             链配置
           </button>
@@ -296,13 +296,13 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
           selectedPath ? (
             <>
               {/* 模块信息头 */}
-              <div className="px-5 pt-4 pb-3 border-b border-[var(--color-border)]">
+              <div className="px-5 pt-4 pb-3 border-b border-border-default">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[var(--color-text-muted)] font-mono">{selectedCluster}</span>
-                  <span className="text-[10px] text-[var(--color-text-dim)]">/</span>
-                  <span className="text-xs font-mono text-[var(--color-text-primary)]">{selectedFile}</span>
+                  <span className="text-[10px] text-text-muted font-mono">{selectedCluster}</span>
+                  <span className="text-[10px] text-text-dim">/</span>
+                  <span className="text-xs font-mono text-text-primary">{selectedFile}</span>
                   {hasModuleChanges && (
-                    <span className="text-[10px] text-[var(--color-primary)] uppercase tracking-wider ml-2">
+                    <span className="text-[10px] text-primary uppercase tracking-wider ml-2">
                       未保存
                     </span>
                   )}
@@ -314,24 +314,24 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                 <textarea
                   value={editContent}
                   onChange={e => setEditContent(e.target.value)}
-                  className="flex-1 w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
-                    p-4 text-sm text-[var(--color-text-primary)] leading-relaxed
+                  className="flex-1 w-full bg-surface-elevated border border-border-default rounded-lg
+                    p-4 text-sm text-text-primary leading-relaxed
                     resize-none outline-none font-mono
-                    focus:border-[var(--color-primary)]/20 transition-colors
-                    placeholder:text-[var(--color-text-dim)]"
+                    focus:border-primary/20 transition-colors
+                    placeholder:text-text-dim"
                   placeholder="输入思维模块内容..."
                   spellCheck={false}
                 />
 
                 {/* 操作栏 */}
-                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[var(--color-border)]">
+                <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border-default">
                   <button
                     onClick={handleSave}
                     disabled={!hasModuleChanges || isSaving}
                     className={`px-4 py-1.5 rounded-lg text-xs cursor-pointer transition-colors
                       ${hasModuleChanges
-                        ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25'
-                        : 'text-[var(--color-text-dim)] cursor-not-allowed'
+                        ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                        : 'text-text-dim cursor-not-allowed'
                       }`}
                   >
                     {isSaving ? '保存中...' : '保存'}
@@ -339,7 +339,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                   <button
                     onClick={handleDelete}
                     className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                      text-[var(--color-text-muted)] hover:text-red-400 transition-colors"
+                      text-text-muted hover:text-red-400 transition-colors"
                   >
                     删除
                   </button>
@@ -347,33 +347,33 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                     <button
                       onClick={() => setEditContent(originalContent)}
                       className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                        text-[var(--color-text-muted)] hover:text-slate-400 transition-colors"
+                        text-text-muted hover:text-slate-400 transition-colors"
                     >
                       恢复
                     </button>
                   )}
-                  <span className="ml-auto text-[10px] text-[var(--color-text-dim)]">Ctrl+S 保存</span>
+                  <span className="ml-auto text-[10px] text-text-dim">Ctrl+S 保存</span>
                 </div>
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-xs text-[var(--color-text-dim)]">选择左侧模块开始编辑</p>
+              <p className="text-xs text-text-dim">选择左侧模块开始编辑</p>
             </div>
           )
         ) : (
           <>
             {/* Chains 配置编辑 */}
-            <div className="px-5 pt-4 pb-3 border-b border-[var(--color-border)]">
+            <div className="px-5 pt-4 pb-3 border-b border-border-default">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-[var(--color-text-primary)]">chains.json</span>
+                <span className="text-xs font-medium text-text-primary">chains.json</span>
                 {hasChainChanges && (
-                  <span className="text-[10px] text-[var(--color-primary)] uppercase tracking-wider ml-2">
+                  <span className="text-[10px] text-primary uppercase tracking-wider ml-2">
                     未保存
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+              <p className="text-[10px] text-text-muted mt-0.5">
                 定义思维链的执行顺序、每步检索参数和融合权重
               </p>
             </div>
@@ -382,23 +382,23 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               <textarea
                 value={chainsContent}
                 onChange={e => setChainsContent(e.target.value)}
-                className="flex-1 w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
-                  p-4 text-sm text-[var(--color-text-primary)] leading-relaxed font-mono
+                className="flex-1 w-full bg-surface-elevated border border-border-default rounded-lg
+                  p-4 text-sm text-text-primary leading-relaxed font-mono
                   resize-none outline-none
-                  focus:border-[var(--color-primary)]/20 transition-colors
-                  placeholder:text-[var(--color-text-dim)]"
+                  focus:border-primary/20 transition-colors
+                  placeholder:text-text-dim"
                 placeholder='{"chains": {}}'
                 spellCheck={false}
               />
 
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[var(--color-border)]">
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border-default">
                 <button
                   onClick={handleSave}
                   disabled={!hasChainChanges || isSaving}
                   className={`px-4 py-1.5 rounded-lg text-xs cursor-pointer transition-colors
                     ${hasChainChanges
-                      ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25'
-                      : 'text-[var(--color-text-dim)] cursor-not-allowed'
+                      ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                      : 'text-text-dim cursor-not-allowed'
                     }`}
                 >
                   {isSaving ? '保存中...' : '保存'}
@@ -407,12 +407,12 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                   <button
                     onClick={() => setChainsContent(originalChains)}
                     className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                      text-[var(--color-text-muted)] hover:text-slate-400 transition-colors"
+                      text-text-muted hover:text-slate-400 transition-colors"
                   >
                     恢复
                   </button>
                 )}
-                <span className="ml-auto text-[10px] text-[var(--color-text-dim)]">Ctrl+S 保存</span>
+                <span className="ml-auto text-[10px] text-text-dim">Ctrl+S 保存</span>
               </div>
             </div>
           </>
@@ -422,8 +422,8 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
       {/* 新建模块弹窗 */}
       {showNewModule && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg p-5 w-80">
-            <h3 className="text-sm text-[var(--color-text-primary)] mb-3">
+          <div className="bg-surface-elevated border border-border-default rounded-lg p-5 w-80">
+            <h3 className="text-sm text-text-primary mb-3">
               新建模块 — {showNewModule.cluster}
             </h3>
             <input
@@ -431,23 +431,23 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               onChange={e => setNewModuleName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
               placeholder="模块名称（自动加 .txt）"
-              className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
-                text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/20
-                placeholder:text-[var(--color-text-dim)] mb-4"
+              className="w-full px-3 py-2 bg-surface-elevated border border-border-default rounded-lg
+                text-sm text-text-primary outline-none focus:border-primary/20
+                placeholder:text-text-dim mb-4"
               autoFocus
             />
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewModule(null)}
-                className="px-3 py-1.5 rounded-lg text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary cursor-pointer transition-colors"
               >
                 取消
               </button>
               <button
                 onClick={handleCreate}
                 disabled={!newModuleName.trim()}
-                className="px-3 py-1.5 rounded-lg text-xs bg-[var(--color-primary)]/15 text-[var(--color-primary)]
-                  hover:bg-[var(--color-primary)]/25 cursor-pointer transition-colors
+                className="px-3 py-1.5 rounded-lg text-xs bg-primary/15 text-primary
+                  hover:bg-primary/25 cursor-pointer transition-colors
                   disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 创建

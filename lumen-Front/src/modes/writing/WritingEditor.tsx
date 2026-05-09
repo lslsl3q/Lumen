@@ -79,7 +79,7 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
       <div className="writing-toolbar-inner">
         {items.map((item, i) => {
           if ("type" in item && item.type === "divider") {
-            return <div key={i} className="w-px h-4 bg-[var(--color-bg-elevated)] mx-0.5 flex-shrink-0" />;
+            return <div key={i} className="w-px h-4 bg-surface-elevated mx-0.5 flex-shrink-0" />;
           }
           const Icon = (item as any).icon;
           const activeVal = (item as any).active;
@@ -99,8 +99,8 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
               onClick={(item as any).cmd}
               className={`p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0
                 ${isActive
-                  ? "text-[var(--color-primary)] bg-[var(--color-primary)]/10"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
+                  ? "text-primary bg-primary/10"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"
                 }`}
               title={(item as any).active || "action"}
             >
@@ -115,14 +115,14 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
           <PopoverTrigger>
             <button
               onClick={() => openPopover("image")}
-              className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
+              className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
               title="插入图片"
             >
               <ImagePlus className="w-4 h-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg p-3 space-y-2">
-            <p className="text-[11px] text-[var(--color-text-secondary)]">图片地址</p>
+          <PopoverContent side="bottom" align="center" className="w-64 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
+            <p className="text-[11px] text-text-secondary">图片地址</p>
             <input
               autoFocus
               value={popoverValue}
@@ -132,11 +132,11 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
                 if (e.key === "Escape") setActivePopover(null);
               }}
               placeholder="https://..."
-              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
+              className="w-full bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
             />
             <div className="flex justify-end gap-1">
-              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer">取消</button>
-              <button onClick={() => applyPopover((v) => { const safe = sanitizeUrl(v); if (safe) editor.chain().focus().setImage({ src: safe }).run(); })} className="px-2 py-0.5 text-[11px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">确认</button>
+              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
+              <button onClick={() => applyPopover((v) => { const safe = sanitizeUrl(v); if (safe) editor.chain().focus().setImage({ src: safe }).run(); })} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
             </div>
           </PopoverContent>
         </Popover>
@@ -145,20 +145,20 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
           <PopoverTrigger>
             <button
               onClick={() => openPopover("color", editor.getAttributes("textStyle").color ?? "#CC7C5E")}
-              className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
+              className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
               title="文字颜色"
             >
               <Palette className="w-4 h-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-52 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg p-3 space-y-2">
-            <p className="text-[11px] text-[var(--color-text-secondary)]">文字颜色</p>
+          <PopoverContent side="bottom" align="center" className="w-52 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
+            <p className="text-[11px] text-text-secondary">文字颜色</p>
             <div className="flex items-center gap-2">
               <input
                 type="color"
                 value={popoverValue || "#CC7C5E"}
                 onChange={(e) => setPopoverValue(e.target.value)}
-                className="w-8 h-8 rounded border border-[var(--color-border)] cursor-pointer bg-transparent"
+                className="w-8 h-8 rounded border border-border-default cursor-pointer bg-transparent"
               />
               <input
                 value={popoverValue}
@@ -168,12 +168,12 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
                   if (e.key === "Escape") setActivePopover(null);
                 }}
                 placeholder="#CC7C5E"
-                className="flex-1 bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
+                className="flex-1 bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
               />
             </div>
             <div className="flex justify-end gap-1">
-              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer">取消</button>
-              <button onClick={() => applyPopover((v) => { if (/^#[0-9a-fA-F]{3,8}$/.test(v.trim()) || /^[a-zA-Z]+$/.test(v.trim())) editor.chain().focus().setColor(v.trim()).run(); })} className="px-2 py-0.5 text-[11px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">确认</button>
+              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
+              <button onClick={() => applyPopover((v) => { if (/^#[0-9a-fA-F]{3,8}$/.test(v.trim()) || /^[a-zA-Z]+$/.test(v.trim())) editor.chain().focus().setColor(v.trim()).run(); })} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
             </div>
           </PopoverContent>
         </Popover>
@@ -186,14 +186,14 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
                 openPopover("link", href);
               }}
               className={`p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0
-                ${editor.isActive("link") ? "text-[var(--color-primary)] bg-[var(--color-primary)]/10" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"}`}
+                ${editor.isActive("link") ? "text-primary bg-primary/10" : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"}`}
               title="链接"
             >
               <Link className="w-4 h-4" />
             </button>
           </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg p-3 space-y-2">
-            <p className="text-[11px] text-[var(--color-text-secondary)]">链接地址</p>
+          <PopoverContent side="bottom" align="center" className="w-64 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
+            <p className="text-[11px] text-text-secondary">链接地址</p>
             <input
               autoFocus
               value={popoverValue}
@@ -210,15 +210,15 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
                 if (e.key === "Escape") setActivePopover(null);
               }}
               placeholder="https://..."
-              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
+              className="w-full bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
             />
             <div className="flex justify-end gap-1">
-              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer">取消</button>
+              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
               <button onClick={() => applyPopover((v) => {
                 const safe = sanitizeUrl(v);
                 if (safe) editor.chain().focus().extendMarkRange("link").setLink({ href: safe }).run();
                 else editor.chain().focus().extendMarkRange("link").unsetLink().run();
-              })} className="px-2 py-0.5 text-[11px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">确认</button>
+              })} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
             </div>
           </PopoverContent>
         </Popover>
@@ -304,26 +304,26 @@ function FindReplaceBar({ editor, onClose }: { editor: any; onClose: () => void 
           value={find}
           onChange={(e) => setFind(e.target.value)}
           placeholder="查找…"
-          className="w-36 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-0.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30"
+          className="w-36 bg-surface-elevated border border-border-default rounded px-2 py-0.5 text-[12px] text-text-primary placeholder-[var(--color-text-dim)] outline-none focus:border-primary/30"
           autoFocus
         />
         <input
           value={replace}
           onChange={(e) => setReplace(e.target.value)}
           placeholder="替换…"
-          className="w-36 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-0.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30"
+          className="w-36 bg-surface-elevated border border-border-default rounded px-2 py-0.5 text-[12px] text-text-primary placeholder-[var(--color-text-dim)] outline-none focus:border-primary/30"
         />
-        <button onClick={doFind} className="px-2 py-0.5 text-[11px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">
+        <button onClick={doFind} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
           查找
         </button>
-        <button onClick={doReplace} className="px-2 py-0.5 text-[11px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">
+        <button onClick={doReplace} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
           替换
         </button>
-        <button onClick={doReplaceAll} className="px-2 py-0.5 text-[11px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">
+        <button onClick={doReplaceAll} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">
           全部替换
         </button>
-        {count > 0 && <span className="text-[10px] text-[var(--color-text-muted)]">{count} 处匹配</span>}
-        <button onClick={onClose} className="ml-auto text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer text-[11px]">
+        {count > 0 && <span className="text-[10px] text-text-muted">{count} 处匹配</span>}
+        <button onClick={onClose} className="ml-auto text-text-muted hover:text-text-secondary cursor-pointer text-[11px]">
           Esc
         </button>
       </div>
@@ -351,7 +351,7 @@ function StatusBar({ editor }: { editor: any }) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => { toggleFocusMode(); editor?.commands?.toggleFocusMode?.(); }}
-            className={`cursor-pointer transition-colors ${focusMode ? "text-[var(--color-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"}`}
+            className={`cursor-pointer transition-colors ${focusMode ? "text-primary" : "text-text-muted hover:text-text-secondary"}`}
             title="专注模式"
           >
             <Eye className="w-3.5 h-3.5" />
@@ -362,12 +362,12 @@ function StatusBar({ editor }: { editor: any }) {
               const el = editor?.view?.dom as HTMLElement;
               el?.classList.toggle("typewriter-mode", !typewriterMode);
             }}
-            className={`cursor-pointer transition-colors ${typewriterMode ? "text-[var(--color-primary)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"}`}
+            className={`cursor-pointer transition-colors ${typewriterMode ? "text-primary" : "text-text-muted hover:text-text-secondary"}`}
             title="打字机模式"
           >
             <Type className="w-3.5 h-3.5" />
           </button>
-          <span className="text-[var(--color-text-muted)]">|</span>
+          <span className="text-text-muted">|</span>
           <span>{chars} 字符</span>
           <span>{words} 词</span>
         </div>
@@ -558,7 +558,7 @@ export function WritingEditor() {
   if (!editor) return null;
 
   return (
-    <div className="flex flex-col h-full bg-[var(--color-bg-deep)]">
+    <div className="flex flex-col h-full bg-surface-deep">
       <EditorToolbar editor={editor} onFindReplace={() => setShowFindReplace((p) => !p)} />
       {showFindReplace && <FindReplaceBar editor={editor} onClose={() => setShowFindReplace(false)} />}
 
@@ -570,7 +570,7 @@ export function WritingEditor() {
 
         {!activeChapterId && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="text-center text-[var(--color-text-muted)]">
+            <div className="text-center text-text-muted">
               <p className="text-sm mb-1">选择或创建章节开始写作</p>
               <p className="text-[11px]">Ctrl+S 保存 · Ctrl+J AI · Ctrl+F 查找</p>
             </div>
@@ -580,11 +580,11 @@ export function WritingEditor() {
         {ghostTextContent && ghostRequestId && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2
             flex items-center gap-2 px-3 py-1.5 rounded-lg
-            bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 text-[11px] text-[var(--color-primary)]/80
+            bg-primary/10 border border-primary/20 text-[11px] text-primary/80
             backdrop-blur-sm z-10"
           >
             <span className="animate-pulse">AI 生成中…</span>
-            <span className="text-[var(--color-text-muted)]">Tab 接受 · Esc 拒绝</span>
+            <span className="text-text-muted">Tab 接受 · Esc 拒绝</span>
             <button
               onClick={() => {
                 clearGhostText();
@@ -598,7 +598,7 @@ export function WritingEditor() {
                   position: { top: coords.bottom + 8, left: coords.left },
                 });
               }}
-              className="px-2 py-0.5 rounded bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30 cursor-pointer text-[11px]"
+              className="px-2 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 cursor-pointer text-[11px]"
             >
               重新生成
             </button>

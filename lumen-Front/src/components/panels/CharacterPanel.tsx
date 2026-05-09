@@ -222,7 +222,7 @@ export default function CharacterPanel({
         <BackButton label="设置" onClick={() => setView('settings')} />
         <SectionHeader>工具配置</SectionHeader>
         <div className="px-3 pb-1">
-          <span className="text-[10px] text-[var(--color-text-dim)]">
+          <span className="text-[10px] text-text-dim">
             排列顺序影响 AI 优先级。点击 ← → 调整顺序。
           </span>
         </div>
@@ -234,23 +234,23 @@ export default function CharacterPanel({
                 {form.tools.map((name, idx) => {
                   const info = availableTools.find(t => t.name === name);
                   return (
-                    <div key={name} className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/15">
+                    <div key={name} className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/15">
                       <div className="flex flex-col gap-0.5">
                         <button
                           onClick={() => moveTool(idx, -1)}
                           disabled={idx === 0}
-                          className="text-[9px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 cursor-pointer leading-none"
+                          className="text-[9px] text-text-muted hover:text-text-primary disabled:opacity-20 cursor-pointer leading-none"
                         >▲</button>
                         <button
                           onClick={() => moveTool(idx, 1)}
                           disabled={idx === form.tools!.length - 1}
-                          className="text-[9px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 cursor-pointer leading-none"
+                          className="text-[9px] text-text-muted hover:text-text-primary disabled:opacity-20 cursor-pointer leading-none"
                         >▼</button>
                       </div>
-                      <span className="font-mono text-xs text-[var(--color-primary)] flex-shrink-0">{name}</span>
-                      <span className="text-[10px] text-[var(--color-text-muted)] truncate flex-1">{info?.description}</span>
+                      <span className="font-mono text-xs text-primary flex-shrink-0">{name}</span>
+                      <span className="text-[10px] text-text-muted truncate flex-1">{info?.description}</span>
                       <button onClick={() => toggleTool(name)}
-                        className="text-[10px] text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer flex-shrink-0">✕</button>
+                        className="text-[10px] text-text-muted hover:text-red-400 cursor-pointer flex-shrink-0">✕</button>
                     </div>
                   );
                 })}
@@ -260,13 +260,13 @@ export default function CharacterPanel({
             {disabledTools.length > 0 && (
               <div>
                 {form.tools && form.tools.length > 0 && (
-                  <span className="text-[10px] text-[var(--color-text-dim)] mb-1 block">未启用</span>
+                  <span className="text-[10px] text-text-dim mb-1 block">未启用</span>
                 )}
                 <div className="flex flex-wrap gap-1.5">
                   {disabledTools.map(tool => (
                     <button key={tool.name} onClick={() => toggleTool(tool.name)}
-                      className="px-2 py-1 rounded text-[11px] font-mono text-[var(--color-text-muted)]
-                        border border-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border)]
+                      className="px-2 py-1 rounded text-[11px] font-mono text-text-muted
+                        border border-border-subtle hover:text-text-primary hover:border-border-default
                         transition-colors cursor-pointer">
                       + {tool.name}
                     </button>
@@ -296,12 +296,12 @@ export default function CharacterPanel({
         <BackButton label="设置" onClick={() => setView('settings')} />
         <SectionHeader>技能配置</SectionHeader>
         <div className="px-3 pb-1">
-          <span className="text-[10px] text-[var(--color-text-dim)]">定义 AI 的工作方式。</span>
+          <span className="text-[10px] text-text-dim">定义 AI 的工作方式。</span>
         </div>
         <ScrollArea className="flex-1 px-3 pb-3">
           <div className="space-y-1.5 pr-1">
             {availableSkills.length === 0 ? (
-              <div className="text-[11px] text-[var(--color-text-dim)] py-4 text-center">暂无可用技能</div>
+              <div className="text-[11px] text-text-dim py-4 text-center">暂无可用技能</div>
             ) : availableSkills.map(skill => {
               const isActive = form.skills?.includes(skill.id) ?? false;
               return (
@@ -310,18 +310,18 @@ export default function CharacterPanel({
                   onClick={() => toggleSkill(skill.id)}
                   className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer border transition-colors text-left
                     ${isActive
-                      ? 'border-[var(--color-primary)]/25 bg-[var(--color-primary)]/5'
-                      : 'border-[var(--color-border-subtle)] bg-transparent hover:border-[var(--color-border)]'
+                      ? 'border-primary/25 bg-primary/5'
+                      : 'border-border-subtle bg-transparent hover:border-border-default'
                     }`}
                 >
                   <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center flex-shrink-0
-                    ${isActive ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/20' : 'border-[var(--color-text-muted)]'}`}>
-                    {isActive && <span className="text-[var(--color-primary)] text-[9px]">✓</span>}
+                    ${isActive ? 'border-primary bg-primary/20' : 'border-text-muted'}`}>
+                    {isActive && <span className="text-primary text-[9px]">✓</span>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className={`text-xs ${isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>{skill.name}</span>
+                    <span className={`text-xs ${isActive ? 'text-primary' : 'text-text-secondary'}`}>{skill.name}</span>
                     {skill.description && (
-                      <div className="text-[10px] text-[var(--color-text-muted)] truncate">{skill.description}</div>
+                      <div className="text-[10px] text-text-muted truncate">{skill.description}</div>
                     )}
                   </div>
                 </button>
@@ -343,7 +343,7 @@ export default function CharacterPanel({
       return (
         <div className="flex flex-col h-full">
           <BackButton label="角色列表" onClick={() => setView('list')} />
-          <div className="flex-1 flex items-center justify-center text-xs text-[var(--color-text-muted)]">加载中...</div>
+          <div className="flex-1 flex items-center justify-center text-xs text-text-muted">加载中...</div>
         </div>
       );
     }
@@ -366,33 +366,33 @@ export default function CharacterPanel({
               value={form.name}
               onChange={e => updateForm({ name: e.target.value })}
               placeholder="角色名字"
-              className="border-0 border-b border-[var(--color-border-subtle)] rounded-none bg-transparent
-                focus:border-[var(--color-primary)]/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]"
+              className="border-0 border-b border-border-subtle rounded-none bg-transparent
+                focus:border-primary/40 focus-visible:ring-0 text-sm text-text-primary placeholder-[var(--color-text-dim)]"
             />
           </div>
 
-          <Separator className="mx-3 my-2 bg-[var(--color-border-subtle)]" />
+          <Separator className="mx-3 my-2 bg-border-subtle" />
 
           {/* 基本信息 */}
           <div className="px-3 pt-3 space-y-2.5">
             <div>
-              <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">描述</Label>
+              <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">描述</Label>
               <Input
                 value={form.description || ''}
                 onChange={e => updateForm({ description: e.target.value })}
                 placeholder="简短描述角色身份"
-                className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-8"
+                className="mt-0.5 bg-surface-elevated border-border-default text-xs text-text-primary
+                  placeholder-[var(--color-text-dim)] focus:border-primary/40 h-8"
               />
             </div>
             <div>
-              <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">开场白</Label>
+              <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">开场白</Label>
               <Input
                 value={form.greeting || ''}
                 onChange={e => updateForm({ greeting: e.target.value })}
                 placeholder="新会话时 AI 的第一句话"
-                className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-8"
+                className="mt-0.5 bg-surface-elevated border-border-default text-xs text-text-primary
+                  placeholder-[var(--color-text-dim)] focus:border-primary/40 h-8"
               />
             </div>
           </div>
@@ -400,27 +400,27 @@ export default function CharacterPanel({
           {/* 模型与上下文 */}
           <div className="px-3 pt-3 space-y-2.5">
             <div>
-              <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">模型</Label>
+              <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">模型</Label>
               <Select
                 value={form.model || ''}
                 onValueChange={v => updateForm({ model: v || undefined })}
               >
                 <SelectTrigger
                   size="sm"
-                  className="mt-0.5 w-full bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                    focus:border-[var(--color-primary)]/40 h-8 data-placeholder:text-[var(--color-text-dim)]"
+                  className="mt-0.5 w-full bg-surface-elevated border-border-default text-xs text-text-primary
+                    focus:border-primary/40 h-8 data-placeholder:text-text-dim"
                 >
                   <SelectValue placeholder="选择模型" />
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false}>
                   <SelectItem value="">
-                    <span className="text-[var(--color-text-muted)]">（全局默认）</span>
+                    <span className="text-text-muted">（全局默认）</span>
                   </SelectItem>
                   {availableModels.map(m => (
                     <SelectItem key={m.id} value={m.id}>
                       <span className="font-mono text-xs">{m.id}</span>
                       {m.owned_by && (
-                        <span className="text-[var(--color-text-muted)] text-[10px] ml-1">{m.owned_by}</span>
+                        <span className="text-text-muted text-[10px] ml-1">{m.owned_by}</span>
                       )}
                     </SelectItem>
                   ))}
@@ -428,7 +428,7 @@ export default function CharacterPanel({
               </Select>
             </div>
             <div>
-              <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">上下文大小</Label>
+              <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">上下文大小</Label>
               <Input
                 type="text"
                 inputMode="numeric"
@@ -438,26 +438,26 @@ export default function CharacterPanel({
                   updateForm({ context_size: v ? parseInt(v) : undefined });
                 }}
                 placeholder="默认 8192"
-                className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-8"
+                className="mt-0.5 bg-surface-elevated border-border-default text-xs text-text-primary
+                  placeholder-[var(--color-text-dim)] focus:border-primary/40 h-8"
               />
             </div>
           </div>
 
           {/* 思考链 */}
-          <Separator className="mx-3 my-3 bg-[var(--color-border-subtle)]" />
+          <Separator className="mx-3 my-3 bg-border-subtle" />
           <div className="px-3 space-y-2.5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">思考链</Label>
+                <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">思考链</Label>
                 {form.thinking?.enabled && (
                   <div className="mt-1.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <input type="range" min="256" max="32000" step="256"
                         value={form.thinking.budget_tokens}
                         onChange={e => updateForm({ thinking: { ...form.thinking!, budget_tokens: parseInt(e.target.value) } })}
-                        className="flex-1 accent-[var(--color-primary)] h-1" />
-                      <span className="text-[10px] text-[var(--color-text-secondary)] font-mono w-12 text-right tabular-nums">
+                        className="flex-1 accent-primary h-1" />
+                      <span className="text-[10px] text-text-secondary font-mono w-12 text-right tabular-nums">
                         {form.thinking.budget_tokens >= 1000
                           ? `${(form.thinking.budget_tokens / 1000).toFixed(1)}K`
                           : form.thinking.budget_tokens}
@@ -467,7 +467,7 @@ export default function CharacterPanel({
                       {[1024, 4096, 8192, 16384, 32000].map(n => {
                         const label = n >= 1000 ? `${n / 1000}K` : n;
                         let color = 'text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10';
-                        if (n >= 4096) color = 'text-[var(--color-primary)] border-[var(--color-primary)]/20 hover:bg-[var(--color-primary)]/10';
+                        if (n >= 4096) color = 'text-primary border-primary/20 hover:bg-primary/10';
                         if (n >= 16384) color = 'text-red-400 border-red-500/20 hover:bg-red-500/10';
                         return (
                           <button key={n} onClick={() => updateForm({ thinking: { ...form.thinking!, budget_tokens: n } })}
@@ -478,14 +478,14 @@ export default function CharacterPanel({
                         );
                       })}
                     </div>
-                    <span className="text-[9px] text-[var(--color-text-dim)]">
+                    <span className="text-[9px] text-text-dim">
                       {form.thinking.budget_tokens < 1024 ? '快速思考（适合简单任务）'
                         : form.thinking.budget_tokens < 4096 ? '标准推理（适合日常对话）'
                         : form.thinking.budget_tokens < 16384 ? '深度推理（适合代码、逻辑）'
                         : '极限拆解（高消耗，慎用）'}
                     </span>
                     {form.model && (
-                      <span className="text-[9px] text-[var(--color-text-muted)] font-mono">
+                      <span className="text-[9px] text-text-muted font-mono">
                         → {getThinkingMapping(form.model, form.thinking.budget_tokens)}
                       </span>
                     )}
@@ -506,14 +506,14 @@ export default function CharacterPanel({
           <div className="px-3 pt-3 space-y-2.5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <Label className="text-xs text-[var(--color-text-secondary)]">自动压缩</Label>
+                <Label className="text-xs text-text-secondary">自动压缩</Label>
                 {form.auto_compact && (
                   <div className="flex items-center gap-2 mt-0.5">
                     <input type="range" min="0.5" max="0.95" step="0.05"
                       value={form.compact_threshold || 0.7}
                       onChange={e => updateForm({ compact_threshold: parseFloat(e.target.value) })}
-                      className="w-28 accent-[var(--color-primary)]" />
-                    <span className="text-[10px] text-[var(--color-text-muted)] font-mono w-6 text-right">
+                      className="w-28 accent-primary" />
+                    <span className="text-[10px] text-text-muted font-mono w-6 text-right">
                       {Math.round((form.compact_threshold || 0.7) * 100)}%
                     </span>
                   </div>
@@ -526,7 +526,7 @@ export default function CharacterPanel({
               />
             </div>
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-[var(--color-text-secondary)]">记忆召回</Label>
+              <Label className="text-xs text-text-secondary">记忆召回</Label>
               <Switch
                 checked={form.memory_enabled !== false}
                 onCheckedChange={() => updateForm({ memory_enabled: !(form.memory_enabled === true) })}
@@ -534,9 +534,9 @@ export default function CharacterPanel({
               />
             </div>
             {form.memory_enabled !== false && (
-              <div className="pl-2 space-y-1.5 border-l border-[var(--color-border)]">
+              <div className="pl-2 space-y-1.5 border-l border-border-default">
                 <div className="flex items-center justify-between">
-                  <Label className="text-[10px] text-[var(--color-text-muted)]">Token 上限</Label>
+                  <Label className="text-[10px] text-text-muted">Token 上限</Label>
                   <Input
                     type="text"
                     inputMode="numeric"
@@ -546,12 +546,12 @@ export default function CharacterPanel({
                       updateForm({ memory_token_budget: v ? parseInt(v) : undefined });
                     }}
                     placeholder="300"
-                    className="w-20 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-[11px] text-[var(--color-text-secondary)]
-                      placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-6 px-2 text-right"
+                    className="w-20 bg-surface-elevated border-border-default text-[11px] text-text-secondary
+                      placeholder-[var(--color-text-dim)] focus:border-primary/40 h-6 px-2 text-right"
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label className="text-[10px] text-[var(--color-text-muted)]">超预算总结</Label>
+                  <Label className="text-[10px] text-text-muted">超预算总结</Label>
                   <Switch
                     checked={!!form.memory_auto_summarize}
                     onCheckedChange={() => updateForm({ memory_auto_summarize: !form.memory_auto_summarize })}
@@ -564,12 +564,12 @@ export default function CharacterPanel({
 
           {/* 知识库访问 */}
           <div className="px-3 pt-3 space-y-2.5">
-            <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">知识库访问</Label>
+            <Label className="text-[10px] text-text-muted uppercase tracking-wider">知识库访问</Label>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-xs text-[var(--color-text-secondary)]">公共知识</Label>
-                  <p className="text-[10px] text-[var(--color-text-dim)]">导入的文档、世界观、技术参考</p>
+                  <Label className="text-xs text-text-secondary">公共知识</Label>
+                  <p className="text-[10px] text-text-dim">导入的文档、世界观、技术参考</p>
                 </div>
                 <Switch
                   checked={form.accessible_knowledge?.includes('public') ?? true}
@@ -586,8 +586,8 @@ export default function CharacterPanel({
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-xs text-[var(--color-text-secondary)]">共享记忆</Label>
-                  <p className="text-[10px] text-[var(--color-text-dim)]">Agent 间共享的经历、偏好</p>
+                  <Label className="text-xs text-text-secondary">共享记忆</Label>
+                  <p className="text-[10px] text-text-dim">Agent 间共享的经历、偏好</p>
                 </div>
                 <Switch
                   checked={form.accessible_knowledge?.includes('shared') ?? false}
@@ -607,48 +607,48 @@ export default function CharacterPanel({
 
           {/* 区块入口 */}
           <div className="px-3 pt-3 pb-2 space-y-1">
-            <Separator className="bg-[var(--color-border-subtle)] mb-2" />
+            <Separator className="bg-border-subtle mb-2" />
             <button onClick={() => onEditSystemPrompt?.(form.system_prompt || '', (c) => updateForm({ system_prompt: c }))}
               className="w-full flex items-center justify-between px-2 py-2 rounded-lg text-left
-                hover:bg-[var(--color-primary-subtle)] transition-colors cursor-pointer group">
+                hover:bg-primary-subtle transition-colors cursor-pointer group">
               <div>
-                <span className="text-xs text-[var(--color-text-primary)] group-hover:text-[var(--color-text-primary)]">系统提示词</span>
+                <span className="text-xs text-text-primary group-hover:text-text-primary">系统提示词</span>
                 {form.system_prompt && (
-                  <div className="text-[10px] text-[var(--color-text-dim)] truncate max-w-[180px]">
+                  <div className="text-[10px] text-text-dim truncate max-w-[180px]">
                     {form.system_prompt.slice(0, 40)}...
                   </div>
                 )}
               </div>
-              <svg className="w-3 h-3 text-[var(--color-text-dim)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-text-dim" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
             <button onClick={() => setView('tools')}
               className="w-full flex items-center justify-between px-2 py-2 rounded-lg text-left
-                hover:bg-[var(--color-primary-subtle)] transition-colors cursor-pointer group">
-              <span className="text-xs text-[var(--color-text-primary)] group-hover:text-[var(--color-text-primary)]">工具配置</span>
+                hover:bg-primary-subtle transition-colors cursor-pointer group">
+              <span className="text-xs text-text-primary group-hover:text-text-primary">工具配置</span>
               <div className="flex items-center gap-1.5">
                 {enabledToolCount > 0 && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)]/60 border-0">
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary/60 border-0">
                     {enabledToolCount}
                   </Badge>
                 )}
-                <svg className="w-3 h-3 text-[var(--color-text-dim)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3 text-text-dim" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
             </button>
             <button onClick={() => setView('skills')}
               className="w-full flex items-center justify-between px-2 py-2 rounded-lg text-left
-                hover:bg-[var(--color-primary-subtle)] transition-colors cursor-pointer group">
-              <span className="text-xs text-[var(--color-text-primary)] group-hover:text-[var(--color-text-primary)]">技能配置</span>
+                hover:bg-primary-subtle transition-colors cursor-pointer group">
+              <span className="text-xs text-text-primary group-hover:text-text-primary">技能配置</span>
               <div className="flex items-center gap-1.5">
                 {enabledSkillCount > 0 && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)]/60 border-0">
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary/60 border-0">
                     {enabledSkillCount}
                   </Badge>
                 )}
-                <svg className="w-3 h-3 text-[var(--color-text-dim)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3 text-text-dim" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </div>
@@ -657,11 +657,11 @@ export default function CharacterPanel({
         </ScrollArea>
 
         {/* 保存 */}
-        <div className="border-t border-[var(--color-border)] px-3 py-2.5">
+        <div className="border-t border-border-default px-3 py-2.5">
           <Button
             onClick={handleSave}
             disabled={isSaving || !form.name.trim()}
-            className="w-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30
+            className="w-full bg-primary/20 text-primary hover:bg-primary/30
               disabled:opacity-50 text-xs"
           >
             {isSaving ? '保存中...' : editingId ? '保存修改' : '创建角色'}
@@ -676,12 +676,12 @@ export default function CharacterPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
-        <span className="text-[10px] text-[var(--color-text-muted)] font-medium tracking-wider uppercase">Characters</span>
+        <span className="text-[10px] text-text-muted font-medium tracking-wider uppercase">Characters</span>
         <Button
           variant="ghost"
           size="icon-xs"
           onClick={openNewCharacter}
-          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+          className="text-text-muted hover:text-text-primary"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
@@ -704,22 +704,22 @@ export default function CharacterPanel({
                 className={`group flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg cursor-pointer
                   transition-colors duration-100 ${navItemClass}
                   ${isActive
-                    ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-primary-subtle'
                   }`}
               >
                 {char.avatar ? (
                   <img src={getAvatarUrl(char.avatar)!} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] text-[var(--color-primary)]">{(char.display_name || char.name)[0]}</span>
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] text-primary">{(char.display_name || char.name)[0]}</span>
                   </div>
                 )}
                 <span className="text-xs truncate flex-1">{char.display_name || char.name}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); openSettings(char.id); }}
                   className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0
-                    text-[var(--color-text-dim)] hover:text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-100
+                    text-text-dim hover:text-text-secondary opacity-0 group-hover:opacity-100
                     transition-opacity duration-150 cursor-pointer"
                   title="设置"
                 >

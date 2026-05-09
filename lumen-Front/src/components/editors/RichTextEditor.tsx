@@ -21,16 +21,16 @@ function BubbleBar({ editor }: { editor: any }) {
   ];
 
   return (
-    <div className="flex items-center gap-0.5 rounded-lg border border-[var(--color-border)]
-      bg-[var(--color-bg-elevated)] px-1 py-0.5 shadow-lg">
+    <div className="flex items-center gap-0.5 rounded-lg border border-border-default
+      bg-surface-elevated px-1 py-0.5 shadow-lg">
       {items.map((item) => (
         <button
           key={item.label}
           onClick={item.cmd}
           className={`px-1.5 py-0.5 rounded text-[11px] transition-colors duration-100 cursor-pointer
             ${editor.isActive(item.active)
-              ? "text-[var(--color-primary)] bg-[var(--color-primary)]/10"
-              : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-slate-700/40"
+              ? "text-primary bg-primary/10"
+              : "text-text-secondary hover:text-text-primary hover:bg-slate-700/40"
             }`}
         >
           {item.label}

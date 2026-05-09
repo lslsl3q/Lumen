@@ -68,7 +68,7 @@ function TdbFileTree({ folders, selectedPath, onSelect, renderFileActions, foote
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              <svg className="w-3 h-3 text-[var(--color-primary)]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-3 h-3 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
               </svg>
@@ -88,7 +88,7 @@ function TdbFileTree({ folders, selectedPath, onSelect, renderFileActions, foote
                 className={`w-full flex items-center gap-1.5 py-1 cursor-pointer transition-colors duration-100
                   ${folder.path ? 'pl-7 pr-3' : 'px-3'}
                   ${isActive
-                    ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
+                    ? 'bg-primary/8 text-text-primary'
                     : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
                   }`}
                 onClick={() => onSelect(file.path)}

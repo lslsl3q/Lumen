@@ -34,30 +34,30 @@ function GraphWindow({ open, onClose }: GraphWindowProps) {
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="absolute inset-0 bg-[var(--color-bg-elevated)]/80 animate-overlay-fade-in" />
+      <div className="absolute inset-0 bg-surface-elevated/80 animate-overlay-fade-in" />
 
       <div
         className={`relative flex flex-col overflow-hidden
-          bg-[var(--color-bg-deep)] border border-[var(--color-border)]
+          bg-surface-deep border border-border-default
           shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(204,124,94,0.05)]
           animate-modal-in
           ${isFullscreen ? 'rounded-none' : 'rounded-xl'}`}
         style={isFullscreen ? { width: '100%', height: '100%' } : { width: 1152, height: 768 }}
       >
         {/* ── 标题栏 ── */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-bg-elevated)] flex-shrink-0">
-          <span className="text-sm font-light text-[var(--color-text-primary)] tracking-wide">图谱编辑器</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border-default bg-surface-elevated flex-shrink-0">
+          <span className="text-sm font-light text-text-primary tracking-wide">图谱编辑器</span>
 
           {/* TDB 选择 */}
-          <div className="flex gap-0.5 bg-[var(--color-bg-elevated)] rounded-lg p-0.5">
+          <div className="flex gap-0.5 bg-surface-elevated rounded-lg p-0.5">
             {tdbs.map(tdb => (
               <button
                 key={tdb.name}
                 onClick={() => setActiveTdb(tdb.name)}
                 className={`px-2.5 py-1 rounded-md text-[11px] transition-all duration-150 cursor-pointer
                   ${activeTdb === tdb.name
-                    ? 'bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]'
-                    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-text-muted hover:text-text-secondary'
                   }`}
               >
                 {tdb.name}
@@ -69,7 +69,7 @@ function GraphWindow({ open, onClose }: GraphWindowProps) {
             <button
               onClick={() => setIsFullscreen(v => !v)}
               className="w-6 h-6 rounded flex items-center justify-center cursor-pointer
-                text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors"
+                text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors"
               title={isFullscreen ? '还原' : '全屏'}
             >
               {isFullscreen ? (
@@ -86,7 +86,7 @@ function GraphWindow({ open, onClose }: GraphWindowProps) {
             <button
               onClick={(e) => { e.stopPropagation(); onClose(); }}
               className="w-6 h-6 rounded flex items-center justify-center cursor-pointer
-                text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />

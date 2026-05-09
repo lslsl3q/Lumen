@@ -66,8 +66,8 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
       title={label}
       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors cursor-pointer
         ${isActive
-          ? "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
-          : "text-slate-600 hover:text-slate-300 hover:bg-[var(--color-bg-elevated)]"
+          ? "bg-primary/15 text-primary"
+          : "text-slate-600 hover:text-slate-300 hover:bg-surface-elevated"
         }`}
     >
       <Icon className="w-[18px] h-[18px]" />
@@ -77,7 +77,7 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
 
 export function WritingIconStrip({ activePanel, onToggle }: WritingIconStripProps) {
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-12 z-20 flex flex-col items-center py-3 bg-[var(--color-bg-deep)]/95 backdrop-blur-sm border-l border-[var(--color-border)] select-none">
+    <div className="absolute right-0 top-0 bottom-0 w-12 z-20 flex flex-col items-center py-3 bg-surface-deep/95 backdrop-blur-sm border-l border-border-default select-none">
       {/* 顶部：章节 + 作品管理 */}
       <div className="flex flex-col gap-0.5">
         {TOP_ICONS.map((item) => (
@@ -86,7 +86,7 @@ export function WritingIconStrip({ activePanel, onToggle }: WritingIconStripProp
       </div>
 
       {/* 分割线 */}
-      <div className="w-5 h-px bg-[var(--color-border)] my-2" />
+      <div className="w-5 h-px bg-border-default my-2" />
 
       {/* 中间：世界观设定 */}
       <div className="flex flex-col gap-0.5">

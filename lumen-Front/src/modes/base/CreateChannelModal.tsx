@@ -31,7 +31,7 @@ function CreateChannelModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl w-80 p-5
+        className="bg-surface-elevated border border-border-default rounded-xl w-80 p-5
           shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
         onClick={(e) => e.stopPropagation()}
       >
@@ -50,9 +50,9 @@ function CreateChannelModal({ onClose }: Props) {
               onChange={(e) => setName(e.target.value)}
               placeholder="新频道"
               autoFocus
-              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-md px-3 py-2
+              className="w-full bg-surface-deep border border-border-default rounded-md px-3 py-2
                 text-sm text-[#ccc] placeholder-[#555] outline-none
-                focus:border-[var(--color-primary)]/33 transition-colors"
+                focus:border-primary/33 transition-colors"
             />
           </div>
 
@@ -66,8 +66,8 @@ function CreateChannelModal({ onClose }: Props) {
                   onClick={() => setType(ct.value)}
                   className={`px-3 py-2 rounded-md border text-left transition-colors cursor-pointer
                     ${type === ct.value
-                      ? 'border-[var(--color-primary)]/33 bg-[var(--color-primary)]/8 text-[var(--color-primary)]'
-                      : 'border-[var(--color-border)] text-[#888] hover:border-[#3a3a38]'
+                      ? 'border-primary/33 bg-primary/8 text-primary'
+                      : 'border-border-default text-[#888] hover:border-[#3a3a38]'
                     }`}
                 >
                   <div className="text-xs font-medium">{ct.label}</div>
@@ -83,9 +83,9 @@ function CreateChannelModal({ onClose }: Props) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="频道用途..."
-              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-md px-3 py-2
+              className="w-full bg-surface-deep border border-border-default rounded-md px-3 py-2
                 text-sm text-[#ccc] placeholder-[#555] outline-none
-                focus:border-[var(--color-primary)]/33 transition-colors"
+                focus:border-primary/33 transition-colors"
             />
           </div>
 
@@ -93,7 +93,7 @@ function CreateChannelModal({ onClose }: Props) {
             type="submit"
             disabled={!name.trim()}
             className="w-full py-2 rounded-md text-sm font-medium transition-colors cursor-pointer
-              bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dim)]
+              bg-primary text-white hover:bg-primary-dim
               disabled:opacity-30 disabled:cursor-not-allowed"
           >
             创建

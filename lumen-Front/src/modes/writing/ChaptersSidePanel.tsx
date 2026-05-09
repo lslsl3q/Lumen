@@ -21,9 +21,9 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
-    <div className="absolute left-0 top-0 bottom-0 w-[260px] z-20 bg-[var(--color-bg-panel)] border-r border-[var(--color-border)] flex flex-col">
+    <div className="absolute left-0 top-0 bottom-0 w-[260px] z-20 bg-surface-panel border-r border-border-default flex flex-col">
       {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default flex-shrink-0">
         <span className="text-[12px] font-medium text-slate-300">章节列表</span>
         <button onClick={onClose} className="p-1 rounded text-slate-600 hover:text-slate-400 cursor-pointer">
           <X className="w-3.5 h-3.5" />
@@ -33,8 +33,8 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto scrollbar-lumen p-3 space-y-3">
         {activeProject && (
-          <div className="px-2.5 py-1.5 rounded-md bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10">
-            <p className="text-[11px] text-[var(--color-primary)]/70 truncate">
+          <div className="px-2.5 py-1.5 rounded-md bg-primary/5 border border-primary/10">
+            <p className="text-[11px] text-primary/70 truncate">
               <FileText className="inline w-3 h-3 mr-1 -mt-0.5" />
               {activeProject.name}
             </p>
@@ -83,7 +83,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
                     setDragId(null);
                   }}
                   className={`flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
-                    ${ch.id === activeChapterId ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]" : "text-slate-400 hover:bg-[var(--color-bg-elevated)]"}
+                    ${ch.id === activeChapterId ? "bg-primary/10 text-primary" : "text-slate-400 hover:bg-surface-elevated"}
                     ${dragId === ch.id ? "opacity-50" : ""}`}
                 >
                   {editingId === ch.id ? (
@@ -98,7 +98,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
                       }}
                       onBlur={() => setEditingId(null)}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-slate-200 outline-none"
+                      className="flex-1 bg-surface-elevated border border-primary/30 rounded px-2 py-0 text-[13px] text-slate-200 outline-none"
                     />
                   ) : (
                     <span className="truncate flex-1">

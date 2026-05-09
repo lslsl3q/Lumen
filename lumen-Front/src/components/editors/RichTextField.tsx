@@ -129,18 +129,18 @@ export function RichTextField({ value, onChange, placeholder, minHeight = 120 }:
               <LinkIcon className="w-3.5 h-3.5" />
             </button>
           </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-56 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg p-2.5 space-y-1.5">
+          <PopoverContent side="bottom" align="center" className="w-56 bg-surface-elevated border border-border-default rounded-lg p-2.5 space-y-1.5">
             <input
               autoFocus
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyLink(); } if (e.key === "Escape") setLinkOpen(false); }}
               placeholder="https://..."
-              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
+              className="w-full bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
             />
             <div className="flex justify-end gap-1">
-              <button onClick={() => setLinkOpen(false)} className="px-2 py-0.5 text-[10px] rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer">取消</button>
-              <button onClick={applyLink} className="px-2 py-0.5 text-[10px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">确认</button>
+              <button onClick={() => setLinkOpen(false)} className="px-2 py-0.5 text-[10px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
+              <button onClick={applyLink} className="px-2 py-0.5 text-[10px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
             </div>
           </PopoverContent>
         </Popover>

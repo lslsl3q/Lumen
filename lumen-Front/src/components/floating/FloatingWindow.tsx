@@ -136,9 +136,9 @@ function ModalPanel({ title, onClose, children }: {
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="absolute inset-0 bg-[var(--color-bg-deep)] backdrop-blur-sm animate-overlay-fade-in" />
-      <div className="relative w-[640px] max-h-[80vh] flex flex-col bg-[var(--color-bg-deep)] rounded-xl
-        border border-[var(--color-border-subtle)] shadow-[0_16px_48px_rgba(0,0,0,0.4)] soft-panel
+      <div className="absolute inset-0 bg-surface-deep backdrop-blur-sm animate-overlay-fade-in" />
+      <div className="relative w-[640px] max-h-[80vh] flex flex-col bg-surface-deep rounded-xl
+        border border-border-subtle shadow-[0_16px_48px_rgba(0,0,0,0.4)] soft-panel
         animate-modal-in"
       >
         <PanelHeader title={title} onClose={onClose} />
@@ -171,8 +171,8 @@ function FloatPanel({ title, onClose, initialPos, initialSize, resizable, childr
 
   return (
     <div
-      className="fixed z-50 flex flex-col bg-[var(--color-bg-deep)] rounded-xl
-        border border-[var(--color-border-subtle)] shadow-[0_12px_40px_rgba(0,0,0,0.4)] soft-panel
+      className="fixed z-50 flex flex-col bg-surface-deep rounded-xl
+        border border-border-subtle shadow-[0_12px_40px_rgba(0,0,0,0.4)] soft-panel
         pointer-events-auto animate-float-in"
       style={{
         left: pos.x,
@@ -184,14 +184,14 @@ function FloatPanel({ title, onClose, initialPos, initialSize, resizable, childr
       {/* 标题栏 — 拖拽手柄 */}
       <div
         onMouseDown={onDragStart}
-        className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--color-border)] cursor-grab active:cursor-grabbing select-none"
+        className="flex items-center justify-between px-4 py-2.5 border-b border-border-default cursor-grab active:cursor-grabbing select-none"
       >
-        <span className="text-xs font-medium tracking-wide text-[var(--color-text-secondary)] font-display">{title}</span>
+        <span className="text-xs font-medium tracking-wide text-text-secondary font-display">{title}</span>
         <button
           onClick={onClose}
           onMouseDown={(e) => e.stopPropagation()}
           className="w-5 h-5 rounded flex items-center justify-center
-            text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
+            text-text-muted hover:text-text-primary hover:bg-surface-elevated
             transition-all duration-150 cursor-pointer"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -212,7 +212,7 @@ function FloatPanel({ title, onClose, initialPos, initialSize, resizable, childr
           className="absolute right-0 bottom-0 w-4 h-4 cursor-nwse-resize
             flex items-end justify-end pr-1 pb-1"
         >
-          <svg className="w-2.5 h-2.5 text-[var(--color-text-dim)]" fill="currentColor" viewBox="0 0 8 8">
+          <svg className="w-2.5 h-2.5 text-text-dim" fill="currentColor" viewBox="0 0 8 8">
             <circle cx="6" cy="2" r="0.8" />
             <circle cx="6" cy="6" r="0.8" />
             <circle cx="2" cy="6" r="0.8" />
@@ -226,12 +226,12 @@ function FloatPanel({ title, onClose, initialPos, initialSize, resizable, childr
 /** 共享标题栏（modal 模式用） */
 function PanelHeader({ title, onClose }: { title: string; onClose: () => void }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-border)]">
-      <span className="text-sm font-medium text-[var(--color-text-primary)] font-display">{title}</span>
+    <div className="flex items-center justify-between px-5 py-3.5 border-b border-border-default">
+      <span className="text-sm font-medium text-text-primary font-display">{title}</span>
       <button
         onClick={onClose}
         className="w-6 h-6 rounded flex items-center justify-center
-          text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
+          text-text-muted hover:text-text-primary hover:bg-surface-elevated
           transition-all duration-150 cursor-pointer"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

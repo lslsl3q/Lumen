@@ -34,16 +34,16 @@ export function WritingSidePanel({ panel, onClose }: WritingSidePanelProps) {
   const isChapters = panel === "chapters";
 
   return (
-    <div className={`z-20 bg-[var(--color-bg-panel)] flex flex-col
+    <div className={`z-20 bg-surface-panel flex flex-col
       ${isChapters
-        ? "absolute left-12 top-0 bottom-0 w-[260px] border-r border-[var(--color-border)]"
-        : "absolute left-16 top-4 bottom-4 w-[300px] rounded-xl border border-[var(--color-border)] shadow-2xl shadow-black/50"
+        ? "absolute left-12 top-0 bottom-0 w-[260px] border-r border-border-default"
+        : "absolute left-16 top-4 bottom-4 w-[300px] rounded-xl border border-border-default shadow-2xl shadow-black/50"
       }`}
     >
       {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
-        <span className="text-[12px] font-medium text-[var(--color-text-primary)]">{PANEL_TITLES[panel] ?? panel}</span>
-        <button onClick={onClose} className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default flex-shrink-0">
+        <span className="text-[12px] font-medium text-text-primary">{PANEL_TITLES[panel] ?? panel}</span>
+        <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-text-secondary cursor-pointer">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -81,8 +81,8 @@ function ChipSelect({ options, value, onChange }: {
           onClick={() => onChange(opt.value)}
           className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer border
             ${value === opt.value
-              ? `border-[var(--color-primary)]/30 ${opt.color ?? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"}`
-              : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:border-slate-600"
+              ? `border-primary/30 ${opt.color ?? "bg-primary/10 text-primary"}`
+              : "border-border-default text-text-muted hover:text-text-primary hover:border-slate-600"
             }`}
         >
           {opt.label}
@@ -102,13 +102,13 @@ function FieldTextarea({ label, value, placeholder, rows = 3, onUpdate }: {
 }) {
   return (
     <div>
-      <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">{label}</label>
+      <label className="text-[10px] text-text-muted uppercase tracking-wider">{label}</label>
       <textarea
         defaultValue={value}
         onBlur={(e) => { if (e.target.value !== value) onUpdate(e.target.value); }}
         placeholder={placeholder}
         rows={rows}
-        className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30 resize-y leading-relaxed"
+        className="w-full mt-1 bg-surface-elevated border border-border-default rounded px-2 py-1.5 text-[12px] text-text-primary placeholder-[var(--color-text-dim)] outline-none focus:border-primary/30 resize-y leading-relaxed"
       />
     </div>
   );
@@ -123,12 +123,12 @@ function FieldInput({ label, value, placeholder, onUpdate }: {
 }) {
   return (
     <div>
-      <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">{label}</label>
+      <label className="text-[10px] text-text-muted uppercase tracking-wider">{label}</label>
       <input
         defaultValue={value}
         onBlur={(e) => { if (e.target.value !== value) onUpdate(e.target.value); }}
         placeholder={placeholder}
-        className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
+        className="w-full mt-1 bg-surface-elevated border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
       />
     </div>
   );
@@ -151,10 +151,10 @@ const CHARACTER_FIELDS: FieldDef[] = [
   {
     key: "role", label: "角色定位", type: "select",
     options: [
-      { value: "protagonist", label: "主角", color: "bg-[var(--color-primary)]/15 text-[var(--color-primary)]" },
+      { value: "protagonist", label: "主角", color: "bg-primary/15 text-primary" },
       { value: "antagonist", label: "反派", color: "bg-red-400/15 text-red-300" },
       { value: "supporting", label: "配角", color: "bg-blue-400/15 text-blue-300" },
-      { value: "minor", label: "龙套", color: "bg-slate-400/10 text-[var(--color-text-primary)]" },
+      { value: "minor", label: "龙套", color: "bg-slate-400/10 text-text-primary" },
     ],
   },
   { key: "gender", label: "性别", type: "text", placeholder: "如：男/女/未知" },
@@ -206,10 +206,10 @@ const ITEM_FIELDS: FieldDef[] = [
   {
     key: "rarity", label: "稀有度", type: "select",
     options: [
-      { value: "common", label: "普通", color: "bg-slate-400/10 text-[var(--color-text-primary)]" },
+      { value: "common", label: "普通", color: "bg-slate-400/10 text-text-primary" },
       { value: "uncommon", label: "稀有", color: "bg-green-400/15 text-green-300" },
       { value: "rare", label: "史诗", color: "bg-purple-400/15 text-purple-300" },
-      { value: "legendary", label: "传说", color: "bg-[var(--color-primary)]/15 text-[var(--color-primary)]" },
+      { value: "legendary", label: "传说", color: "bg-primary/15 text-primary" },
     ],
   },
   {
@@ -251,7 +251,7 @@ function CategoryPanel({ category, label, icon, fieldConfig }: {
   return (
     <div className="p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">{label}列表</span>
+        <span className="text-[10px] uppercase tracking-wider text-text-muted">{label}列表</span>
         <button
           onClick={async () => {
             if (!activeProjectId) return;
@@ -261,18 +261,18 @@ function CategoryPanel({ category, label, icon, fieldConfig }: {
               setPendingEditName("新" + label);
             } catch {}
           }}
-          className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer"
+          className="p-0.5 rounded text-text-muted hover:text-text-primary cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {!activeProjectId && (
-        <p className="text-[11px] text-[var(--color-text-muted)] italic py-2">请先选择一个作品</p>
+        <p className="text-[11px] text-text-muted italic py-2">请先选择一个作品</p>
       )}
 
       {filtered.length === 0 && activeProjectId && (
-        <p className="text-[11px] text-[var(--color-text-muted)] italic py-2">暂无{label}，点击 + 创建</p>
+        <p className="text-[11px] text-text-muted italic py-2">暂无{label}，点击 + 创建</p>
       )}
 
       <div className="space-y-0.5">
@@ -335,10 +335,10 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
       {/* 列表行 */}
       <div
         onClick={onToggle}
-        className="flex items-center gap-2 px-2.5 py-2 text-[13px] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] cursor-pointer transition-colors group"
+        className="flex items-center gap-2 px-2.5 py-2 text-[13px] text-text-secondary hover:bg-surface-elevated cursor-pointer transition-colors group"
       >
         <span className="text-sm">{icon}</span>
-        {isExpanded ? <ChevronDown className="w-3 h-3 text-[var(--color-text-muted)]" /> : <ChevronRight className="w-3 h-3 text-[var(--color-text-muted)]" />}
+        {isExpanded ? <ChevronDown className="w-3 h-3 text-text-muted" /> : <ChevronRight className="w-3 h-3 text-text-muted" />}
         {pendingEdit ? (
           <input
             autoFocus
@@ -351,19 +351,19 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
             }}
             onBlur={() => onPendingEditCancel?.()}
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none min-w-0"
+            className="flex-1 bg-surface-elevated border border-primary/30 rounded px-2 py-0 text-[13px] text-text-primary outline-none min-w-0"
           />
         ) : (
           <span className="truncate flex-1">{setting.name}</span>
         )}
         {badge && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] flex-shrink-0">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-elevated text-text-muted flex-shrink-0">
             {badge}
           </span>
         )}
         <button
           onClick={async (e) => { e.stopPropagation(); await onDelete(); }}
-          className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer"
+          className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 cursor-pointer"
         >
           <Trash2 className="w-3 h-3" />
         </button>
@@ -371,7 +371,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
 
       {/* 展开编辑器 */}
       {isExpanded && (
-        <div className="px-3 pb-3 pt-1 space-y-2.5 bg-[var(--color-bg-deep)]">
+        <div className="px-3 pb-3 pt-1 space-y-2.5 bg-surface-deep">
           {/* 名称 */}
           <FieldInput
             label="名称"
@@ -384,7 +384,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
             if (field.type === "select" && field.options) {
               return (
                 <div key={field.key}>
-                  <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">{field.label}</label>
+                  <label className="text-[10px] text-text-muted uppercase tracking-wider">{field.label}</label>
                   <div className="mt-1">
                     <ChipSelect
                       options={field.options}
@@ -457,8 +457,8 @@ function ChaptersPanel() {
   return (
     <div className="p-3 space-y-3">
       {activeProject && (
-        <div className="px-2.5 py-1.5 rounded-md bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10">
-          <p className="text-[11px] text-[var(--color-primary)]/70 truncate">
+        <div className="px-2.5 py-1.5 rounded-md bg-primary/5 border border-primary/10">
+          <p className="text-[11px] text-primary/70 truncate">
             <FileText className="inline w-3 h-3 mr-1 -mt-0.5" />
             {activeProject.name}
           </p>
@@ -466,7 +466,7 @@ function ChaptersPanel() {
       )}
 
       {!activeProject && (
-        <p className="text-[11px] text-[var(--color-text-muted)] italic px-2">
+        <p className="text-[11px] text-text-muted italic px-2">
           请先在「作品管理」中创建或选择作品
         </p>
       )}
@@ -474,17 +474,17 @@ function ChaptersPanel() {
       {activeProject && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">章节</span>
+            <span className="text-[10px] uppercase tracking-wider text-text-muted">章节</span>
             <button
               onClick={() => createChapter("新章节")}
-              className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer"
+              className="p-0.5 rounded text-text-muted hover:text-text-primary cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="space-y-0.5">
             {chapters.length === 0 && (
-              <p className="text-[11px] text-[var(--color-text-muted)] italic px-1 py-2">点击 + 创建第一章</p>
+              <p className="text-[11px] text-text-muted italic px-1 py-2">点击 + 创建第一章</p>
             )}
             {chapters.map((ch, idx) => (
               <div
@@ -507,7 +507,7 @@ function ChaptersPanel() {
                   setDragId(null);
                 }}
                 className={`flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
-                  ${ch.id === activeChapterId ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}
+                  ${ch.id === activeChapterId ? "bg-primary/10 text-primary" : "text-text-secondary hover:bg-surface-elevated"}
                   ${dragId === ch.id ? "opacity-50" : ""}`}
               >
                 {editingId === ch.id ? (
@@ -528,22 +528,22 @@ function ChaptersPanel() {
                     }}
                     onBlur={() => setEditingId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
+                    className="flex-1 bg-surface-elevated border border-primary/30 rounded px-2 py-0 text-[13px] text-text-primary outline-none"
                   />
                 ) : (
                   <span className="truncate flex-1">
-                    <span className="text-[var(--color-text-muted)] mr-1 text-[11px]">{idx + 1}.</span>
+                    <span className="text-text-muted mr-1 text-[11px]">{idx + 1}.</span>
                     {ch.title}
                   </span>
                 )}
-                <span className="text-[10px] text-[var(--color-text-muted)] mr-1">{ch.word_count ?? 0}字</span>
+                <span className="text-[10px] text-text-muted mr-1">{ch.word_count ?? 0}字</span>
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
                     if (!confirm("删除此章节？")) return;
                     await deleteChapter(ch.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer"
+                  className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -581,14 +581,14 @@ function ProjectManagementPanel() {
             setEditName("新作品");
           } catch {}
         }}
-        className="flex items-center gap-2 w-full px-3 py-2.5 rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/15 cursor-pointer transition-colors text-[13px]"
+        className="flex items-center gap-2 w-full px-3 py-2.5 rounded-md bg-primary/10 text-primary hover:bg-primary/15 cursor-pointer transition-colors text-[13px]"
       >
         <Plus className="w-4 h-4" />
         新建作品
       </button>
 
       {projects.length === 0 && (
-        <p className="text-[11px] text-[var(--color-text-muted)] italic px-1 py-2">暂无作品</p>
+        <p className="text-[11px] text-text-muted italic px-1 py-2">暂无作品</p>
       )}
 
       <div className="space-y-1">
@@ -599,7 +599,7 @@ function ProjectManagementPanel() {
             <div
               key={p.id}
               className={`rounded-md overflow-hidden transition-colors
-                ${isActive ? "bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10" : "border border-transparent"}`}
+                ${isActive ? "bg-primary/5 border border-primary/10" : "border border-transparent"}`}
             >
               <div
                 onClick={() => setActiveProject(p.id)}
@@ -617,22 +617,22 @@ function ProjectManagementPanel() {
                     }}
                     onBlur={() => setEditingId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0.5 text-[13px] text-[var(--color-text-primary)] outline-none"
+                    className="flex-1 bg-surface-elevated border border-primary/30 rounded px-2 py-0.5 text-[13px] text-text-primary outline-none"
                   />
                 ) : (
                   <>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] truncate ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-text-primary)]"}`}>
+                      <p className={`text-[13px] truncate ${isActive ? "text-primary" : "text-text-primary"}`}>
                         {p.name}
                       </p>
-                      <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
+                      <p className="text-[10px] text-text-muted mt-0.5">
                         {new Date(p.created_at * 1000).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setEditName(p.name); }}
-                        className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                        className="p-1 rounded text-text-muted hover:text-text-primary cursor-pointer"
                       >
                         <Edit3 className="w-3 h-3" />
                       </button>
@@ -642,7 +642,7 @@ function ProjectManagementPanel() {
                           if (!confirm(`删除「${p.name}」及其所有章节和设定？`)) return;
                           await deleteProject(p.id);
                         }}
-                        className="p-1 rounded text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer"
+                        className="p-1 rounded text-text-muted hover:text-red-400 cursor-pointer"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -662,32 +662,32 @@ function ProjectManagementPanel() {
         const chapterCount = useWritingStore.getState().chapters.length;
         const totalWords = useWritingStore.getState().chapters.reduce((sum, c) => sum + (c.word_count ?? 0), 0);
         return (
-          <div className="mt-2 pt-3 border-t border-[var(--color-border)]">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-2">作品信息</p>
+          <div className="mt-2 pt-3 border-t border-border-default">
+            <p className="text-[10px] uppercase tracking-wider text-text-muted mb-2">作品信息</p>
             <div className="grid grid-cols-2 gap-2">
-              <div className="px-2.5 py-2 rounded-md bg-[var(--color-bg-elevated)]">
-                <p className="text-[10px] text-[var(--color-text-muted)]">章节</p>
-                <p className="text-[14px] text-[var(--color-text-primary)]">{chapterCount}</p>
+              <div className="px-2.5 py-2 rounded-md bg-surface-elevated">
+                <p className="text-[10px] text-text-muted">章节</p>
+                <p className="text-[14px] text-text-primary">{chapterCount}</p>
               </div>
-              <div className="px-2.5 py-2 rounded-md bg-[var(--color-bg-elevated)]">
-                <p className="text-[10px] text-[var(--color-text-muted)]">总字数</p>
-                <p className="text-[14px] text-[var(--color-text-primary)]">{totalWords.toLocaleString()}</p>
+              <div className="px-2.5 py-2 rounded-md bg-surface-elevated">
+                <p className="text-[10px] text-text-muted">总字数</p>
+                <p className="text-[14px] text-text-primary">{totalWords.toLocaleString()}</p>
               </div>
             </div>
             {proj.description && (
               <div className="mt-2">
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase">简介</label>
-                <p className="text-[12px] text-[var(--color-text-secondary)] mt-0.5">{proj.description}</p>
+                <label className="text-[10px] text-text-muted uppercase">简介</label>
+                <p className="text-[12px] text-text-secondary mt-0.5">{proj.description}</p>
               </div>
             )}
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase">创建</label>
-                <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{new Date(proj.created_at * 1000).toLocaleDateString()}</p>
+                <label className="text-[10px] text-text-muted uppercase">创建</label>
+                <p className="text-[11px] text-text-secondary mt-0.5">{new Date(proj.created_at * 1000).toLocaleDateString()}</p>
               </div>
               <div>
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase">更新</label>
-                <p className="text-[11px] text-[var(--color-text-secondary)] mt-0.5">{new Date(proj.updated_at * 1000).toLocaleDateString()}</p>
+                <label className="text-[10px] text-text-muted uppercase">更新</label>
+                <p className="text-[11px] text-text-secondary mt-0.5">{new Date(proj.updated_at * 1000).toLocaleDateString()}</p>
               </div>
             </div>
           </div>
@@ -732,19 +732,19 @@ function OutlinePanel() {
     <div className="p-3">
       {/* 概览 */}
       <div className="grid grid-cols-2 gap-2 mb-3">
-        <div className="px-2.5 py-2 rounded-md bg-[var(--color-bg-elevated)]">
-          <p className="text-[10px] text-[var(--color-text-muted)]">总章节</p>
-          <p className="text-[14px] text-[var(--color-text-primary)]">{chapters.length}</p>
+        <div className="px-2.5 py-2 rounded-md bg-surface-elevated">
+          <p className="text-[10px] text-text-muted">总章节</p>
+          <p className="text-[14px] text-text-primary">{chapters.length}</p>
         </div>
-        <div className="px-2.5 py-2 rounded-md bg-[var(--color-bg-elevated)]">
-          <p className="text-[10px] text-[var(--color-text-muted)]">总字数</p>
-          <p className="text-[14px] text-[var(--color-text-primary)]">{totalWords.toLocaleString()}</p>
+        <div className="px-2.5 py-2 rounded-md bg-surface-elevated">
+          <p className="text-[10px] text-text-muted">总字数</p>
+          <p className="text-[14px] text-text-primary">{totalWords.toLocaleString()}</p>
         </div>
       </div>
 
-      <p className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] mb-2">章节大纲</p>
+      <p className="text-[10px] uppercase tracking-wider text-text-muted mb-2">章节大纲</p>
       {chapters.length === 0 && (
-        <p className="text-[11px] text-[var(--color-text-muted)] italic">暂无章节</p>
+        <p className="text-[11px] text-text-muted italic">暂无章节</p>
       )}
       <div className="space-y-0.5">
         {chapters.map((ch, idx) => {
@@ -758,15 +758,15 @@ function OutlinePanel() {
                   setActiveChapter(ch.id);
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-2 text-[13px] cursor-pointer transition-colors group
-                  ${ch.id === activeChapterId ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}`}
+                  ${ch.id === activeChapterId ? "bg-primary/10 text-primary" : "text-text-secondary hover:bg-surface-elevated"}`}
               >
-                {isExpanded ? <ChevronDown className="w-3 h-3 text-[var(--color-text-muted)]" /> : <ChevronRight className="w-3 h-3 text-[var(--color-text-muted)]" />}
-                <span className="text-[var(--color-text-muted)] text-[11px]">{idx + 1}.</span>
+                {isExpanded ? <ChevronDown className="w-3 h-3 text-text-muted" /> : <ChevronRight className="w-3 h-3 text-text-muted" />}
+                <span className="text-text-muted text-[11px]">{idx + 1}.</span>
                 <span className="truncate flex-1">{ch.title}</span>
-                <span className="text-[10px] text-[var(--color-text-muted)]">{ch.word_count ?? 0}字</span>
+                <span className="text-[10px] text-text-muted">{ch.word_count ?? 0}字</span>
               </div>
               {isExpanded && (
-                <div className="px-3 pb-2 pt-1 bg-[var(--color-bg-deep)]">
+                <div className="px-3 pb-2 pt-1 bg-surface-deep">
                   <textarea
                     defaultValue={outlineText}
                     onBlur={async (e) => {
@@ -777,7 +777,7 @@ function OutlinePanel() {
                     }}
                     placeholder={`${ch.title} 的大纲备注…`}
                     rows={4}
-                    className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30 resize-y leading-relaxed"
+                    className="w-full bg-surface-elevated border border-border-default rounded px-2 py-1.5 text-[12px] text-text-primary placeholder-[var(--color-text-dim)] outline-none focus:border-primary/30 resize-y leading-relaxed"
                   />
                 </div>
               )}
@@ -798,7 +798,7 @@ function ExportPanel() {
   const project = projects.find((p) => p.id === activeProjectId);
 
   if (!activeProjectId || !project) {
-    return <p className="text-[12px] text-[var(--color-text-muted)] p-4">请先选择一个作品</p>;
+    return <p className="text-[12px] text-text-muted p-4">请先选择一个作品</p>;
   }
 
   const formats: { format: "txt" | "md"; label: string; desc: string; icon: string }[] = [
@@ -815,31 +815,31 @@ function ExportPanel() {
 
   return (
     <div className="p-4 space-y-2">
-      <p className="text-[12px] text-[var(--color-text-secondary)] mb-3">导出「{project.name}」</p>
+      <p className="text-[12px] text-text-secondary mb-3">导出「{project.name}」</p>
 
       {formats.map((opt) => (
         <a
           key={opt.format}
           href={getExportUrl(activeProjectId, opt.format)}
           download
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] cursor-pointer transition-colors no-underline"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md bg-surface-elevated text-text-primary hover:bg-primary/10 hover:text-primary cursor-pointer transition-colors no-underline"
         >
           <span className="text-lg">{opt.icon}</span>
           <div>
             <p className="text-[13px]">{opt.label}</p>
-            <p className="text-[10px] text-[var(--color-text-muted)]">{opt.desc}</p>
+            <p className="text-[10px] text-text-muted">{opt.desc}</p>
           </div>
-          <Download className="w-4 h-4 ml-auto text-[var(--color-text-muted)]" />
+          <Download className="w-4 h-4 ml-auto text-text-muted" />
         </a>
       ))}
 
       {/* 未来格式 */}
-      <div className="pt-3 mt-3 border-t border-[var(--color-border)]">
-        <p className="text-[10px] text-[var(--color-text-muted)] mb-2">更多格式开发中</p>
+      <div className="pt-3 mt-3 border-t border-border-default">
+        <p className="text-[10px] text-text-muted mb-2">更多格式开发中</p>
         {futureFormats.map((opt) => (
           <div
             key={opt.label}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-[var(--color-text-muted)] opacity-50"
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-text-muted opacity-50"
           >
             <span className="text-lg">{opt.icon}</span>
             <div>

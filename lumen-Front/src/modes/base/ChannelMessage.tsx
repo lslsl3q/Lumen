@@ -20,7 +20,7 @@ function ChannelMessage({ message }: Props) {
     return (
       <div className="px-3 py-1.5 hover:bg-[#ffffff04] rounded-md">
         <div className="flex items-baseline gap-2">
-          <span className="text-xs font-semibold text-[var(--color-primary)]">你</span>
+          <span className="text-xs font-semibold text-primary">你</span>
           <span className="text-xs text-[#555]">
             {new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
           </span>

@@ -75,7 +75,7 @@ function SessionItem({
         group relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer
         mx-2 rounded-full my-px ${navItemClass}
         ${isActive
-          ? 'bg-[var(--color-primary)]/10 text-slate-200'
+          ? 'bg-primary/10 text-slate-200'
           : 'text-slate-400'
         }
       `}
@@ -89,7 +89,7 @@ function SessionItem({
           onKeyDown={handleKeyDown}
           onClick={e => e.stopPropagation()}
           className="flex-1 text-sm bg-slate-800/50 rounded px-2 py-0.5
-            text-slate-200 outline-none border border-[var(--color-primary)]/30"
+            text-slate-200 outline-none border border-primary/30"
           autoFocus
         />
       ) : (

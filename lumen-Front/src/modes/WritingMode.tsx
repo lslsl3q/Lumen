@@ -19,13 +19,13 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
   render() {
     if (this.state.error) {
       return (
-        <div className="flex items-center justify-center h-full bg-[var(--color-bg-deep)] text-slate-400">
+        <div className="flex items-center justify-center h-full bg-surface-deep text-slate-400">
           <div className="text-center max-w-md">
             <p className="text-red-400 text-sm mb-2">写作模式渲染错误</p>
             <pre className="text-[11px] text-slate-600 whitespace-pre-wrap break-all">{this.state.error.message}</pre>
             <button
               onClick={() => this.setState({ error: null })}
-              className="mt-3 px-3 py-1 text-[11px] bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/20 cursor-pointer"
+              className="mt-3 px-3 py-1 text-[11px] bg-primary/10 text-primary rounded hover:bg-primary/20 cursor-pointer"
             >
               重试
             </button>
@@ -56,7 +56,7 @@ export default function WritingMode() {
 
   return (
     <ErrorBoundary>
-      <div className="h-full w-full bg-[var(--color-bg-deep)] relative overflow-hidden flex">
+      <div className="h-full w-full bg-surface-deep relative overflow-hidden flex">
 
         {/* 左侧：编辑器 + 章节侧栏 */}
         <div className="flex-1 relative overflow-hidden">
@@ -73,7 +73,7 @@ export default function WritingMode() {
 
         {/* AI 聊天面板（由图标触发） */}
         {isChatPanelOpen && (
-          <div className="w-[380px] flex-shrink-0 border-l border-[var(--color-border)]">
+          <div className="w-[380px] flex-shrink-0 border-l border-border-default">
             <AiWritingPanel />
           </div>
         )}

@@ -52,13 +52,13 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
   };
 
   return (
-    <div className="h-full bg-[var(--color-bg-deep)] text-[var(--color-text-primary)]">
+    <div className="h-full bg-surface-deep text-text-primary">
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-8 px-6 py-4">
         <div className="flex items-center gap-4">
           <button
             onClick={() => goBack()}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+            className="text-text-secondary hover:text-text-primary transition-colors"
           >
             ← 返回聊天
           </button>
@@ -67,13 +67,13 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
         <div className="flex gap-2">
           <button
             onClick={handleImport}
-            className="px-4 py-2 rounded-lg bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] transition-all"
+            className="px-4 py-2 rounded-lg bg-border-subtle border border-border-subtle text-text-secondary hover:bg-surface-elevated transition-all"
           >
             导入
           </button>
           <button
             onClick={handleCreate}
-            className="px-4 py-2 rounded-lg bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all"
+            className="px-4 py-2 rounded-lg bg-primary/10 border border-primary/30 text-primary hover:bg-primary/20 transition-all"
           >
             + 新建 Skill
           </button>
@@ -82,7 +82,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
 
       {/* 说明 */}
       <div className="max-w-6xl mx-auto px-6 mb-6">
-        <p className="text-sm text-[var(--color-text-muted)]">
+        <p className="text-sm text-text-muted">
           Skills 定义 AI 的工作方式。角色卡决定"AI 是谁"，世界书决定"AI 知道什么"，工具决定"AI 能做什么"，Skills 决定"AI 怎么干活"。
         </p>
       </div>
@@ -90,11 +90,11 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
       {/* 内容区 */}
       <div className="max-w-6xl mx-auto px-6">
         {isLoading ? (
-          <div className="text-center py-16 text-[var(--color-text-muted)]">加载中...</div>
+          <div className="text-center py-16 text-text-muted">加载中...</div>
         ) : skills.length === 0 ? (
-          <div className="text-center py-16 text-[var(--color-text-muted)]">
+          <div className="text-center py-16 text-text-muted">
             <p className="mb-4">还没有 Skill</p>
-            <button onClick={handleCreate} className="text-[var(--color-primary)] hover:underline">
+            <button onClick={handleCreate} className="text-primary hover:underline">
               创建第一个 Skill
             </button>
           </div>
@@ -104,7 +104,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
               <div
                 key={skill.id}
                 onClick={() => goTo('skill-editor', { id: skill.id })}
-                className="group relative p-5 rounded-xl cursor-pointer bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-elevated)] transition-all"
+                className="group relative p-5 rounded-xl cursor-pointer bg-surface-elevated border border-border-default hover:border-primary/30 hover:bg-surface-elevated transition-all"
               >
                 {/* 删除按钮 */}
                 <button
@@ -112,7 +112,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
                     e.stopPropagation();
                     handleDelete(skill.id, skill.name);
                   }}
-                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-red-400 transition-all"
+                  className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all"
                 >
                   ×
                 </button>
@@ -120,13 +120,13 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
                 {/* 内容 */}
                 <div className="flex items-center gap-2 mb-2 pr-6">
                   <span className={`w-2 h-2 rounded-full ${skill.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-                  <h3 className="text-lg font-medium text-[var(--color-text-primary)]">{skill.name}</h3>
+                  <h3 className="text-lg font-medium text-text-primary">{skill.name}</h3>
                 </div>
                 {skill.description && (
-                  <p className="text-sm text-[var(--color-text-muted)] line-clamp-2">{skill.description}</p>
+                  <p className="text-sm text-text-muted line-clamp-2">{skill.description}</p>
                 )}
                 {skill.when_to_use && (
-                  <p className="text-xs text-[var(--color-text-muted)] mt-1 line-clamp-1">触发: {skill.when_to_use}</p>
+                  <p className="text-xs text-text-muted mt-1 line-clamp-1">触发: {skill.when_to_use}</p>
                 )}
               </div>
             ))}

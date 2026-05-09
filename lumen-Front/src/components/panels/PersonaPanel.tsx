@@ -134,7 +134,7 @@ export default function PersonaPanel({
       return (
         <div className="flex flex-col h-full">
           <BackButton label="Persona 列表" onClick={() => setView('list')} />
-          <div className="flex-1 flex items-center justify-center text-xs text-[var(--color-text-muted)]">加载中...</div>
+          <div className="flex-1 flex items-center justify-center text-xs text-text-muted">加载中...</div>
         </div>
       );
     }
@@ -156,40 +156,40 @@ export default function PersonaPanel({
               value={form.name}
               onChange={e => updateForm({ name: e.target.value })}
               placeholder="Persona 名字"
-              className="border-0 border-b border-[var(--color-border-subtle)] rounded-none bg-transparent
-                focus:border-[var(--color-primary)]/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-slate-700"
+              className="border-0 border-b border-border-subtle rounded-none bg-transparent
+                focus:border-primary/40 focus-visible:ring-0 text-sm text-text-primary placeholder-slate-700"
             />
           </div>
 
-          <Separator className="mx-3 bg-[var(--color-bg-elevated)]/40" />
+          <Separator className="mx-3 bg-surface-elevated/40" />
 
           {/* 描述 */}
           <div className="px-3 pt-3 space-y-2.5">
             <div>
-              <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-1">描述</Label>
+              <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">描述</Label>
               <Input
                 value={form.description}
                 onChange={e => updateForm({ description: e.target.value })}
                 placeholder="描述这个身份的特点..."
-                className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-slate-700 focus:border-[var(--color-primary)]/40 h-8"
+                className="mt-0.5 bg-surface-elevated border-border-default text-xs text-text-primary
+                  placeholder-slate-700 focus:border-primary/40 h-8"
               />
             </div>
           </div>
 
           {/* Traits */}
           <div className="px-3 pt-3 space-y-2">
-            <Label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider">特质标签</Label>
+            <Label className="text-[10px] text-text-muted uppercase tracking-wider">特质标签</Label>
             <div className="flex flex-wrap gap-1.5">
               {form.traits.map(trait => (
                 <Badge
                   key={trait}
                   variant="secondary"
-                  className="bg-[var(--color-primary)]/10 text-[var(--color-primary)] border-[var(--color-primary)]/20 text-[11px] pr-1 cursor-pointer hover:bg-[var(--color-primary)]/20"
+                  className="bg-primary/10 text-primary border-primary/20 text-[11px] pr-1 cursor-pointer hover:bg-primary/20"
                   onClick={() => removeTrait(trait)}
                 >
                   {trait}
-                  <span className="ml-1 text-[var(--color-primary)]/50 hover:text-red-400">✕</span>
+                  <span className="ml-1 text-primary/50 hover:text-red-400">✕</span>
                 </Badge>
               ))}
             </div>
@@ -199,15 +199,15 @@ export default function PersonaPanel({
                 onChange={e => setTraitInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
                 placeholder="添加特质..."
-                className="flex-1 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-slate-700 focus:border-[var(--color-primary)]/40 h-7"
+                className="flex-1 bg-surface-elevated border-border-default text-xs text-text-primary
+                  placeholder-slate-700 focus:border-primary/40 h-7"
               />
               <Button
                 variant="ghost"
                 size="xs"
                 onClick={addTrait}
                 disabled={!traitInput.trim()}
-                className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+                className="text-text-muted hover:text-text-primary"
               >
                 +
               </Button>
@@ -216,11 +216,11 @@ export default function PersonaPanel({
         </ScrollArea>
 
         {/* 保存 */}
-        <div className="border-t border-[var(--color-border)] px-3 py-2.5">
+        <div className="border-t border-border-default px-3 py-2.5">
           <Button
             onClick={handleSave}
             disabled={isSaving || !form.name.trim()}
-            className="w-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30
+            className="w-full bg-primary/20 text-primary hover:bg-primary/30
               disabled:opacity-50 text-xs"
           >
             {isSaving ? '保存中...' : editingId ? '保存修改' : '创建 Persona'}
@@ -235,12 +235,12 @@ export default function PersonaPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
-        <span className="text-[10px] text-[var(--color-text-muted)] font-medium tracking-wider uppercase">Personas</span>
+        <span className="text-[10px] text-text-muted font-medium tracking-wider uppercase">Personas</span>
         <Button
           variant="ghost"
           size="icon-xs"
           onClick={openNewPersona}
-          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]"
+          className="text-text-muted hover:text-text-primary"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
@@ -258,12 +258,12 @@ export default function PersonaPanel({
             className={`w-full flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg text-left cursor-pointer
               transition-colors duration-100 ${navItemClass}
               ${activePersonaId === null
-                ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
+                ? 'bg-primary/10 text-primary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-primary-subtle'
               }`}
           >
-            <div className="w-6 h-6 rounded-full bg-[var(--color-bg-elevated)] flex-shrink-0 flex items-center justify-center">
-              <span className="text-[9px] text-[var(--color-text-muted)]">—</span>
+            <div className="w-6 h-6 rounded-full bg-surface-elevated flex-shrink-0 flex items-center justify-center">
+              <span className="text-[9px] text-text-muted">—</span>
             </div>
             <span className="text-xs">不使用</span>
           </button>
@@ -282,18 +282,18 @@ export default function PersonaPanel({
                 className={`group flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg cursor-pointer
                   transition-colors duration-100 ${navItemClass}
                   ${isActive
-                    ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-primary-subtle'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] text-[var(--color-primary)]">{p.name[0]}</span>
+                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] text-primary">{p.name[0]}</span>
                 </div>
                 <span className="text-xs truncate flex-1">{p.name}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); openSettings(p.id); }}
                   className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0
-                    text-[var(--color-text-dim)] hover:text-[var(--color-text-secondary)] opacity-0 group-hover:opacity-100
+                    text-text-dim hover:text-text-secondary opacity-0 group-hover:opacity-100
                     transition-opacity duration-150 cursor-pointer"
                   title="设置"
                 >

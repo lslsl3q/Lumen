@@ -174,11 +174,11 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 w-[380px] bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
+      className="fixed z-50 w-[380px] bg-surface-deep border border-border-default rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
       style={{ top: position.top, left: position.left }}
     >
       {/* 模式按钮行 */}
-      <div className="flex items-center gap-0.5 px-2 py-2 border-b border-[var(--color-border)]">
+      <div className="flex items-center gap-0.5 px-2 py-2 border-b border-border-default">
         {availableModes.map((m) => {
           const Icon = m.icon;
           const active = mode === m.key;
@@ -188,8 +188,8 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
               onClick={() => setMode(m.key)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer
                 ${active
-                  ? "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
-                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
+                  ? "bg-primary/15 text-primary"
+                  : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"
                 }`}
             >
               <Icon className="w-3 h-3" />
@@ -201,7 +201,7 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
         {/* 连接状态 */}
         <div className="ml-auto flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
-          <button onClick={onClose} className="p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer">
+          <button onClick={onClose} className="p-0.5 text-text-muted hover:text-text-secondary cursor-pointer">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -228,16 +228,16 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
             : "向 AI 提问…"
           }
           disabled={!activeChapterId || streaming}
-          className="flex-1 bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-lg px-3 py-1.5
-            text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]
-            focus:outline-none focus:border-[var(--color-primary)]/30 transition-colors
+          className="flex-1 bg-surface-deep border border-border-default rounded-lg px-3 py-1.5
+            text-[12px] text-text-primary placeholder-[var(--color-text-dim)]
+            focus:outline-none focus:border-primary/30 transition-colors
             disabled:opacity-50"
         />
         <button
           onClick={handleGenerate}
           disabled={!activeChapterId || streaming || !isConnected}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--color-primary)]/15 text-[var(--color-primary)]
-            hover:bg-[var(--color-primary)]/25 transition-colors cursor-pointer text-[11px] font-medium
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/15 text-primary
+            hover:bg-primary/25 transition-colors cursor-pointer text-[11px] font-medium
             disabled:opacity-50"
         >
           {streaming ? (
@@ -252,7 +252,7 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
       {/* 问答模式：显示 AI 回复 */}
       {mode === "chat" && accumulated && (
         <div className="px-3 pb-3 max-h-[200px] overflow-y-auto scrollbar-lumen">
-          <div className="text-[12px] leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap bg-[var(--color-bg-deep)] rounded-lg p-2.5">
+          <div className="text-[12px] leading-relaxed text-text-primary whitespace-pre-wrap bg-surface-deep rounded-lg p-2.5">
             {accumulated}
             {streaming && <span className="animate-pulse">▊</span>}
           </div>

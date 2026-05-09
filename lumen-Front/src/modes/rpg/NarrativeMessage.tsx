@@ -35,7 +35,7 @@ function SystemMessage({ content }: { content: string }) {
       <div className={`
         px-4 py-1.5 rounded-full text-xs
         ${isDiceRoll
-          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]/80 border border-[var(--color-primary)]/20'
+          ? 'bg-primary/10 text-primary/80 border border-primary/20'
           : 'bg-slate-800/50 text-slate-500 border border-slate-700/30'
         }
       `}>
@@ -50,7 +50,7 @@ function PlayerAction({ content, className }: { content: string; className: stri
   return (
     <div className={`px-6 py-3 min-w-0 flex justify-end ${className}`}>
       <div className="max-w-[75%] min-w-0">
-        <div className="border-r-2 border-[var(--color-primary)]/60 pr-4 py-1 bg-[var(--color-primary)]/3 rounded-l-lg">
+        <div className="border-r-2 border-primary/60 pr-4 py-1 bg-primary/3 rounded-l-lg">
           <p className="text-[14px] text-slate-300 leading-relaxed italic break-words">
             {content}
           </p>
