@@ -1,12 +1,12 @@
 /**
  * Lumen 主题系统 — 类型定义
  *
- * ThemeTokens: 29 个语义色 token，涵盖 Lumen 自定义变量 + Shadcn 映射。
+ * ThemeTokens: 52 个 token，涵盖 5 层（色/间距/效果/动画/排版）。
  * render-css.ts 将每个 token 映射到对应的 CSS 变量组。
  */
 
 export interface ThemeTokens {
-  // === 主色 — 赤陶棕 accent ===
+  // === 主色 accent ===
   primary: string;
   primaryDim: string;
   primaryDeep: string;
@@ -18,31 +18,71 @@ export interface ThemeTokens {
   successLight: string;
   error: string;
   errorLight: string;
+  warning: string;
 
-  // === 背景层（4 级明度梯度）===
-  bgDeep: string;
-  bgBase: string;
-  bgSurface: string;
-  bgElevated: string;
+  // === 背景层（7 级）===
+  surfaceDeep: string;
+  surfaceBase: string;
+  surface: string;
+  surfaceElevated: string;
+  surfaceRail: string;
+  surfacePanel: string;
+  surfaceCanvas: string;
 
-  // === 区域色（ActivityBar / SidePanel / ChatPanel）===
-  bgRail: string;
-  bgPanel: string;
-  bgCanvas: string;
-
-  // === 文字色（4 级对比度）===
+  // === 文字色（4 级）===
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
   textDim: string;
 
   // === 边框 ===
-  border: string;
+  borderDefault: string;
   borderSubtle: string;
 
   // === 发光效果 ===
   glowPrimary: string;
   glowSubtle: string;
+
+  // === 间距（4 级）===
+  spacingTight: string;
+  spacingNormal: string;
+  spacingRelaxed: string;
+  spacingSpacious: string;
+
+  // === 阴影（4 级）===
+  shadowSubtle: string;
+  shadowCard: string;
+  shadowModal: string;
+  shadowDeep: string;
+
+  // === 圆角（4 级）===
+  radiusSm: string;
+  radiusMd: string;
+  radiusLg: string;
+  radiusFull: string;
+
+  // === 模糊（2 级）===
+  blurSubtle: string;
+  blurOverlay: string;
+
+  // === 动画时长（4 级）===
+  durationInstant: string;
+  durationFast: string;
+  durationNormal: string;
+  durationSlow: string;
+
+  // === 缓动函数（3 个）===
+  easeDefault: string;
+  easeSpring: string;
+  easeDecelerate: string;
+
+  // === 排版（6 级）===
+  textXs: string;
+  textSm: string;
+  textBase: string;
+  textLg: string;
+  textXl: string;
+  text2xl: string;
 }
 
 export interface ThemeSchema {
