@@ -20,7 +20,7 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex-1 h-1.5 bg-[#2a2926] rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-[var(--color-bg-elevated)] rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${colorClass}`}
           style={{ width: `${pct}%` }}
@@ -42,9 +42,9 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
     'text-red-400';
 
   return (
-    <div className="bg-[#1C1B19] rounded-lg border border-[#2a2926] overflow-hidden">
+    <div className="bg-[var(--color-bg-elevated)] rounded-lg border border-[var(--color-bg-elevated)] overflow-hidden">
       <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#2a2926]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-bg-elevated)]/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className={`w-1.5 h-1.5 rounded-full ${statusColor} flex-shrink-0`} />
@@ -61,7 +61,7 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
         <HpBar hp={entity.hp} maxHp={entity.max_hp} />
       </div>
       {expanded && (
-        <div className="px-3 pb-2.5 space-y-1 border-t border-[#2a2926] pt-2">
+        <div className="px-3 pb-2.5 space-y-1 border-t border-[var(--color-bg-elevated)] pt-2">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Heart className="w-3 h-3 text-red-400" />
             <span>生命值</span>
@@ -110,7 +110,7 @@ function EmotionBar({ name, value }: { name: string; value: number }) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-[11px] text-slate-400 w-10 text-right flex-shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-[#2a2926] rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-[var(--color-bg-elevated)] rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700 ease-out"
           style={{ width: `${pct}%`, backgroundColor: color }}
@@ -146,9 +146,9 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
   if (!hasContent) return null;
 
   return (
-    <div className="border-t border-[#1a1a19]">
+    <div className="border-t border-[var(--color-border)]">
       <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#2a2926]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-bg-elevated)]/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <Brain className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
@@ -223,9 +223,9 @@ function RpgStatusPanel({ roomState, playerId }: RpgStatusPanelProps) {
   });
 
   return (
-    <div className="w-64 flex flex-col bg-[#111110] border-r border-[#1a1a19] flex-shrink-0">
+    <div className="w-64 flex flex-col bg-[var(--color-bg-deep)] border-r border-[var(--color-border)] flex-shrink-0">
       {/* 面板头部 */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1a1a19]">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--color-border)]">
         <Swords className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
         <span className="text-sm font-medium text-slate-300 truncate">
           {roomState.roomName || '等待进入...'}

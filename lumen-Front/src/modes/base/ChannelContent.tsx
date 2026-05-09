@@ -35,7 +35,7 @@ function ChannelContent() {
   return (
     <div className="flex-1 flex flex-col min-w-0">
       {/* 频道标题栏 */}
-      <div className="h-10 flex items-center gap-2 px-4 border-b border-[#1a1a19] flex-shrink-0">
+      <div className="h-10 flex items-center gap-2 px-4 border-b border-[var(--color-border)] flex-shrink-0">
         <Hash size={14} className="text-[#555]" />
         <span className="text-sm font-medium text-[#ccc]">{activeChannel?.name}</span>
         {activeChannel?.description && (
@@ -70,7 +70,7 @@ function ChannelContent() {
           <button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="text-[#555] hover:text-[#CC7C5E] disabled:opacity-30
+            className="text-[#555] hover:text-[var(--color-primary)] disabled:opacity-30
               transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             <Send size={14} />

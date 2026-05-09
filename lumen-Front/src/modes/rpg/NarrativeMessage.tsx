@@ -50,7 +50,7 @@ function PlayerAction({ content, className }: { content: string; className: stri
   return (
     <div className={`px-6 py-3 min-w-0 flex justify-end ${className}`}>
       <div className="max-w-[75%] min-w-0">
-        <div className="border-r-2 border-[#CC7C5E]/60 pr-4 py-1 bg-[#CC7C5E08] rounded-l-lg">
+        <div className="border-r-2 border-[var(--color-primary)]/60 pr-4 py-1 bg-[var(--color-primary)]/3 rounded-l-lg">
           <p className="text-[14px] text-slate-300 leading-relaxed italic break-words">
             {content}
           </p>

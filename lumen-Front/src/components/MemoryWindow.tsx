@@ -116,7 +116,7 @@ function FolderTree({
                 onClick={() => onSelect(folder.path, file.name)}
                 className={`w-full flex items-center gap-1.5 pl-8 pr-3 py-1 cursor-pointer transition-colors duration-100
                   ${isActive
-                    ? 'bg-[#CC7C5E]/08 text-[var(--color-text-primary)]'
+                    ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
                     : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-slate-800/30'
                   }`}
               >
@@ -556,7 +556,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                 placeholder="文件夹名"
                 className="flex-1 text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
                   px-2 py-1 text-[var(--color-text-primary)] placeholder:text-slate-700
-                  outline-none focus:border-[#CC7C5E]/30"
+                  outline-none focus:border-[var(--color-primary)]/30"
                 autoFocus
               />
               <button onClick={handleCreateFolder} className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer">OK</button>
@@ -818,7 +818,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       onClick={() => { setSelectedEntryId(entry.id); setSelectedFilePath(null); }}
                       className={`w-full flex flex-col gap-0.5 px-3 py-2 cursor-pointer transition-colors duration-100 text-left
                         ${isActive
-                          ? 'bg-[#CC7C5E]/08 text-[var(--color-text-primary)]'
+                          ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
                           : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-slate-800/30'
                         }`}
                     >
@@ -1011,7 +1011,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                         className={`w-full text-left px-4 py-2 border-b border-[var(--color-border)]/50
                           text-xs hover:text-[var(--color-text-primary)] hover:bg-slate-800/30
                           cursor-pointer transition-colors
-                          ${chunk.id === selectedEntryId ? 'bg-[#CC7C5E]/08 text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'}
+                          ${chunk.id === selectedEntryId ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'}
                         `}
                       >
                         <span className="text-[10px] text-slate-700">#{idx + 1}</span>
@@ -1239,7 +1239,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   placeholder="搜索日记..."
                   className="w-32 text-[11px] bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
                     px-2.5 py-1 text-[var(--color-text-primary)] placeholder:text-slate-700
-                    outline-none focus:border-[#CC7C5E]/30 transition-colors"
+                    outline-none focus:border-[var(--color-primary)]/30 transition-colors"
                 />
               </div>
               <button
@@ -1260,7 +1260,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               <button
                 onClick={handleSaveFile}
                 className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                  bg-[#CC7C5E]/15 text-[#CC7C5E] hover:bg-[#CC7C5E]/25 transition-colors"
+                  bg-[var(--color-primary)]/15 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25 transition-colors"
               >
                 保存
               </button>

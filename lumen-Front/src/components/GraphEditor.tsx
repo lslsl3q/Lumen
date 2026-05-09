@@ -456,7 +456,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             onChange={e => setLayoutType(e.target.value)}
             className="flex-1 text-[10px] bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
               px-2 py-1 text-[var(--color-text-muted)] outline-none cursor-pointer
-              hover:border-[#CC7C5E]/20 focus:border-[#CC7C5E]/30"
+              hover:border-[var(--color-primary)]/20 focus:border-[var(--color-primary)]/30"
           >
             {Object.entries(LAYOUTS).map(([key, { label }]) => (
               <option key={key} value={key}>{label}</option>
@@ -594,7 +594,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   }}
                   className={`w-full text-left px-3 pl-5 py-1 text-xs cursor-pointer transition-colors duration-100
                     ${String(entity.id) === selectedNodeId
-                      ? 'bg-[#CC7C5E]/08 text-[var(--color-text-primary)]'
+                      ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
                       : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]'
                     }`}
                 >
@@ -622,7 +622,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               placeholder="实体名称"
               className="w-full text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
                 px-2 py-1 text-[var(--color-text-primary)] placeholder:text-slate-700
-                outline-none focus:border-[#CC7C5E]/30"
+                outline-none focus:border-[var(--color-primary)]/30"
               autoFocus
             />
             <select
@@ -657,7 +657,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               onChange={e => setPromptText(e.target.value)}
               className="w-full h-48 text-[10px] leading-relaxed bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
                 px-2 py-1.5 text-[var(--color-text-secondary)] outline-none resize-y
-                focus:border-[#CC7C5E]/30"
+                focus:border-[var(--color-primary)]/30"
               spellCheck={false}
             />
             <div className="flex gap-1.5">
@@ -726,7 +726,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
                 className="w-full text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
-                  px-2 py-1 text-[var(--color-text-primary)] outline-none focus:border-[#CC7C5E]/30"
+                  px-2 py-1 text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
                 placeholder="名称"
               />
               <select

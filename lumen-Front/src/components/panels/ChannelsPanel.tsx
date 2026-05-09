@@ -40,13 +40,13 @@ function ChannelsPanel() {
   return (
     <div className="h-full flex flex-col" onClick={closeContextMenu}>
       {/* 顶部工具栏 */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-[#1a1a19]">
+      <div className="h-10 flex items-center justify-between px-3 border-b border-[var(--color-border)]">
         <span className="text-xs font-medium text-[#888] tracking-wide">频道</span>
         <div className="flex gap-1">
           <button
             onClick={() => setShowCreate(true)}
             className="w-6 h-6 flex items-center justify-center rounded
-              text-[#666] hover:text-[#CC7C5E] hover:bg-[#CC7C5E15] transition-colors cursor-pointer"
+              text-[#666] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/8 transition-colors cursor-pointer"
             title="创建频道"
           >
             <Plus size={14} />
@@ -83,7 +83,7 @@ function ChannelsPanel() {
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer
                   transition-colors duration-150 group
                   ${activeChannelId === channel.id
-                    ? 'bg-[#CC7C5E18] text-[#CC7C5E]'
+                    ? 'bg-[var(--color-primary)]/9 text-[var(--color-primary)]'
                     : 'text-[#888] hover:bg-[#ffffff06] hover:text-[#bbb]'
                   }`}
               >

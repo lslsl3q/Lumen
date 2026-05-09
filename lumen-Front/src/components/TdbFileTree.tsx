@@ -88,7 +88,7 @@ function TdbFileTree({ folders, selectedPath, onSelect, renderFileActions, foote
                 className={`w-full flex items-center gap-1.5 py-1 cursor-pointer transition-colors duration-100
                   ${folder.path ? 'pl-7 pr-3' : 'px-3'}
                   ${isActive
-                    ? 'bg-[#CC7C5E]/08 text-slate-200'
+                    ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
                     : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
                   }`}
                 onClick={() => onSelect(file.path)}

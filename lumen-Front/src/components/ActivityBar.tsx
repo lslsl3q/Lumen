@@ -147,7 +147,7 @@ function ActivityBar({
       <button
         onClick={() => { onOpenSettings(); setMoreOpen(false); }}
         className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left cursor-pointer
-          text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[#2a2926]
+          text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]
           transition-colors duration-100 text-xs"
       >
         设置...

@@ -46,7 +46,7 @@ function RpgMode() {
       {/* 右侧：叙事流 + 输入区 */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* 顶栏：返回 + 频道名 + 回合数 */}
-        <div className="h-10 flex items-center gap-3 px-4 border-b border-[#1a1a19] flex-shrink-0">
+        <div className="h-10 flex items-center gap-3 px-4 border-b border-[var(--color-border)] flex-shrink-0">
           <button
             onClick={handleBack}
             className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]
@@ -55,13 +55,13 @@ function RpgMode() {
             <ArrowLeft size={14} />
             <span>返回基地</span>
           </button>
-          <div className="w-px h-4 bg-[#2a2926]" />
+          <div className="w-px h-4 bg-[var(--color-bg-elevated)]" />
           <span className="text-sm font-medium text-[var(--color-text-secondary)]">
             冒险
           </span>
           {round > 0 && (
             <>
-              <div className="w-px h-4 bg-[#2a2926]" />
+              <div className="w-px h-4 bg-[var(--color-bg-elevated)]" />
               <span className="text-xs text-[var(--color-text-muted)]">
                 回合 {round}
               </span>
@@ -76,10 +76,10 @@ function RpgMode() {
         />
 
         {/* 输入区 */}
-        <div className="px-4 pb-3 pt-2 flex-shrink-0 border-t border-[#1a1a19]">
-          <div className="flex items-center gap-2 bg-[#0f0f0e] border border-[var(--color-border)] rounded-lg px-3 py-2
-            focus-within:border-[#CC7C5E40] transition-colors">
-            <span className="text-[#CC7C5E] text-sm font-mono flex-shrink-0">&gt;</span>
+        <div className="px-4 pb-3 pt-2 flex-shrink-0 border-t border-[var(--color-border)]">
+          <div className="flex items-center gap-2 bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-lg px-3 py-2
+            focus-within:border-[var(--color-primary)]/25 transition-colors">
+            <span className="text-[var(--color-primary)] text-sm font-mono flex-shrink-0">&gt;</span>
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -92,7 +92,7 @@ function RpgMode() {
             {chat.isLoading ? (
               <button
                 onClick={abort}
-                className="text-[#CC7C5E] hover:text-[#CC7C5E80] transition-colors
+                className="text-[var(--color-primary)] hover:text-[var(--color-primary)]/50 transition-colors
                   text-xs font-medium cursor-pointer"
               >
                 停止
@@ -101,7 +101,7 @@ function RpgMode() {
               <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="text-[#555] hover:text-[#CC7C5E] disabled:opacity-30
+                className="text-[#555] hover:text-[var(--color-primary)] disabled:opacity-30
                   transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 <Send size={14} />

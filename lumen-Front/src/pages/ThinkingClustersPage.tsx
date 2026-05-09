@@ -253,7 +253,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                     onClick={() => selectModule(fullPath)}
                     className={`w-full text-left px-3 pl-5 py-1 text-xs cursor-pointer transition-colors duration-100
                       ${isActive
-                        ? 'bg-[#CC7C5E]/08 text-[var(--color-text-primary)]'
+                        ? 'bg-[var(--color-primary)]/8 text-[var(--color-text-primary)]'
                         : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]'
                       }`}
                   >
@@ -302,7 +302,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                   <span className="text-[10px] text-[var(--color-text-dim)]">/</span>
                   <span className="text-xs font-mono text-[var(--color-text-primary)]">{selectedFile}</span>
                   {hasModuleChanges && (
-                    <span className="text-[10px] text-[#CC7C5E] uppercase tracking-wider ml-2">
+                    <span className="text-[10px] text-[var(--color-primary)] uppercase tracking-wider ml-2">
                       未保存
                     </span>
                   )}
@@ -317,7 +317,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                   className="flex-1 w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
                     p-4 text-sm text-[var(--color-text-primary)] leading-relaxed
                     resize-none outline-none font-mono
-                    focus:border-[#CC7C5E]/20 transition-colors
+                    focus:border-[var(--color-primary)]/20 transition-colors
                     placeholder:text-[var(--color-text-dim)]"
                   placeholder="输入思维模块内容..."
                   spellCheck={false}
@@ -330,7 +330,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                     disabled={!hasModuleChanges || isSaving}
                     className={`px-4 py-1.5 rounded-lg text-xs cursor-pointer transition-colors
                       ${hasModuleChanges
-                        ? 'bg-[#CC7C5E]/15 text-[#CC7C5E] hover:bg-[#CC7C5E]/25'
+                        ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25'
                         : 'text-[var(--color-text-dim)] cursor-not-allowed'
                       }`}
                   >
@@ -368,7 +368,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium text-[var(--color-text-primary)]">chains.json</span>
                 {hasChainChanges && (
-                  <span className="text-[10px] text-[#CC7C5E] uppercase tracking-wider ml-2">
+                  <span className="text-[10px] text-[var(--color-primary)] uppercase tracking-wider ml-2">
                     未保存
                   </span>
                 )}
@@ -385,7 +385,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                 className="flex-1 w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
                   p-4 text-sm text-[var(--color-text-primary)] leading-relaxed font-mono
                   resize-none outline-none
-                  focus:border-[#CC7C5E]/20 transition-colors
+                  focus:border-[var(--color-primary)]/20 transition-colors
                   placeholder:text-[var(--color-text-dim)]"
                 placeholder='{"chains": {}}'
                 spellCheck={false}
@@ -397,7 +397,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                   disabled={!hasChainChanges || isSaving}
                   className={`px-4 py-1.5 rounded-lg text-xs cursor-pointer transition-colors
                     ${hasChainChanges
-                      ? 'bg-[#CC7C5E]/15 text-[#CC7C5E] hover:bg-[#CC7C5E]/25'
+                      ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25'
                       : 'text-[var(--color-text-dim)] cursor-not-allowed'
                     }`}
                 >
@@ -432,7 +432,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }}
               placeholder="模块名称（自动加 .txt）"
               className="w-full px-3 py-2 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg
-                text-sm text-[var(--color-text-primary)] outline-none focus:border-[#CC7C5E]/20
+                text-sm text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/20
                 placeholder:text-[var(--color-text-dim)] mb-4"
               autoFocus
             />
@@ -446,8 +446,8 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
               <button
                 onClick={handleCreate}
                 disabled={!newModuleName.trim()}
-                className="px-3 py-1.5 rounded-lg text-xs bg-[#CC7C5E]/15 text-[#CC7C5E]
-                  hover:bg-[#CC7C5E]/25 cursor-pointer transition-colors
+                className="px-3 py-1.5 rounded-lg text-xs bg-[var(--color-primary)]/15 text-[var(--color-primary)]
+                  hover:bg-[var(--color-primary)]/25 cursor-pointer transition-colors
                   disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 创建
