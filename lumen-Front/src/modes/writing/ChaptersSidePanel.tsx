@@ -33,8 +33,8 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto scrollbar-lumen p-3 space-y-3">
         {activeProject && (
-          <div className="px-2.5 py-1.5 rounded-md bg-amber-400/5 border border-amber-400/10">
-            <p className="text-[11px] text-amber-300/70 truncate">
+          <div className="px-2.5 py-1.5 rounded-md bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10">
+            <p className="text-[11px] text-[var(--color-primary)]/70 truncate">
               <FileText className="inline w-3 h-3 mr-1 -mt-0.5" />
               {activeProject.name}
             </p>
@@ -83,7 +83,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
                     setDragId(null);
                   }}
                   className={`flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
-                    ${ch.id === activeChapterId ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-[var(--color-bg-elevated)]"}
+                    ${ch.id === activeChapterId ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]" : "text-slate-400 hover:bg-[var(--color-bg-elevated)]"}
                     ${dragId === ch.id ? "opacity-50" : ""}`}
                 >
                   {editingId === ch.id ? (
@@ -98,7 +98,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
                       }}
                       onBlur={() => setEditingId(null)}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-slate-200 outline-none"
+                      className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-slate-200 outline-none"
                     />
                   ) : (
                     <span className="truncate flex-1">

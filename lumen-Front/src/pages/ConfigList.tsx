@@ -11,7 +11,7 @@ import { SettingsPageProps } from '../types/settings';
 
 /** 配置类型的图标和颜色 */
 const TYPE_META: Record<string, { icon: string; color: string }> = {
-  env: { icon: '⚙', color: 'text-amber-400' },
+  env: { icon: '⚙', color: 'text-[var(--color-primary)]' },
   json: { icon: '{ }', color: 'text-teal-400' },
 };
 
@@ -121,12 +121,12 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
-                    hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)]
+                    hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-elevated)]
                     transition-all duration-200
                   "
                 >
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl text-amber-400">&#128218;</div>
+                    <div className="text-2xl text-[var(--color-primary)]">&#128218;</div>
                     <div>
                       <div className="text-base text-[var(--color-text-primary)]">知识库</div>
                       <div className="text-sm text-[var(--color-text-muted)]">导入文档，语义检索注入对话</div>
@@ -138,12 +138,12 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
-                    hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)]
+                    hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-elevated)]
                     transition-all duration-200
                   "
                 >
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl text-amber-400">&#9889;</div>
+                    <div className="text-2xl text-[var(--color-primary)]">&#9889;</div>
                     <div>
                       <div className="text-base text-[var(--color-text-primary)]">Skills 管理</div>
                       <div className="text-sm text-[var(--color-text-muted)]">定义 AI 的工作方式</div>
@@ -155,7 +155,7 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
                   className="
                     group p-4 rounded-xl cursor-pointer
                     bg-[var(--color-bg-elevated)] border border-[var(--color-border)]
-                    hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)]
+                    hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-elevated)]
                     transition-all duration-200
                   "
                 >

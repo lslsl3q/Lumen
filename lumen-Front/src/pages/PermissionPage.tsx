@@ -136,7 +136,7 @@ export default function PermissionPage() {
         {tab === 'character' && dirty && (
           <button
             onClick={handleSave}
-            className="px-4 py-1.5 bg-amber-500 text-black text-sm font-medium rounded hover:bg-amber-400 transition-colors"
+            className="px-4 py-1.5 bg-[var(--color-primary)] text-black text-sm font-medium rounded hover:bg-[var(--color-primary)] transition-colors"
           >
             保存
           </button>
@@ -147,7 +147,7 @@ export default function PermissionPage() {
         <button
           onClick={() => setTab('character')}
           className={`flex-1 py-2.5 text-xs tracking-wide transition-colors ${
-            tab === 'character' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+            tab === 'character' ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
           }`}
         >
           按角色
@@ -155,7 +155,7 @@ export default function PermissionPage() {
         <button
           onClick={() => setTab('resource')}
           className={`flex-1 py-2.5 text-xs tracking-wide transition-colors ${
-            tab === 'resource' ? 'text-amber-400 border-b-2 border-amber-400' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+            tab === 'resource' ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
           }`}
         >
           按知识库
@@ -172,7 +172,7 @@ export default function PermissionPage() {
                   onClick={() => setSelectedCharId(char.id)}
                   className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                     selectedCharId === char.id
-                      ? 'bg-slate-800/80 text-amber-400'
+                      ? 'bg-slate-800/80 text-[var(--color-primary)]'
                       : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]'
                   }`}
                 >

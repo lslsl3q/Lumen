@@ -34,7 +34,7 @@ const iconSlot = `w-10 h-10 rounded-lg flex items-center justify-center cursor-p
 /** 活跃态左侧 accent bar */
 function ActiveIndicator() {
   return (
-    <div className="absolute left-0 top-1/4 bottom-1/4 w-[2px] rounded-r bg-amber-400" />
+    <div className="absolute left-0 top-1/4 bottom-1/4 w-[2px] rounded-r bg-[var(--color-primary)]" />
   );
 }
 
@@ -169,10 +169,10 @@ function ActivityBar({
               onClick={() => onPanelSelect(id)}
               className={`${iconSlot}
                 ${isActive
-                  ? 'text-amber-400 bg-amber-500/10'
+                  ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/10'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                 }
-                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
+                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 focus-visible:bg-[var(--color-border-subtle)]`}
               title={title}
             >
               {isActive && <ActiveIndicator />}
@@ -190,7 +190,7 @@ function ActivityBar({
         <button
           onClick={onOpenMemoryWindow}
           className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="知识运维"
         >
           <Database className="w-4 h-4" />
@@ -198,7 +198,7 @@ function ActivityBar({
         <button
           onClick={onOpenGraphEditor}
           className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="图谱编辑器"
         >
           <GraphIcon />
@@ -206,7 +206,7 @@ function ActivityBar({
         <button
           onClick={onManageWorldBooks}
           className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="世界书"
         >
           <WorldBookIcon />
@@ -214,7 +214,7 @@ function ActivityBar({
         <button
           onClick={onToggleDebug}
           className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]
-            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
+            focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 focus-visible:bg-[var(--color-border-subtle)]`}
           title="监控面板"
         >
           <DebugIcon />
@@ -230,7 +230,7 @@ function ActivityBar({
           trigger={
             <button
               className={`${iconSlot} text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-subtle)]
-                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-400/40 focus-visible:bg-[var(--color-border-subtle)]`}
+                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 focus-visible:bg-[var(--color-border-subtle)]`}
               title="更多"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

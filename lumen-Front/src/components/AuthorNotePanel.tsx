@@ -26,8 +26,8 @@ function AuthorNotePanel({
     return (
       <div className="p-3">
         <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="w-8 h-8 rounded-full bg-amber-500/10 flex-shrink-0 flex items-center justify-center">
-            <svg className="w-4 h-4 text-amber-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/10 flex-shrink-0 flex items-center justify-center">
+            <svg className="w-4 h-4 text-[var(--color-primary)] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
             </svg>
@@ -48,8 +48,8 @@ function AuthorNotePanel({
         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
           hover:bg-[var(--color-primary-subtle)] transition-all duration-150 cursor-pointer"
       >
-        <div className="w-8 h-8 rounded-full bg-amber-500/10 flex-shrink-0 flex items-center justify-center">
-          <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/10 flex-shrink-0 flex items-center justify-center">
+          <svg className="w-4 h-4 text-[var(--color-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
           </svg>
@@ -61,7 +61,7 @@ function AuthorNotePanel({
           </div>
         </div>
         {hasContent && (
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] flex-shrink-0" />
         )}
         <svg
           className={`w-3.5 h-3.5 text-[var(--color-text-muted)] transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
@@ -81,7 +81,7 @@ function AuthorNotePanel({
             rows={4}
             className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg
               px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder-slate-600 leading-relaxed
-              focus:outline-hidden focus:border-amber-500/40
+              focus:outline-hidden focus:border-[var(--color-primary)]/40
               focus:shadow-[0_0_8px_rgba(204,124,94,0.08)]
               resize-none transition-all duration-200"
           />
@@ -91,7 +91,7 @@ function AuthorNotePanel({
                 onClick={() => onSetPosition('before_user')}
                 className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-all duration-150 cursor-pointer
                   ${config.injection_position === 'before_user'
-                    ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+                    ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/30'
                     : 'bg-[var(--color-border-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border)]'
                   }`}
               >
@@ -101,7 +101,7 @@ function AuthorNotePanel({
                 onClick={() => onSetPosition('after_user')}
                 className={`flex-1 px-2 py-1.5 text-xs rounded-lg transition-all duration-150 cursor-pointer
                   ${config.injection_position === 'after_user'
-                    ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+                    ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/30'
                     : 'bg-[var(--color-border-subtle)] text-[var(--color-text-muted)] border border-[var(--color-border-subtle)] hover:border-[var(--color-border)]'
                   }`}
               >

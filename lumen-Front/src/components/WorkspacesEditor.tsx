@@ -98,7 +98,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
               flex-1 px-4 py-2.5 rounded-lg text-sm font-mono
               bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]
               text-[var(--color-text-primary)] placeholder-slate-600
-              focus:outline-hidden focus:border-amber-500/40
+              focus:outline-hidden focus:border-[var(--color-primary)]/40
               transition-all duration-200
             "
           />
@@ -107,8 +107,8 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
             disabled={!newPath.trim()}
             className="
               px-4 py-2.5 rounded-lg text-sm
-              bg-amber-500/10 border border-amber-500/30 text-amber-400
-              hover:bg-amber-500/20 hover:border-amber-500/50
+              bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)]
+              hover:bg-[var(--color-primary)]/20 hover:border-[var(--color-primary)]/50
               disabled:opacity-30 disabled:cursor-not-allowed
               transition-all duration-200
             "
@@ -132,7 +132,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
             onClick={() => setReadonlyMode(!readonlyMode)}
             className={`
               relative w-10 h-5 rounded-full transition-colors duration-200
-              ${readonlyMode ? 'bg-amber-500/30' : 'bg-slate-700'}
+              ${readonlyMode ? 'bg-[var(--color-primary)]/30' : 'bg-slate-700'}
             `}
           >
             <span
@@ -157,7 +157,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
               w-24 px-3 py-1.5 rounded-lg text-sm
               bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)]
               text-[var(--color-text-primary)]
-              focus:outline-hidden focus:border-amber-500/40
+              focus:outline-hidden focus:border-[var(--color-primary)]/40
               transition-all duration-200
             "
           />
@@ -171,8 +171,8 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
           disabled={isSaving || !hasChanges}
           className="
             px-5 py-2.5 rounded-lg text-sm font-medium
-            bg-amber-500/10 border border-amber-500/30 text-amber-400
-            hover:bg-amber-500/20 hover:border-amber-500/50
+            bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)]
+            hover:bg-[var(--color-primary)]/20 hover:border-[var(--color-primary)]/50
             disabled:opacity-30 disabled:cursor-not-allowed
             transition-all duration-200
           "

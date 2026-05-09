@@ -188,7 +188,7 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
               onClick={() => setMode(m.key)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer
                 ${active
-                  ? "bg-amber-400/15 text-amber-300"
+                  ? "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
                 }`}
             >
@@ -230,14 +230,14 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
           disabled={!activeChapterId || streaming}
           className="flex-1 bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-lg px-3 py-1.5
             text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]
-            focus:outline-none focus:border-amber-400/30 transition-colors
+            focus:outline-none focus:border-[var(--color-primary)]/30 transition-colors
             disabled:opacity-50"
         />
         <button
           onClick={handleGenerate}
           disabled={!activeChapterId || streaming || !isConnected}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-400/15 text-amber-300
-            hover:bg-amber-400/25 transition-colors cursor-pointer text-[11px] font-medium
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--color-primary)]/15 text-[var(--color-primary)]
+            hover:bg-[var(--color-primary)]/25 transition-colors cursor-pointer text-[11px] font-medium
             disabled:opacity-50"
         >
           {streaming ? (

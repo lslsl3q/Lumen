@@ -30,7 +30,7 @@ function Avatar({ src, name, className = '' }: { src?: string | null; name?: str
       {src ? (
         <img src={getAvatarUrl(src)!} alt={name} className="w-full h-full object-cover" />
       ) : (
-        <span className="text-xs text-amber-400">{(name || 'AI')[0]}</span>
+        <span className="text-xs text-[var(--color-primary)]">{(name || 'AI')[0]}</span>
       )}
     </div>
   );
@@ -57,36 +57,36 @@ function ThinkingBubble({ content, done }: { content: string; done: boolean }) {
 
   return (
     <div className="mb-2">
-      <div className="w-full rounded border border-amber-900/30 bg-amber-950/15 transition-all duration-200 ease-out">
+      <div className="w-full rounded border border-[var(--color-primary)]/30 bg-[var(--color-primary)]/15 transition-all duration-200 ease-out">
         <div
           className="flex items-center justify-between px-3 py-2 cursor-pointer select-none"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-2 min-w-0">
             {done ? (
-              <svg className="w-3 h-3 text-amber-400/70 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 12 12">
+              <svg className="w-3 h-3 text-[var(--color-primary)]/70 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 12 12">
                 <circle cx="6" cy="6" r="4" />
               </svg>
             ) : (
-              <div className="w-3 h-3 rounded-full border-2 border-amber-500/60 border-t-transparent animate-spin flex-shrink-0" />
+              <div className="w-3 h-3 rounded-full border-2 border-[var(--color-primary)]/60 border-t-transparent animate-spin flex-shrink-0" />
             )}
-            <span className="text-xs text-amber-400/60 truncate">
+            <span className="text-xs text-[var(--color-primary)]/60 truncate">
               {done ? '思维过程' : '思考中...'}
             </span>
             {!done && content && (
-              <span className="text-xs text-amber-500/40">{content.length}字</span>
+              <span className="text-xs text-[var(--color-primary)]/40">{content.length}字</span>
             )}
           </div>
           <svg
-            className={`w-3 h-3 text-amber-500/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            className={`w-3 h-3 text-[var(--color-primary)]/40 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
             fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 12 12"
           >
             <path d="M3 5l3 3 3-3" />
           </svg>
         </div>
         {isExpanded && (
-          <div className="px-3 pb-2 border-t border-amber-900/20">
-            <pre className="text-xs text-amber-300/50 whitespace-pre-wrap break-words mt-2 max-h-60 overflow-y-auto">
+          <div className="px-3 pb-2 border-t border-[var(--color-primary)]/20">
+            <pre className="text-xs text-[var(--color-primary)]/50 whitespace-pre-wrap break-words mt-2 max-h-60 overflow-y-auto">
               {content}
             </pre>
           </div>
@@ -452,7 +452,7 @@ function ThinkingIndicator({ characterName, characterAvatar }: { characterName?:
   return (
     <div className="flex justify-start items-start gap-2">
       <Avatar src={characterAvatar} name={characterName} />
-      <div className="rounded-lg px-4 py-3 bg-[var(--color-border-subtle)] border border-amber-500/10">
+      <div className="rounded-lg px-4 py-3 bg-[var(--color-border-subtle)] border border-[var(--color-primary)]/10">
         <div className="flex items-center gap-1">
           <span className="block w-1.5 h-1.5 animate-pixel-breathe" style={{ color: 'transparent', boxShadow: '0 0 0 0 transparent', animationDelay: '0ms' }} />
           <style>{`
@@ -521,14 +521,14 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
           <textarea
             value={editContent}
             onChange={e => onEditChange(e.target.value)}
-            className="w-full rounded-lg px-4 py-3 bg-[var(--color-bg-elevated)]/60 border border-amber-500/30
-              text-[var(--color-text-primary)] text-sm leading-relaxed resize-none outline-none focus:border-amber-500/50"
+            className="w-full rounded-lg px-4 py-3 bg-[var(--color-bg-elevated)]/60 border border-[var(--color-primary)]/30
+              text-[var(--color-text-primary)] text-sm leading-relaxed resize-none outline-none focus:border-[var(--color-primary)]/50"
             rows={Math.max(2, Math.min(editContent.split('\n').length, 10))}
             autoFocus
           />
           <div className="flex gap-2 justify-end">
             <button onClick={onCancelEdit} className="px-3 py-1 rounded-lg text-xs cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] transition-colors">取消</button>
-            <button onClick={onSaveEdit} className="px-3 py-1 rounded-lg text-xs cursor-pointer bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 transition-colors">保存</button>
+            <button onClick={onSaveEdit} className="px-3 py-1 rounded-lg text-xs cursor-pointer bg-[var(--color-primary)]/15 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25 transition-colors">保存</button>
           </div>
         </div>
         {isUser && <div className="w-8 h-8 flex-shrink-0" />}
@@ -539,7 +539,7 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
   if (isUser) {
     return (
       <div className="flex justify-end items-start gap-2" onContextMenu={e => e.preventDefault()}>
-        <div className="max-w-[75%] rounded-lg px-4 py-3 bg-amber-500/10 border border-amber-500/20 text-amber-50"
+        <div className="max-w-[75%] rounded-lg px-4 py-3 bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 text-[var(--color-primary)]/50"
           data-message-bubble="true"
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
           <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
@@ -556,7 +556,7 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
   return (
     <div className="flex justify-start items-start gap-2" onContextMenu={e => e.preventDefault()}>
       <Avatar src={characterAvatar} name={characterName} />
-      <div className="max-w-[75%] rounded-lg px-4 py-3 bg-[var(--color-border-subtle)] border border-amber-500/10 text-[var(--color-text-primary)]"
+      <div className="max-w-[75%] rounded-lg px-4 py-3 bg-[var(--color-border-subtle)] border border-[var(--color-primary)]/10 text-[var(--color-text-primary)]"
         data-message-bubble="true"
         onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
         {renderStepsContent(message, showThinking, showTools)}
@@ -852,7 +852,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
       <div className="px-4 pb-4 pt-3 relative">
         <div ref={inputContainerRef}
           className="rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] overflow-hidden
-            focus-within:border-amber-500/30 focus-within:bg-[var(--color-bg-elevated)]
+            focus-within:border-[var(--color-primary)]/30 focus-within:bg-[var(--color-bg-elevated)]
             focus-within:shadow-[0_0_12px_rgba(204,124,94,0.08)]
             transition-all duration-200"
           onFocus={() => setIsInputFocused(true)}
@@ -915,8 +915,8 @@ function SharedChatPanel(props: SharedChatPanelProps) {
                     <Tooltip text="Author's Note">
                       <button type="button" onClick={() => setShowAnEditor(prev => !prev)}
                         className={`w-6 h-6 rounded flex items-center justify-center transition-all duration-150 cursor-pointer
-                          ${showAnEditor ? 'text-amber-400 bg-amber-500/15'
-                            : anConfig?.enabled ? 'text-amber-500/60 hover:text-amber-400 hover:bg-amber-500/10'
+                          ${showAnEditor ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/15'
+                            : anConfig?.enabled ? 'text-[var(--color-primary)]/60 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10'
                             : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]'}`}>
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -933,16 +933,16 @@ function SharedChatPanel(props: SharedChatPanelProps) {
                       placeholder="Author's Note 内容..." rows={2}
                       className="w-full rounded-lg px-3 py-2 bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)]
                         text-[var(--color-text-primary)] text-xs leading-relaxed resize-none outline-none
-                        focus:border-amber-500/30 transition-colors placeholder-[var(--color-text-dim)]" />
+                        focus:border-[var(--color-primary)]/30 transition-colors placeholder-[var(--color-text-dim)]" />
                     <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
                       <span>注入:</span>
                       <button type="button" onClick={() => onAnSetPosition?.('before_user')}
                         className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors
-                          ${anConfig?.injection_position === 'before_user' ? 'text-amber-400 bg-amber-500/15' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'}`}>用户前</button>
+                          ${anConfig?.injection_position === 'before_user' ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/15' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'}`}>用户前</button>
                       <button type="button" onClick={() => onAnSetPosition?.('after_user')}
                         className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors
-                          ${anConfig?.injection_position === 'after_user' ? 'text-amber-400 bg-amber-500/15' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'}`}>用户后</button>
-                      {anConfig?.enabled && anContent.trim() && <span className="ml-auto text-amber-500/60">已启用</span>}
+                          ${anConfig?.injection_position === 'after_user' ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/15' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'}`}>用户后</button>
+                      {anConfig?.enabled && anContent.trim() && <span className="ml-auto text-[var(--color-primary)]/60">已启用</span>}
                     </div>
                   </div>
                 )}
@@ -957,7 +957,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
             {/* 附件 */}
             <Tooltip text="附件">
               <button type="button" onClick={() => setShowAttachMenu(!showAttachMenu)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] active:bg-[var(--color-border-subtle)] focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40 transition-all duration-150">
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] active:bg-[var(--color-border-subtle)] focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 transition-all duration-150">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
@@ -979,7 +979,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
                     setShowPalette(false);
                   }
                 }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] active:bg-[var(--color-border-subtle)] focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40 transition-all duration-150">
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] active:bg-[var(--color-border-subtle)] focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 transition-all duration-150">
                   <span className="text-sm font-mono font-bold">/</span>
                 </button>
               </Tooltip>
@@ -1009,7 +1009,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
             ) : (
               <Tooltip text="发送">
                 <button type="button" onClick={() => doSend()} disabled={!input.trim()}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500/15 border border-amber-500/30 text-amber-400 hover:bg-amber-500/25 hover:border-amber-500/50 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-amber-500/40 transition-all duration-200">
+                  className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/25 hover:border-[var(--color-primary)]/50 disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-[var(--color-primary)]/40 transition-all duration-200">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V5M5 12l7-7 7 7" />
                   </svg>
@@ -1030,10 +1030,10 @@ function SharedChatPanel(props: SharedChatPanelProps) {
             className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-slate-700/40 cursor-pointer transition-colors">编辑消息</button>
           {contextMenu.messageId && messages.find(m => m.id === contextMenu.messageId)?.role === 'assistant' && (
             <button onClick={handleRegenerate}
-              className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-amber-300 hover:bg-slate-700/40 cursor-pointer transition-colors">重新回复</button>
+              className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:bg-slate-700/40 cursor-pointer transition-colors">重新回复</button>
           )}
           <button onClick={handleBranch}
-            className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-amber-300 hover:bg-slate-700/40 cursor-pointer transition-colors">创建分支</button>
+            className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] hover:bg-slate-700/40 cursor-pointer transition-colors">创建分支</button>
           <button onClick={handleDeleteMessage}
             className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-red-400 hover:bg-red-400/08 cursor-pointer transition-colors">删除此条消息</button>
         </div>,

@@ -112,7 +112,7 @@ function TreeNode({
             className="flex items-center justify-center w-4 h-4 mr-1.5"
           >
             {state === 'checked' && (
-              <div className="w-3.5 h-3.5 rounded bg-amber-500 flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded bg-[var(--color-primary)] flex items-center justify-center">
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                   <path d="M1.5 4L3 5.5L6.5 2" stroke="black" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -130,7 +130,7 @@ function TreeNode({
         )}
 
         {hasChildren ? (
-          expanded ? <FolderOpen size={14} className="text-amber-500/70" /> : <Folder size={14} className="text-amber-500/70" />
+          expanded ? <FolderOpen size={14} className="text-[var(--color-primary)]/70" /> : <Folder size={14} className="text-[var(--color-primary)]/70" />
         ) : (
           <Folder size={14} className="text-slate-500" />
         )}

@@ -20,13 +20,13 @@ interface DebugContentProps {
 
 function getBarColor(percent: number): string {
   if (percent > 80) return 'bg-red-500';
-  if (percent > 50) return 'bg-amber-500';
+  if (percent > 50) return 'bg-[var(--color-primary)]';
   return 'bg-teal-500';
 }
 
 function getTokenTextColor(tokens: number): string {
   if (tokens > 500) return 'text-orange-400';
-  if (tokens >= 100) return 'text-amber-400';
+  if (tokens >= 100) return 'text-[var(--color-primary)]';
   return 'text-emerald-400';
 }
 
@@ -140,7 +140,7 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
                     entry.method === 'sparse'
                       ? 'bg-emerald-500/10 text-emerald-400'
                       : entry.method === 'fulltext'
-                      ? 'bg-amber-500/10 text-amber-400'
+                      ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                       : 'bg-orange-500/10 text-orange-400'
                   }`}>
                     {entry.method === 'sparse' ? '稀疏向量' : entry.method === 'fulltext' ? '全文注入' : 'BM25'}
@@ -262,7 +262,7 @@ function TraceTab({ trace }: { trace: ReactTraceStep[] }) {
       tool_result: 'bg-emerald-500/10 text-emerald-400',
       response: 'bg-teal-500/10 text-teal-400',
       error: 'bg-red-500/10 text-red-400',
-      cancelled: 'bg-amber-500/10 text-amber-400',
+      cancelled: 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]',
     };
     return map[action] || 'bg-slate-500/10 text-[var(--color-text-secondary)]';
   }
@@ -294,7 +294,7 @@ function TraceTab({ trace }: { trace: ReactTraceStep[] }) {
                   )}
                 </div>
                 {step.duration_ms != null && (
-                  <span className={`font-mono ${step.duration_ms > 5000 ? 'text-red-400' : step.duration_ms > 1000 ? 'text-amber-400' : 'text-[var(--color-text-muted)]'}`}>
+                  <span className={`font-mono ${step.duration_ms > 5000 ? 'text-red-400' : step.duration_ms > 1000 ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'}`}>
                     {step.duration_ms >= 1000 ? `${(step.duration_ms / 1000).toFixed(1)}s` : `${Math.round(step.duration_ms)}ms`}
                   </span>
                 )}

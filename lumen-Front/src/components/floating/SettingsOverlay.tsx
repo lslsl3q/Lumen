@@ -172,7 +172,7 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
                     onClick={() => setSection({ page: item.page })}
                     className={`w-full text-left px-5 py-2 text-sm transition-all duration-150 cursor-pointer
                       ${activeNav === item.page
-                        ? 'text-amber-400 bg-amber-500/8 rounded mr-2'
+                        ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/8 rounded mr-2'
                         : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                       }`}
                   >

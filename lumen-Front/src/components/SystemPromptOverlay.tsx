@@ -73,8 +73,8 @@ export default function SystemPromptOverlay({
             onClick={handleSave}
             disabled={isSaving}
             className="px-3 py-1 rounded-md text-xs
-              bg-amber-500/15 text-amber-400 border border-amber-500/25
-              hover:bg-amber-500/25 transition-colors cursor-pointer
+              bg-[var(--color-primary)]/15 text-[var(--color-primary)] border border-[var(--color-primary)]/25
+              hover:bg-[var(--color-primary)]/25 transition-colors cursor-pointer
               disabled:opacity-50"
           >
             {isSaving ? '保存中...' : '保存'}
@@ -91,7 +91,7 @@ export default function SystemPromptOverlay({
           placeholder="你的角色设定、行为准则、说话风格..."
           className="w-full h-full px-4 py-3 rounded-lg text-sm
             bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]
-            focus:outline-none focus:border-amber-500/40 resize-none
+            focus:outline-none focus:border-[var(--color-primary)]/40 resize-none
             font-mono leading-relaxed"
         />
       </div>

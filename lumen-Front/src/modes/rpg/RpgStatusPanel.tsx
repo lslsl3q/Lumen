@@ -15,7 +15,7 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
   const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
   const colorClass =
     pct > 60 ? 'bg-emerald-500' :
-    pct > 30 ? 'bg-amber-500' :
+    pct > 30 ? 'bg-[var(--color-primary)]' :
     'bg-red-500';
 
   return (
@@ -38,7 +38,7 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
   const hpPct = (entity.hp / entity.max_hp) * 100;
   const statusColor =
     hpPct > 60 ? 'text-emerald-400' :
-    hpPct > 30 ? 'text-amber-400' :
+    hpPct > 30 ? 'text-[var(--color-primary)]' :
     'text-red-400';
 
   return (
@@ -176,10 +176,10 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
           {/* 当前目标 */}
           {goals && goals.length > 0 && (
             <div className="flex items-start gap-1.5">
-              <Target className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+              <Target className="w-3 h-3 text-[var(--color-primary)] mt-0.5 flex-shrink-0" />
               <div className="flex flex-wrap gap-1">
                 {goals.map((g, i) => (
-                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-300">
+                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-primary)]/30 text-[var(--color-primary)]">
                     {g}
                   </span>
                 ))}
@@ -226,7 +226,7 @@ function RpgStatusPanel({ roomState, playerId }: RpgStatusPanelProps) {
     <div className="w-64 flex flex-col bg-[var(--color-bg-deep)] border-r border-[var(--color-border)] flex-shrink-0">
       {/* 面板头部 */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--color-border)]">
-        <Swords className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+        <Swords className="w-3.5 h-3.5 text-[var(--color-primary)] flex-shrink-0" />
         <span className="text-sm font-medium text-slate-300 truncate">
           {roomState.roomName || '等待进入...'}
         </span>

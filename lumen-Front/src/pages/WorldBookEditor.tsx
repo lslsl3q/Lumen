@@ -116,8 +116,8 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
   }
 
   // 复用样式常量
-  const inputCls = "w-full px-4 py-2.5 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] placeholder-slate-600 focus:outline-hidden focus:border-amber-500/40 transition-all";
-  const numInputCls = "w-24 px-3 py-1.5 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] focus:outline-hidden focus:border-amber-500/40 transition-all";
+  const inputCls = "w-full px-4 py-2.5 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] placeholder-slate-600 focus:outline-hidden focus:border-[var(--color-primary)]/40 transition-all";
+  const numInputCls = "w-24 px-3 py-1.5 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] focus:outline-hidden focus:border-[var(--color-primary)]/40 transition-all";
   const sectionTitleCls = "text-sm text-[var(--color-text-secondary)] mb-3";
   const tagCls = (color: string) => `px-3 py-1 rounded-full text-sm bg-${color}-500/10 text-${color}-400 border border-${color}-500/20 flex items-center gap-2`;
   const addBtnCls = (color: string) => `px-4 py-2.5 rounded-lg text-sm bg-${color}-500/10 border border-${color}-500/30 text-${color}-400 hover:bg-${color}-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all`;
@@ -167,7 +167,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
                 {form.keywords.map((kw, i) => (
                   <span key={kw} className={tagCls('amber')}>
                     {kw}
-                    <button onClick={() => handleRemoveKeyword(i)} className="text-amber-600 hover:text-amber-300">×</button>
+                    <button onClick={() => handleRemoveKeyword(i)} className="text-[var(--color-primary)] hover:text-[var(--color-primary)]">×</button>
                   </span>
                 ))}
                 {form.keywords.length === 0 && <span className="text-[var(--color-text-muted)] text-xs">暂无</span>}
@@ -191,7 +191,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
                 <div className="space-y-3 pl-1 border-l-2 border-slate-800 ml-1">
                   <div>
                     <select value={form.selective_logic} onChange={e => setForm({ ...form, selective_logic: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] focus:outline-hidden focus:border-amber-500/40 transition-all">
+                      className="w-full px-3 py-2 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] focus:outline-hidden focus:border-[var(--color-primary)]/40 transition-all">
                       <option value="and">AND — 次关键词也必须命中才触发</option>
                       <option value="not">NOT — 次关键词命中时不触发</option>
                     </select>
@@ -242,7 +242,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
             <div>
               <label className="block text-xs text-[var(--color-text-muted)] mb-1">注入位置</label>
               <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value as any })}
-                className="w-full px-4 py-2.5 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] focus:outline-hidden focus:border-amber-500/40 transition-all">
+                className="w-full px-4 py-2.5 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] focus:outline-hidden focus:border-[var(--color-primary)]/40 transition-all">
                 <option value="before_sys">系统提示词之前</option>
                 <option value="after_sys">系统提示词之后</option>
                 <option value="before_user">用户消息之前</option>
@@ -267,7 +267,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
                 <div className="text-xs text-[var(--color-text-muted)]">禁用后不会触发注入</div>
               </div>
               <button type="button" onClick={() => setForm({ ...form, enabled: !form.enabled })}
-                className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${form.enabled ? 'bg-amber-500/30' : 'bg-slate-700'}`}>
+                className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${form.enabled ? 'bg-[var(--color-primary)]/30' : 'bg-slate-700'}`}>
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-slate-300 transition-transform duration-200 ${form.enabled ? 'translate-x-[20px]' : ''}`} />
               </button>
             </label>
@@ -280,7 +280,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
           <textarea value={form.content} onChange={e => setForm({ ...form, content: e.target.value })}
             placeholder="当关键词被触发时，这段内容会被注入到提示词中..."
             rows={10}
-            className="w-full px-4 py-3 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] placeholder-slate-600 focus:outline-hidden focus:border-amber-500/40 transition-all resize-y" />
+            className="w-full px-4 py-3 rounded-lg text-sm bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] placeholder-slate-600 focus:outline-hidden focus:border-[var(--color-primary)]/40 transition-all resize-y" />
         </section>
 
         {/* 底部操作栏 */}
@@ -289,7 +289,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
             取消
           </button>
           <button type="submit" disabled={isSaving}
-            className="px-5 py-2.5 rounded-lg text-sm font-medium bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+            className="px-5 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all">
             {isSaving ? '保存中...' : '保存'}
           </button>
         </div>

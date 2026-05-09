@@ -15,7 +15,7 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
   const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
   const colorClass =
     pct > 60 ? 'bg-emerald-500' :
-    pct > 30 ? 'bg-amber-500' :
+    pct > 30 ? 'bg-[var(--color-primary)]' :
     'bg-red-500';
 
   return (
@@ -40,7 +40,7 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
   const hpPct = (entity.hp / entity.max_hp) * 100;
   const statusColor =
     hpPct > 60 ? 'text-emerald-400' :
-    hpPct > 30 ? 'text-amber-400' :
+    hpPct > 30 ? 'text-[var(--color-primary)]' :
     'text-red-400';
 
   return (
@@ -101,7 +101,7 @@ function RpgPanel({ roomState, onClose, playerId }: RpgPanelProps) {
         {/* 头部 */}
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2 min-w-0">
-            <Swords className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            <Swords className="w-3.5 h-3.5 text-[var(--color-primary)] flex-shrink-0" />
             <h3 className="text-sm font-medium text-[var(--color-text-primary)] truncate">
               {roomState.roomName || '当前房间'}
             </h3>

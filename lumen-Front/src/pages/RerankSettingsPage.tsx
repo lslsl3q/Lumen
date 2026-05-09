@@ -176,7 +176,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
             <button
               onClick={handleToggleEnabled}
               className={`relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer
-                ${status?.enabled ? 'bg-amber-600' : 'bg-slate-700'}`}
+                ${status?.enabled ? 'bg-[var(--color-primary)]' : 'bg-slate-700'}`}
             >
               <span
                 className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200
@@ -204,14 +204,14 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                     onClick={() => handleSetActive(provider.id)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all duration-150
                       ${isActive
-                        ? 'border-amber-500/50 bg-amber-500/5'
+                        ? 'border-[var(--color-primary)]/50 bg-[var(--color-primary)]/5'
                         : 'border-[var(--color-border)] bg-[var(--color-bg-elevated)] hover:bg-[var(--color-primary-subtle)]'
                       }`}
                   >
                     {/* 活跃指示器 */}
                     <span
                       className={`w-2 h-2 rounded-full shrink-0
-                        ${isActive ? 'bg-amber-400' : 'bg-slate-600'}`}
+                        ${isActive ? 'bg-[var(--color-primary)]' : 'bg-slate-600'}`}
                     />
 
                     {/* 服务商信息 */}
@@ -219,7 +219,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-[var(--color-text-primary)]">{provider.name}</span>
                         {isActive && (
-                          <span className="text-[10px] text-amber-400/80 uppercase tracking-wider">活跃</span>
+                          <span className="text-[10px] text-[var(--color-primary)]/80 uppercase tracking-wider">活跃</span>
                         )}
                       </div>
                       <span className="text-xs text-[var(--color-text-muted)] truncate block">{provider.api_url}</span>
@@ -273,7 +273,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                   onChange={e => setNewProvider(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="如：硅基流动"
                   className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                    text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 placeholder:text-[var(--color-text-muted)]
+                    text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 placeholder:text-[var(--color-text-muted)]
                     transition-colors"
                 />
 
@@ -283,7 +283,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                   onChange={e => setNewProvider(prev => ({ ...prev, api_url: e.target.value }))}
                   placeholder="https://api.siliconflow.cn/v1/rerank"
                   className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                    text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 placeholder:text-[var(--color-text-muted)]
+                    text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 placeholder:text-[var(--color-text-muted)]
                     transition-colors"
                 />
 
@@ -294,7 +294,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                   onChange={e => setNewProvider(prev => ({ ...prev, api_key: e.target.value }))}
                   placeholder="sk-..."
                   className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                    text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 placeholder:text-[var(--color-text-muted)]
+                    text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 placeholder:text-[var(--color-text-muted)]
                     transition-colors"
                 />
 
@@ -304,7 +304,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                   onChange={e => setNewProvider(prev => ({ ...prev, model: e.target.value }))}
                   placeholder="BAAI/bge-reranker-v2-m3"
                   className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                    text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 placeholder:text-[var(--color-text-muted)]
+                    text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 placeholder:text-[var(--color-text-muted)]
                     transition-colors"
                 />
 
@@ -315,7 +315,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                   onChange={e => setNewProvider(prev => ({ ...prev, max_doc_chars: Number(e.target.value) }))}
                   placeholder="0 = 不限制"
                   className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                    text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 placeholder:text-[var(--color-text-muted)]
+                    text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 placeholder:text-[var(--color-text-muted)]
                     transition-colors w-32"
                 />
                 <span className="text-[10px] text-[var(--color-text-muted)] col-start-2">0 = 不限制</span>
@@ -331,7 +331,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
                 </button>
                 <button
                   onClick={handleAdd}
-                  className="px-3 py-1.5 rounded text-sm bg-amber-600 hover:bg-amber-500
+                  className="px-3 py-1.5 rounded text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary)]
                     text-white transition-colors cursor-pointer"
                 >
                   保存
@@ -351,7 +351,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
               value={status?.top_k ?? 10}
               onChange={e => handleSettingChange('top_k', Number(e.target.value))}
               className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 transition-colors w-32"
+                text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 transition-colors w-32"
             />
 
             <label className="text-xs text-[var(--color-text-muted)] text-right">最低分数</label>
@@ -361,7 +361,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
               value={status?.min_score ?? 0.3}
               onChange={e => handleSettingChange('min_score', Number(e.target.value))}
               className="bg-slate-800/50 border border-[var(--color-border-subtle)] rounded px-3 py-1.5 text-sm
-                text-[var(--color-text-primary)] outline-none focus:border-amber-500/40 transition-colors w-32"
+                text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/40 transition-colors w-32"
             />
           </div>
         </section>

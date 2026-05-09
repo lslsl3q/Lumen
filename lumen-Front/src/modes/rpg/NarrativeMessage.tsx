@@ -35,7 +35,7 @@ function SystemMessage({ content }: { content: string }) {
       <div className={`
         px-4 py-1.5 rounded-full text-xs
         ${isDiceRoll
-          ? 'bg-amber-500/10 text-amber-400/80 border border-amber-500/20'
+          ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]/80 border border-[var(--color-primary)]/20'
           : 'bg-slate-800/50 text-slate-500 border border-slate-700/30'
         }
       `}>

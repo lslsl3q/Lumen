@@ -44,7 +44,7 @@ function CommandPalette({ input, visible, selectedIndex, onSelect, onHover }: Co
             w-full px-3 py-2 flex items-center gap-2 text-left text-sm
             transition-all duration-75
             ${idx === safeIndex
-              ? 'bg-amber-500/10 text-amber-300'
+              ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]'
             }
           `}

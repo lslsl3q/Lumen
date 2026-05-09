@@ -79,7 +79,7 @@ function TitleBar() {
     <div className="h-9 flex items-center bg-surface-rail/80 border-b border-[var(--color-border)] select-none relative">
       {/* 左侧品牌 — 拖拽区 */}
       <div data-tauri-drag-region className="flex items-center gap-2 pl-4 h-full cursor-default">
-        <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
+        <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
         <span className="text-sm font-light tracking-widest text-[var(--color-text-secondary)] uppercase font-display">
           Lumen
         </span>

@@ -21,7 +21,7 @@ export function AvatarUpload({ preview, fallback, onChange, size = 'default' }: 
 
   return (
     <label className="cursor-pointer group">
-      <Avatar size={size} className="border border-dashed border-slate-700 group-hover:border-amber-500/40 transition-colors">
+      <Avatar size={size} className="border border-dashed border-slate-700 group-hover:border-[var(--color-primary)]/40 transition-colors">
         {preview ? (
           <AvatarImage src={preview} alt="" />
         ) : (

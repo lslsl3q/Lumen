@@ -504,8 +504,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                       disabled={extractingFile !== null}
                       className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
                         ${isExtractingThis
-                          ? 'text-amber-400 bg-amber-400/10 cursor-wait'
-                          : 'text-slate-700 hover:text-amber-400 hover:bg-amber-400/10'
+                          ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/10 cursor-wait'
+                          : 'text-slate-700 hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10'
                         }`}
                       title={`重抽 ${file.name}`}
                     >
@@ -537,8 +537,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                       disabled={isExtracting || extractingFile !== null}
                       className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
                         ${isExtracting
-                          ? 'text-amber-400 cursor-wait'
-                          : 'text-[var(--color-text-muted)] hover:text-amber-400 hover:bg-amber-400/10'
+                          ? 'text-[var(--color-primary)] cursor-wait'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10'
                         }`}
                     >
                       {isExtracting ? '全部抽取中...' : '全部重抽'}
@@ -560,8 +560,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                       disabled={isExtracting || extractingFile !== null}
                       className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
                         ${isExtracting
-                          ? 'text-amber-400 cursor-wait'
-                          : 'text-[var(--color-text-muted)] hover:text-amber-400 hover:bg-amber-400/10'
+                          ? 'text-[var(--color-primary)] cursor-wait'
+                          : 'text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10'
                         }`}
                       title="同步知识库变更到图谱"
                     >
@@ -636,7 +636,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               ))}
             </select>
             <div className="flex gap-1">
-              <button onClick={handleCreateEntity} className="flex-1 text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer">创建</button>
+              <button onClick={handleCreateEntity} className="flex-1 text-[10px] text-[var(--color-primary)] hover:text-[var(--color-primary)] cursor-pointer">创建</button>
               <button onClick={() => setIsCreating(false)} className="flex-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer">取消</button>
             </div>
           </div>
@@ -675,8 +675,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   }
                 }}
                 disabled={isSavingPrompt}
-                className="flex-1 text-[10px] px-2 py-1 rounded bg-amber-500/15 text-amber-400
-                  hover:bg-amber-500/25 transition-colors cursor-pointer
+                className="flex-1 text-[10px] px-2 py-1 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)]
+                  hover:bg-[var(--color-primary)]/25 transition-colors cursor-pointer
                   disabled:opacity-40 disabled:cursor-wait"
               >
                 {isSavingPrompt ? '保存中...' : '保存'}
@@ -742,7 +742,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               <button
                 onClick={handleUpdateEntity}
                 className="w-full py-1 rounded text-[10px] cursor-pointer
-                  text-amber-400 hover:text-amber-300 hover:bg-amber-400/5 transition-colors"
+                  text-[var(--color-primary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 transition-colors"
               >
                 保存修改
               </button>

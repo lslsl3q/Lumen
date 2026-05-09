@@ -66,7 +66,7 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
       title={label}
       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors cursor-pointer
         ${isActive
-          ? "bg-amber-400/15 text-amber-400"
+          ? "bg-[var(--color-primary)]/15 text-[var(--color-primary)]"
           : "text-slate-600 hover:text-slate-300 hover:bg-[var(--color-bg-elevated)]"
         }`}
     >

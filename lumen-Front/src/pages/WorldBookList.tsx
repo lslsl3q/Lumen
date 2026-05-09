@@ -63,7 +63,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
         </div>
         <button
           onClick={handleCreate}
-          className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all"
+          className="px-4 py-2 rounded-lg bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all"
         >
           + 新建世界书
         </button>
@@ -76,7 +76,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
         ) : entries.length === 0 ? (
           <div className="text-center py-16 text-[var(--color-text-muted)]">
             <p className="mb-4">还没有世界书条目</p>
-            <button onClick={handleCreate} className="text-amber-400 hover:underline">
+            <button onClick={handleCreate} className="text-[var(--color-primary)] hover:underline">
               创建第一个世界书
             </button>
           </div>
@@ -86,7 +86,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
               <div
                 key={entry.id}
                 onClick={() => goTo('worldbook-editor', { id: entry.id })}
-                className="group relative p-5 rounded-xl cursor-pointer bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)] transition-all"
+                className="group relative p-5 rounded-xl cursor-pointer bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-elevated)] transition-all"
               >
                 {/* 删除按钮 */}
                 <button
@@ -103,7 +103,7 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
                 <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-2 pr-6">{entry.name}</h3>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {entry.keywords.map((kw) => (
-                    <span key={kw} className="px-2 py-1 rounded text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <span key={kw} className="px-2 py-1 rounded text-xs bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20">
                       {kw}
                     </span>
                   ))}

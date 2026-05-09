@@ -106,7 +106,7 @@ export default function DebugWindowPage() {
             onClick={toggleAlwaysOnTop}
             className={`h-8 px-2 flex items-center justify-center text-[10px] transition-colors cursor-pointer
               ${alwaysOnTop
-                ? 'text-amber-400 bg-amber-500/10'
+                ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/10'
                 : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/40'
               }`}
             title={alwaysOnTop ? '取消置顶' : '始终置顶'}

@@ -94,7 +94,7 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
 
       {/* 上传区域 */}
       <div className="max-w-6xl mx-auto px-6 mb-8">
-        <div className="p-6 rounded-xl bg-[var(--color-bg-elevated)] border border-dashed border-amber-500/30">
+        <div className="p-6 rounded-xl bg-[var(--color-bg-elevated)] border border-dashed border-[var(--color-primary)]/30">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium text-[var(--color-text-primary)] mb-1">上传新头像</h3>
@@ -102,8 +102,8 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
             </div>
             <label className="
               px-4 py-2 rounded-lg text-sm font-medium
-              bg-amber-500/10 border border-amber-500/30 text-amber-400
-              hover:bg-amber-500/20 transition-all
+              bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)]
+              hover:bg-[var(--color-primary)]/20 transition-all
               cursor-pointer
             ">
               {isUploading ? '上传中...' : '选择文件'}
@@ -133,7 +133,7 @@ function AvatarManager({ onBack }: AvatarManagerProps) {
             {avatars.map((avatar) => (
               <div
                 key={avatar.id}
-                className="group relative p-3 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-amber-500/30 transition-all"
+                className="group relative p-3 rounded-xl bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-[var(--color-primary)]/30 transition-all"
               >
                 {/* 头像图片 */}
                 <div className="aspect-square rounded-lg overflow-hidden bg-[var(--color-primary-subtle)] mb-2">

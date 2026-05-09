@@ -18,9 +18,9 @@ interface PushNotificationProps {
 function getLevelStyles(level: PushNotificationType['level']) {
   switch (level) {
     case 'success': return { border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-400' };
-    case 'warning': return { border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-400' };
+    case 'warning': return { border: 'border-[var(--color-primary)]/40', bg: 'bg-[var(--color-primary)]/10', text: 'text-[var(--color-primary)]' };
     case 'error':   return { border: 'border-red-500/40', bg: 'bg-red-500/10', text: 'text-red-400' };
-    default:        return { border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-400' };
+    default:        return { border: 'border-[var(--color-primary)]/40', bg: 'bg-[var(--color-primary)]/10', text: 'text-[var(--color-primary)]' };
   }
 }
 

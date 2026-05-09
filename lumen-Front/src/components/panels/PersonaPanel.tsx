@@ -157,7 +157,7 @@ export default function PersonaPanel({
               onChange={e => updateForm({ name: e.target.value })}
               placeholder="Persona 名字"
               className="border-0 border-b border-[var(--color-border-subtle)] rounded-none bg-transparent
-                focus:border-amber-500/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-slate-700"
+                focus:border-[var(--color-primary)]/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-slate-700"
             />
           </div>
 
@@ -172,7 +172,7 @@ export default function PersonaPanel({
                 onChange={e => updateForm({ description: e.target.value })}
                 placeholder="描述这个身份的特点..."
                 className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-slate-700 focus:border-amber-500/40 h-8"
+                  placeholder-slate-700 focus:border-[var(--color-primary)]/40 h-8"
               />
             </div>
           </div>
@@ -185,11 +185,11 @@ export default function PersonaPanel({
                 <Badge
                   key={trait}
                   variant="secondary"
-                  className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[11px] pr-1 cursor-pointer hover:bg-amber-500/20"
+                  className="bg-[var(--color-primary)]/10 text-[var(--color-primary)] border-[var(--color-primary)]/20 text-[11px] pr-1 cursor-pointer hover:bg-[var(--color-primary)]/20"
                   onClick={() => removeTrait(trait)}
                 >
                   {trait}
-                  <span className="ml-1 text-amber-500/50 hover:text-red-400">✕</span>
+                  <span className="ml-1 text-[var(--color-primary)]/50 hover:text-red-400">✕</span>
                 </Badge>
               ))}
             </div>
@@ -200,7 +200,7 @@ export default function PersonaPanel({
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTrait(); } }}
                 placeholder="添加特质..."
                 className="flex-1 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-slate-700 focus:border-amber-500/40 h-7"
+                  placeholder-slate-700 focus:border-[var(--color-primary)]/40 h-7"
               />
               <Button
                 variant="ghost"
@@ -220,7 +220,7 @@ export default function PersonaPanel({
           <Button
             onClick={handleSave}
             disabled={isSaving || !form.name.trim()}
-            className="w-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30
+            className="w-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30
               disabled:opacity-50 text-xs"
           >
             {isSaving ? '保存中...' : editingId ? '保存修改' : '创建 Persona'}
@@ -258,7 +258,7 @@ export default function PersonaPanel({
             className={`w-full flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg text-left cursor-pointer
               transition-colors duration-100 ${navItemClass}
               ${activePersonaId === null
-                ? 'bg-amber-500/10 text-amber-300'
+                ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                 : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
               }`}
           >
@@ -282,12 +282,12 @@ export default function PersonaPanel({
                 className={`group flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg cursor-pointer
                   transition-colors duration-100 ${navItemClass}
                   ${isActive
-                    ? 'bg-amber-500/10 text-amber-300'
+                    ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-[10px] text-amber-400">{p.name[0]}</span>
+                <div className="w-6 h-6 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[10px] text-[var(--color-primary)]">{p.name[0]}</span>
                 </div>
                 <span className="text-xs truncate flex-1">{p.name}</span>
                 <button

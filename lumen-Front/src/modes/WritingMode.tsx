@@ -25,7 +25,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
             <pre className="text-[11px] text-slate-600 whitespace-pre-wrap break-all">{this.state.error.message}</pre>
             <button
               onClick={() => this.setState({ error: null })}
-              className="mt-3 px-3 py-1 text-[11px] bg-amber-400/10 text-amber-300 rounded hover:bg-amber-400/20 cursor-pointer"
+              className="mt-3 px-3 py-1 text-[11px] bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded hover:bg-[var(--color-primary)]/20 cursor-pointer"
             >
               重试
             </button>

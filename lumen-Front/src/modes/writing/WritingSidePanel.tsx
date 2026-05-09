@@ -81,7 +81,7 @@ function ChipSelect({ options, value, onChange }: {
           onClick={() => onChange(opt.value)}
           className={`px-2 py-0.5 rounded text-[11px] transition-colors cursor-pointer border
             ${value === opt.value
-              ? `border-amber-400/30 ${opt.color ?? "bg-amber-400/10 text-amber-300"}`
+              ? `border-[var(--color-primary)]/30 ${opt.color ?? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"}`
               : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:border-slate-600"
             }`}
         >
@@ -108,7 +108,7 @@ function FieldTextarea({ label, value, placeholder, rows = 3, onUpdate }: {
         onBlur={(e) => { if (e.target.value !== value) onUpdate(e.target.value); }}
         placeholder={placeholder}
         rows={rows}
-        className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-amber-400/30 resize-y leading-relaxed"
+        className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30 resize-y leading-relaxed"
       />
     </div>
   );
@@ -128,7 +128,7 @@ function FieldInput({ label, value, placeholder, onUpdate }: {
         defaultValue={value}
         onBlur={(e) => { if (e.target.value !== value) onUpdate(e.target.value); }}
         placeholder={placeholder}
-        className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-amber-400/30"
+        className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
       />
     </div>
   );
@@ -151,7 +151,7 @@ const CHARACTER_FIELDS: FieldDef[] = [
   {
     key: "role", label: "角色定位", type: "select",
     options: [
-      { value: "protagonist", label: "主角", color: "bg-amber-400/15 text-amber-200" },
+      { value: "protagonist", label: "主角", color: "bg-[var(--color-primary)]/15 text-[var(--color-primary)]" },
       { value: "antagonist", label: "反派", color: "bg-red-400/15 text-red-300" },
       { value: "supporting", label: "配角", color: "bg-blue-400/15 text-blue-300" },
       { value: "minor", label: "龙套", color: "bg-slate-400/10 text-[var(--color-text-primary)]" },
@@ -209,7 +209,7 @@ const ITEM_FIELDS: FieldDef[] = [
       { value: "common", label: "普通", color: "bg-slate-400/10 text-[var(--color-text-primary)]" },
       { value: "uncommon", label: "稀有", color: "bg-green-400/15 text-green-300" },
       { value: "rare", label: "史诗", color: "bg-purple-400/15 text-purple-300" },
-      { value: "legendary", label: "传说", color: "bg-amber-400/15 text-amber-200" },
+      { value: "legendary", label: "传说", color: "bg-[var(--color-primary)]/15 text-[var(--color-primary)]" },
     ],
   },
   {
@@ -351,7 +351,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
             }}
             onBlur={() => onPendingEditCancel?.()}
             onClick={(e) => e.stopPropagation()}
-            className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none min-w-0"
+            className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none min-w-0"
           />
         ) : (
           <span className="truncate flex-1">{setting.name}</span>
@@ -457,8 +457,8 @@ function ChaptersPanel() {
   return (
     <div className="p-3 space-y-3">
       {activeProject && (
-        <div className="px-2.5 py-1.5 rounded-md bg-amber-400/5 border border-amber-400/10">
-          <p className="text-[11px] text-amber-300/70 truncate">
+        <div className="px-2.5 py-1.5 rounded-md bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10">
+          <p className="text-[11px] text-[var(--color-primary)]/70 truncate">
             <FileText className="inline w-3 h-3 mr-1 -mt-0.5" />
             {activeProject.name}
           </p>
@@ -507,7 +507,7 @@ function ChaptersPanel() {
                   setDragId(null);
                 }}
                 className={`flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
-                  ${ch.id === activeChapterId ? "bg-amber-400/10 text-amber-300" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}
+                  ${ch.id === activeChapterId ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}
                   ${dragId === ch.id ? "opacity-50" : ""}`}
               >
                 {editingId === ch.id ? (
@@ -528,7 +528,7 @@ function ChaptersPanel() {
                     }}
                     onBlur={() => setEditingId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
+                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
                   />
                 ) : (
                   <span className="truncate flex-1">
@@ -581,7 +581,7 @@ function ProjectManagementPanel() {
             setEditName("新作品");
           } catch {}
         }}
-        className="flex items-center gap-2 w-full px-3 py-2.5 rounded-md bg-amber-400/10 text-amber-300 hover:bg-amber-400/15 cursor-pointer transition-colors text-[13px]"
+        className="flex items-center gap-2 w-full px-3 py-2.5 rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/15 cursor-pointer transition-colors text-[13px]"
       >
         <Plus className="w-4 h-4" />
         新建作品
@@ -599,7 +599,7 @@ function ProjectManagementPanel() {
             <div
               key={p.id}
               className={`rounded-md overflow-hidden transition-colors
-                ${isActive ? "bg-amber-400/5 border border-amber-400/10" : "border border-transparent"}`}
+                ${isActive ? "bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/10" : "border border-transparent"}`}
             >
               <div
                 onClick={() => setActiveProject(p.id)}
@@ -617,12 +617,12 @@ function ProjectManagementPanel() {
                     }}
                     onBlur={() => setEditingId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0.5 text-[13px] text-[var(--color-text-primary)] outline-none"
+                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0.5 text-[13px] text-[var(--color-text-primary)] outline-none"
                   />
                 ) : (
                   <>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[13px] truncate ${isActive ? "text-amber-300" : "text-[var(--color-text-primary)]"}`}>
+                      <p className={`text-[13px] truncate ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-text-primary)]"}`}>
                         {p.name}
                       </p>
                       <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
@@ -758,7 +758,7 @@ function OutlinePanel() {
                   setActiveChapter(ch.id);
                 }}
                 className={`flex items-center gap-1.5 px-2.5 py-2 text-[13px] cursor-pointer transition-colors group
-                  ${ch.id === activeChapterId ? "bg-amber-400/10 text-amber-300" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}`}
+                  ${ch.id === activeChapterId ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}`}
               >
                 {isExpanded ? <ChevronDown className="w-3 h-3 text-[var(--color-text-muted)]" /> : <ChevronRight className="w-3 h-3 text-[var(--color-text-muted)]" />}
                 <span className="text-[var(--color-text-muted)] text-[11px]">{idx + 1}.</span>
@@ -777,7 +777,7 @@ function OutlinePanel() {
                     }}
                     placeholder={`${ch.title} 的大纲备注…`}
                     rows={4}
-                    className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-amber-400/30 resize-y leading-relaxed"
+                    className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30 resize-y leading-relaxed"
                   />
                 </div>
               )}
@@ -822,7 +822,7 @@ function ExportPanel() {
           key={opt.format}
           href={getExportUrl(activeProjectId, opt.format)}
           download
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] hover:bg-amber-400/10 hover:text-amber-300 cursor-pointer transition-colors no-underline"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] cursor-pointer transition-colors no-underline"
         >
           <span className="text-lg">{opt.icon}</span>
           <div>

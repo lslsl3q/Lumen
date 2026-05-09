@@ -224,7 +224,7 @@ function ToolsViewer({ parsed }: { parsed?: Record<string, ToolDef> }) {
                         key={paramName}
                         className="flex items-start gap-3 px-3 py-2 rounded bg-[var(--color-primary-subtle)]"
                       >
-                        <code className="text-xs text-amber-400 font-mono shrink-0">{paramName}</code>
+                        <code className="text-xs text-[var(--color-primary)] font-mono shrink-0">{paramName}</code>
                         <div className="text-xs text-[var(--color-text-muted)]">
                           <span className="text-[var(--color-text-secondary)]">{paramDef.type}</span>
                           {paramDef.description && (

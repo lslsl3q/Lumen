@@ -234,7 +234,7 @@ export default function CharacterPanel({
                 {form.tools.map((name, idx) => {
                   const info = availableTools.find(t => t.name === name);
                   return (
-                    <div key={name} className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
+                    <div key={name} className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-[var(--color-primary)]/5 border border-[var(--color-primary)]/15">
                       <div className="flex flex-col gap-0.5">
                         <button
                           onClick={() => moveTool(idx, -1)}
@@ -247,7 +247,7 @@ export default function CharacterPanel({
                           className="text-[9px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 cursor-pointer leading-none"
                         >▼</button>
                       </div>
-                      <span className="font-mono text-xs text-amber-400 flex-shrink-0">{name}</span>
+                      <span className="font-mono text-xs text-[var(--color-primary)] flex-shrink-0">{name}</span>
                       <span className="text-[10px] text-[var(--color-text-muted)] truncate flex-1">{info?.description}</span>
                       <button onClick={() => toggleTool(name)}
                         className="text-[10px] text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer flex-shrink-0">✕</button>
@@ -310,16 +310,16 @@ export default function CharacterPanel({
                   onClick={() => toggleSkill(skill.id)}
                   className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer border transition-colors text-left
                     ${isActive
-                      ? 'border-amber-500/25 bg-amber-500/5'
+                      ? 'border-[var(--color-primary)]/25 bg-[var(--color-primary)]/5'
                       : 'border-[var(--color-border-subtle)] bg-transparent hover:border-[var(--color-border)]'
                     }`}
                 >
                   <div className={`w-3.5 h-3.5 rounded border-2 flex items-center justify-center flex-shrink-0
-                    ${isActive ? 'border-amber-400 bg-amber-400/20' : 'border-[var(--color-text-muted)]'}`}>
-                    {isActive && <span className="text-amber-400 text-[9px]">✓</span>}
+                    ${isActive ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/20' : 'border-[var(--color-text-muted)]'}`}>
+                    {isActive && <span className="text-[var(--color-primary)] text-[9px]">✓</span>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className={`text-xs ${isActive ? 'text-amber-300' : 'text-[var(--color-text-secondary)]'}`}>{skill.name}</span>
+                    <span className={`text-xs ${isActive ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>{skill.name}</span>
                     {skill.description && (
                       <div className="text-[10px] text-[var(--color-text-muted)] truncate">{skill.description}</div>
                     )}
@@ -367,7 +367,7 @@ export default function CharacterPanel({
               onChange={e => updateForm({ name: e.target.value })}
               placeholder="角色名字"
               className="border-0 border-b border-[var(--color-border-subtle)] rounded-none bg-transparent
-                focus:border-amber-500/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]"
+                focus:border-[var(--color-primary)]/40 focus-visible:ring-0 text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]"
             />
           </div>
 
@@ -382,7 +382,7 @@ export default function CharacterPanel({
                 onChange={e => updateForm({ description: e.target.value })}
                 placeholder="简短描述角色身份"
                 className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-[var(--color-text-dim)] focus:border-amber-500/40 h-8"
+                  placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-8"
               />
             </div>
             <div>
@@ -392,7 +392,7 @@ export default function CharacterPanel({
                 onChange={e => updateForm({ greeting: e.target.value })}
                 placeholder="新会话时 AI 的第一句话"
                 className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-[var(--color-text-dim)] focus:border-amber-500/40 h-8"
+                  placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-8"
               />
             </div>
           </div>
@@ -408,7 +408,7 @@ export default function CharacterPanel({
                 <SelectTrigger
                   size="sm"
                   className="mt-0.5 w-full bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                    focus:border-amber-500/40 h-8 data-placeholder:text-[var(--color-text-dim)]"
+                    focus:border-[var(--color-primary)]/40 h-8 data-placeholder:text-[var(--color-text-dim)]"
                 >
                   <SelectValue placeholder="选择模型" />
                 </SelectTrigger>
@@ -439,7 +439,7 @@ export default function CharacterPanel({
                 }}
                 placeholder="默认 8192"
                 className="mt-0.5 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-xs text-[var(--color-text-primary)]
-                  placeholder-[var(--color-text-dim)] focus:border-amber-500/40 h-8"
+                  placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-8"
               />
             </div>
           </div>
@@ -456,7 +456,7 @@ export default function CharacterPanel({
                       <input type="range" min="256" max="32000" step="256"
                         value={form.thinking.budget_tokens}
                         onChange={e => updateForm({ thinking: { ...form.thinking!, budget_tokens: parseInt(e.target.value) } })}
-                        className="flex-1 accent-amber-500 h-1" />
+                        className="flex-1 accent-[var(--color-primary)] h-1" />
                       <span className="text-[10px] text-[var(--color-text-secondary)] font-mono w-12 text-right tabular-nums">
                         {form.thinking.budget_tokens >= 1000
                           ? `${(form.thinking.budget_tokens / 1000).toFixed(1)}K`
@@ -467,7 +467,7 @@ export default function CharacterPanel({
                       {[1024, 4096, 8192, 16384, 32000].map(n => {
                         const label = n >= 1000 ? `${n / 1000}K` : n;
                         let color = 'text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10';
-                        if (n >= 4096) color = 'text-amber-400 border-amber-500/20 hover:bg-amber-500/10';
+                        if (n >= 4096) color = 'text-[var(--color-primary)] border-[var(--color-primary)]/20 hover:bg-[var(--color-primary)]/10';
                         if (n >= 16384) color = 'text-red-400 border-red-500/20 hover:bg-red-500/10';
                         return (
                           <button key={n} onClick={() => updateForm({ thinking: { ...form.thinking!, budget_tokens: n } })}
@@ -512,7 +512,7 @@ export default function CharacterPanel({
                     <input type="range" min="0.5" max="0.95" step="0.05"
                       value={form.compact_threshold || 0.7}
                       onChange={e => updateForm({ compact_threshold: parseFloat(e.target.value) })}
-                      className="w-28 accent-amber-500" />
+                      className="w-28 accent-[var(--color-primary)]" />
                     <span className="text-[10px] text-[var(--color-text-muted)] font-mono w-6 text-right">
                       {Math.round((form.compact_threshold || 0.7) * 100)}%
                     </span>
@@ -547,7 +547,7 @@ export default function CharacterPanel({
                     }}
                     placeholder="300"
                     className="w-20 bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-[11px] text-[var(--color-text-secondary)]
-                      placeholder-[var(--color-text-dim)] focus:border-amber-500/40 h-6 px-2 text-right"
+                      placeholder-[var(--color-text-dim)] focus:border-[var(--color-primary)]/40 h-6 px-2 text-right"
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -629,7 +629,7 @@ export default function CharacterPanel({
               <span className="text-xs text-[var(--color-text-primary)] group-hover:text-[var(--color-text-primary)]">工具配置</span>
               <div className="flex items-center gap-1.5">
                 {enabledToolCount > 0 && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-amber-500/10 text-amber-500/60 border-0">
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)]/60 border-0">
                     {enabledToolCount}
                   </Badge>
                 )}
@@ -644,7 +644,7 @@ export default function CharacterPanel({
               <span className="text-xs text-[var(--color-text-primary)] group-hover:text-[var(--color-text-primary)]">技能配置</span>
               <div className="flex items-center gap-1.5">
                 {enabledSkillCount > 0 && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-amber-500/10 text-amber-500/60 border-0">
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-[var(--color-primary)]/10 text-[var(--color-primary)]/60 border-0">
                     {enabledSkillCount}
                   </Badge>
                 )}
@@ -661,7 +661,7 @@ export default function CharacterPanel({
           <Button
             onClick={handleSave}
             disabled={isSaving || !form.name.trim()}
-            className="w-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30
+            className="w-full bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30
               disabled:opacity-50 text-xs"
           >
             {isSaving ? '保存中...' : editingId ? '保存修改' : '创建角色'}
@@ -704,15 +704,15 @@ export default function CharacterPanel({
                 className={`group flex items-center gap-2.5 px-3 py-2 mx-1 rounded-lg cursor-pointer
                   transition-colors duration-100 ${navItemClass}
                   ${isActive
-                    ? 'bg-amber-500/10 text-amber-300'
+                    ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-primary-subtle)]'
                   }`}
               >
                 {char.avatar ? (
                   <img src={getAvatarUrl(char.avatar)!} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[10px] text-amber-400">{(char.display_name || char.name)[0]}</span>
+                  <div className="w-6 h-6 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] text-[var(--color-primary)]">{(char.display_name || char.name)[0]}</span>
                   </div>
                 )}
                 <span className="text-xs truncate flex-1">{char.display_name || char.name}</span>

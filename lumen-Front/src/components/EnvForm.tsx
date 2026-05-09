@@ -145,7 +145,7 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
                   w-full px-4 py-2.5 rounded-lg text-sm
                   bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)]
                   text-[var(--color-text-primary)] placeholder-slate-600
-                  focus:outline-hidden focus:border-amber-500/40
+                  focus:outline-hidden focus:border-[var(--color-primary)]/40
                   transition-all duration-200
                 "
               />
@@ -174,8 +174,8 @@ function EnvForm({ content, onSave, isSaving }: EnvFormProps) {
           disabled={isSaving || !hasChanges}
           className="
             px-5 py-2.5 rounded-lg text-sm font-medium
-            bg-amber-500/10 border border-amber-500/30 text-amber-400
-            hover:bg-amber-500/20 hover:border-amber-500/50
+            bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)]
+            hover:bg-[var(--color-primary)]/20 hover:border-[var(--color-primary)]/50
             disabled:opacity-30 disabled:cursor-not-allowed
             transition-all duration-200
           "

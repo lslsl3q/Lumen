@@ -136,11 +136,11 @@ export function RichTextField({ value, onChange, placeholder, minHeight = 120 }:
               onChange={(e) => setLinkUrl(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyLink(); } if (e.key === "Escape") setLinkOpen(false); }}
               placeholder="https://..."
-              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-amber-400/30"
+              className="w-full bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
             />
             <div className="flex justify-end gap-1">
               <button onClick={() => setLinkOpen(false)} className="px-2 py-0.5 text-[10px] rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer">取消</button>
-              <button onClick={applyLink} className="px-2 py-0.5 text-[10px] rounded bg-amber-400/10 text-amber-300 hover:bg-amber-400/20 cursor-pointer">确认</button>
+              <button onClick={applyLink} className="px-2 py-0.5 text-[10px] rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 cursor-pointer">确认</button>
             </div>
           </PopoverContent>
         </Popover>

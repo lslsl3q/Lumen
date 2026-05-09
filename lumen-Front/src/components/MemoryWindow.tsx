@@ -28,7 +28,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  preference: 'text-amber-400',
+  preference: 'text-[var(--color-primary)]',
   fact: 'text-sky-400',
   context: 'text-[var(--color-text-secondary)]',
   decision: 'text-emerald-400',
@@ -97,7 +97,7 @@ function FolderTree({
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            <svg className="w-3.5 h-3.5 text-amber-700/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 text-[var(--color-primary)]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
@@ -178,7 +178,7 @@ function SearchResult({
             {CATEGORY_LABELS[item.category] || item.category}
           </span>
           {item.importance >= 4 && (
-            <span className="text-[10px] text-amber-500">!</span>
+            <span className="text-[10px] text-[var(--color-primary)]">!</span>
           )}
           {item.tags.length > 0 && (
             <span className="text-[10px] text-[var(--color-text-muted)]">
@@ -570,7 +570,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
             <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
               {selectedPath ? selectedPath.split('/').pop()?.replace(/\.md$/, '') : '编辑器'}
             </span>
-            {hasFileChanges && <span className="ml-2 text-[10px] text-amber-600">未保存</span>}
+            {hasFileChanges && <span className="ml-2 text-[10px] text-[var(--color-primary)]">未保存</span>}
           </div>
           {selectedPath ? (
             <RichTextEditor
@@ -704,7 +704,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       };
                       input.click();
                     }}
-                    className="p-1 rounded text-[var(--color-text-muted)] hover:text-amber-400 hover:bg-amber-500/10
+                    className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10
                       transition-colors cursor-pointer"
                     title="上传文件到知识库"
                   >
@@ -753,7 +753,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
 
               {scanResult.modified?.length > 0 && (
                 <div className="mb-2">
-                  <div className="text-[9px] text-amber-400 mb-1">已修改 ({scanResult.modified.length})</div>
+                  <div className="text-[9px] text-[var(--color-primary)] mb-1">已修改 ({scanResult.modified.length})</div>
                   {scanResult.modified.map((f: any, i: number) => (
                     <div key={i} className="text-[10px] text-[var(--color-text-secondary)] pl-2">{f.path}</div>
                   ))}
@@ -848,7 +848,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   ).length;
                   if (chunkCount === 0) {
                     return (<>
-                      <span className="text-[9px] text-amber-500/80 mr-1">未导入</span>
+                      <span className="text-[9px] text-[var(--color-primary)]/80 mr-1">未导入</span>
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
@@ -867,8 +867,8 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                           }
                         }}
                         disabled={importingPaths.has(file.path)}
-                        className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400
-                          hover:bg-amber-500/25 transition-colors flex-shrink-0 cursor-pointer
+                        className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--color-primary)]/15 text-[var(--color-primary)]
+                          hover:bg-[var(--color-primary)]/25 transition-colors flex-shrink-0 cursor-pointer
                           disabled:opacity-40 disabled:cursor-wait"
                       >
                         {importingPaths.has(file.path) ? '导入中...' : '导入'}
@@ -896,7 +896,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                         }
                       }}
                       disabled={importingPaths.has(file.path)}
-                      className="text-[9px] px-1.5 py-0.5 rounded text-[var(--color-text-muted)] hover:text-amber-400 hover:bg-amber-500/10
+                      className="text-[9px] px-1.5 py-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10
                         transition-colors flex-shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-wait"
                       title="重新导入"
                     >
@@ -944,7 +944,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     return (
                       <div className="border-t border-[var(--color-border)] mt-1">
                         <details className="group">
-                          <summary className="px-3 py-2 text-[10px] text-amber-500/70 cursor-pointer hover:text-amber-400 transition-colors">
+                          <summary className="px-3 py-2 text-[10px] text-[var(--color-primary)]/70 cursor-pointer hover:text-[var(--color-primary)] transition-colors">
                             孤立条目 ({orphans.length})
                           </summary>
                           <div className="pb-1">
@@ -1026,9 +1026,9 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     <textarea
                       value={editTdbContent}
                       onChange={e => setEditTdbContent(e.target.value)}
-                      className="w-full min-h-[200px] rounded-lg px-3 py-2 bg-slate-800/60 border border-amber-500/20
+                      className="w-full min-h-[200px] rounded-lg px-3 py-2 bg-slate-800/60 border border-[var(--color-primary)]/20
                         text-[var(--color-text-primary)] text-sm leading-relaxed resize-none outline-none
-                        focus:border-amber-500/40"
+                        focus:border-[var(--color-primary)]/40"
                     />
                   ) : (
                     <p className="text-sm text-[var(--color-text-primary)] leading-relaxed whitespace-pre-wrap">{displayEntry.content}</p>
@@ -1065,7 +1065,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                           }}
                           disabled={isSavingTdb}
                           className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                            bg-amber-500/20 text-amber-300 hover:bg-amber-500/30
+                            bg-[var(--color-primary)]/20 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/30
                             disabled:opacity-50 transition-colors"
                         >
                           {isSavingTdb ? '保存中...' : '保存修改'}
@@ -1150,7 +1150,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       type="range" min={1} max={5}
                       value={editTdbImportance}
                       onChange={e => setEditTdbImportance(Number(e.target.value))}
-                      className="w-full mt-1 accent-amber-500"
+                      className="w-full mt-1 accent-[var(--color-primary)]"
                     />
                   ) : (
                     <span className="text-[var(--color-text-secondary)] ml-2">{displayEntry.importance || '—'}</span>

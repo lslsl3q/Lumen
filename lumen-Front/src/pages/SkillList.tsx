@@ -73,7 +73,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
           </button>
           <button
             onClick={handleCreate}
-            className="px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-all"
+            className="px-4 py-2 rounded-lg bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/30 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 transition-all"
           >
             + 新建 Skill
           </button>
@@ -94,7 +94,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
         ) : skills.length === 0 ? (
           <div className="text-center py-16 text-[var(--color-text-muted)]">
             <p className="mb-4">还没有 Skill</p>
-            <button onClick={handleCreate} className="text-amber-400 hover:underline">
+            <button onClick={handleCreate} className="text-[var(--color-primary)] hover:underline">
               创建第一个 Skill
             </button>
           </div>
@@ -104,7 +104,7 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
               <div
                 key={skill.id}
                 onClick={() => goTo('skill-editor', { id: skill.id })}
-                className="group relative p-5 rounded-xl cursor-pointer bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-amber-500/30 hover:bg-[var(--color-bg-elevated)] transition-all"
+                className="group relative p-5 rounded-xl cursor-pointer bg-[var(--color-bg-elevated)] border border-[var(--color-border)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-elevated)] transition-all"
               >
                 {/* 删除按钮 */}
                 <button

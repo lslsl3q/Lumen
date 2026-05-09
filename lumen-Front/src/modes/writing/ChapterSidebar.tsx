@@ -80,7 +80,7 @@ export function ChapterSidebar() {
                 onClick={() => handleProjectClick(p.id)}
                 className={`flex items-center gap-1.5 px-2 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
                   ${isActive
-                    ? "bg-amber-400/10 text-amber-300"
+                    ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
                     : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
                   }`}
               >
@@ -110,7 +110,7 @@ export function ChapterSidebar() {
                     }}
                     onBlur={() => setEditingProjectId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
+                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
                   />
                 ) : (
                   <span className="truncate flex-1">{p.name}</span>
@@ -186,7 +186,7 @@ export function ChapterSidebar() {
                 }}
                 className={`flex items-center justify-between px-3 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
                   ${ch.id === activeChapterId
-                    ? "bg-amber-400/10 text-amber-300"
+                    ? "bg-[var(--color-primary)]/10 text-[var(--color-primary)]"
                     : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] hover:text-[var(--color-text-primary)]"
                   }
                   ${dragId === ch.id ? "opacity-50" : ""}
@@ -211,7 +211,7 @@ export function ChapterSidebar() {
                     }}
                     onBlur={() => setEditingChapterId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
+                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[13px] text-[var(--color-text-primary)] outline-none"
                   />
                 ) : (
                   <span className="truncate flex-1">
@@ -343,7 +343,7 @@ function SettingsList() {
                     }}
                     onBlur={() => setPendingSettingId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[12px] text-[var(--color-text-primary)] outline-none min-w-0"
+                    className="flex-1 bg-[var(--color-bg-elevated)] border border-[var(--color-primary)]/30 rounded px-2 py-0 text-[12px] text-[var(--color-text-primary)] outline-none min-w-0"
                   />
                 ) : (
                   <span>{s.name}</span>
@@ -368,7 +368,7 @@ function SettingsList() {
                     try { await updateSetting(s.id, { name: e.target.value }); }
                     catch { /* ignore */ }
                   }}
-                  className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-amber-400/30"
+                  className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[12px] text-[var(--color-text-primary)] outline-none focus:border-[var(--color-primary)]/30"
                   placeholder="设定名称"
                 />
                 <select
@@ -377,7 +377,7 @@ function SettingsList() {
                     try { await updateSetting(s.id, { category: e.target.value }); await loadSettings(activeProjectId!); }
                     catch { /* ignore */ }
                   }}
-                  className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[11px] text-[var(--color-text-secondary)] outline-none focus:border-amber-400/30"
+                  className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1 text-[11px] text-[var(--color-text-secondary)] outline-none focus:border-[var(--color-primary)]/30"
                 >
                   {CATEGORY_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -388,7 +388,7 @@ function SettingsList() {
                   onBlur={(e) => handleUpdateContent(s.id, e.target.value)}
                   placeholder="描述内容…"
                   rows={4}
-                  className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-amber-400/30 resize-y leading-relaxed"
+                  className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded px-2 py-1.5 text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-[var(--color-primary)]/30 resize-y leading-relaxed"
                 />
               </div>
             )}
