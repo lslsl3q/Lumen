@@ -430,16 +430,16 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         minWidth={144}
         maxWidth={320}
         storageKey="lumen_graph_sidebar_width"
-        className="border-r border-[#2a2926] bg-[#171715] flex flex-col"
+        className="border-r border-[var(--color-border)] bg-[var(--color-bg-panel)] flex flex-col"
       >
-        <div className="px-3 py-2 border-b border-[#2a2926] flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-widest text-slate-600">
+        <div className="px-3 py-2 border-b border-[var(--color-border)] flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)]">
             实体 ({entities.length})
           </span>
           <button
             onClick={() => setIsCreating(true)}
             className="w-4 h-4 flex items-center justify-center rounded
-              text-slate-700 hover:text-slate-400 hover:bg-slate-700/40
+              text-slate-700 hover:text-[var(--color-text-secondary)] hover:bg-slate-700/40
               transition-all duration-150 cursor-pointer"
             title="新建实体"
           >
@@ -450,12 +450,12 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         </div>
 
         {/* 布局切换 */}
-        <div className="px-3 py-1.5 border-b border-[#2a2926] flex gap-1.5">
+        <div className="px-3 py-1.5 border-b border-[var(--color-border)] flex gap-1.5">
           <select
             value={layoutType}
             onChange={e => setLayoutType(e.target.value)}
-            className="flex-1 text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded
-              px-2 py-1 text-slate-500 outline-none cursor-pointer
+            className="flex-1 text-[10px] bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
+              px-2 py-1 text-[var(--color-text-muted)] outline-none cursor-pointer
               hover:border-[#CC7C5E]/20 focus:border-[#CC7C5E]/30"
           >
             {Object.entries(LAYOUTS).map(([key, { label }]) => (
@@ -466,9 +466,9 @@ function GraphEditor({ tdb }: GraphEditorProps) {
 
         {/* 源文件树（可折叠） */}
         {fileFolders.length > 0 && (
-          <details className="border-b border-[#2a2926] group" open>
+          <details className="border-b border-[var(--color-border)] group" open>
             <summary className="px-3 py-1.5 cursor-pointer flex items-center gap-1.5
-              text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors">
+              text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors">
               <svg className="w-2.5 h-2.5 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
@@ -514,7 +514,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   );
                 }}
                 footer={
-                  <div className="px-3 pl-6 pt-1 border-t border-[#2a2926]/50 mt-0.5 flex items-center gap-2">
+                  <div className="px-3 pl-6 pt-1 border-t border-[var(--color-border)]/50 mt-0.5 flex items-center gap-2">
                     <button
                       onClick={async () => {
                         if (isExtracting) return;
@@ -538,7 +538,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                       className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
                         ${isExtracting
                           ? 'text-amber-400 cursor-wait'
-                          : 'text-slate-600 hover:text-amber-400 hover:bg-amber-400/10'
+                          : 'text-[var(--color-text-muted)] hover:text-amber-400 hover:bg-amber-400/10'
                         }`}
                     >
                       {isExtracting ? '全部抽取中...' : '全部重抽'}
@@ -561,7 +561,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                       className={`text-[9px] px-1 py-0.5 rounded cursor-pointer transition-colors
                         ${isExtracting
                           ? 'text-amber-400 cursor-wait'
-                          : 'text-slate-600 hover:text-amber-400 hover:bg-amber-400/10'
+                          : 'text-[var(--color-text-muted)] hover:text-amber-400 hover:bg-amber-400/10'
                         }`}
                       title="同步知识库变更到图谱"
                     >
@@ -577,7 +577,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         <div className="flex-1 overflow-y-auto scrollbar-lumen">
           {Object.entries(entitiesByType).map(([type, items]) => (
             <div key={type}>
-              <div className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-slate-600 font-medium flex items-center gap-1.5">
+              <div className="px-3 py-1.5 text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] font-medium flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getNodeColor(type) }} />
                 {type} ({items.length})
               </div>
@@ -594,8 +594,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   }}
                   className={`w-full text-left px-3 pl-5 py-1 text-xs cursor-pointer transition-colors duration-100
                     ${String(entity.id) === selectedNodeId
-                      ? 'bg-[#CC7C5E]/08 text-slate-200'
-                      : 'text-slate-500 hover:text-slate-300 hover:bg-[#1f1f1c]'
+                      ? 'bg-[#CC7C5E]/08 text-[var(--color-text-primary)]'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]'
                     }`}
                 >
                   {(entity.payload?.name as string) || `#${entity.id}`}
@@ -614,22 +614,22 @@ function GraphEditor({ tdb }: GraphEditorProps) {
 
         {/* 新建实体内联输入 */}
         {isCreating && (
-          <div className="px-3 py-2 border-t border-[#2a2926] space-y-1.5">
+          <div className="px-3 py-2 border-t border-[var(--color-border)] space-y-1.5">
             <input
               value={newEntityName}
               onChange={e => setNewEntityName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleCreateEntity(); if (e.key === 'Escape') setIsCreating(false); }}
               placeholder="实体名称"
-              className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
-                px-2 py-1 text-slate-300 placeholder:text-slate-700
+              className="w-full text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
+                px-2 py-1 text-[var(--color-text-primary)] placeholder:text-slate-700
                 outline-none focus:border-[#CC7C5E]/30"
               autoFocus
             />
             <select
               value={newEntityType}
               onChange={e => setNewEntityType(e.target.value)}
-              className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
-                px-2 py-1 text-slate-400 outline-none cursor-pointer"
+              className="w-full text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
+                px-2 py-1 text-[var(--color-text-secondary)] outline-none cursor-pointer"
             >
               {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
                 <option key={t} value={t}>{t}</option>
@@ -637,15 +637,15 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             </select>
             <div className="flex gap-1">
               <button onClick={handleCreateEntity} className="flex-1 text-[10px] text-amber-400 hover:text-amber-300 cursor-pointer">创建</button>
-              <button onClick={() => setIsCreating(false)} className="flex-1 text-[10px] text-slate-600 hover:text-slate-400 cursor-pointer">取消</button>
+              <button onClick={() => setIsCreating(false)} className="flex-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer">取消</button>
             </div>
           </div>
         )}
 
         {/* 提示词编辑区（折叠） */}
-        <details className="border-t border-[#2a2926] group/prompt">
+        <details className="border-t border-[var(--color-border)] group/prompt">
           <summary className="px-3 py-1.5 cursor-pointer flex items-center gap-1.5
-            text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-colors">
+            text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors">
             <svg className="w-2.5 h-2.5 transition-transform group-open/prompt:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
@@ -655,8 +655,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             <textarea
               value={promptText}
               onChange={e => setPromptText(e.target.value)}
-              className="w-full h-48 text-[10px] leading-relaxed bg-[#1C1B19] border border-[#2a2926] rounded
-                px-2 py-1.5 text-slate-400 outline-none resize-y
+              className="w-full h-48 text-[10px] leading-relaxed bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
+                px-2 py-1.5 text-[var(--color-text-secondary)] outline-none resize-y
                 focus:border-[#CC7C5E]/30"
               spellCheck={false}
             />
@@ -689,8 +689,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                     toast('已重新加载', 'info');
                   } catch { /* */ }
                 }}
-                className="text-[10px] px-2 py-1 rounded text-slate-600
-                  hover:text-slate-400 hover:bg-slate-700/40 transition-colors cursor-pointer"
+                className="text-[10px] px-2 py-1 rounded text-[var(--color-text-muted)]
+                  hover:text-[var(--color-text-secondary)] hover:bg-slate-700/40 transition-colors cursor-pointer"
               >
                 重载
               </button>
@@ -703,37 +703,37 @@ function GraphEditor({ tdb }: GraphEditorProps) {
       <div className="flex-1 relative" ref={containerRef} />
 
       {/* ── 右栏：详情面板 ── */}
-      <div className="w-56 flex-shrink-0 border-l border-[#2a2926] bg-[#171715] flex flex-col">
+      <div className="w-56 flex-shrink-0 border-l border-[var(--color-border)] bg-[var(--color-bg-panel)] flex flex-col">
         {selectedEntity && (
           <>
             {/* 实体详情 */}
-            <div className="px-3 py-2 border-b border-[#2a2926]">
+            <div className="px-3 py-2 border-b border-[var(--color-border)]">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: getNodeColor(editType || 'entity') }} />
-                <span className="text-sm text-slate-200 font-medium truncate">
+                <span className="text-sm text-[var(--color-text-primary)] font-medium truncate">
                   {(selectedEntity.payload?.name as string) || `#${selectedEntity.id}`}
                 </span>
               </div>
-              <div className="mt-1 text-[10px] text-slate-600">
+              <div className="mt-1 text-[10px] text-[var(--color-text-muted)]">
                 ID: {selectedEntity.id} · 类型: {editType}
               </div>
             </div>
 
             {/* 编辑表单 */}
-            <div className="px-3 py-2 space-y-1.5 border-b border-[#2a2926]">
+            <div className="px-3 py-2 space-y-1.5 border-b border-[var(--color-border)]">
               <input
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
-                className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
-                  px-2 py-1 text-slate-300 outline-none focus:border-[#CC7C5E]/30"
+                className="w-full text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
+                  px-2 py-1 text-[var(--color-text-primary)] outline-none focus:border-[#CC7C5E]/30"
                 placeholder="名称"
               />
               <select
                 value={editType}
                 onChange={e => setEditType(e.target.value)}
-                className="w-full text-xs bg-[#1C1B19] border border-[#2a2926] rounded
-                  px-2 py-1 text-slate-400 outline-none cursor-pointer"
+                className="w-full text-xs bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded
+                  px-2 py-1 text-[var(--color-text-secondary)] outline-none cursor-pointer"
               >
                 {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
                   <option key={t} value={t}>{t}</option>
@@ -749,8 +749,8 @@ function GraphEditor({ tdb }: GraphEditorProps) {
             </div>
 
             {/* 关联关系 */}
-            <div className="px-3 py-2 border-b border-[#2a2926]">
-              <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1.5">
+            <div className="px-3 py-2 border-b border-[var(--color-border)]">
+              <div className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] mb-1.5">
                 关联 ({connectedEdges.length})
               </div>
               <div className="space-y-1 max-h-32 overflow-y-auto scrollbar-lumen">
@@ -760,10 +760,10 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   const otherId = isSource ? edge.dst : edge.src;
                   return (
                     <div key={i} className="flex items-center gap-1.5 group">
-                      <span className="text-[10px] text-slate-500">
+                      <span className="text-[10px] text-[var(--color-text-muted)]">
                         {isSource ? '→' : '←'}
                       </span>
-                      <span className="text-[10px] text-slate-400 truncate">{otherName || `#${otherId}`}</span>
+                      <span className="text-[10px] text-[var(--color-text-secondary)] truncate">{otherName || `#${otherId}`}</span>
                       <button
                         onClick={() => handleDeleteEdge(edge.src, edge.dst)}
                         className="ml-auto text-slate-700 hover:text-red-400 opacity-0 group-hover:opacity-100
@@ -785,7 +785,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               <button
                 onClick={() => handleDeleteEntity(selectedEntity.id)}
                 className="w-full py-1.5 rounded text-[10px] cursor-pointer
-                  text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
               >
                 删除实体
               </button>
@@ -796,11 +796,11 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         {selectedEdge && (
           <>
             {/* 边详情 */}
-            <div className="px-3 py-2 border-b border-[#2a2926]">
-              <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-2">关系</div>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
+            <div className="px-3 py-2 border-b border-[var(--color-border)]">
+              <div className="text-[10px] uppercase tracking-widest text-[var(--color-text-muted)] mb-2">关系</div>
+              <div className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
                 <span className="truncate">{selectedEdge.src_name || `#${selectedEdge.src}`}</span>
-                <svg className="w-3 h-3 text-slate-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3 text-[var(--color-text-muted)] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                 </svg>
                 <span className="truncate">{selectedEdge.dst_name || `#${selectedEdge.dst}`}</span>
@@ -810,7 +810,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
               <button
                 onClick={() => handleDeleteEdge(selectedEdge.src, selectedEdge.dst)}
                 className="w-full py-1.5 rounded text-[10px] cursor-pointer
-                  text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  text-[var(--color-text-muted)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
               >
                 删除关系
               </button>

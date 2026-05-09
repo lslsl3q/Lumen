@@ -58,7 +58,7 @@ const CHARACTER_FIELDS: FieldDef[] = [
       { value: "protagonist", label: "主角", color: "bg-amber-400/15 text-amber-200" },
       { value: "antagonist", label: "反派", color: "bg-red-400/15 text-red-300" },
       { value: "supporting", label: "配角", color: "bg-blue-400/15 text-blue-300" },
-      { value: "minor", label: "龙套", color: "bg-slate-400/10 text-slate-300" },
+      { value: "minor", label: "龙套", color: "bg-slate-400/10 text-[var(--color-text-primary)]" },
     ],
   },
   { key: "gender", label: "性别", type: "text", placeholder: "男/女/未知" },
@@ -110,7 +110,7 @@ const ITEM_FIELDS: FieldDef[] = [
   {
     key: "rarity", label: "稀有度", type: "select",
     options: [
-      { value: "common", label: "普通", color: "bg-slate-400/10 text-slate-300" },
+      { value: "common", label: "普通", color: "bg-slate-400/10 text-[var(--color-text-primary)]" },
       { value: "uncommon", label: "稀有", color: "bg-green-400/15 text-green-300" },
       { value: "rare", label: "史诗", color: "bg-purple-400/15 text-purple-300" },
       { value: "legendary", label: "传说", color: "bg-amber-400/15 text-amber-200" },
@@ -147,16 +147,16 @@ export function WritingModalPanel({ panel, onClose }: WritingModalPanelProps) {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* 弹窗主体 */}
-      <div className="relative w-[1100px] h-[680px] max-w-[90vw] max-h-[85vh] bg-[#1e1d1a] rounded-2xl border border-[#2a2926] shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
+      <div className="relative w-[1100px] h-[680px] max-w-[90vw] max-h-[85vh] bg-[var(--color-bg-base)] rounded-2xl border border-[var(--color-border)] shadow-2xl shadow-black/50 flex flex-col overflow-hidden">
         {/* 头部 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a2926] flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] flex-shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-xl">{PANEL_ICONS[panel]}</span>
-            <h2 className="text-[15px] font-medium text-slate-200">{PANEL_TITLES[panel]}</h2>
+            <h2 className="text-[15px] font-medium text-[var(--color-text-primary)]">{PANEL_TITLES[panel]}</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-[#2a2926] cursor-pointer transition-colors"
+            className="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -242,13 +242,13 @@ function CategoryContent({ category, fields, label, icon }: {
         <div
           onClick={() => setSelectedId(s.id)}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[13px] cursor-pointer group transition-colors
-            ${isActive ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-[#1f1f1c]"}`}
+            ${isActive ? "bg-amber-400/10 text-amber-300" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}`}
           style={{ paddingLeft: `${12 + indent}px` }}
         >
           {children.length > 0 ? (
             <button
               onClick={(e) => { e.stopPropagation(); toggleExpand(s.id); }}
-              className="text-slate-600 hover:text-slate-400 cursor-pointer flex-shrink-0"
+              className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer flex-shrink-0"
             >
               {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             </button>
@@ -277,13 +277,13 @@ function CategoryContent({ category, fields, label, icon }: {
               }}
               onBlur={() => setPendingEditId(null)}
               onClick={(e) => e.stopPropagation()}
-              className="flex-1 bg-[#1f1f1c] border border-amber-400/30 rounded px-2 py-0 text-[12px] text-slate-200 outline-none min-w-0"
+              className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[12px] text-[var(--color-text-primary)] outline-none min-w-0"
             />
           ) : (
             <span className="truncate flex-1">{s.name}</span>
           )}
           {badge && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1f1f1c] text-slate-500 flex-shrink-0">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--color-bg-elevated)] text-[var(--color-text-muted)] flex-shrink-0">
               {badge}
             </span>
           )}
@@ -298,7 +298,7 @@ function CategoryContent({ category, fields, label, icon }: {
                 setPendingEditName("新子项");
               } catch {}
             }}
-            className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-amber-400 cursor-pointer"
+            className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-amber-400 cursor-pointer"
             title="新建子项"
           >
             <Plus className="w-3 h-3" />
@@ -310,7 +310,7 @@ function CategoryContent({ category, fields, label, icon }: {
               await deleteSetting(s.id);
               if (selectedId === s.id) setSelectedId(null);
             }}
-            className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-400 cursor-pointer"
+            className="opacity-0 group-hover:opacity-100 text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer"
           >
             <Trash2 className="w-3 h-3" />
           </button>
@@ -326,15 +326,15 @@ function CategoryContent({ category, fields, label, icon }: {
   return (
     <div className="flex h-full">
       {/* 左栏：树形列表 */}
-      <div className="w-[280px] flex-shrink-0 border-r border-[#2a2926] flex flex-col bg-[#1a1917]">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2a2926] flex-shrink-0">
+      <div className="w-[280px] flex-shrink-0 border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-panel)]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
           <div className="flex-1 relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-text-muted)]" />
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={`搜索${label}…`}
-              className="w-full pl-7 pr-2 py-1.5 bg-[#1f1f1c] border border-[#2a2926] rounded-lg text-[12px] text-slate-200 placeholder-slate-600 outline-none focus:border-amber-400/30"
+              className="w-full pl-7 pr-2 py-1.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-amber-400/30"
             />
           </div>
           <button
@@ -355,10 +355,10 @@ function CategoryContent({ category, fields, label, icon }: {
 
         <div className="flex-1 overflow-y-auto scrollbar-lumen">
           {!activeProjectId && (
-            <p className="text-[12px] text-slate-600 italic p-4">请先选择一个作品</p>
+            <p className="text-[12px] text-[var(--color-text-muted)] italic p-4">请先选择一个作品</p>
           )}
           {roots.length === 0 && activeProjectId && (
-            <p className="text-[12px] text-slate-600 italic p-4">
+            <p className="text-[12px] text-[var(--color-text-muted)] italic p-4">
               {searchQuery ? "未找到匹配项" : `暂无${label}，点击 + 创建`}
             </p>
           )}
@@ -369,9 +369,9 @@ function CategoryContent({ category, fields, label, icon }: {
       </div>
 
       {/* 右栏：详情编辑器 */}
-      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-lumen bg-[#1e1d1a]">
+      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-lumen bg-[var(--color-bg-base)]">
         {!selected ? (
-          <div className="flex items-center justify-center h-full text-slate-600">
+          <div className="flex items-center justify-center h-full text-[var(--color-text-muted)]">
             <div className="text-center">
               <p className="text-4xl mb-3">{icon}</p>
               <p className="text-[13px]">选择或创建一个{label}</p>
@@ -406,7 +406,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
     <div className="p-6 space-y-5">
       {/* 名称 */}
       <div>
-        <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">名称</label>
+        <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">名称</label>
         <input
           key={setting.id + "-name"}
           defaultValue={setting.name}
@@ -415,7 +415,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
               await updateSetting(setting.id, { name: e.target.value });
             }
           }}
-          className="w-full mt-1 bg-[#1f1f1c] border border-[#2a2926] rounded-lg px-3 py-2 text-[15px] text-slate-200 outline-none focus:border-amber-400/30"
+          className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-[15px] text-[var(--color-text-primary)] outline-none focus:border-amber-400/30"
         />
       </div>
 
@@ -424,7 +424,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
         if (field.type === "select" && field.options) {
           return (
             <div key={field.key}>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{field.label}</label>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">{field.label}</label>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {field.options.map((opt) => (
                   <button
@@ -433,7 +433,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
                     className={`px-3 py-1.5 rounded-lg text-[12px] transition-colors cursor-pointer border
                       ${content[field.key] === opt.value
                         ? `border-amber-400/30 ${opt.color ?? "bg-amber-400/10 text-amber-300"}`
-                        : "border-[#2a2926] text-slate-500 hover:text-slate-300 hover:border-slate-600"
+                        : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:border-slate-600"
                       }`}
                   >
                     {opt.label}
@@ -447,7 +447,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
         if (field.type === "textarea") {
           return (
             <div key={field.key}>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{field.label}</label>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">{field.label}</label>
               <RichTextField
                 key={setting.id + "-" + field.key}
                 value={getFieldValue(field.key)}
@@ -461,13 +461,13 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
 
         return (
           <div key={field.key}>
-            <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{field.label}</label>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">{field.label}</label>
             <input
               key={setting.id + "-" + field.key}
               defaultValue={content[field.key] ?? ""}
               onBlur={(e) => { if (e.target.value !== (content[field.key] ?? "")) updateField(field.key, e.target.value); }}
               placeholder={field.placeholder}
-              className="w-full mt-1 bg-[#1f1f1c] border border-[#2a2926] rounded-lg px-3 py-2 text-[13px] text-slate-200 outline-none focus:border-amber-400/30"
+              className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--color-text-primary)] outline-none focus:border-amber-400/30"
             />
           </div>
         );
@@ -494,9 +494,9 @@ function ProjectManagementContent() {
   return (
     <div className="flex h-full">
       {/* 左栏：作品列表 */}
-      <div className="w-[300px] flex-shrink-0 border-r border-[#2a2926] flex flex-col bg-[#1a1917]">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-[#2a2926] flex-shrink-0">
-          <span className="text-[12px] text-slate-500 flex-1">{projects.length} 个作品</span>
+      <div className="w-[300px] flex-shrink-0 border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-panel)]">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
+          <span className="text-[12px] text-[var(--color-text-muted)] flex-1">{projects.length} 个作品</span>
           <button
             onClick={async () => {
               try {
@@ -520,7 +520,7 @@ function ProjectManagementContent() {
                 key={p.id}
                 onClick={() => setActiveProject(p.id)}
                 className={`rounded-lg px-3 py-3 cursor-pointer group transition-colors
-                  ${isActive ? "bg-amber-400/10 border border-amber-400/10" : "hover:bg-[#1f1f1c] border border-transparent"}`}
+                  ${isActive ? "bg-amber-400/10 border border-amber-400/10" : "hover:bg-[var(--color-bg-elevated)] border border-transparent"}`}
               >
                 {isEditing ? (
                   <input
@@ -534,22 +534,22 @@ function ProjectManagementContent() {
                     }}
                     onBlur={() => setEditingId(null)}
                     onClick={(e) => e.stopPropagation()}
-                    className="w-full bg-[#1f1f1c] border border-amber-400/30 rounded px-2 py-0.5 text-[13px] text-slate-200 outline-none"
+                    className="w-full bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0.5 text-[13px] text-[var(--color-text-primary)] outline-none"
                   />
                 ) : (
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[14px] font-medium truncate ${isActive ? "text-amber-300" : "text-slate-300"}`}>
+                      <p className={`text-[14px] font-medium truncate ${isActive ? "text-amber-300" : "text-[var(--color-text-primary)]"}`}>
                         {p.name}
                       </p>
-                      <p className="text-[11px] text-slate-600 mt-1">
+                      <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
                         创建于 {new Date(p.created_at * 1000).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setEditName(p.name); }}
-                        className="p-1 rounded text-slate-600 hover:text-slate-300 cursor-pointer"
+                        className="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] cursor-pointer"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
@@ -559,7 +559,7 @@ function ProjectManagementContent() {
                           if (!confirm(`删除「${p.name}」及其所有数据？`)) return;
                           await deleteProject(p.id);
                         }}
-                        className="p-1 rounded text-slate-600 hover:text-red-400 cursor-pointer"
+                        className="p-1 rounded text-[var(--color-text-muted)] hover:text-red-400 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -570,13 +570,13 @@ function ProjectManagementContent() {
             );
           })}
           {projects.length === 0 && (
-            <p className="text-[12px] text-slate-600 italic p-4">暂无作品，点击新建创建</p>
+            <p className="text-[12px] text-[var(--color-text-muted)] italic p-4">暂无作品，点击新建创建</p>
           )}
         </div>
       </div>
 
       {/* 右栏：当前作品信息 */}
-      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-lumen bg-[#1e1d1a] p-6">
+      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-lumen bg-[var(--color-bg-base)] p-6">
         {activeProjectId ? (() => {
           const proj = projects.find((p) => p.id === activeProjectId);
           if (!proj) return null;
@@ -584,44 +584,44 @@ function ProjectManagementContent() {
           const totalWords = chapters.reduce((sum, c) => sum + (c.word_count ?? 0), 0);
           return (
             <div className="space-y-5">
-              <h3 className="text-[18px] font-medium text-slate-200">{proj.name}</h3>
+              <h3 className="text-[18px] font-medium text-[var(--color-text-primary)]">{proj.name}</h3>
 
               <div className="grid grid-cols-3 gap-3">
-                <div className="px-4 py-3 rounded-xl bg-[#1a1917] border border-[#2a2926]">
-                  <p className="text-[11px] text-slate-500">章节</p>
-                  <p className="text-[20px] font-medium text-slate-200 mt-0.5">{chapters.length}</p>
+                <div className="px-4 py-3 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border)]">
+                  <p className="text-[11px] text-[var(--color-text-muted)]">章节</p>
+                  <p className="text-[20px] font-medium text-[var(--color-text-primary)] mt-0.5">{chapters.length}</p>
                 </div>
-                <div className="px-4 py-3 rounded-xl bg-[#1a1917] border border-[#2a2926]">
-                  <p className="text-[11px] text-slate-500">总字数</p>
-                  <p className="text-[20px] font-medium text-slate-200 mt-0.5">{totalWords.toLocaleString()}</p>
+                <div className="px-4 py-3 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border)]">
+                  <p className="text-[11px] text-[var(--color-text-muted)]">总字数</p>
+                  <p className="text-[20px] font-medium text-[var(--color-text-primary)] mt-0.5">{totalWords.toLocaleString()}</p>
                 </div>
-                <div className="px-4 py-3 rounded-xl bg-[#1a1917] border border-[#2a2926]">
-                  <p className="text-[11px] text-slate-500">设定数</p>
-                  <p className="text-[20px] font-medium text-slate-200 mt-0.5">{useWritingStore.getState().settings.length}</p>
+                <div className="px-4 py-3 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border)]">
+                  <p className="text-[11px] text-[var(--color-text-muted)]">设定数</p>
+                  <p className="text-[20px] font-medium text-[var(--color-text-primary)] mt-0.5">{useWritingStore.getState().settings.length}</p>
                 </div>
               </div>
 
               {proj.description && (
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">简介</label>
-                  <p className="text-[13px] text-slate-400 mt-1 leading-relaxed">{proj.description}</p>
+                  <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">简介</label>
+                  <p className="text-[13px] text-[var(--color-text-secondary)] mt-1 leading-relaxed">{proj.description}</p>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">创建时间</label>
-                  <p className="text-[12px] text-slate-400 mt-1">{new Date(proj.created_at * 1000).toLocaleString()}</p>
+                  <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">创建时间</label>
+                  <p className="text-[12px] text-[var(--color-text-secondary)] mt-1">{new Date(proj.created_at * 1000).toLocaleString()}</p>
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">更新时间</label>
-                  <p className="text-[12px] text-slate-400 mt-1">{new Date(proj.updated_at * 1000).toLocaleString()}</p>
+                  <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">更新时间</label>
+                  <p className="text-[12px] text-[var(--color-text-secondary)] mt-1">{new Date(proj.updated_at * 1000).toLocaleString()}</p>
                 </div>
               </div>
             </div>
           );
         })() : (
-          <div className="flex items-center justify-center h-full text-slate-600">
+          <div className="flex items-center justify-center h-full text-[var(--color-text-muted)]">
             <p className="text-[13px]">选择一个作品查看详情</p>
           </div>
         )}
@@ -665,34 +665,34 @@ function OutlineContent() {
   return (
     <div className="flex h-full">
       {/* 左栏：章节列表 */}
-      <div className="w-[280px] flex-shrink-0 border-r border-[#2a2926] flex flex-col bg-[#1a1917]">
-        <div className="px-4 py-3 border-b border-[#2a2926] flex-shrink-0">
+      <div className="w-[280px] flex-shrink-0 border-r border-[var(--color-border)] flex flex-col bg-[var(--color-bg-panel)]">
+        <div className="px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
           <div className="grid grid-cols-2 gap-2">
-            <div className="px-3 py-2 rounded-lg bg-[#1f1f1c]">
-              <p className="text-[10px] text-slate-600">章节</p>
-              <p className="text-[16px] text-slate-200">{chapters.length}</p>
+            <div className="px-3 py-2 rounded-lg bg-[var(--color-bg-elevated)]">
+              <p className="text-[10px] text-[var(--color-text-muted)]">章节</p>
+              <p className="text-[16px] text-[var(--color-text-primary)]">{chapters.length}</p>
             </div>
-            <div className="px-3 py-2 rounded-lg bg-[#1f1f1c]">
-              <p className="text-[10px] text-slate-600">总字数</p>
-              <p className="text-[16px] text-slate-200">{totalWords.toLocaleString()}</p>
+            <div className="px-3 py-2 rounded-lg bg-[var(--color-bg-elevated)]">
+              <p className="text-[10px] text-[var(--color-text-muted)]">总字数</p>
+              <p className="text-[16px] text-[var(--color-text-primary)]">{totalWords.toLocaleString()}</p>
             </div>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-lumen p-2 space-y-0.5">
           {chapters.length === 0 && (
-            <p className="text-[12px] text-slate-600 italic p-4">暂无章节</p>
+            <p className="text-[12px] text-[var(--color-text-muted)] italic p-4">暂无章节</p>
           )}
           {chapters.map((ch, idx) => (
             <div
               key={ch.id}
               onClick={() => { setSelectedId(ch.id); setActiveChapter(ch.id); }}
               className={`rounded-lg px-3 py-2.5 cursor-pointer transition-colors
-                ${selectedId === ch.id ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-[#1f1f1c]"}`}
+                ${selectedId === ch.id ? "bg-amber-400/10 text-amber-300" : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)]"}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-600">{idx + 1}.</span>
-                <span className="text-[10px] text-slate-600">{ch.word_count ?? 0}字</span>
+                <span className="text-[11px] text-[var(--color-text-muted)]">{idx + 1}.</span>
+                <span className="text-[10px] text-[var(--color-text-muted)]">{ch.word_count ?? 0}字</span>
               </div>
               <p className="truncate text-[13px] mt-0.5">{ch.title}</p>
             </div>
@@ -701,23 +701,23 @@ function OutlineContent() {
       </div>
 
       {/* 右栏：大纲备注 */}
-      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-lumen bg-[#1e1d1a] p-6">
+      <div className="flex-1 min-w-0 overflow-y-auto scrollbar-lumen bg-[var(--color-bg-base)] p-6">
         {!selectedChapter ? (
-          <div className="flex items-center justify-center h-full text-slate-600">
+          <div className="flex items-center justify-center h-full text-[var(--color-text-muted)]">
             <p className="text-[13px]">选择一个章节查看大纲</p>
           </div>
         ) : (
           <div className="space-y-4">
-            <h3 className="text-[16px] font-medium text-slate-200">
+            <h3 className="text-[16px] font-medium text-[var(--color-text-primary)]">
               {selectedChapter.title}
             </h3>
-            <div className="flex items-center gap-3 text-[11px] text-slate-500">
+            <div className="flex items-center gap-3 text-[11px] text-[var(--color-text-muted)]">
               <span>{selectedChapter.word_count ?? 0} 字</span>
               <span>·</span>
               <span>第 {chapters.indexOf(selectedChapter) + 1} 章</span>
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">大纲备注</label>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium">大纲备注</label>
               <textarea
                 key={selectedChapter.id}
                 defaultValue={getOutlineContent(selectedChapter.id)}
@@ -727,7 +727,7 @@ function OutlineContent() {
                 }}
                 placeholder={`${selectedChapter.title} 的大纲备注、剧情要点、伏笔…`}
                 rows={15}
-                className="w-full mt-1 bg-[#1f1f1c] border border-[#2a2926] rounded-lg px-3 py-2 text-[13px] text-slate-300 placeholder-slate-600 outline-none focus:border-amber-400/30 resize-y leading-relaxed"
+                className="w-full mt-1 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-[13px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] outline-none focus:border-amber-400/30 resize-y leading-relaxed"
               />
             </div>
           </div>
@@ -747,7 +747,7 @@ function ExportContent() {
 
   if (!activeProjectId || !project) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-600">
+      <div className="flex items-center justify-center h-full text-[var(--color-text-muted)]">
         <p className="text-[13px]">请先选择一个作品</p>
       </div>
     );
@@ -758,8 +758,8 @@ function ExportContent() {
 
   return (
     <div className="p-8 max-w-lg mx-auto">
-      <h3 className="text-[18px] font-medium text-slate-200 mb-2">导出「{project.name}」</h3>
-      <p className="text-[12px] text-slate-500 mb-6">
+      <h3 className="text-[18px] font-medium text-[var(--color-text-primary)] mb-2">导出「{project.name}」</h3>
+      <p className="text-[12px] text-[var(--color-text-muted)] mb-6">
         {chapters.length} 章 · {totalWords.toLocaleString()} 字
       </p>
 
@@ -773,26 +773,26 @@ function ExportContent() {
             key={opt.format}
             href={getExportUrl(activeProjectId, opt.format)}
             download
-            className="flex items-center gap-4 w-full px-5 py-4 rounded-xl bg-[#1a1917] border border-[#2a2926] text-slate-300 hover:bg-amber-400/5 hover:border-amber-400/20 hover:text-amber-300 cursor-pointer transition-colors no-underline group"
+            className="flex items-center gap-4 w-full px-5 py-4 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-amber-400/5 hover:border-amber-400/20 hover:text-amber-300 cursor-pointer transition-colors no-underline group"
           >
             <span className="text-2xl">{opt.icon}</span>
             <div className="flex-1">
               <p className="text-[14px] font-medium">{opt.label}</p>
-              <p className="text-[11px] text-slate-600 group-hover:text-slate-500">{opt.desc}</p>
+              <p className="text-[11px] text-[var(--color-text-muted)] group-hover:text-[var(--color-text-muted)]">{opt.desc}</p>
             </div>
-            <Download className="w-5 h-5 text-slate-600 group-hover:text-amber-400" />
+            <Download className="w-5 h-5 text-[var(--color-text-muted)] group-hover:text-amber-400" />
           </a>
         ))}
       </div>
 
-      <div className="mt-8 pt-6 border-t border-[#2a2926]">
-        <p className="text-[11px] text-slate-600 mb-3">更多格式开发中</p>
+      <div className="mt-8 pt-6 border-t border-[var(--color-border)]">
+        <p className="text-[11px] text-[var(--color-text-muted)] mb-3">更多格式开发中</p>
         <div className="space-y-2 opacity-40">
           {[
             { label: "EPUB 电子书", icon: "📚" },
             { label: "PDF 文档", icon: "📋" },
           ].map((opt) => (
-            <div key={opt.label} className="flex items-center gap-4 px-5 py-3 rounded-xl bg-[#1a1917] border border-[#2a2926] text-slate-600">
+            <div key={opt.label} className="flex items-center gap-4 px-5 py-3 rounded-xl bg-[var(--color-bg-panel)] border border-[var(--color-border)] text-[var(--color-text-muted)]">
               <span className="text-xl">{opt.icon}</span>
               <p className="text-[13px]">{opt.label}</p>
             </div>

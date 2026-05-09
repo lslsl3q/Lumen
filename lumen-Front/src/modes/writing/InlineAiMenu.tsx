@@ -174,11 +174,11 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 w-[380px] bg-[#1a1a17] border border-[#2a2926] rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
+      className="fixed z-50 w-[380px] bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-xl shadow-2xl shadow-black/50 overflow-hidden"
       style={{ top: position.top, left: position.left }}
     >
       {/* 模式按钮行 */}
-      <div className="flex items-center gap-0.5 px-2 py-2 border-b border-[#2a2926]">
+      <div className="flex items-center gap-0.5 px-2 py-2 border-b border-[var(--color-border)]">
         {availableModes.map((m) => {
           const Icon = m.icon;
           const active = mode === m.key;
@@ -189,7 +189,7 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
               className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer
                 ${active
                   ? "bg-amber-400/15 text-amber-300"
-                  : "text-slate-500 hover:text-slate-300 hover:bg-[#1f1f1c]"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)]"
                 }`}
             >
               <Icon className="w-3 h-3" />
@@ -201,7 +201,7 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
         {/* 连接状态 */}
         <div className="ml-auto flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`} />
-          <button onClick={onClose} className="p-0.5 text-slate-600 hover:text-slate-400 cursor-pointer">
+          <button onClick={onClose} className="p-0.5 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] cursor-pointer">
             <X className="w-3 h-3" />
           </button>
         </div>
@@ -228,8 +228,8 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
             : "向 AI 提问…"
           }
           disabled={!activeChapterId || streaming}
-          className="flex-1 bg-[#141413] border border-[#2a2926] rounded-lg px-3 py-1.5
-            text-[12px] text-slate-200 placeholder-slate-600
+          className="flex-1 bg-[var(--color-bg-deep)] border border-[var(--color-border)] rounded-lg px-3 py-1.5
+            text-[12px] text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)]
             focus:outline-none focus:border-amber-400/30 transition-colors
             disabled:opacity-50"
         />
@@ -252,7 +252,7 @@ export function InlineAiMenu({ editor, position, onClose }: InlineAiMenuProps) {
       {/* 问答模式：显示 AI 回复 */}
       {mode === "chat" && accumulated && (
         <div className="px-3 pb-3 max-h-[200px] overflow-y-auto scrollbar-lumen">
-          <div className="text-[12px] leading-relaxed text-slate-300 whitespace-pre-wrap bg-[#141413] rounded-lg p-2.5">
+          <div className="text-[12px] leading-relaxed text-[var(--color-text-primary)] whitespace-pre-wrap bg-[var(--color-bg-deep)] rounded-lg p-2.5">
             {accumulated}
             {streaming && <span className="animate-pulse">▊</span>}
           </div>

@@ -884,7 +884,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
               disabled={isLoading}
               rows={1}
               className="w-full px-4 py-2.5 resize-none bg-transparent border-none
-                text-[var(--color-text-primary)] placeholder-slate-600 text-sm leading-relaxed
+                text-[var(--color-text-primary)] placeholder-[var(--color-text-dim)] text-sm leading-relaxed
                 focus:outline-hidden disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
             />
           </form>
@@ -898,7 +898,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
                 transition: 'grid-template-rows 150ms ease-out, opacity 150ms ease-out',
               }}>
               <div className="overflow-hidden min-h-0">
-                <div className="h-px bg-[#2a2926] mx-3" />
+                <div className="h-px bg-[var(--color-bg-elevated)] mx-3" />
                 <div className="flex items-center gap-2 px-3 py-1">
                   <CockpitModelSelect value={currentModel || ''} onChange={onModelChange || (() => {})} />
                   {tokenUsage && (
@@ -933,7 +933,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
                       placeholder="Author's Note 内容..." rows={2}
                       className="w-full rounded-lg px-3 py-2 bg-[var(--color-border-subtle)] border border-[var(--color-border-subtle)]
                         text-[var(--color-text-primary)] text-xs leading-relaxed resize-none outline-none
-                        focus:border-amber-500/30 transition-colors placeholder-slate-600" />
+                        focus:border-amber-500/30 transition-colors placeholder-[var(--color-text-dim)]" />
                     <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
                       <span>注入:</span>
                       <button type="button" onClick={() => onAnSetPosition?.('before_user')}
@@ -951,7 +951,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
           )}
 
           {/* 工具栏分割线 */}
-          <div className="h-px bg-[#2a2926] mx-3" />
+          <div className="h-px bg-[var(--color-bg-elevated)] mx-3" />
           {/* 工具栏 */}
           <div className="flex items-center gap-1 px-3 py-1.5">
             {/* 附件 */}
@@ -964,7 +964,7 @@ function SharedChatPanel(props: SharedChatPanelProps) {
               </button>
             </Tooltip>
             {showAttachMenu && (
-              <div className="absolute bottom-full left-3 mb-1 py-1 rounded-lg bg-slate-900 border border-[var(--color-border)] shadow-lg min-w-[140px] z-50">
+              <div className="absolute bottom-full left-3 mb-1 py-1 rounded-lg bg-[var(--color-bg-elevated)] border border-[var(--color-border)] shadow-lg min-w-[140px] z-50">
                 <button type="button" onClick={() => setShowAttachMenu(false)}
                   className="w-full px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-elevated)] text-left">上传文件（开发中）</button>
               </div>

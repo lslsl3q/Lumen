@@ -20,13 +20,13 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex-1 h-1.5 bg-[#2a2926] rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-[var(--color-bg-elevated)] rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${colorClass}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[11px] text-slate-500 tabular-nums w-14 text-right">
+      <span className="text-[11px] text-[var(--color-text-muted)] tabular-nums w-14 text-right">
         {hp}/{maxHp}
       </span>
     </div>
@@ -44,30 +44,30 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
     'text-red-400';
 
   return (
-    <div className="bg-[#1C1B19] rounded-lg border border-[#2a2926] overflow-hidden">
+    <div className="bg-[var(--color-bg-elevated)] rounded-lg border border-[var(--color-border)] overflow-hidden">
       <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#2a2926]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--color-bg-elevated)]/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className={`w-1.5 h-1.5 rounded-full ${statusColor} flex-shrink-0`} />
-        <span className="text-sm text-slate-300 font-medium flex-1 truncate">
+        <span className="text-sm text-[var(--color-text-primary)] font-medium flex-1 truncate">
           {entity.name}
         </span>
         {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+          <ChevronUp className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+          <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
         )}
       </button>
       <div className="px-3 pb-2">
         <HpBar hp={entity.hp} maxHp={entity.max_hp} />
       </div>
       {expanded && (
-        <div className="px-3 pb-2.5 space-y-1 border-t border-[#2a2926] pt-2">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="px-3 pb-2.5 space-y-1 border-t border-[var(--color-border)] pt-2">
+          <div className="flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
             <Heart className="w-3 h-3 text-red-400" />
             <span>生命值</span>
-            <span className="text-slate-300 ml-auto">{entity.hp} / {entity.max_hp}</span>
+            <span className="text-[var(--color-text-primary)] ml-auto">{entity.hp} / {entity.max_hp}</span>
           </div>
         </div>
       )}
@@ -97,22 +97,22 @@ function RpgPanel({ roomState, onClose, playerId }: RpgPanelProps) {
   return createPortal(
     <div className="fixed right-4 top-14 z-40 w-64 pointer-events-auto">
       {/* 面板主体 */}
-      <div className="bg-[#1f1f1c] border border-[#2a2926] rounded-xl shadow-2xl overflow-hidden">
+      <div className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-2xl overflow-hidden">
         {/* 头部 */}
-        <div className="flex items-center justify-between px-3 py-2.5 border-b border-[#2a2926]">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-2 min-w-0">
             <Swords className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-            <h3 className="text-sm font-medium text-slate-300 truncate">
+            <h3 className="text-sm font-medium text-[var(--color-text-primary)] truncate">
               {roomState.roomName || '当前房间'}
             </h3>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <span className="text-[11px] text-slate-600">
+            <span className="text-[11px] text-[var(--color-text-muted)]">
               {roomState.entities.length} 人
             </span>
             <button
               onClick={onClose}
-              className="ml-1 w-5 h-5 flex items-center justify-center rounded text-slate-600 hover:text-slate-400 hover:bg-[#2a2926] transition-colors text-sm"
+              className="ml-1 w-5 h-5 flex items-center justify-center rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-elevated)] transition-colors text-sm"
             >
               ×
             </button>
@@ -122,7 +122,7 @@ function RpgPanel({ roomState, onClose, playerId }: RpgPanelProps) {
         {/* 实体列表 */}
         <div className="max-h-80 overflow-y-auto p-2 space-y-1.5">
           {sorted.length === 0 ? (
-            <p className="text-xs text-slate-600 text-center py-4">房间内暂无实体</p>
+            <p className="text-xs text-[var(--color-text-muted)] text-center py-4">房间内暂无实体</p>
           ) : (
             sorted.map(entity => (
               <EntityCard
