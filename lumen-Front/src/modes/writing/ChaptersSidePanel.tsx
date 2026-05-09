@@ -21,9 +21,9 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
-    <div className="absolute left-12 top-0 bottom-0 w-[260px] z-20 bg-[#161614] border-r border-[#2a2926] flex flex-col">
+    <div className="absolute left-0 top-0 bottom-0 w-[260px] z-20 bg-[var(--color-bg-panel)] border-r border-[var(--color-border)] flex flex-col">
       {/* 头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2926] flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] flex-shrink-0">
         <span className="text-[12px] font-medium text-slate-300">章节列表</span>
         <button onClick={onClose} className="p-1 rounded text-slate-600 hover:text-slate-400 cursor-pointer">
           <X className="w-3.5 h-3.5" />
@@ -83,7 +83,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
                     setDragId(null);
                   }}
                   className={`flex items-center justify-between px-2.5 py-2 rounded-md text-[13px] cursor-pointer group transition-colors
-                    ${ch.id === activeChapterId ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-[#1f1f1c]"}
+                    ${ch.id === activeChapterId ? "bg-amber-400/10 text-amber-300" : "text-slate-400 hover:bg-[var(--color-bg-elevated)]"}
                     ${dragId === ch.id ? "opacity-50" : ""}`}
                 >
                   {editingId === ch.id ? (
@@ -98,7 +98,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
                       }}
                       onBlur={() => setEditingId(null)}
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 bg-[#1f1f1c] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-slate-200 outline-none"
+                      className="flex-1 bg-[var(--color-bg-elevated)] border border-amber-400/30 rounded px-2 py-0 text-[13px] text-slate-200 outline-none"
                     />
                   ) : (
                     <span className="truncate flex-1">

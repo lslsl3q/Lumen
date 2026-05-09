@@ -18,7 +18,7 @@ interface WritingState {
   // UI 状态
   aiMode: AiMode;
   sidebarWidth: number;
-  aiPanelWidth: number;
+  isChatPanelOpen: boolean;
   isLoaded: boolean;
   focusMode: boolean;
   typewriterMode: boolean;
@@ -56,7 +56,7 @@ interface WritingState {
   // UI
   setAiMode: (mode: AiMode) => void;
   setSidebarWidth: (w: number) => void;
-  setAiPanelWidth: (w: number) => void;
+  toggleChatPanel: () => void;
 
   // 获取当前章节内容（从 store 中）
   getActiveChapter: () => WritingChapter | undefined;
@@ -71,7 +71,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   settings: [],
   aiMode: "chat",
   sidebarWidth: 280,
-  aiPanelWidth: 380,
+  isChatPanelOpen: false,
   isLoaded: false,
   focusMode: false,
   typewriterMode: false,
@@ -202,7 +202,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   setAiMode: (mode) => set({ aiMode: mode }),
   setSidebarWidth: (w) => set({ sidebarWidth: Math.max(200, Math.min(500, w)) }),
-  setAiPanelWidth: (w) => set({ aiPanelWidth: Math.max(0, Math.min(600, w)) }),
+  toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
 
   setGhostText: (content, requestId) => set({ ghostTextContent: content, ghostRequestId: requestId }),
   clearGhostText: () => set({ ghostTextContent: "", ghostRequestId: null }),

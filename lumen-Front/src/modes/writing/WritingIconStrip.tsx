@@ -8,12 +8,12 @@
  */
 import {
   FileText, BookOpen, User, MapPin, Globe, Package,
-  ListTree, Download,
+  ListTree, Download, MessageSquare,
 } from "lucide-react";
 
 export type WritingPanelType =
   | "chapters" | "project" | "characters" | "locations"
-  | "world" | "items" | "outline" | "export" | null;
+  | "world" | "items" | "outline" | "export" | "chat" | null;
 
 interface WritingIconStripProps {
   activePanel: WritingPanelType;
@@ -50,6 +50,7 @@ const BOTTOM_ICONS: {
   label: string;
 }[] = [
   { id: "export", icon: Download, label: "导出" },
+  { id: "chat", icon: MessageSquare, label: "AI 聊天" },
 ];
 
 function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
@@ -66,7 +67,7 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors cursor-pointer
         ${isActive
           ? "bg-amber-400/15 text-amber-400"
-          : "text-slate-600 hover:text-slate-300 hover:bg-[#1f1f1c]"
+          : "text-slate-600 hover:text-slate-300 hover:bg-[var(--color-bg-elevated)]"
         }`}
     >
       <Icon className="w-[18px] h-[18px]" />
@@ -76,7 +77,7 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
 
 export function WritingIconStrip({ activePanel, onToggle }: WritingIconStripProps) {
   return (
-    <div className="absolute left-0 top-0 bottom-0 w-12 z-20 flex flex-col items-center py-3 bg-[#141413]/95 backdrop-blur-sm border-r border-[#2a2926] select-none">
+    <div className="absolute right-0 top-0 bottom-0 w-12 z-20 flex flex-col items-center py-3 bg-[var(--color-bg-deep)]/95 backdrop-blur-sm border-l border-[var(--color-border)] select-none">
       {/* 顶部：章节 + 作品管理 */}
       <div className="flex flex-col gap-0.5">
         {TOP_ICONS.map((item) => (
@@ -85,7 +86,7 @@ export function WritingIconStrip({ activePanel, onToggle }: WritingIconStripProp
       </div>
 
       {/* 分割线 */}
-      <div className="w-5 h-px bg-[#2a2926] my-2" />
+      <div className="w-5 h-px bg-[var(--color-border)] my-2" />
 
       {/* 中间：世界观设定 */}
       <div className="flex flex-col gap-0.5">
