@@ -3,6 +3,7 @@ Lumen API 服务
 用 FastAPI 把核心逻辑包装成 HTTP 接口，供前端调用
 """
 
+import os
 import sys
 import asyncio
 import logging
@@ -164,10 +165,10 @@ app.include_router(writing.router, prefix="/writing", tags=["写作模式"])
 app.include_router(permissions.router, prefix="/permissions", tags=["权限管理"])
 app.include_router(rerank.router, tags=["Rerank"])
 
-# 挂载头像静态文件目录
-avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"
-avatars_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/avatars", StaticFiles(directory=str(avatars_dir)), name="avatars")
+# 挂载头像静态文件目录（使用 config.py AVATARS_DIR，与 save_avatar() 一致）
+from lumen.config import AVATARS_DIR
+os.makedirs(AVATARS_DIR, exist_ok=True)
+app.mount("/avatars", StaticFiles(directory=AVATARS_DIR), name="avatars")
 
 
 # 根路径健康检查
