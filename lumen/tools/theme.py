@@ -30,9 +30,8 @@ async def _push_theme_update(tokens: dict, theme_id: str = ""):
 def _schedule_push(tokens: dict, theme_id: str = ""):
     """调度异步推送（从同步上下文调用）"""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_push_theme_update(tokens, theme_id))
+        asyncio.get_running_loop()
+        asyncio.ensure_future(_push_theme_update(tokens, theme_id))
     except RuntimeError:
         pass
 

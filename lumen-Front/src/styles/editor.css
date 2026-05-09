@@ -113,7 +113,7 @@
   margin-top: 1.2em;
   margin-bottom: 0.4em;
   padding-bottom: 0.3em;
-  border-bottom: 1px solid var(--color-glow-primary);
+  border-bottom: 1px solid var(--glow-primary);
 }
 
 .rich-text-editor-prosemirror h2 {
@@ -123,7 +123,7 @@
   margin-top: 1em;
   margin-bottom: 0.3em;
   padding-bottom: 0.2em;
-  border-bottom: 1px solid var(--color-glow-subtle);
+  border-bottom: 1px solid var(--glow-subtle);
 }
 
 .rich-text-editor-prosemirror h3 {
@@ -151,7 +151,7 @@
 /* 行内代码 */
 .rich-text-editor-prosemirror code {
   background: var(--color-primary-subtle);
-  border: 1px solid var(--color-glow-primary);
+  border: 1px solid var(--glow-primary);
   border-radius: 4px;
   padding: 0.1em 0.35em;
   font-family: 'SF Mono', 'Cascadia Code', monospace;
@@ -183,7 +183,7 @@
 
 /* 引用 */
 .rich-text-editor-prosemirror blockquote {
-  border-left: 3px solid var(--color-glow-primary);
+  border-left: 3px solid var(--glow-primary);
   background: var(--color-primary-subtle);
   padding: 0.5em 0.75em;
   margin: 0.75em 0;
@@ -381,7 +381,7 @@
 
 /* 高亮 */
 .rich-text-editor-prosemirror mark {
-  background: var(--color-glow-primary);
+  background: var(--glow-primary);
   border-radius: 2px;
   padding: 0.05em 0.1em;
 }
@@ -468,7 +468,7 @@
 }
 
 .rich-field-wrapper:focus-within {
-  border-color: var(--color-glow-primary);
+  border-color: var(--glow-primary);
 }
 
 .rich-field-wrapper .tiptap {
@@ -551,7 +551,7 @@
 
 .rich-field-wrapper .tiptap code {
   background: var(--color-primary-subtle);
-  border: 1px solid var(--color-glow-primary);
+  border: 1px solid var(--glow-primary);
   border-radius: 3px;
   padding: 0.1em 0.3em;
   font-family: 'SF Mono', 'Cascadia Code', monospace;
@@ -560,7 +560,7 @@
 }
 
 .rich-field-wrapper .tiptap blockquote {
-  border-left: 2px solid var(--color-glow-primary);
+  border-left: 2px solid var(--glow-primary);
   background: var(--color-primary-subtle);
   padding: 0.3em 0.6em;
   margin: 0.4em 0;
@@ -599,7 +599,7 @@
 }
 
 .rich-field-wrapper .tiptap mark {
-  background: var(--color-glow-primary);
+  background: var(--glow-primary);
   border-radius: 2px;
   padding: 0.05em 0.1em;
 }

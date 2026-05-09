@@ -7,6 +7,7 @@
 
 import { useEffect, useCallback, useState } from 'react';
 import type { StreamEvent } from '../api/chat';
+import { useThemeStore } from '../stores/useThemeStore';
 
 const WS_URL = 'ws://127.0.0.1:8888/ws';
 
@@ -56,11 +57,9 @@ function connect() {
 
         // 特殊处理 theme_update 事件：直接应用，不经过 handler
         if (data.type === 'theme_update') {
-          import('../stores/useThemeStore').then(({ useThemeStore }) => {
-            if (data.tokens) {
-              useThemeStore.getState().applyAIOverrides(data.tokens);
-            }
-          });
+          if (data.tokens) {
+            useThemeStore.getState().applyAIOverrides(data.tokens);
+          }
         }
 
         notifyHandlers(data as StreamEvent);

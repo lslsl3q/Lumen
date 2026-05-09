@@ -58,7 +58,9 @@ export async function syncThemeFromBackend() {
     const resp = await fetch("/api/theme/current");
     if (!resp.ok) return;
     const data = await resp.json();
-    const overrides = data.overrides || {};
+    // API returns { theme_id, tokens: { tokens, overrides, ... } }
+    const themeData = data.tokens || data;
+    const overrides = themeData.overrides || {};
     if (Object.keys(overrides).length > 0) {
       useThemeStore.getState().applyAIOverrides(overrides);
     }
