@@ -113,7 +113,7 @@
   margin-top: 1.2em;
   margin-bottom: 0.4em;
   padding-bottom: 0.3em;
-  border-bottom: 1px solid rgba(204, 124, 94, 0.15);
+  border-bottom: 1px solid var(--color-glow-primary);
 }
 
 .rich-text-editor-prosemirror h2 {
@@ -123,7 +123,7 @@
   margin-top: 1em;
   margin-bottom: 0.3em;
   padding-bottom: 0.2em;
-  border-bottom: 1px solid rgba(204, 124, 94, 0.1);
+  border-bottom: 1px solid var(--color-glow-subtle);
 }
 
 .rich-text-editor-prosemirror h3 {
@@ -398,7 +398,7 @@
 
 /* 下划线 */
 .rich-text-editor-prosemirror u {
-  text-decoration-color: rgba(204, 124, 94, 0.4);
+  text-decoration-color: var(--color-primary);
 }
 
 /* ── 斜杠命令菜单 ── */
