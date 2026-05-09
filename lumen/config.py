@@ -126,6 +126,7 @@ STATE_DIR = os.path.join(DATA_DIR, "state")                 # 运行时状态
 HISTORY_DB = os.path.join(DB_DIR, "history.db")
 PERMISSIONS_DB = os.path.join(DB_DIR, "permissions.db")
 WORLD_STATE_DB = os.path.join(DB_DIR, "world_state.db")
+THEME_DB = os.path.join(DB_DIR, "themes.db")
 
 # TriviumDB
 KNOWLEDGE_DB_PATH = os.getenv("KNOWLEDGE_DB_PATH", os.path.join(TDB_API_DIR, "knowledge.tdb"))
