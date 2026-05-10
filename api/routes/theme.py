@@ -51,8 +51,8 @@ async def get_current_theme():
         theme_id = theme_storage.get_current_theme_id()
         return theme_id, theme_service.get_full_theme(theme_id)
 
-    theme_id, tokens = await asyncio.to_thread(_sync)
-    return {"theme_id": theme_id, "tokens": tokens}
+    theme_id, result = await asyncio.to_thread(_sync)
+    return {"theme_id": theme_id, "tokens": result["tokens"], "overrides": result["overrides"]}
 
 
 @router.get("/{theme_id}")
@@ -61,10 +61,10 @@ async def get_theme(theme_id: str):
     def _sync():
         return theme_service.get_full_theme(theme_id)
 
-    tokens = await asyncio.to_thread(_sync)
-    if not tokens:
+    result = await asyncio.to_thread(_sync)
+    if not result:
         raise HTTPException(status_code=404, detail=f"主题不存在: {theme_id}")
-    return {"theme_id": theme_id, "tokens": tokens}
+    return {"theme_id": theme_id, "tokens": result["tokens"], "overrides": result["overrides"]}
 
 
 @router.post("/switch")
@@ -74,8 +74,8 @@ async def switch_theme(req: SwitchThemeRequest):
         def _sync():
             return theme_service.apply_theme_switch(req.theme_id)
 
-        tokens = await asyncio.to_thread(_sync)
-        return {"theme_id": req.theme_id, "tokens": tokens}
+        result = await asyncio.to_thread(_sync)
+        return {"theme_id": req.theme_id, "tokens": result["tokens"]}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -98,8 +98,8 @@ async def clear_overrides():
         theme_storage.clear_overrides(theme_id)
         return theme_service.get_full_theme(theme_id)
 
-    tokens = await asyncio.to_thread(_sync)
-    return {"message": "已清空覆盖值", "tokens": tokens}
+    result = await asyncio.to_thread(_sync)
+    return {"message": "已清空覆盖值", "tokens": result["tokens"]}
 
 
 @router.post("/save")

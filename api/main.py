@@ -92,7 +92,7 @@ async def lifespan(app):
     # T11: 初始化内置主题
     try:
         from lumen.services import theme as theme_service
-        await theme_service.ensure_builtin_themes()
+        theme_service.ensure_builtin_themes()
     except Exception as e:
         logger.warning(f"主题系统初始化失败: {e}")
 
@@ -121,6 +121,8 @@ async def lifespan(app):
     access_control.close()
     from lumen.services.storage import theme as theme_storage
     theme_storage.close_conn()
+    from lumen.services.storage import writing, writing_snapshot
+    writing.close_conn()
 
 
 from fastapi import FastAPI
@@ -147,7 +149,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank, theme
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank, theme
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -159,7 +161,6 @@ app.include_router(persona.router, prefix="/personas", tags=["Persona"])
 app.include_router(authors_note.router, prefix="/authors-note", tags=["Author's Note"])
 app.include_router(models.router, prefix="/models", tags=["模型"])
 app.include_router(worldbook.router, prefix="/worldbooks", tags=["世界书"])
-app.include_router(avatar.router, prefix="/avatars", tags=["头像管理"])
 app.include_router(skills.router, prefix="/skills", tags=["Skills"])
 app.include_router(knowledge.router, prefix="/knowledge", tags=["知识库"])
 app.include_router(memories.router, prefix="/memories", tags=["日记"])

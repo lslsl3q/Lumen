@@ -1,5 +1,5 @@
 /**
- * ChaptersSidePanel — 章节侧栏（贴边挤压式）
+ * ChaptersSidePanel — 章节侧栏（从右侧展开的 flex 子面板）
  */
 import { useEffect, useState } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
@@ -21,7 +21,7 @@ export function ChaptersSidePanel({ onClose }: { onClose: () => void }) {
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
-    <div className="absolute left-0 top-0 bottom-0 w-[260px] z-20 bg-surface-panel border-r border-border-default flex flex-col">
+    <div className="w-[260px] flex-shrink-0 bg-surface-panel border-l border-border-default flex flex-col">
       {/* 头部 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-default flex-shrink-0">
         <span className="text-[12px] font-medium text-slate-300">章节列表</span>

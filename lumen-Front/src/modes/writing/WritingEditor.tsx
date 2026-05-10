@@ -1,10 +1,9 @@
 /**
- * WritingEditor — 中间编辑区域
+ * WritingEditor — 写作编辑区域
  *
  * TipTap 3.x 编辑器，Markdown 格式存储，500ms 自动保存。
- * 纸张效果（暗色画布 + 居中深色纸张）。
- * Ctrl+J 打开内联 AI 菜单。
- * Ctrl+F 打开查找替换。
+ * 布局：工具栏（全宽）→ 中间行（纸张 + children 面板）→ 状态栏（全宽）。
+ * Ctrl+J 打开内联 AI 菜单。Ctrl+F 打开查找替换。
  */
 import { useRef, useEffect, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -341,6 +340,8 @@ function StatusBar({ editor }: { editor: any }) {
   const toggleFocusMode = useWritingStore((s) => s.toggleFocusMode);
   const toggleTypewriterMode = useWritingStore((s) => s.toggleTypewriterMode);
   const ch = chapters.find((c) => c.id === activeChapterId);
+  const saveStatus = useWritingStore((s) => s.saveStatus);
+  const lastSavedAt = useWritingStore((s) => s.lastSavedAt);
   const chars = editor?.storage?.characterCount?.characters?.() ?? 0;
   const words = editor?.storage?.characterCount?.words?.() ?? 0;
 
@@ -348,6 +349,16 @@ function StatusBar({ editor }: { editor: any }) {
     <div className="writing-statusbar-wrapper">
       <div className="writing-statusbar-inner">
         <span>{ch?.title ?? "未选择章节"}</span>
+        {(saveStatus === "saving" || saveStatus === "error") && (
+          <span className={saveStatus === "error" ? "text-red-400" : "text-text-muted"}>
+            {saveStatus === "saving" ? "保存中..." : "保存失败"}
+          </span>
+        )}
+        {saveStatus === "saved" && lastSavedAt && (
+          <span className="text-text-muted">
+            {Math.floor((Date.now() - lastSavedAt) / 1000) < 60 ? "已保存" : `已保存 ${new Date(lastSavedAt).toLocaleTimeString()}`}
+          </span>
+        )}
         <div className="flex items-center gap-3">
           <button
             onClick={() => { toggleFocusMode(); editor?.commands?.toggleFocusMode?.(); }}
@@ -378,7 +389,7 @@ function StatusBar({ editor }: { editor: any }) {
 
 /* ── 主组件 ── */
 
-export function WritingEditor() {
+export function WritingEditor({ children }: { children?: React.ReactNode }) {
   const { chapters, activeChapterId, updateChapter } = useWritingStore();
   const ghostTextContent = useWritingStore((s) => s.ghostTextContent);
   const ghostRequestId = useWritingStore((s) => s.ghostRequestId);
@@ -411,6 +422,7 @@ export function WritingEditor() {
     },
     onUpdate: ({ editor: ed }) => {
       if (isInternalUpdate.current) return;
+      useWritingStore.setState({ contentDirty: true });
       // 打字机模式：滚动光标到视口中央
       if (useWritingStore.getState().typewriterMode) {
         requestAnimationFrame(() => {
@@ -562,48 +574,54 @@ export function WritingEditor() {
       <EditorToolbar editor={editor} onFindReplace={() => setShowFindReplace((p) => !p)} />
       {showFindReplace && <FindReplaceBar editor={editor} onClose={() => setShowFindReplace(false)} />}
 
-      {/* 纸张容器 */}
-      <div className="writing-paper-container scrollbar-lumen relative">
-        <div className="writing-paper">
-          <EditorContent editor={editor} />
+      {/* 中间行：纸张 + 侧面板 */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 纸张容器 */}
+        <div className="flex-1 writing-paper-container scrollbar-lumen relative">
+          <div className="writing-paper">
+            <EditorContent editor={editor} />
+          </div>
+
+          {!activeChapterId && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <div className="text-center text-text-muted">
+                <p className="text-sm mb-1">选择或创建章节开始写作</p>
+                <p className="text-[11px]">Ctrl+S 保存 · Ctrl+J AI · Ctrl+F 查找</p>
+              </div>
+            </div>
+          )}
+
+          {ghostTextContent && ghostRequestId && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2
+              flex items-center gap-2 px-3 py-1.5 rounded-lg
+              bg-primary/10 border border-primary/20 text-[11px] text-primary/80
+              backdrop-blur-sm z-10"
+            >
+              <span className="animate-pulse">AI 生成中…</span>
+              <span className="text-text-muted">Tab 接受 · Esc 拒绝</span>
+              <button
+                onClick={() => {
+                  clearGhostText();
+                  ghostRangeRef.current = null;
+                  // 重新打开 Ctrl+J 面板让用户选择模式
+                  const { view } = editor;
+                  const { from } = view.state.selection;
+                  const coords = view.coordsAtPos(from);
+                  setInlineMenu({
+                    visible: true,
+                    position: { top: coords.bottom + 8, left: coords.left },
+                  });
+                }}
+                className="px-2 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 cursor-pointer text-[11px]"
+              >
+                重新生成
+              </button>
+            </div>
+          )}
         </div>
 
-        {!activeChapterId && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <div className="text-center text-text-muted">
-              <p className="text-sm mb-1">选择或创建章节开始写作</p>
-              <p className="text-[11px]">Ctrl+S 保存 · Ctrl+J AI · Ctrl+F 查找</p>
-            </div>
-          </div>
-        )}
-
-        {ghostTextContent && ghostRequestId && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2
-            flex items-center gap-2 px-3 py-1.5 rounded-lg
-            bg-primary/10 border border-primary/20 text-[11px] text-primary/80
-            backdrop-blur-sm z-10"
-          >
-            <span className="animate-pulse">AI 生成中…</span>
-            <span className="text-text-muted">Tab 接受 · Esc 拒绝</span>
-            <button
-              onClick={() => {
-                clearGhostText();
-                ghostRangeRef.current = null;
-                // 重新打开 Ctrl+J 面板让用户选择模式
-                const { view } = editor;
-                const { from } = view.state.selection;
-                const coords = view.coordsAtPos(from);
-                setInlineMenu({
-                  visible: true,
-                  position: { top: coords.bottom + 8, left: coords.left },
-                });
-              }}
-              className="px-2 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 cursor-pointer text-[11px]"
-            >
-              重新生成
-            </button>
-          </div>
-        )}
+        {/* 侧面板（章节、AI 聊天、图标条）由 WritingMode 传入 */}
+        {children}
       </div>
 
       <StatusBar editor={editor} />

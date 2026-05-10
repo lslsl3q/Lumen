@@ -216,28 +216,3 @@ async def api_delete_character(character_id: str) -> dict:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"删除角色失败: {str(e)}")
-
-
-@router.post("/upload-avatar")
-async def api_upload_avatar(
-    character_id: str = Form(...),
-    avatar: UploadFile = File(...),
-) -> dict:
-    """
-    单独上传/更新角色头像
-    """
-    try:
-        file_data = await avatar.read()
-        avatar_filename = save_avatar(character_id, avatar.filename, file_data)
-
-        # 同时更新角色 JSON 中的 avatar 字段
-        update_character(character_id, {"avatar": avatar_filename})
-
-        return {"message": "头像上传成功", "avatar": avatar_filename}
-
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"头像上传失败: {str(e)}")

@@ -1,19 +1,42 @@
 """
 知识库 chunks 的 SQLite + FTS5 BM25 存储
 
-从 history.py 拆出：知识库文本片段的 CRUD + 全文检索。
+知识库文本片段的 CRUD + 全文检索。
+独立 DB 文件，不再依赖 history.py。
 """
 
 import logging
+import os
+import sqlite3
+import threading
 
-from lumen.services.storage.history import _get_conn, _write_lock
+from lumen.config import SEARCH_INDEX_DB
 
 logger = logging.getLogger(__name__)
+
+DB_PATH = SEARCH_INDEX_DB
+_local = threading.local()
+write_lock = threading.Lock()
+
+
+def get_conn() -> sqlite3.Connection:
+    if not hasattr(_local, "conn") or _local.conn is None:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True)
+        _local.conn.row_factory = sqlite3.Row
+        _local.conn.execute("PRAGMA journal_mode=WAL")
+    return _local.conn
+
+
+def close_conn():
+    if hasattr(_local, "conn") and _local.conn is not None:
+        _local.conn.close()
+        _local.conn = None
 
 
 def _ensure_table():
     """初始化 knowledge_chunks 表 + FTS5 索引（幂等）"""
-    conn = _get_conn()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS knowledge_chunks (
@@ -49,8 +72,8 @@ def save_knowledge_chunks_batch(
     """批量保存知识库 chunks（一次锁，多次插入）"""
     import jieba
 
-    with _write_lock:
-        conn = _get_conn()
+    with write_lock:
+        conn = get_conn()
         for i, content in enumerate(chunks):
             cursor = conn.execute(
                 """INSERT INTO knowledge_chunks
@@ -89,7 +112,7 @@ def search_knowledge_bm25(
         return []
 
     query = " OR ".join(f'"{kw}"' for kw in keywords)
-    conn = _get_conn()
+    conn = get_conn()
 
     try:
         sql = """
@@ -127,8 +150,8 @@ def search_knowledge_bm25(
 
 def delete_knowledge_chunks(file_id: str) -> int:
     """删除指定文件的所有 chunks + FTS5 索引，返回删除数量"""
-    with _write_lock:
-        conn = _get_conn()
+    with write_lock:
+        conn = get_conn()
         rows = conn.execute(
             "SELECT id FROM knowledge_chunks WHERE file_id = ?", (file_id,)
         ).fetchall()

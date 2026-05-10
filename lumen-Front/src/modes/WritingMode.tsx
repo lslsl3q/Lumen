@@ -1,17 +1,19 @@
 /**
  * WritingMode — 写作模式主组件
  *
- * 布局：全宽编辑器底层（纸张始终居中于整个窗口），
- * 图标条/章节侧栏浮动在左侧，AI 面板浮动在右侧。
+ * WritingEditor 内部布局：工具栏（全宽）→ 中间行（纸张 + 侧面板）→ 状态栏（全宽）。
+ * 侧面板（章节/AI聊天/图标条）作为 children 注入，只在中间行展开，不挤压上下栏。
  * 设定面板（人物/地点/世界/物品/大纲/导出/作品管理）为居中模态弹窗。
  */
-import { useState, Component } from "react";
+import { useState, useEffect, Component } from "react";
 import { WritingIconStrip, type WritingPanelType } from "./writing/WritingIconStrip";
 import { ChaptersSidePanel } from "./writing/ChaptersSidePanel";
 import { WritingModalPanel } from "./writing/WritingModalPanel";
 import { WritingEditor } from "./writing/WritingEditor";
 import { AiWritingPanel } from "./writing/AiWritingPanel";
+import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
+import * as writingApi from "../api/writing";
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -40,7 +42,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 const MODAL_PANELS: WritingPanelType[] = ["project", "characters", "locations", "world", "items", "outline", "export"];
 
 export default function WritingMode() {
-  const { isChatPanelOpen, toggleChatPanel } = useWritingStore();
+  const { isChatPanelOpen, toggleChatPanel, activeProjectId } = useWritingStore();
 
   const [activePanel, setActivePanel] = useState<WritingPanelType>(null);
 
@@ -54,32 +56,46 @@ export default function WritingMode() {
 
   const isModal = activePanel ? MODAL_PANELS.includes(activePanel) : false;
 
+  // 自动快照：每 15 分钟检查 contentDirty 后触发
+  useEffect(() => {
+    if (!activeProjectId) return;
+    const timer = setInterval(async () => {
+      const state = useWritingStore.getState();
+      if (state.contentDirty && state.activeProjectId) {
+        try {
+          await writingApi.createSnapshot(state.activeProjectId, "自动快照", "auto");
+          useWritingStore.setState({ contentDirty: false });
+        } catch {}
+      }
+    }, 15 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [activeProjectId]);
+
   return (
     <ErrorBoundary>
-      <div className="h-full w-full bg-surface-deep relative overflow-hidden flex">
+      <div className="h-full w-full bg-surface-deep relative overflow-hidden">
 
-        {/* 左侧：编辑器 + 章节侧栏 */}
-        <div className="flex-1 relative overflow-hidden">
-          {/* 全宽编辑器 */}
-          <div className="absolute inset-0">
-            <WritingEditor />
-          </div>
-
-          {/* 章节侧栏（从左边展开） */}
+        <WritingEditor>
+          {/* 章节侧栏（从右侧展开） */}
           {activePanel === "chapters" && (
             <ChaptersSidePanel onClose={() => setActivePanel(null)} />
           )}
-        </div>
 
-        {/* AI 聊天面板（由图标触发） */}
-        {isChatPanelOpen && (
-          <div className="w-[380px] flex-shrink-0 border-l border-border-default">
-            <AiWritingPanel />
-          </div>
+          {/* AI 聊天面板 */}
+          {isChatPanelOpen && (
+            <div className="w-[380px] flex-shrink-0 border-l border-border-default">
+              <AiWritingPanel />
+            </div>
+          )}
+
+          {/* 图标条（始终在最右侧） */}
+          <WritingIconStrip activePanel={activePanel} onToggle={handleTogglePanel} />
+        </WritingEditor>
+
+        {/* 快照面板 */}
+        {activePanel === "snapshots" && (
+          <SnapshotPanel onClose={() => setActivePanel(null)} />
         )}
-
-        {/* 右侧：图标条 */}
-        <WritingIconStrip activePanel={activePanel} onToggle={handleTogglePanel} />
 
         {/* 模态弹窗 */}
         {isModal && (

@@ -159,6 +159,10 @@ def _is_tool_message(msg: dict) -> bool:
         return True
     content = msg.get("content", "").strip()
     if msg.get("role") == "assistant":
+        # 工具调用 JSON：{"tool": ...} 或 {"calls": [...]}
+        if content.startswith('{"tool"') or content.startswith('{"calls"'):
+            return True
+        # 旧格式：带 type 字段
         if 'type": "tool_call' in content or 'type":"tool_call' in content:
             return True
     if msg.get("role") == "user":

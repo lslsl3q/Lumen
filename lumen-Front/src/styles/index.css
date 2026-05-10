@@ -210,13 +210,13 @@
  */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border-default;
     /* 全局滚动条：细圆条，无箭头 */
     scrollbar-width: thin;
     scrollbar-color: rgba(138, 132, 120, 0.2) transparent;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-surface-canvas text-text-primary;
   }
   html {
     @apply font-sans;

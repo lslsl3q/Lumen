@@ -140,8 +140,12 @@ export default function CharacterPanel({
         accessible_knowledge: d.accessible_knowledge ?? ['public'],
         thinking: d.thinking ?? { enabled: false, budget_tokens: 1024 },
       });
-      if (d.avatar) setAvatarPreview(getAvatarUrl(d.avatar));
-      else setAvatarPreview(null);
+      if (d.avatar) {
+        setAvatarPreview(getAvatarUrl(d.avatar));
+      } else {
+        setAvatarPreview(null);
+      }
+      setAvatarFile(null);
       if (availableTools.length === 0) fetchAvailableTools().then(setAvailableTools);
     } catch { /* ignore */ }
     setIsLoading(false);

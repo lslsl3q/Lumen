@@ -76,7 +76,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
   const handleSetActive = useCallback(async (providerId: string) => {
     try {
       await setActiveProvider(providerId);
-      setStatus(prev => prev ? { ...prev, active_provider: providerId } : prev);
+      setStatus(prev => prev ? { ...prev, active_provider_id: providerId } : prev);
       toast('已切换活跃服务商');
     } catch (err) {
       console.error('切换失败:', err);
@@ -90,8 +90,8 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
     try {
       await deleteProvider(provider.id);
       setProviders(prev => prev.filter(p => p.id !== provider.id));
-      if (status?.active_provider === provider.id) {
-        setStatus(prev => prev ? { ...prev, active_provider: '' } : prev);
+      if (status?.active_provider_id === provider.id) {
+        setStatus(prev => prev ? { ...prev, active_provider_id: '' } : prev);
       }
       toast(`已删除「${provider.name}」`);
     } catch (err) {
@@ -166,11 +166,21 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
 
   return (
     <div className="h-full bg-surface-deep text-text-primary overflow-y-auto scrollbar-lumen">
-      <div className="max-w-2xl mx-auto p-6 space-y-6">
+      <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
 
-        {/* 标题 */}
+        {/* 标题 + 返回 */}
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-bold text-text-primary">重排序服务</h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={_props.onBack}
+              className="px-2 py-1 rounded text-sm text-text-secondary
+                hover:text-text-primary hover:bg-surface-elevated
+                transition-colors duration-150 cursor-pointer"
+            >
+              &larr; 配置管理
+            </button>
+            <h1 className="text-lg font-medium text-text-primary">重排序服务</h1>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-text-secondary">启用重排序</span>
             <button
@@ -197,7 +207,7 @@ export default function RerankSettingsPage(_props: RerankSettingsPageProps) {
           ) : (
             <div className="space-y-2">
               {providers.map(provider => {
-                const isActive = status?.active_provider === provider.id;
+                const isActive = status?.active_provider_id === provider.id;
                 return (
                   <div
                     key={provider.id}

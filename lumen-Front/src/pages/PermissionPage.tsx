@@ -5,7 +5,6 @@
  * 按知识库：选文件夹 → 查看可访问角色 → 添加/移除
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import PermissionTree, { FolderNode } from '../components/PermissionTree';
 import { usePermissions } from '../hooks/usePermissions';
 import { batchCheckPermissions, grantAccess, revokeAccess } from '../api/permissions';
@@ -44,7 +43,6 @@ function buildFolderTree(flatFolders: TdbFileFolder[]): FolderNode[] {
 }
 
 export default function PermissionPage() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('character');
   const {
     characters,
@@ -128,9 +126,6 @@ export default function PermissionPage() {
     <div className="h-full bg-surface-deep text-text-primary flex flex-col">
       <div className="flex items-center justify-between px-6 py-4 shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/')} className="text-text-secondary hover:text-text-primary text-sm">
-            ← 返回
-          </button>
           <h1 className="text-xl font-bold">权限管理</h1>
         </div>
         {tab === 'character' && dirty && (

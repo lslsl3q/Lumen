@@ -61,7 +61,7 @@ def ensure_builtin_themes():
 
 
 def get_full_theme(theme_id: str) -> dict:
-    """获取主题的完整 token 值（基础 tokens + overrides 合并）"""
+    """获取主题的完整 token 值（基础 tokens + overrides 合并）及覆盖层"""
     theme = theme_storage.get_theme(theme_id)
     if not theme:
         return {}
@@ -69,7 +69,10 @@ def get_full_theme(theme_id: str) -> dict:
     base_tokens = theme.get("tokens", {})
     overrides = theme_storage.get_overrides(theme_id)
 
-    return {**base_tokens, **overrides}
+    return {
+        "tokens": {**base_tokens, **overrides},
+        "overrides": overrides,
+    }
 
 
 def apply_theme_switch(theme_id: str) -> dict:
@@ -83,7 +86,7 @@ def apply_theme_switch(theme_id: str) -> dict:
     theme_storage.set_current_theme_id(theme_id)
     theme_storage.clear_overrides(theme_id)
 
-    return get_full_theme(theme_id)
+    return get_full_theme(theme_id)  # 返回 {"tokens": merged, "overrides": {}}
 
 
 def apply_token_overrides(tokens: dict[str, str]) -> dict:

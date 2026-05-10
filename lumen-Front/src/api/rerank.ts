@@ -16,9 +16,11 @@ export interface Provider {
 
 export interface RerankStatus {
   enabled: boolean;
-  active_provider: string;
+  active_provider_id: string;
+  active_provider_name: string;
   top_k: number;
   min_score: number;
+  provider_count: number;
 }
 
 export interface TestResult {
@@ -40,7 +42,8 @@ export async function getRerankStatus(): Promise<RerankStatus> {
 export async function getProviders(): Promise<Provider[]> {
   const res = await fetch(`${API_BASE}/providers`);
   if (!res.ok) throw new Error(`获取服务商列表失败: ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  return data.providers ?? data;
 }
 
 /** POST /rerank/providers */

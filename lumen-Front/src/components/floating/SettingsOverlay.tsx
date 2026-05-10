@@ -12,7 +12,6 @@ import WorldBookList from '../../pages/WorldBookList';
 import WorldBookEditor from '../../pages/WorldBookEditor';
 import SkillList from '../../pages/SkillList';
 import SkillEditor from '../../pages/SkillEditor';
-import AvatarManager from '../../pages/AvatarManager';
 import ConfigList from '../../pages/ConfigList';
 import ConfigEditor from '../../pages/ConfigEditor';
 import ToolTipsPage from '../../pages/ToolTipsPage';
@@ -24,7 +23,6 @@ import RerankSettingsPage from '../../pages/RerankSettingsPage';
 type SettingsPage =
   | 'worldbook-list' | 'worldbook-editor'
   | 'skill-list' | 'skill-editor'
-  | 'avatar-manager'
   | 'config-list' | 'config-editor'
   | 'tooltips' | 'thinking-clusters' | 'permissions' | 'rerank-settings'
 ;
@@ -46,7 +44,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { page: 'worldbook-list', label: '世界书' },
       { page: 'skill-list', label: '技能' },
-      { page: 'avatar-manager', label: '头像' },
     ],
   },
   {
@@ -56,7 +53,6 @@ const NAV_GROUPS: NavGroup[] = [
       { page: 'tooltips', label: '工具提示词' },
       { page: 'thinking-clusters', label: '思维簇' },
       { page: 'permissions', label: '权限' },
-      { page: 'rerank-settings', label: '重排' },
     ],
   },
 ];
@@ -110,8 +106,6 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
         return <SkillList {...contentNav} />;
       case 'skill-editor':
         return <SkillEditor skillId={section.id} onBack={goBackToList} onNavigate={navigateTo} />;
-      case 'avatar-manager':
-        return <AvatarManager {...contentNav} />;
       case 'config-list':
         return <ConfigList {...contentNav} />;
       case 'config-editor':
@@ -123,7 +117,7 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
       case 'permissions':
         return <PermissionPage />;
       case 'rerank-settings':
-        return <RerankSettingsPage {...contentNav} />;
+        return <RerankSettingsPage onBack={() => setSection({ page: 'config-list' })} onNavigate={navigateTo} />;
     }
   };
 
@@ -136,57 +130,59 @@ export default function SettingsOverlay({ open, onClose, initialSection }: Setti
       />
 
       {/* 内容面板 */}
-      <div className="absolute inset-4 flex rounded-xl overflow-hidden
+      <div className="absolute inset-4 flex flex-col rounded-xl overflow-hidden
         bg-surface-deep border border-border-subtle shadow-[0_16px_48px_rgba(0,0,0,0.5)]
         animate-overlay-content-in"
       >
-        {/* 左导航 */}
-        <nav className="w-56 flex-shrink-0 border-r border-border-default bg-surface-deep
-          flex flex-col overflow-y-auto scrollbar-lumen"
-        >
-          {/* 顶部 */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-            <span className="text-sm font-medium text-text-primary font-display">设置</span>
-            <button
-              onClick={onClose}
-              className="w-6 h-6 rounded flex items-center justify-center
-                text-text-muted hover:text-text-primary hover:bg-surface-elevated
-                transition-all duration-150 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        {/* 标题栏 */}
+        <div className="flex items-center justify-between h-10 px-4 shrink-0 border-b border-border-default bg-surface-deep">
+          <span className="text-sm font-medium text-text-primary">设置</span>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded flex items-center justify-center
+              text-text-muted hover:text-text-primary hover:bg-surface-elevated
+              transition-all duration-150 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-          {/* 导航分组 */}
-          <div className="flex-1 py-3">
-            {NAV_GROUPS.map(group => (
-              <div key={group.label} className="mb-4">
-                <div className="px-5 mb-1.5 text-[10px] uppercase tracking-widest text-text-muted font-medium">
-                  {group.label}
+        {/* 主体：左导航 + 右内容 */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* 左导航 */}
+          <nav className="w-48 flex-shrink-0 border-r border-border-default bg-surface-deep
+            flex flex-col overflow-y-auto scrollbar-lumen"
+          >
+            <div className="flex-1 py-3">
+              {NAV_GROUPS.map(group => (
+                <div key={group.label} className="mb-4">
+                  <div className="px-4 mb-1.5 text-xs text-text-muted font-medium">
+                    {group.label}
+                  </div>
+                  {group.items.map(item => (
+                    <button
+                      key={item.page}
+                      onClick={() => setSection({ page: item.page })}
+                      className={`w-full text-left px-4 py-1.5 text-sm transition-all duration-150 cursor-pointer
+                        ${activeNav === item.page
+                          ? 'text-primary bg-primary/8'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-primary-subtle'
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
-                {group.items.map(item => (
-                  <button
-                    key={item.page}
-                    onClick={() => setSection({ page: item.page })}
-                    className={`w-full text-left px-5 py-2 text-sm transition-all duration-150 cursor-pointer
-                      ${activeNav === item.page
-                        ? 'text-primary bg-primary/8 rounded mr-2'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-primary-subtle'
-                      }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </nav>
+              ))}
+            </div>
+          </nav>
 
-        {/* 右内容区 */}
-        <div className="flex-1 overflow-y-auto scrollbar-lumen">
-          {renderContent()}
+          {/* 右内容区 */}
+          <div className="flex-1 overflow-y-auto scrollbar-lumen">
+            {renderContent()}
+          </div>
         </div>
       </div>
     </div>,

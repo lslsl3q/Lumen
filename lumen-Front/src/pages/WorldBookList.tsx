@@ -8,9 +8,8 @@ import { toast } from '../utils/toast';
 
 interface WorldBookListProps extends SettingsPageProps {}
 
-function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
+function WorldBookList({ onNavigate }: WorldBookListProps) {
   const navigate = useNavigate();
-  const goBack = onBack ?? (() => navigate('/'));
   const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const { entries, isLoading, create, remove } = useWorldBook();
 
@@ -53,12 +52,6 @@ function WorldBookList({ onBack, onNavigate }: WorldBookListProps) {
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-8 px-6 py-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => goBack()}
-            className="text-text-secondary hover:text-text-primary transition-colors"
-          >
-            ← 返回聊天
-          </button>
           <h1 className="text-2xl font-bold">世界书管理</h1>
         </div>
         <button

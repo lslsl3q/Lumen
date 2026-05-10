@@ -1,13 +1,15 @@
 """
 稀疏向量存储服务
 SQLite 存储 + In-memory 缓存 + Dot Product 搜索
-复用 history.db，与 history.py 共享连接
+与 chunks.py 共享 SEARCH_INDEX_DB
 """
 
 import json
 import logging
 import threading
 from typing import Optional
+
+from lumen.services.knowledge.chunks import get_conn
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +22,7 @@ _cache_lock = threading.Lock()
 
 def _ensure_table():
     """确保 sparse_vectors 表存在"""
-    from lumen.services.storage.history import _get_conn
-    conn = _get_conn()
+    conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sparse_vectors (
             node_id INTEGER PRIMARY KEY,
@@ -61,8 +62,7 @@ def _ensure_cache():
             return
 
         _ensure_table()
-        from lumen.services.storage.history import _get_conn
-        conn = _get_conn()
+        conn = get_conn()
         rows = conn.execute(
             "SELECT node_id, file_id, chunk_index, category, sparse_data FROM sparse_vectors"
         ).fetchall()
@@ -99,10 +99,9 @@ def save_sparse_batch(items: list[dict]):
         return
 
     _ensure_table()
-    from lumen.services.storage.history import _get_conn
 
     with _cache_lock:
-        conn = _get_conn()
+        conn = get_conn()
         for item in items:
             raw = item["sparse_data"]
             json_str = json.dumps(raw, ensure_ascii=False)
@@ -180,10 +179,9 @@ def search_sparse(
 def delete_by_file(file_id: str):
     """删除指定文件的所有稀疏向量"""
     _ensure_table()
-    from lumen.services.storage.history import _get_conn
 
     with _cache_lock:
-        conn = _get_conn()
+        conn = get_conn()
         conn.execute("DELETE FROM sparse_vectors WHERE file_id = ?", (file_id,))
         conn.commit()
 

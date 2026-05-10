@@ -121,12 +121,18 @@ TDB_LOCAL_DIR = os.path.join(TDB_DIR, "local")              # 本地嵌入阵营
 CONFIG_DIR = os.path.join(DATA_DIR, "config")               # 可编辑配置
 ASSETS_DIR = os.path.join(DATA_DIR, "assets")               # 用户资源
 STATE_DIR = os.path.join(DATA_DIR, "state")                 # 运行时状态
+WORLDBOOKS_DIR = os.path.join(DATA_DIR, "worldbooks")       # 世界书词条
+SKILLS_DIR = os.path.join(DATA_DIR, "skills")               # 技能定义
+CHARACTERS_DIR = os.path.join(DATA_DIR, "characters")       # 角色配置
 
 # SQLite 数据库
 HISTORY_DB = os.path.join(DB_DIR, "history.db")
 PERMISSIONS_DB = os.path.join(DB_DIR, "permissions.db")
 WORLD_STATE_DB = os.path.join(DB_DIR, "world_state.db")
 THEME_DB = os.path.join(DB_DIR, "themes.db")
+WRITING_DB = os.path.join(DB_DIR, "writing.db")
+SEARCH_INDEX_DB = os.path.join(DB_DIR, "search_index.db")
+GRAPH_META_DB = os.path.join(DB_DIR, "graph_meta.db")
 
 # TriviumDB
 KNOWLEDGE_DB_PATH = os.getenv("KNOWLEDGE_DB_PATH", os.path.join(TDB_API_DIR, "knowledge.tdb"))

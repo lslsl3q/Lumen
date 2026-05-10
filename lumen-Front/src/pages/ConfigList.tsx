@@ -1,25 +1,19 @@
 /**
  * 配置管理列表页
  *
- * 职责：展示所有配置分类卡片，点击进入编辑
+ * 职责：展示所有配置文件和服务的紧凑列表，点击进入编辑/管理
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listConfigs } from '../api/config';
 import { ConfigItem } from '../types/config';
 import { SettingsPageProps } from '../types/settings';
-
-/** 配置类型的图标和颜色 */
-const TYPE_META: Record<string, { icon: string; color: string }> = {
-  env: { icon: '⚙', color: 'text-primary' },
-  json: { icon: '{ }', color: 'text-teal-400' },
-};
+import { Separator } from '../components/ui/separator';
 
 interface ConfigListProps extends SettingsPageProps {}
 
-function ConfigList({ onBack, onNavigate }: ConfigListProps) {
+function ConfigList({ onNavigate }: ConfigListProps) {
   const navigate = useNavigate();
-  const goBack = onBack ?? (() => navigate('/'));
   const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,25 +36,32 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
     loadList();
   }, [loadList]);
 
+  const ArrowIcon = () => (
+    <svg className="w-3.5 h-3.5 text-text-muted group-hover:text-text-secondary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  );
+
+  const SectionHeader = ({ children }: { children: React.ReactNode }) => (
+    <div className="px-4 pt-5 pb-1.5 text-xs text-text-muted font-medium select-none">
+      {children}
+    </div>
+  );
+
+  const Row = ({ onClick, children }: { onClick: () => void; children: React.ReactNode }) => (
+    <div
+      onClick={onClick}
+      className="group flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface-elevated transition-colors duration-100"
+    >
+      {children}
+    </div>
+  );
+
   return (
-    <div className="h-full bg-surface-deep text-text-primary">
+    <div className="h-full bg-surface-deep text-text-primary overflow-y-auto scrollbar-lumen">
       <div className="max-w-3xl mx-auto px-6 py-6">
-        {/* 顶栏 */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => goBack()}
-              className="
-                px-3 py-1.5 rounded-lg text-sm text-text-secondary
-                hover:text-text-primary hover:bg-surface-elevated
-                transition-all duration-150
-              "
-            >
-              &larr; 返回聊天
-            </button>
-            <h1 className="text-xl font-light tracking-wide">配置管理</h1>
-          </div>
-        </div>
+        {/* 标题 */}
+        <h1 className="text-lg font-medium text-text-primary mb-4">配置管理</h1>
 
         {/* 错误提示 */}
         {error && (
@@ -73,103 +74,37 @@ function ConfigList({ onBack, onNavigate }: ConfigListProps) {
         {isLoading ? (
           <div className="text-center py-16 text-text-muted">加载中...</div>
         ) : (
-          <>
-            {/* 配置卡片列表 */}
-            <div className="space-y-4">
-              {configs.map(config => {
-                const meta = TYPE_META[config.type] || { icon: '?', color: 'text-text-secondary' };
-                return (
-                  <div
-                    key={config.name}
-                    onClick={() => goTo('config-editor', { resource: config.name })}
-                    className="
-                      group relative p-5 rounded-xl cursor-pointer
-                      bg-surface-elevated border border-border-default
-                      hover:border-teal-500/30 hover:bg-surface-elevated
-                      transition-all duration-200
-                    "
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* 图标 */}
-                      <div className={`text-2xl font-mono ${meta.color}`}>
-                        {meta.icon}
-                      </div>
-                      {/* 信息 */}
-                      <div className="flex-1">
-                        <div className="text-base text-text-primary">{config.name}</div>
-                        <div className="text-sm text-text-muted mt-0.5">{config.description}</div>
-                      </div>
-                      {/* 箭头 */}
-                      <svg
-                        className="w-4 h-4 text-text-muted group-hover:text-teal-400 transition-colors"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="border border-border-default rounded-lg overflow-hidden bg-surface-panel">
+            {/* 配置文件分组 */}
+            <SectionHeader>配置文件</SectionHeader>
 
-            {/* 其他功能入口 */}
-            <div className="mt-8 pt-6 border-t border-border-default">
-              <h3 className="text-sm text-text-muted mb-4">其他功能</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div
-                  onClick={() => window.dispatchEvent(new CustomEvent('lumen:open-knowledge'))}
-                  className="
-                    group p-4 rounded-xl cursor-pointer
-                    bg-surface-elevated border border-border-default
-                    hover:border-primary/30 hover:bg-surface-elevated
-                    transition-all duration-200
-                  "
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl text-primary">&#128218;</div>
-                    <div>
-                      <div className="text-base text-text-primary">知识库</div>
-                      <div className="text-sm text-text-muted">导入文档，语义检索注入对话</div>
-                    </div>
+            {configs.map((config, i) => (
+              <div key={config.name}>
+                {i > 0 && <Separator />}
+                <Row onClick={() => goTo('config-editor', { resource: config.name })}>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-text-primary">{config.name}</span>
+                    {config.description && (
+                      <span className="text-xs text-text-muted ml-3">{config.description}</span>
+                    )}
                   </div>
-                </div>
-                <div
-                  onClick={() => goTo('skill-list')}
-                  className="
-                    group p-4 rounded-xl cursor-pointer
-                    bg-surface-elevated border border-border-default
-                    hover:border-primary/30 hover:bg-surface-elevated
-                    transition-all duration-200
-                  "
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl text-primary">&#9889;</div>
-                    <div>
-                      <div className="text-base text-text-primary">Skills 管理</div>
-                      <div className="text-sm text-text-muted">定义 AI 的工作方式</div>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  onClick={() => goTo('avatar-manager')}
-                  className="
-                    group p-4 rounded-xl cursor-pointer
-                    bg-surface-elevated border border-border-default
-                    hover:border-primary/30 hover:bg-surface-elevated
-                    transition-all duration-200
-                  "
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl">&#128444;&#65039;</div>
-                    <div>
-                      <div className="text-base text-text-primary">头像管理</div>
-                      <div className="text-sm text-text-muted">上传和管理头像</div>
-                    </div>
-                  </div>
-                </div>
+                  <ArrowIcon />
+                </Row>
               </div>
-            </div>
-          </>
+            ))}
+
+            {/* 服务分组 */}
+            <Separator />
+            <SectionHeader>服务</SectionHeader>
+
+            <Row onClick={() => goTo('rerank-settings')}>
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-text-primary">重排序服务</span>
+                <span className="text-xs text-text-muted ml-3">搜索结果二次排序</span>
+              </div>
+              <ArrowIcon />
+            </Row>
+          </div>
         )}
       </div>
     </div>

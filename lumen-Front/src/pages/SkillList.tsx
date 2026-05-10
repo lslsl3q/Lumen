@@ -9,9 +9,8 @@ import { toast } from '../utils/toast';
 
 interface SkillListProps extends SettingsPageProps {}
 
-function SkillList({ onBack, onNavigate }: SkillListProps) {
+function SkillList({ onNavigate }: SkillListProps) {
   const navigate = useNavigate();
-  const goBack = onBack ?? (() => navigate('/'));
   const goTo = onNavigate ?? ((page: string, _params?: { id?: string; resource?: string }) => navigate(`/settings/${page}`));
   const { skills, isLoading, create, remove, refresh } = useSkills();
 
@@ -56,12 +55,6 @@ function SkillList({ onBack, onNavigate }: SkillListProps) {
       {/* 顶栏 */}
       <div className="flex items-center justify-between mb-8 px-6 py-4">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => goBack()}
-            className="text-text-secondary hover:text-text-primary transition-colors"
-          >
-            ← 返回聊天
-          </button>
           <h1 className="text-2xl font-bold">Skills 管理</h1>
         </div>
         <div className="flex gap-2">

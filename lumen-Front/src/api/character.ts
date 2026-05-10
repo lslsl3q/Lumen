@@ -28,7 +28,6 @@ export async function createCharacter(
   avatarFile?: File,
 ): Promise<{ message: string; character: CharacterDetail & { id: string } }> {
   const formData = new FormData();
-  // 不再添加 character_id，让后端自动生成
   formData.append('data', JSON.stringify(data));
   if (avatarFile) {
     formData.append('avatar', avatarFile);

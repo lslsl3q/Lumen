@@ -26,8 +26,9 @@
   "skills": [],
   "response_style": "balanced",
   "accessible_knowledge": [],
+  "write_targets": {},
   "thinking": {
-    "enabled": true,
-    "budget_tokens": 4096
+    "enabled": false,
+    "budget_tokens": 1024
   }
 }

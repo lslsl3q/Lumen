@@ -85,9 +85,9 @@ def _theme_get(params: dict) -> dict:
         if not theme_id:
             theme_id = theme_storage.get_current_theme_id()
 
-        full_theme = theme_service.get_full_theme(theme_id)
+        result = theme_service.get_full_theme(theme_id)
 
-        if not full_theme:
+        if not result:
             return error_result(
                 "theme",
                 ErrorCode.EXEC_FAILED,
@@ -95,7 +95,7 @@ def _theme_get(params: dict) -> dict:
                 {"theme_id": theme_id}
             )
 
-        return success_result("theme", {"theme_id": theme_id, "tokens": full_theme})
+        return success_result("theme", {"theme_id": theme_id, "tokens": result["tokens"]})
     except Exception as e:
         return error_result(
             "theme",
@@ -119,7 +119,8 @@ def _theme_apply(params: dict) -> dict:
     try:
         # 模式 1 & 3：切换主题
         if theme_id:
-            full_theme = theme_service.apply_theme_switch(theme_id)
+            switch_result = theme_service.apply_theme_switch(theme_id)
+            merged_tokens = switch_result["tokens"]
 
             # 模式 3：切换后再微调
             if tokens:
@@ -130,16 +131,16 @@ def _theme_apply(params: dict) -> dict:
                     {
                         "action": "switch_and_override",
                         "theme_id": theme_id,
-                        "tokens": full_theme,
+                        "tokens": merged_tokens,
                         "overrides_applied": override_result["applied"],
                         "errors": override_result["errors"],
                     }
                 )
 
-            _schedule_push(full_theme, theme_id)
+            _schedule_push(merged_tokens, theme_id)
             return success_result(
                 "theme",
-                {"action": "switch", "theme_id": theme_id, "tokens": full_theme}
+                {"action": "switch", "theme_id": theme_id, "tokens": merged_tokens}
             )
 
         # 模式 2：仅微调

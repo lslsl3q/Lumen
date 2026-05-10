@@ -45,6 +45,9 @@ function isToolMessage(msg: HistoryMessage): boolean {
   if (!content) return false;
   if (content.startsWith('<tool_result')) return true;
   if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
+  for (const marker of TOOL_CALL_MARKERS) {
+    if (content.startsWith(marker)) return true;
+  }
   return false;
 }
 

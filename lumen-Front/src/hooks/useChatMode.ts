@@ -148,14 +148,14 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
   };
 
   // 切换会话
-  const handleSwitchSession = async (sessionId: string) => {
+  const handleSwitchSession = useCallback(async (sessionId: string) => {
     if (sessionId === sessions.currentSessionId) return;
     await sessions.switchSession(sessionId);
     await chat.loadHistory(sessionId);
     rpg.resetRpgState();
     setRpgPanelOpen(false);
     sessions.refreshSessions();
-  };
+  }, [sessions, chat, rpg]);
 
   // 删除会话
   const handleDeleteSession = async (sessionId: string) => {
@@ -197,6 +197,30 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
       chat.setCurrentSessionId(null);
     }
   }, [sessions, characters, chat, rpg]);
+
+  // 监听全局角色切换事件（从 SidePanel 触发）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const characterId = (e as CustomEvent).detail as string;
+      if (characterId) {
+        handleSwitchCharacter(characterId);
+      }
+    };
+    window.addEventListener('lumen:switch-character', handler);
+    return () => window.removeEventListener('lumen:switch-character', handler);
+  }, [handleSwitchCharacter]);
+
+  // 监听全局会话切换事件（从 SidePanel 触发）
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const sessionId = (e as CustomEvent).detail as string;
+      if (sessionId) {
+        handleSwitchSession(sessionId);
+      }
+    };
+    window.addEventListener('lumen:switch-session', handler);
+    return () => window.removeEventListener('lumen:switch-session', handler);
+  }, [handleSwitchSession]);
 
   // 切换 Persona
   const handleSwitchPersona = useCallback(async (personaId: string | null) => {

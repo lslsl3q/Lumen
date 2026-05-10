@@ -2,7 +2,7 @@
  * T11 useWritingStore — 写作模式全局状态
  */
 import { create } from "zustand";
-import type { WritingProject, WritingChapter, WritingSetting } from "../api/writing";
+import type { WritingProject, WritingChapter, WritingSetting, WritingSnapshot } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense";
@@ -30,6 +30,18 @@ interface WritingState {
   ghostRequestId: string | null;
   setGhostText: (content: string, requestId: string) => void;
   clearGhostText: () => void;
+
+  // 保存状态
+  saveStatus: "saved" | "saving" | "error";
+  lastSavedAt: number | null;
+  contentDirty: boolean;
+
+  // 快照
+  snapshots: WritingSnapshot[];
+  loadSnapshots: (projectId: string) => Promise<void>;
+  createManualSnapshot: (label?: string) => Promise<void>;
+  restoreFromSnapshot: (snapshotId: string) => Promise<void>;
+  deleteSnapshotAction: (snapshotId: string) => Promise<void>;
 
   // 作品
   loadProjects: () => Promise<void>;
@@ -79,6 +91,10 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   toggleTypewriterMode: () => set((s) => ({ typewriterMode: !s.typewriterMode })),
   ghostTextContent: "",
   ghostRequestId: null,
+  saveStatus: "saved",
+  lastSavedAt: null,
+  contentDirty: false,
+  snapshots: [],
 
   // ── 作品 ──
 
@@ -134,10 +150,18 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   updateChapter: async (id, data) => {
-    const chapter = await writingApi.updateChapter(id, data);
-    set((s) => ({
-      chapters: s.chapters.map((c) => (c.id === id ? chapter : c)),
-    }));
+    set({ saveStatus: "saving" });
+    try {
+      const chapter = await writingApi.updateChapter(id, data);
+      set((s) => ({
+        chapters: s.chapters.map((c) => (c.id === id ? chapter : c)),
+        saveStatus: "saved",
+        lastSavedAt: Date.now(),
+        contentDirty: false,
+      }));
+    } catch {
+      set({ saveStatus: "error" });
+    }
   },
 
   deleteChapter: async (id) => {
@@ -185,10 +209,17 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   updateSetting: async (id, data) => {
-    const setting = await writingApi.updateSetting(id, data);
-    set((s) => ({
-      settings: s.settings.map((st) => (st.id === id ? setting : st)),
-    }));
+    set({ saveStatus: "saving" });
+    try {
+      const setting = await writingApi.updateSetting(id, data);
+      set((s) => ({
+        settings: s.settings.map((st) => (st.id === id ? setting : st)),
+        saveStatus: "saved",
+        lastSavedAt: Date.now(),
+      }));
+    } catch {
+      set({ saveStatus: "error" });
+    }
   },
 
   deleteSetting: async (id) => {
@@ -203,6 +234,37 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   setAiMode: (mode) => set({ aiMode: mode }),
   setSidebarWidth: (w) => set({ sidebarWidth: Math.max(200, Math.min(500, w)) }),
   toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
+
+  loadSnapshots: async (projectId) => {
+    const { items } = await writingApi.listSnapshots(projectId);
+    set({ snapshots: items });
+  },
+
+  createManualSnapshot: async (label) => {
+    const { activeProjectId } = get();
+    if (!activeProjectId) return;
+    await writingApi.createSnapshot(activeProjectId, label);
+    await get().loadSnapshots(activeProjectId);
+  },
+
+  restoreFromSnapshot: async (snapshotId) => {
+    await writingApi.restoreSnapshot(snapshotId);
+    const { activeProjectId, activeChapterId } = get();
+    if (activeProjectId) {
+      // 先清空 activeChapterId 触发编辑器卸载内容
+      set({ activeChapterId: null });
+      await get().loadChapters(activeProjectId);
+      await get().loadSettings(activeProjectId);
+      await get().loadSnapshots(activeProjectId);
+      // 恢复 activeChapterId 触发编辑器重新加载
+      if (activeChapterId) set({ activeChapterId });
+    }
+  },
+
+  deleteSnapshotAction: async (snapshotId) => {
+    await writingApi.deleteSnapshot(snapshotId);
+    set((s) => ({ snapshots: s.snapshots.filter((snap) => snap.id !== snapshotId) }));
+  },
 
   setGhostText: (content, requestId) => set({ ghostTextContent: content, ghostRequestId: requestId }),
   clearGhostText: () => set({ ghostTextContent: "", ghostRequestId: null }),
