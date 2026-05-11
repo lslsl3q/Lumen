@@ -55,7 +55,7 @@ const CHARACTER_FIELDS: FieldDef[] = [
   {
     key: "role", label: "角色定位", type: "select",
     options: [
-      { value: "protagonist", label: "主角", color: "bg-primary/15 text-primary/200" },
+      { value: "protagonist", label: "主角", color: "bg-primary/15 text-primary/80" },
       { value: "antagonist", label: "反派", color: "bg-red-400/15 text-red-300" },
       { value: "supporting", label: "配角", color: "bg-blue-400/15 text-blue-300" },
       { value: "minor", label: "龙套", color: "bg-slate-400/10 text-text-primary" },
@@ -113,7 +113,7 @@ const ITEM_FIELDS: FieldDef[] = [
       { value: "common", label: "普通", color: "bg-slate-400/10 text-text-primary" },
       { value: "uncommon", label: "稀有", color: "bg-green-400/15 text-green-300" },
       { value: "rare", label: "史诗", color: "bg-purple-400/15 text-purple-300" },
-      { value: "legendary", label: "传说", color: "bg-primary/15 text-primary/200" },
+      { value: "legendary", label: "传说", color: "bg-primary/15 text-primary/80" },
     ],
   },
   {

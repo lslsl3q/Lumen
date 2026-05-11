@@ -65,7 +65,9 @@ export default function WritingMode() {
         try {
           await writingApi.createSnapshot(state.activeProjectId, "自动快照", "auto");
           useWritingStore.setState({ contentDirty: false });
-        } catch {}
+        } catch (e) {
+          console.warn("[WritingMode] 自动快照失败:", e);
+        }
       }
     }, 15 * 60 * 1000);
     return () => clearInterval(timer);

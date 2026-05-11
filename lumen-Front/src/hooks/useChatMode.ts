@@ -1,5 +1,5 @@
 // src/hooks/useChatMode.ts
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useChat } from './useChat';
 import { useCharacterStore } from '../stores/useCharacterStore';
 import { usePersonaStore } from '../stores/usePersonaStore';
@@ -29,12 +29,13 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
   const authorNote = useAuthorNote(sessions.currentSessionId);
   const rpg = useRPG();
 
+  // ── 会话同步 refs ──
+  const prevSessionIdRef = useRef<string | null>(null);
+  const prevCharIdRef = useRef<string | null>(null);
+  const initializedRef = useRef(false);
+
   const [memoryWindowOpen, setMemoryWindowOpen] = useState(false);
   const [graphWindowOpen, setGraphWindowOpen] = useState(false);
-  const [sysPromptEditor, setSysPromptEditor] = useState<{
-    content: string;
-    onSave: (c: string) => void;
-  } | null>(null);
   const [rpgPanelOpen, setRpgPanelOpen] = useState(false);
   const [currentModel, setCurrentModel] = useState('');
   const [tokenUsage, setTokenUsage] = useState<{
@@ -78,13 +79,47 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
     refreshTokenUsage();
   }, [chat, debug, rpg, refreshTokenUsage]);
 
-  // 初始化同步：会话加载后加载聊天历史
+  // Session sync effect：currentSessionId 变化时自动加载历史
+  // 依赖数组故意只有 [currentSessionId, isLoading]：
+  //   - chat.loadHistory / chat.resetChat 是 useCallback 稳定引用
+  //   - chat.isLoading / chat.messages 只在 effect 内读取，不需要触发重跑
+  //   - characters.currentCharacterId 通过 ref 读取（prevCharIdRef）
   useEffect(() => {
-    if (!sessions.isLoading && sessions.currentSessionId && !chat.currentSessionId) {
-      const lastCharId = localStorage.getItem('lastCharacterId') || undefined;
-      chat.loadHistory(sessions.currentSessionId, lastCharId);
+    const sessionId = sessions.currentSessionId;
+    const prevId = prevSessionIdRef.current;
+    prevSessionIdRef.current = sessionId;
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      prevCharIdRef.current = characters.currentCharacterId;
+      if (sessionId) chat.loadHistory(sessionId, characters.currentCharacterId);
+      return;
     }
-  }, [sessions.isLoading, sessions.currentSessionId, chat.currentSessionId, chat.loadHistory]);
+
+    if (sessions.isLoading) return;
+    if (sessionId === prevId) return;
+
+    // 竞态防护：精准识别"首条消息自动创建会话"场景
+    const isAutoCreatedFirstMessage = !prevId && sessionId && chat.messages.length > 0;
+    if (isAutoCreatedFirstMessage) return;
+
+    if (sessionId) {
+      if (chat.isLoading) chat.abort();
+      chat.loadHistory(sessionId, characters.currentCharacterId);
+      rpg.resetRpgState();
+      setRpgPanelOpen(false);
+    } else {
+      chat.resetChat();
+    }
+  }, [sessions.currentSessionId, sessions.isLoading]);
+
+  // Character change effect：角色切换时原子更新会话
+  useEffect(() => {
+    if (!initializedRef.current) return;
+    if (characters.currentCharacterId === prevCharIdRef.current) return;
+    prevCharIdRef.current = characters.currentCharacterId;
+    sessions.handleCharacterSwitch(characters.currentCharacterId);
+  }, [characters.currentCharacterId]);
 
   // 会话变化时获取 token 用量
   useEffect(() => {
@@ -140,35 +175,6 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
     return () => window.removeEventListener('lumen:open-settings', handler);
   }, [floating]);
 
-  // 新建会话
-  const handleNewSession = async () => {
-    const newId = await sessions.createNewSession(characters.currentCharacterId);
-    chat.resetChat();
-    chat.setCurrentSessionId(newId);
-  };
-
-  // 切换会话
-  const handleSwitchSession = useCallback(async (sessionId: string) => {
-    if (sessionId === sessions.currentSessionId) return;
-    await sessions.switchSession(sessionId);
-    await chat.loadHistory(sessionId);
-    rpg.resetRpgState();
-    setRpgPanelOpen(false);
-    sessions.refreshSessions();
-  }, [sessions, chat, rpg]);
-
-  // 删除会话
-  const handleDeleteSession = async (sessionId: string) => {
-    const newSessionId = await sessions.deleteSession(sessionId);
-    if (newSessionId) {
-      const charId = characters.currentCharacterId;
-      await chat.loadHistory(newSessionId, charId);
-    } else {
-      chat.resetChat();
-      chat.setCurrentSessionId(null);
-    }
-  };
-
   // 重命名会话
   const handleRenameSession = useCallback(async (sessionId: string, title: string) => {
     try {
@@ -177,50 +183,6 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
       sessions.refreshSessions();
     } catch { /* 静默失败 */ }
   }, [sessions]);
-
-  // 切换角色
-  const handleSwitchCharacter = useCallback(async (characterId: string) => {
-    characters.setCurrentCharacterId(characterId);
-    const list = await sessions.setCharacterFilter(characterId);
-    rpg.resetRpgState();
-    setRpgPanelOpen(false);
-    if (list.length > 0) {
-      const lastSessionId = localStorage.getItem(`lastSession_${characterId}`);
-      const targetId = (lastSessionId && list.some(s => s.session_id === lastSessionId))
-        ? lastSessionId
-        : list[0].session_id;
-      sessions.setCurrentSessionId(targetId);
-      await chat.loadHistory(targetId, characterId);
-    } else {
-      sessions.setCurrentSessionId(null);
-      chat.resetChat();
-      chat.setCurrentSessionId(null);
-    }
-  }, [sessions, characters, chat, rpg]);
-
-  // 监听全局角色切换事件（从 SidePanel 触发）
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const characterId = (e as CustomEvent).detail as string;
-      if (characterId) {
-        handleSwitchCharacter(characterId);
-      }
-    };
-    window.addEventListener('lumen:switch-character', handler);
-    return () => window.removeEventListener('lumen:switch-character', handler);
-  }, [handleSwitchCharacter]);
-
-  // 监听全局会话切换事件（从 SidePanel 触发）
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const sessionId = (e as CustomEvent).detail as string;
-      if (sessionId) {
-        handleSwitchSession(sessionId);
-      }
-    };
-    window.addEventListener('lumen:switch-session', handler);
-    return () => window.removeEventListener('lumen:switch-session', handler);
-  }, [handleSwitchSession]);
 
   // 切换 Persona
   const handleSwitchPersona = useCallback(async (personaId: string | null) => {
@@ -261,8 +223,6 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
   const handleBranch = async (messageId: string) => {
     const newId = await chat.branchFromMessage(messageId);
     if (newId) {
-      await chat.loadHistory(newId, characters.currentCharacterId || undefined);
-      chat.setCurrentSessionId(newId);
       sessions.switchSession(newId);
       sessions.refreshSessions();
     }
@@ -279,10 +239,9 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
   return {
     chat, sessions, characters, persona, authorNote, rpg,
     tokenUsage, currentModel,
-    memoryWindowOpen, graphWindowOpen, sysPromptEditor, rpgPanelOpen,
-    setMemoryWindowOpen, setGraphWindowOpen, setSysPromptEditor, setRpgPanelOpen, setCurrentModel,
-    handleSendMessage, handleNewSession, handleSwitchSession, handleDeleteSession,
-    handleRenameSession, handleSwitchCharacter, handleSwitchPersona, handleCommandResult,
+    memoryWindowOpen, graphWindowOpen, rpgPanelOpen,
+    setMemoryWindowOpen, setGraphWindowOpen, setRpgPanelOpen, setCurrentModel,
+    handleSendMessage, handleRenameSession, handleSwitchPersona, handleCommandResult,
     handleToggleDebug, handleCompact, handleRegenerate, handleBranch,
     refreshTokenUsage,
   };

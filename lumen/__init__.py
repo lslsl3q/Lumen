@@ -51,10 +51,6 @@ __all__ = [
     "SessionManager",
     "get_session_manager",
 
-    # 聊天功能
-    "validate_tool_call",
-    "chat_non_stream",
-
     # 上下文管理
     "trim_messages",
     "fold_tool_calls",

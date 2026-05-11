@@ -30,6 +30,7 @@ from lumen.config import (
     KNOWLEDGE_RERANK_ENABLED,
     KNOWLEDGE_RERANK_TOP_K,
     KNOWLEDGE_RERANK_MIN_SCORE,
+    KNOWLEDGE_LIB_DIR,
 )
 from lumen.services.search.embedding import get_service as get_embedding_service
 from lumen.services.knowledge.chunker import chunk_text, split_sentences
@@ -50,26 +51,40 @@ def get_last_search_meta() -> dict:
 
 from lumen.services.tdb_registry import get_tdb
 
-# ── Registry 缓存 ──
-_registry_cache: Optional[Dict[str, Dict]] = None
+# ── 参数化辅助函数（通用管道）──
+
+def _get_db_for(kb_name: str) -> triviumdb.TriviumDB:
+    """根据 kb_name 获取对应的 TDB 实例"""
+    return get_tdb(kb_name)
+
+
+def _get_sentence_db_for(kb_name: str) -> triviumdb.TriviumDB:
+    """根据 kb_name 获取对应的句子 TDB 实例"""
+    from lumen.services.knowledge.manifest import load_kb_manifest
+    manifest = load_kb_manifest(kb_name)
+    path = manifest.get("sentence_path") if manifest else None
+    if path:
+        basename = os.path.splitext(os.path.basename(path))[0]
+        return get_tdb(basename)
+    return get_tdb("knowledge_sentences")
+
+
+def _get_source_dir_for(kb_name: str) -> str:
+    """获取 kb_name 对应的源文件目录"""
+    return os.path.join(KNOWLEDGE_LIB_DIR, kb_name)
+
+# ── Registry 缓存（按 kb_name 隔离）──
+_registry_caches: Dict[str, Dict[str, Dict]] = {}
 _registry_lock = threading.Lock()
 
 MANIFEST_PATH = os.path.join(KNOWLEDGE_SOURCE_DIR, "_manifest.json")
 
 
-def _get_db() -> triviumdb.TriviumDB:
-    """获取 knowledge.tdb 实例（已迁移到 tdb_registry）"""
-    return get_tdb("knowledge")
-
-
-def _get_agent_db() -> triviumdb.TriviumDB:
-    """获取 agent_knowledge.tdb 实例（已迁移到 tdb_registry）"""
-    return get_tdb("agent_knowledge")
-
-
-def _get_sentence_db() -> triviumdb.TriviumDB:
-    """获取 knowledge_sentences.tdb 实例（已迁移到 tdb_registry）"""
-    return get_tdb("knowledge_sentences")
+def _manifest_path_for(kb_name: str) -> str:
+    """获取 kb_name 对应的 manifest 路径"""
+    if kb_name == "knowledge":
+        return MANIFEST_PATH
+    return os.path.join(KNOWLEDGE_LIB_DIR, kb_name, "_manifest.json")
 
 
 def _prf_refine(db, query_vector: list[float], hits: list[dict],
@@ -201,7 +216,7 @@ async def search_diagnostics(query: str, top_k: int = 10) -> dict:
     if not query_vector:
         return {"error": "embedding unavailable"}
 
-    db = _get_db()
+    db = _get_db_for("knowledge")
     try:
         hits, ctx = db.search_with_context(query_vector, top_k=top_k, min_score=0.3)
     except Exception as e:
@@ -281,40 +296,43 @@ def _rrf_merge(
     return result
 
 
-def _load_registry() -> Dict[str, Dict]:
-    """加载 registry（从 _manifest.json 的 files 字段，带内存缓存）"""
-    global _registry_cache
-    if _registry_cache is not None:
-        return _registry_cache
+def _load_registry(kb_name: str = "knowledge") -> Dict[str, Dict]:
+    """加载 registry（从 manifest 的 files 字段，带内存缓存）"""
+    if kb_name in _registry_caches:
+        return _registry_caches[kb_name]
+    path = _manifest_path_for(kb_name)
     try:
-        if os.path.exists(MANIFEST_PATH):
-            with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-                _registry_cache = manifest.get("files", {})
-            return _registry_cache
+                _registry_caches[kb_name] = manifest.get("files", {})
+            return _registry_caches[kb_name]
     except (json.JSONDecodeError, IOError):
         pass
-    _registry_cache = {}
-    return _registry_cache
+    _registry_caches[kb_name] = {}
+    return _registry_caches[kb_name]
 
 
-def _save_registry(registry: Dict[str, Dict]) -> None:
-    """保存 registry（写回 _manifest.json 的 files 字段）并刷新缓存"""
-    global _registry_cache
+def _save_registry(registry: Dict[str, Dict], kb_name: str = "knowledge") -> None:
+    """保存 registry（写回 manifest 的 files 字段）并刷新缓存"""
+    path = _manifest_path_for(kb_name)
     manifest = {}
-    if os.path.exists(MANIFEST_PATH):
-        with open(MANIFEST_PATH, "r", encoding="utf-8") as f:
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
             manifest = json.load(f)
     manifest["files"] = registry
-    os.makedirs(os.path.dirname(MANIFEST_PATH), exist_ok=True)
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    _registry_cache = registry
+    _registry_caches[kb_name] = registry
 
 
-def _clear_registry_cache() -> None:
-    global _registry_cache
-    _registry_cache = None
+def _clear_registry_cache(kb_name: str = None) -> None:
+    """清 registry 缓存（kb_name=None 时清全部）"""
+    if kb_name is None:
+        _registry_caches.clear()
+    else:
+        _registry_caches.pop(kb_name, None)
 
 
 def _generate_file_id() -> str:
@@ -345,18 +363,18 @@ def _read_file_content(path: str) -> str | None:
 # ── 公开 API ──
 
 
-def list_files(category: str = None) -> List[Dict]:
+def list_files(category: str = None, kb_name: str = "knowledge") -> List[Dict]:
     """列出所有已导入的文件元数据，可按 category 过滤"""
-    registry = _load_registry()
+    registry = _load_registry(kb_name)
     entries = list(registry.values())
     if category:
         entries = [e for e in entries if e.get("category") == category]
     return sorted(entries, key=lambda e: e.get("created_at", ""), reverse=True)
 
 
-def get_file(file_id: str) -> Dict:
+def get_file(file_id: str, kb_name: str = "knowledge") -> Dict:
     """获取单个文件的元数据"""
-    registry = _load_registry()
+    registry = _load_registry(kb_name)
     if file_id not in registry:
         raise FileNotFoundError(f"文件不存在: {file_id}")
     return registry[file_id]
@@ -368,6 +386,7 @@ async def import_file(
     category: str = "imports",
     subdir: str = "",
     source: str = "upload",
+    kb_name: str = "knowledge",
 ) -> Dict:
     """导入文件: 保存源文件 → 切分 → 批量嵌入 → 存入 knowledge.tdb
 
@@ -384,10 +403,11 @@ async def import_file(
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
 
     # 1. 保存源文件（保留目录结构）
+    _source_base = _get_source_dir_for(kb_name)
     if subdir:
-        source_dir = os.path.join(KNOWLEDGE_SOURCE_DIR, category, subdir)
+        source_dir = os.path.join(_source_base, category, subdir)
     else:
-        source_dir = os.path.join(KNOWLEDGE_SOURCE_DIR, category)
+        source_dir = os.path.join(_source_base, category)
     os.makedirs(source_dir, exist_ok=True)
     source_path = os.path.join(source_dir, filename)
     with open(source_path, "w", encoding="utf-8") as f:
@@ -401,12 +421,12 @@ async def import_file(
     if not chunks:
         # 空内容，只保存源文件不向量化
         meta = _build_meta(fid, filename, category, subdir, 0, len(content), now, content)
-        _update_registry(fid, meta)
+        _update_registry(fid, meta, kb_name)
         logger.info(f"知识库导入（空内容）: {fid} ({filename})")
         return meta
 
     # 3. 批量嵌入（尝试同时获取稠密+稀疏向量）
-    backend = await get_embedding_service("knowledge")
+    backend = await get_embedding_service(kb_name)
 
     sparse_vectors = None
     vectors = None
@@ -428,7 +448,7 @@ async def import_file(
         raise RuntimeError("Embedding 服务不可用，无法向量化")
 
     # 4. 存入 TriviumDB
-    db = _get_db()
+    db = _get_db_for(kb_name)
     rel_path = os.path.join(category, subdir, filename) if subdir else os.path.join(category, filename)
     rel_path = rel_path.replace("\\", "/")
 
@@ -467,6 +487,7 @@ async def import_file(
                         "chunk_index": i,
                         "category": category,
                         "sparse_data": sv,
+                        "kb_name": kb_name,
                     })
             if items:
                 save_sparse_batch(items)
@@ -478,7 +499,7 @@ async def import_file(
         try:
             from lumen.services.graph import extract_and_store
             result = await extract_and_store(
-                content=content, tdb_name="knowledge",
+                content=content, tdb_name=kb_name,
                 source_path=subdir or category,
                 source_doc_id=fid,
                 source_type="file_chunk",
@@ -498,14 +519,14 @@ async def import_file(
 
     # 4.5 写入 BM25 索引（FTS5 + jieba 分词）
     try:
-        knowledge_chunks.save_knowledge_chunks_batch(fid, rel_path, filename, category, chunks)
+        knowledge_chunks.save_knowledge_chunks_batch(fid, rel_path, filename, category, chunks, kb_name=kb_name)
     except Exception as e:
         logger.warning(f"知识库 BM25 索引写入失败 ({fid}): {e}")
 
     # 5. 句子级向量化（小模型，独立 TDB）
     sentence_backend = await get_embedding_service("knowledge_sentences")
     if sentence_backend:
-        sdb = _get_sentence_db()
+        sdb = _get_sentence_db_for(kb_name)
         total_sentences = 0
         for i, chunk in enumerate(chunks):
             sentences = split_sentences(chunk)
@@ -530,7 +551,7 @@ async def import_file(
 
     # 5. 更新 registry
     meta = _build_meta(fid, filename, category, subdir, len(chunks), len(content), now, content)
-    _update_registry(fid, meta)
+    _update_registry(fid, meta, kb_name)
 
     logger.info(f"知识库导入: {fid} ({filename}), {len(chunks)} chunks")
     return meta
@@ -539,6 +560,7 @@ async def import_file(
 async def refine_with_sentences(
     query: str,
     top_chunks: list[dict],
+    kb_name: str = "knowledge",
 ) -> list[dict]:
     """在 top chunks 内做句子级精排 + 窗口展开
 
@@ -562,7 +584,7 @@ async def refine_with_sentences(
     if not query_vector:
         return top_chunks
 
-    sdb = _get_sentence_db()
+    sdb = _get_sentence_db_for(kb_name)
 
     # 收集 top chunks 的 (file_id, chunk_index) 集合
     target_chunks = set()
@@ -708,13 +730,25 @@ async def search(
     min_score: float = 0.3,
     category: str = None,
     character_id: str = None,
+    kb_name: str = "knowledge",
+    access_filter: dict = None,
 ) -> List[Dict]:
-    """混合搜索: 向量+文本 + API稀疏 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排"""
+    """混合搜索: 向量+文本 + API稀疏 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排
+
+    Args:
+        query: 搜索文本
+        top_k: 返回条数
+        min_score: 最低相似度
+        category: 按分类过滤
+        character_id: 角色 ID，用于 ACL 前置过滤
+        kb_name: 知识库名称（对应 TDB 实例），默认 "knowledge"
+        access_filter: 访问控制过滤，格式 {"owner_id": "xxx", "access_list": [...]}
+    """
     from lumen.config import PRF_ENABLED, PRF_ALPHA, PRF_BETA
     import time as _time
     _t0 = _time.time()
 
-    backend = await get_embedding_service("knowledge")
+    backend = await get_embedding_service(kb_name)
     query_vector = await backend.encode(query) if backend else None
     if not query_vector:
         return []
@@ -731,7 +765,7 @@ async def search(
     except Exception as e:
         logger.debug(f"语义组偏置跳过: {e}")
 
-    db = _get_db()
+    db = _get_db_for(kb_name)
 
     # ── ACL 前置过滤：展开为叶子文件夹精确列表 ──
     payload_filter = None
@@ -741,7 +775,7 @@ async def search(
             from lumen.services.access_control import get_instance
             acl = get_instance()
             all_folders = _get_all_folders(db)
-            allowed = acl.get_allowed_folders(character_id, "knowledge", "knowledge", all_folders)
+            allowed = acl.get_allowed_folders(character_id, "knowledge", kb_name, all_folders)
 
             if len(allowed) == len(all_folders):
                 payload_filter = None
@@ -790,7 +824,7 @@ async def search(
                 )
                 if sparse_result:
                     _, query_sparse = sparse_result
-                    bm25_hits = search_sparse(query_sparse, category or "", top_k)
+                    bm25_hits = search_sparse(query_sparse, category or "", top_k, kb_name=kb_name)
                     sparse_used = True
                     # 补充 TriviumDB 中的 content（sparse_store 只存索引不存原文）
                     if bm25_hits:
@@ -804,10 +838,10 @@ async def search(
             keywords = [w for w in jieba.cut(query) if len(w.strip()) > 1]
             if keywords:
                 bm25_hits = knowledge_chunks.search_knowledge_bm25(
-                    keywords, category=category or "", limit=top_k
+                    keywords, category=category or "", limit=top_k, kb_name=kb_name
                 )
                 # 主动记忆（daily_note）也走 BM25，合并到同一路径进 RRF
-                if not category or category.startswith("active"):
+                if kb_name == "knowledge" and (not category or category.startswith("active")):
                     active_hits = []
                     for kw in keywords:
                         active_hits.extend(
@@ -873,7 +907,7 @@ async def search(
             # source_path_prefixes 只在部分 ACL 分支定义，统一安全取值
             _folders = source_path_prefixes if "source_path_prefixes" in dir() else list(allowed)
             graph_hits = await search_graph(
-                query_vector, query, tdb_name="knowledge",
+                query_vector, query, tdb_name=kb_name,
                 top_k=GRAPH_RECALL_TOP_K, acl_filter=graph_acl_filter,
                 allowed_folders=_folders, character_id=character_id,
             )
@@ -883,6 +917,7 @@ async def search(
     # ── 记录搜索元数据（先于 PRF 和句子级精排）──
     global _last_search_meta
     _last_search_meta = {
+        "kb_name": kb_name,
         "search_method": search_method,
         "elapsed_ms": round((_time.time() - _t0) * 1000, 1),
         "vector_count": len(vector_hits),
@@ -894,6 +929,16 @@ async def search(
 
     # ── RRF 合并（三路）──
     hits = _rrf_merge(vector_hits, bm25_hits, graph_hits, top_k=top_k)
+
+    # ── access_filter 后过滤（从 search_agent_knowledge 迁移）──
+    if access_filter:
+        owner_id = access_filter.get("owner_id", "")
+        filtered = []
+        for hit in hits:
+            access_list = hit.get("access_list", ["public"])
+            if "public" in access_list or owner_id in access_list:
+                filtered.append(hit)
+        hits = filtered
 
     # ── Cross-Encoder Rerank（RRF 后、PRF 前的精排层）──
     if KNOWLEDGE_RERANK_ENABLED and hits:
@@ -925,6 +970,7 @@ async def search(
                     "content": payload.get("content", ""),
                     "score": hit.score if hasattr(hit, "score") else 0.0,
                     "chunk_index": payload.get("chunk_index", 0),
+                    "access_list": payload.get("access_list", ["public"]),
                 })
                 if len(refined_hits) >= top_k:
                     break
@@ -933,93 +979,41 @@ async def search(
                 _last_search_meta["prf_refined"] = True
                 logger.debug(f"知识库 PRF 精炼: {len(refined_hits)} 条结果")
 
+    # ── access_filter 后过滤（PRF 后也要过滤）──
+    if access_filter and hits:
+        owner_id = access_filter.get("owner_id", "")
+        filtered = []
+        for hit in hits:
+            access_list = hit.get("access_list", ["public"])
+            if "public" in access_list or owner_id in access_list:
+                filtered.append(hit)
+        hits = filtered
+
     # ── 句子级精排 ──
     if KNOWLEDGE_SENTENCE_LEVEL and hits:
-        refined = await refine_with_sentences(query, hits)
+        refined = await refine_with_sentences(query, hits, kb_name=kb_name)
         _last_search_meta["sentence_refined"] = True
         return refined
 
     return hits
 
 
-async def search_agent_knowledge(
-    query: str,
-    agent_id: str = "",
-    top_k: int = 5,
-    min_score: float = 0.3,
-) -> List[Dict]:
-    """搜索 agent_knowledge.tdb，按 access_list 过滤
-
-    Args:
-        query: 搜索文本
-        agent_id: 当前 Agent ID，用于过滤 access_list（空 = 不过滤）
-        top_k: 返回条数
-        min_score: 最低相似度
-    """
-    backend = await get_embedding_service("agent_knowledge")
-    query_vector = await backend.encode(query) if backend else None
-    if not query_vector:
-        return []
-
-    db = _get_agent_db()
-    # DB 侧预过滤：access_list 包含 public 或包含当前 agent_id
-    # 注：$or 过滤在 TQL 中支持，但 payload_filter 可能不支持复杂 $or
-    # 简化：无 agent_id 时不加 filter（公开搜索），有 agent_id 时搜后过滤
-    search_filter = None
-    if not agent_id:
-        search_filter = {"access_list": "public"}
-    results = db.search(query_vector, top_k=top_k * 3, min_score=min_score,
-                        payload_filter=search_filter)
-
-    hits = []
-    seen = set()
-    for hit in results:
-        payload = hit.payload if hasattr(hit, "payload") else {}
-        access_list = payload.get("access_list", ["public"])
-
-        # 有 agent_id 时需二次过滤（DB 不支持 $or 复杂过滤）
-        if agent_id and "public" not in access_list and agent_id not in access_list:
-            continue
-
-        key = (payload.get("file_id", ""), payload.get("chunk_index", 0))
-        if key in seen:
-            continue
-        seen.add(key)
-
-        hits.append({
-            "chunk_id": hit.id if hasattr(hit, "id") else 0,
-            "file_id": payload.get("file_id", ""),
-            "source_path": payload.get("source_path", ""),
-            "filename": payload.get("filename", ""),
-            "content": payload.get("content", ""),
-            "score": hit.score if hasattr(hit, "score") else 0.0,
-            "chunk_index": payload.get("chunk_index", 0),
-            "owner_id": payload.get("owner_id", ""),
-            "access_list": access_list,
-            "source": payload.get("source", ""),
-        })
-        if len(hits) >= top_k:
-            break
-
-    return hits
-
-
-async def delete_file(file_id: str) -> None:
+async def delete_file(file_id: str, kb_name: str = "knowledge") -> None:
     """删除文件：删向量 + 删源文件 + 更新 registry"""
-    registry = _load_registry()
+    registry = _load_registry(kb_name)
     if file_id not in registry:
         raise FileNotFoundError(f"文件不存在: {file_id}")
 
     meta = registry[file_id]
 
     # 1. 删向量（chunk 级）
-    db = _get_db()
+    db = _get_db_for(kb_name)
     result = db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
     count = result.get("affected", 0) if isinstance(result, dict) else 0
 
     # 1.1 删 BM25 索引
     try:
-        bm25_count = knowledge_chunks.delete_knowledge_chunks(file_id)
+        bm25_count = knowledge_chunks.delete_knowledge_chunks(file_id, kb_name)
         if bm25_count:
             logger.info(f"知识库 BM25 清理: {file_id}, {bm25_count} 条")
     except Exception as e:
@@ -1028,42 +1022,43 @@ async def delete_file(file_id: str) -> None:
     # 1.2 删稀疏向量
     try:
         from lumen.services.search.sparse_store import delete_by_file as delete_sparse
-        delete_sparse(file_id)
+        delete_sparse(file_id, kb_name)
     except Exception as e:
         logger.warning(f"稀疏向量清理失败 ({file_id}): {e}")
 
     # 1.5 删句子向量（句子级）
-    if _sentence_db is not None:
-        try:
-            s_result = _sentence_db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
-            s_count = s_result.get("affected", 0) if isinstance(s_result, dict) else 0
-            logger.info(f"句子级清理: {file_id}, {s_count} 句")
-        except Exception as e:
-            logger.warning(f"句子级清理失败 ({file_id}): {e}")
+    try:
+        sdb = _get_sentence_db_for(kb_name)
+        s_result = sdb.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
+        s_count = s_result.get("affected", 0) if isinstance(s_result, dict) else 0
+        logger.info(f"句子级清理: {file_id}, {s_count} 句")
+    except Exception as e:
+        logger.warning(f"句子级清理失败 ({file_id}): {e}")
 
     # 2. 删源文件
     source_path = meta.get("source_path", "")
+    source_dir = _get_source_dir_for(kb_name)
     if source_path:
-        full_path = os.path.join(KNOWLEDGE_SOURCE_DIR, source_path)
+        full_path = os.path.join(source_dir, source_path)
         if os.path.exists(full_path):
             os.remove(full_path)
             # 清理空目录
-            _cleanup_empty_dirs(os.path.dirname(full_path), KNOWLEDGE_SOURCE_DIR)
+            _cleanup_empty_dirs(os.path.dirname(full_path), source_dir)
 
     # 3. 更新 registry
     del registry[file_id]
-    _save_registry(registry)
+    _save_registry(registry, kb_name)
 
     logger.info(f"知识库删除: {file_id} ({meta.get('filename', '')}), 清理 {count} 条向量")
 
 
-async def reindex_file(file_id: str) -> dict:
+async def reindex_file(file_id: str, kb_name: str = "knowledge") -> dict:
     """重新索引已修改的文件（全文件覆写，幂等）。
 
     流程：删旧数据 → 重读源文件 → 重新分块嵌入 → 更新 registry
     """
     with _registry_lock:
-        registry = _load_registry()
+        registry = _load_registry(kb_name)
     if file_id not in registry:
         return {"error": f"file_id {file_id} not found in registry"}
 
@@ -1073,7 +1068,8 @@ async def reindex_file(file_id: str) -> dict:
     source = info.get("source", "upload")
 
     # 构建源文件完整路径
-    full_path = os.path.join(KNOWLEDGE_SOURCE_DIR, source_path)
+    source_dir = _get_source_dir_for(kb_name)
+    full_path = os.path.join(source_dir, source_path)
     if not os.path.exists(full_path):
         return {"error": f"source file not found: {source_path}"}
 
@@ -1083,26 +1079,25 @@ async def reindex_file(file_id: str) -> dict:
         return {"error": f"cannot read file: {source_path}"}
 
     # 1. 删除旧数据（复用 delete_file 的清理逻辑，但不删源文件和 registry 条目）
-    db = _get_db()
+    db = _get_db_for(kb_name)
     db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
 
     # 清理句子库
-    if _sentence_db is not None:
-        try:
-            _sentence_db.tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
-        except Exception as e:
-            logger.warning(f"重索引句子级清理失败 ({file_id}): {e}")
+    try:
+        _get_sentence_db_for(kb_name).tql_mut(f'MATCH (a {{file_id: {json.dumps(file_id)}}}) DETACH DELETE a')
+    except Exception as e:
+        logger.warning(f"重索引句子级清理失败 ({file_id}): {e}")
 
     # 清理 BM25
     try:
-        knowledge_chunks.delete_knowledge_chunks(file_id)
+        knowledge_chunks.delete_knowledge_chunks(file_id, kb_name)
     except Exception as e:
         logger.warning(f"重索引 BM25 清理失败 ({file_id}): {e}")
 
     # 清理 sparse
     try:
         from lumen.services.search.sparse_store import delete_by_file as delete_sparse
-        delete_sparse(file_id)
+        delete_sparse(file_id, kb_name)
     except Exception as e:
         logger.warning(f"重索引稀疏向量清理失败 ({file_id}): {e}")
 
@@ -1115,18 +1110,18 @@ async def reindex_file(file_id: str) -> dict:
         # 空内容，只更新 registry
         new_md5 = _compute_md5(content)
         with _registry_lock:
-            reg = _load_registry()
+            reg = _load_registry(kb_name)
             reg[file_id]["md5"] = new_md5
             reg[file_id]["graph_sync_needed"] = True
             reg[file_id]["chunk_count"] = 0
             reg[file_id]["char_count"] = len(content)
             from datetime import datetime as _dt
             reg[file_id]["updated_at"] = _dt.now().isoformat()
-            _save_registry(reg)
+            _save_registry(reg, kb_name)
         return {"file_id": file_id, "chunks": 0, "md5": new_md5}
 
     # 3. 重新嵌入
-    backend = await get_embedding_service("knowledge")
+    backend = await get_embedding_service(kb_name)
 
     vectors = None
     sparse_vectors = None
@@ -1193,7 +1188,7 @@ async def reindex_file(file_id: str) -> dict:
     # 4.5 句子级向量化
     sentence_backend = await get_embedding_service("knowledge_sentences")
     if sentence_backend:
-        sdb = _get_sentence_db()
+        sdb = _get_sentence_db_for(kb_name)
         total_sentences = 0
         for i, chunk in enumerate(chunks):
             sentences = split_sentences(chunk)
@@ -1218,7 +1213,7 @@ async def reindex_file(file_id: str) -> dict:
 
     # 5. BM25 重建
     try:
-        knowledge_chunks.save_knowledge_chunks_batch(file_id, source_path, info.get("filename", ""), category, chunks)
+        knowledge_chunks.save_knowledge_chunks_batch(file_id, source_path, info.get("filename", ""), category, chunks, kb_name=kb_name)
     except Exception as e:
         logger.warning(f"重索引 BM25 写入失败 ({file_id}): {e}")
 
@@ -1226,13 +1221,13 @@ async def reindex_file(file_id: str) -> dict:
     new_md5 = _compute_md5(content)
     from datetime import datetime as _dt
     with _registry_lock:
-        reg = _load_registry()
+        reg = _load_registry(kb_name)
         reg[file_id]["md5"] = new_md5
         reg[file_id]["graph_sync_needed"] = True
         reg[file_id]["chunk_count"] = len(chunks)
         reg[file_id]["char_count"] = len(content)
         reg[file_id]["updated_at"] = _dt.now().isoformat()
-        _save_registry(reg)
+        _save_registry(reg, kb_name)
 
     logger.info(f"知识库重索引: {file_id} ({info.get('filename', '')}), {len(chunks)} chunks")
     return {"file_id": file_id, "chunks": len(chunks), "md5": new_md5}
@@ -1265,50 +1260,76 @@ def close():
     close_all()
 
 
-def cleanup_orphan_registry() -> int:
-    """清理 registry 中指向不存在 TDB 节点的孤儿条目
+def cleanup_orphan_registry(kb_name: str = "knowledge") -> int:
+    """清理 registry 中指向不存在 TDB 节点的孤儿条目 + 级联清理关联索引
 
-    场景：用户在 MemoryWindow 编辑器手动删了 TDB 节点，
-    或 TDB 文件损坏/重建后，registry 里残留旧条目。
+    场景：用户手动删了 TDB 节点/文件、TDB 重建后，registry 和索引里残留旧条目。
+    对每个孤儿 file_id，同步清理：registry + BM25 + 稀疏向量 + 句子向量。
 
     Returns:
         清理的孤儿条目数
     """
-    db = _get_db()
-    registry = _load_registry()
+    try:
+        db = _get_db_for(kb_name)
+    except Exception:
+        logger.warning("cleanup_orphan_registry: TDB 不可用，跳过")
+        return 0
+
+    registry = _load_registry(kb_name)
     orphans = []
 
     for file_id, meta in registry.items():
-        # 检查 knowledge.tdb 中是否有至少一条属于此 file_id 的节点
         has_chunk = False
         try:
             rows = db.tql(f'FIND {{file_id: {json.dumps(file_id)}}} RETURN id')
             if rows:
                 has_chunk = True
         except Exception:
-            # TQL FIND 失败 → 保守策略，不删
             continue
 
         if not has_chunk:
             orphans.append(file_id)
 
-    if orphans:
-        for fid in orphans:
-            del registry[fid]
-        _save_registry(registry)
-        logger.info(f"Registry 清理: {len(orphans)} 个孤儿条目已移除")
+    if not orphans:
+        return 0
 
+    # 级联清理每个孤儿 file_id 的所有关联数据
+    for fid in orphans:
+        # BM25
+        try:
+            knowledge_chunks.delete_knowledge_chunks(fid, kb_name)
+        except Exception as e:
+            logger.warning(f"孤儿 BM25 清理失败 ({fid}): {e}")
+
+        # 稀疏向量
+        try:
+            from lumen.services.search.sparse_store import delete_by_file as delete_sparse
+            delete_sparse(fid, kb_name)
+        except Exception as e:
+            logger.warning(f"孤儿稀疏向量清理失败 ({fid}): {e}")
+
+        # 句子向量
+        try:
+            sdb = _get_sentence_db_for(kb_name)
+            sdb.tql_mut(f'MATCH (a {{file_id: {json.dumps(fid)}}}) DETACH DELETE a')
+        except Exception as e:
+            logger.warning(f"孤儿句子向量清理失败 ({fid}): {e}")
+
+        del registry[fid]
+
+    _save_registry(registry, kb_name)
+    logger.info(f"Registry 级联清理: {len(orphans)} 个孤儿条目（registry + BM25 + 稀疏 + 句子）")
     return len(orphans)
 
 
-async def rebuild_if_empty():
+async def rebuild_if_empty(kb_name: str = "knowledge"):
     """启动时检测 knowledge.tdb 是否为空，为空则从源文件自动重建。
 
     场景：用户换了 embedding API、删除了 TDB 文件、或首次启动。
-    扫描 KNOWLEDGE_SOURCE_DIR 下所有 .md/.txt/.markdown 文件，
+    扫描源文件目录下所有 .md/.txt/.markdown 文件，
     跳过 _manifest.json 和已有条目的文件，逐个调用 import_file。
     """
-    db = _get_db()
+    db = _get_db_for(kb_name)
     node_ids = db.all_node_ids()
     if len(node_ids) > 0:
         logger.info(f"知识库已有 {len(node_ids)} 条向量，跳过自动重建")
@@ -1316,7 +1337,8 @@ async def rebuild_if_empty():
 
     logger.info("知识库为空，扫描源文件进行自动重建...")
 
-    if not os.path.isdir(KNOWLEDGE_SOURCE_DIR):
+    source_dir = _get_source_dir_for(kb_name)
+    if not os.path.isdir(source_dir):
         logger.info("源文件目录不存在，跳过")
         return
 
@@ -1326,7 +1348,7 @@ async def rebuild_if_empty():
     ALLOWED_EXT = {".md", ".txt", ".markdown"}
     files_to_import = []
 
-    for dirpath, dirnames, filenames in os.walk(KNOWLEDGE_SOURCE_DIR):
+    for dirpath, dirnames, filenames in os.walk(source_dir):
         dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         for f in sorted(filenames):
             if f == "_manifest.json":
@@ -1334,7 +1356,7 @@ async def rebuild_if_empty():
             ext = os.path.splitext(f)[1].lower()
             if ext in ALLOWED_EXT:
                 full_path = os.path.join(dirpath, f)
-                rel_path = os.path.relpath(full_path, KNOWLEDGE_SOURCE_DIR).replace("\\", "/")
+                rel_path = os.path.relpath(full_path, source_dir).replace("\\", "/")
                 if rel_path not in existing_paths:
                     files_to_import.append((full_path, rel_path))
 
@@ -1358,7 +1380,7 @@ async def rebuild_if_empty():
             subdir = "/".join(parts[1:-1]) if len(parts) > 2 else ""
             # 保留原始来源：daily_note 目录下的 = daily_note，其余 = upload
             source = parts[0] if parts[0] == "daily_note" else "upload"
-            await import_file(filename, content, category=category, subdir=subdir, source=source)
+            await import_file(filename, content, category=category, subdir=subdir, source=source, kb_name=kb_name)
             imported += 1
         except Exception as e:
             failed += 1
@@ -1370,7 +1392,7 @@ async def rebuild_if_empty():
     if imported > 0:
         try:
             from lumen.services.graph import restore_graph
-            restored = restore_graph("knowledge")
+            restored = restore_graph(kb_name)
             if restored > 0:
                 logger.info(f"图谱实体已从备份恢复: {restored} 个")
         except Exception as e:
@@ -1404,11 +1426,11 @@ def _build_meta(
     }
 
 
-def _update_registry(fid: str, meta: Dict) -> None:
+def _update_registry(fid: str, meta: Dict, kb_name: str = "knowledge") -> None:
     with _registry_lock:
-        registry = _load_registry()
+        registry = _load_registry(kb_name)
         registry[fid] = meta
-        _save_registry(registry)
+        _save_registry(registry, kb_name)
 
 
 def _cleanup_empty_dirs(current: str, stop_at: str) -> None:

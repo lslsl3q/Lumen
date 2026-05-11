@@ -19,6 +19,9 @@ class MemoryComponent(ContextComponent):
     priority = 30  # Identity(10) → Lore(20) → Memory(30)
     zone = PromptZone.DYNAMIC  # 记忆召回每轮不同，放动态区不破坏缓存前缀
 
+    def __init__(self):
+        self.last_recall_log: list = []
+
     async def pre_act(self, context: dict) -> str:
         character = context.get("character", {})
         if not character.get("memory_enabled", True):
@@ -43,6 +46,8 @@ class MemoryComponent(ContextComponent):
             auto_summarize=auto_summarize,
             session_id=session_id,
         )
+
+        self.last_recall_log = recall_log
 
         if recall_log:
             logger.debug(f"MemoryComponent 召回: {len(recall_log)} 条")

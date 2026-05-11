@@ -164,6 +164,150 @@ def _rebuild_fts5_index(cursor):
         cursor.execute("INSERT INTO messages_fts(rowid, content) VALUES(?, ?)", (msg_id, tokens))
 
 
+# ── 消息搜索（供 memory 系统调用） ──
+
+# 工具消息标记，搜索结果中跳过
+_TOOL_MARKERS = (
+    '"tool":', '"tool" :', '"type": "tool_call', '"type":"tool_call',
+    '"calls":', '"calls" :', '{"success":', '{"error_code":',
+    '<tool_result', '<<<[TOOL_REQUEST]',
+)
+
+
+def search_messages_bm25(
+    keywords: list[str],
+    character_id: str,
+    limit: int = 10,
+    exclude_session_id: str = "",
+) -> list[dict]:
+    """FTS5 BM25 全文搜索（jieba 分词，支持中文）
+
+    Args:
+        keywords: 搜索关键词列表（jieba 提取的）
+        character_id: 限定角色
+        limit: 最多返回条数
+        exclude_session_id: 排除当前会话的消息
+
+    Returns:
+        [{"id", "role", "content", "session_id", "created_at", "bm25_score"}, ...]
+    """
+    if not keywords:
+        return []
+
+    query = " OR ".join(f'"{kw}"' for kw in keywords)
+
+    conn = _get_conn()
+    try:
+        rows = conn.execute("""
+            SELECT m.id, m.role, m.content, m.session_id, m.created_at,
+                   bm25(messages_fts) AS score
+            FROM messages_fts f
+            JOIN messages m ON m.id = f.rowid
+            JOIN sessions s ON m.session_id = s.id
+            WHERE messages_fts MATCH ?
+              AND s.character_id = ?
+              AND m.role != 'system'
+              AND (? = '' OR m.session_id != ?)
+            ORDER BY score
+            LIMIT ?
+        """, (query, character_id, exclude_session_id, exclude_session_id, limit)).fetchall()
+    except Exception as e:
+        logger.warning(f"FTS5 搜索失败: {e}")
+        return []
+
+    results = []
+    for row in rows:
+        content = row["content"]
+        if not content or len(content) < 5:
+            continue
+        if any(marker in content for marker in _TOOL_MARKERS):
+            continue
+        results.append({
+            "id": row["id"],
+            "role": row["role"],
+            "content": content,
+            "session_id": row["session_id"],
+            "created_at": row["created_at"],
+            "bm25_score": row["score"],
+        })
+    return results
+
+
+def search_messages(
+    keyword: str,
+    character_id: str,
+    limit: int = 10,
+    exclude_session_id: str = "",
+) -> list[dict]:
+    """跨会话搜索消息（LIKE 模糊匹配，jieba 回退路径）
+
+    Args:
+        keyword: 搜索关键词
+        character_id: 限定角色的会话
+        limit: 最多返回条数
+        exclude_session_id: 排除当前会话的消息
+
+    Returns:
+        [{"id", "role", "content", "session_id", "created_at"}, ...]
+    """
+    if not keyword or not keyword.strip():
+        return []
+
+    conn = _get_conn()
+    escaped = keyword.replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    rows = conn.execute("""
+        SELECT m.id, m.role, m.content, m.session_id, m.created_at
+        FROM messages m
+        JOIN sessions s ON m.session_id = s.id
+        WHERE s.character_id = ?
+          AND m.role != 'system'
+          AND m.content LIKE ? ESCAPE '\\'
+          AND (? = '' OR m.session_id != ?)
+        ORDER BY m.id DESC
+        LIMIT ?
+    """, (character_id, pattern, exclude_session_id, exclude_session_id, limit)).fetchall()
+
+    results = []
+    for row in rows:
+        content = row["content"]
+        if not content or len(content) < 5:
+            continue
+        if any(marker in content for marker in _TOOL_MARKERS):
+            continue
+        results.append({
+            "id": row["id"],
+            "role": row["role"],
+            "content": content,
+            "session_id": row["session_id"],
+            "created_at": row["created_at"],
+        })
+    return results
+
+
+def get_message_context(session_id: str, center_id: int, window: int = 2) -> list[dict[str, str]]:
+    """获取某条消息的前后上下文
+
+    Args:
+        session_id: 会话 ID
+        center_id: 中心消息 ID
+        window: 前后各取几条（默认 2）
+
+    Returns:
+        [{"role", "content"}, ...] 上下文消息列表
+    """
+    conn = _get_conn()
+    rows = conn.execute("""
+        SELECT role, content FROM messages
+        WHERE session_id = ?
+          AND role != 'system'
+          AND id BETWEEN ? AND ?
+        ORDER BY id
+    """, (session_id, center_id - window, center_id + window)).fetchall()
+
+    return [{"role": row["role"], "content": row["content"]} for row in rows]
+
+
 
 
 def _init_db():

@@ -57,10 +57,7 @@ function SidePanel({
             sessions={sessions.sessions}
             currentSessionId={sessions.currentSessionId}
             isLoading={sessions.isLoading}
-            onSelectSession={(id) => {
-              sessions.switchSession(id);
-              window.dispatchEvent(new CustomEvent('lumen:switch-session', { detail: id }));
-            }}
+            onSelectSession={(id) => sessions.switchSession(id)}
             onNewSession={() => sessions.createNewSession(characters.currentCharacterId)}
             onDeleteSession={(id) => sessions.deleteSession(id)}
             onRenameSession={async (sessionId, title) => {
@@ -76,10 +73,7 @@ function SidePanel({
           <CharacterPanel
             characters={characters.characters}
             currentCharacterId={characters.currentCharacterId}
-            onSwitchCharacter={(id) => {
-              characters.setCurrentCharacterId(id);
-              window.dispatchEvent(new CustomEvent('lumen:switch-character', { detail: id }));
-            }}
+            onSwitchCharacter={(id) => characters.setCurrentCharacterId(id)}
             onRefreshCharacters={characters.refreshCharacters}
             onEditSystemPrompt={onEditSystemPrompt}
           />

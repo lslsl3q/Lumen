@@ -36,7 +36,7 @@ export function buildOverrideCSS(overrides: Record<string, string>): string {
   const lines = Object.entries(overrides)
     .filter(([, value]) => sanitizeCSSValue(value) !== "")
     .map(([key, value]) => `  --${toCssVarName(key)}: ${value};`);
-  return `:root {\n${lines.join("\n")}\n}`;
+  return `html[data-theme] {\n${lines.join("\n")}\n}`;
 }
 
 /**

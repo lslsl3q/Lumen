@@ -4,8 +4,7 @@ TDB 条目浏览 API（通用，支持任意 TDB）
 GET  /tdb/{name}/entries         — 列出条目（?source=&category=&limit=50&offset=0）
 GET  /tdb/{name}/stats           — 条目统计
 GET  /tdb/{name}/file-tree       — 源文件目录树
-PUT  /tdb/{name}/entries/{id}    — 更新条目（payload + 可选重向量化）
-DELETE /tdb/{name}/entries/{id}  — 删除条目
+POST /tdb/{name}/import-file     — 从磁盘导入文件
 """
 
 import os
@@ -124,83 +123,6 @@ async def tdb_stats(name: str):
 
     except Exception as e:
         raise HTTPException(500, f"统计失败: {e}")
-
-
-class TdbEntryUpdate(BaseModel):
-    content: str | None = None
-    source: str | None = None
-    category: str | None = None
-    tags: list[str] | None = None
-    importance: int | None = None
-    reindex: bool = True  # 是否重算向量
-
-
-@router.put("/{name}/entries/{entry_id}")
-async def update_entry(name: str, entry_id: int, body: TdbEntryUpdate):
-    """更新 TDB 条目 payload（可选重向量化）"""
-    db = _get_tdb(name)
-    try:
-        payload = db.get_payload(entry_id)
-        if not payload:
-            raise HTTPException(404, f"条目不存在: {entry_id}")
-
-        payload = dict(payload)
-
-        # 保存旧 content（更新前），用于源文件同步
-        old_content = payload.get("content", "")
-
-        # 更新 payload 字段
-        if body.content is not None:
-            payload["content"] = body.content
-        if body.source is not None:
-            payload["source"] = body.source
-        if body.category is not None:
-            payload["category"] = body.category
-        if body.tags is not None:
-            payload["tags"] = body.tags
-        if body.importance is not None:
-            payload["importance"] = body.importance
-
-        # 内容变了且需要重向量化
-        if body.reindex and body.content is not None and name == "knowledge":
-            from lumen.services.search.embedding import get_service
-            backend = await get_service("knowledge")
-            if backend:
-                new_vector = await backend.encode(body.content)
-                if new_vector:
-                    db.update_vector(entry_id, new_vector)
-                    logger.info(f"TDB 条目 {entry_id} 已重向量化 ({name})")
-
-        db.update_payload(entry_id, payload)
-        db.flush()
-
-        # 内容变更时同步写回源文件
-        if body.content is not None and name == "knowledge":
-            source_path = payload.get("source_path", "")
-            if old_content and body.content != old_content and source_path:
-                try:
-                    from lumen.config import KNOWLEDGE_SOURCE_DIR
-                    file_path = os.path.join(KNOWLEDGE_SOURCE_DIR, source_path)
-                    if os.path.isfile(file_path):
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            file_content = f.read()
-                        # 替换旧 chunk 内容为新内容
-                        if old_content in file_content:
-                            new_file_content = file_content.replace(old_content, body.content, 1)
-                            with open(file_path, "w", encoding="utf-8") as f:
-                                f.write(new_file_content)
-                            logger.info(f"源文件已同步更新: {source_path}")
-                        else:
-                            logger.warning(f"源文件中未找到旧 chunk 内容，跳过同步: {source_path}")
-                except Exception as e:
-                    logger.warning(f"源文件同步失败: {source_path}: {e}")
-
-        return {"id": entry_id, "updated": True}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"更新条目失败: {e}")
 
 
 @router.get("/{name}/file-tree")

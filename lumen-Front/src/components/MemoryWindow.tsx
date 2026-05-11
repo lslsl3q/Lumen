@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 import RichTextEditor from './editors/RichTextEditor';
 import * as memoriesApi from '../api/memories';
 import type { MemoryFolder, MemoryItem } from '../api/memories';
-import { listTdbs, listTdbEntries, updateTdbEntry, getTdbFileTree, importTdbFile, getTdbStats } from '../api/tdb';
+import { listTdbs, listTdbEntries, getTdbFileTree, importTdbFile, getTdbStats } from '../api/tdb';
 import { uploadKnowledgeFile, deleteKnowledgeFile, listKnowledgeFiles, scanKnowledge, applyScanChanges } from '../api/knowledge';
 import type { TdbInfo, TdbEntry, TdbFileFolder, TdbStats } from '../api/tdb';
 import TdbFileTree from './TdbFileTree';
@@ -244,12 +244,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
   const [tdbStats, setTdbStats] = useState<TdbStats | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
   const [tdbSourceFilter, setTdbSourceFilter] = useState('');
-  const [isEditingTdb, setIsEditingTdb] = useState(false);
-  const [editTdbContent, setEditTdbContent] = useState('');
-  const [editTdbCategory, setEditTdbCategory] = useState('');
-  const [editTdbTags, setEditTdbTags] = useState('');
-  const [editTdbImportance, setEditTdbImportance] = useState(3);
-  const [isSavingTdb, setIsSavingTdb] = useState(false);
   /* 源文件视图 */
   const [tdbViewMode, setTdbViewMode] = useState<'entries' | 'files'>('entries');
   const [fileFolders, setFileFolders] = useState<TdbFileFolder[]>([]);
@@ -328,7 +322,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     setSelectedEntryId(null);
     setSelectedFilePath(null);
     setTdbSourceFilter('');
-    setIsEditingTdb(false);
     setTdbViewMode('entries');
 
     if (activeTdb === 'daily_note') {
@@ -1020,81 +1013,10 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     ))}
                   </div>
                 )}
-                {/* 内容显示 */}
+                {/* 内容显示（只读） */}
                 <div className="p-4">
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <textarea
-                      value={editTdbContent}
-                      onChange={e => setEditTdbContent(e.target.value)}
-                      className="w-full min-h-[200px] rounded-lg px-3 py-2 bg-slate-800/60 border border-primary/20
-                        text-text-primary text-sm leading-relaxed resize-none outline-none
-                        focus:border-primary/40"
-                    />
-                  ) : (
-                    <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{displayEntry.content}</p>
-                  )}
+                  <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{displayEntry.content}</p>
                 </div>
-              </div>
-              {/* 操作按钮 */}
-              <div className="px-4 py-2 border-t border-border-default flex items-center gap-2">
-                {activeTdb === 'knowledge' && (
-                  <>
-                    {isEditingTdb ? (
-                      <>
-                        <button
-                          onClick={async () => {
-                            if (!displayEntry?.id) return;
-                            setIsSavingTdb(true);
-                            try {
-                              const tags = editTdbTags.split(',').map(t => t.trim()).filter(Boolean);
-                              await updateTdbEntry('knowledge', displayEntry!.id!, {
-                                content: editTdbContent,
-                                category: editTdbCategory || undefined,
-                                tags: tags.length > 0 ? tags : undefined,
-                                importance: editTdbImportance,
-                                reindex: true,
-                              });
-                              toast('保存成功（已重向量化）', 'success');
-                              setIsEditingTdb(false);
-                              loadTdbEntries();
-                            } catch (err) {
-                              toast('保存失败', 'error');
-                            } finally {
-                              setIsSavingTdb(false);
-                            }
-                          }}
-                          disabled={isSavingTdb}
-                          className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                            bg-primary/20 text-primary hover:bg-primary/30
-                            disabled:opacity-50 transition-colors"
-                        >
-                          {isSavingTdb ? '保存中...' : '保存修改'}
-                        </button>
-                        <button
-                          onClick={() => setIsEditingTdb(false)}
-                          className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                            text-text-muted hover:text-text-primary hover:bg-slate-800/60 transition-colors"
-                        >
-                          取消
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setIsEditingTdb(true);
-                          setEditTdbContent(displayEntry.content);
-                          setEditTdbCategory(displayEntry.category);
-                          setEditTdbTags(displayEntry.keywords?.join(', ') || '');
-                          setEditTdbImportance(displayEntry.importance || 3);
-                        }}
-                        className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                          text-text-secondary hover:text-text-primary hover:bg-slate-800/60 transition-colors"
-                      >
-                        编辑
-                      </button>
-                    )}
-                  </>
-                )}
               </div>
             </>
           ) : (
@@ -1122,52 +1044,22 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   <span>来源</span>
                   <span className="text-text-secondary">{displayEntry.source || '—'}</span>
                 </div>
-                {/* 分类：编辑模式下可修改 */}
-                <div>
+                {/* 分类 */}
+                <div className="flex justify-between">
                   <span>分类</span>
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <select
-                      value={editTdbCategory}
-                      onChange={e => setEditTdbCategory(e.target.value)}
-                      className="w-full mt-1 text-[10px] bg-surface-elevated border border-border-default rounded px-1.5 py-0.5
-                        text-text-secondary outline-none cursor-pointer"
-                    >
-                      {CATEGORY_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{CATEGORY_LABELS[opt] || opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className={`ml-2 ${CATEGORY_COLORS[displayEntry.category] || 'text-text-secondary'}`}>
-                      {CATEGORY_LABELS[displayEntry.category] || displayEntry.category || '—'}
-                    </span>
-                  )}
+                  <span className={`ml-2 ${CATEGORY_COLORS[displayEntry.category] || 'text-text-secondary'}`}>
+                    {CATEGORY_LABELS[displayEntry.category] || displayEntry.category || '—'}
+                  </span>
                 </div>
-                {/* 重要度：编辑模式下可修改 */}
-                <div>
+                {/* 重要度 */}
+                <div className="flex justify-between">
                   <span>重要度</span>
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <input
-                      type="range" min={1} max={5}
-                      value={editTdbImportance}
-                      onChange={e => setEditTdbImportance(Number(e.target.value))}
-                      className="w-full mt-1 accent-primary"
-                    />
-                  ) : (
-                    <span className="text-text-secondary ml-2">{displayEntry.importance || '—'}</span>
-                  )}
+                  <span className="text-text-secondary ml-2">{displayEntry.importance || '—'}</span>
                 </div>
-                {/* 标签：编辑模式下可修改 */}
+                {/* 标签 */}
                 <div>
                   <span>标签</span>
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <input
-                      value={editTdbTags}
-                      onChange={e => setEditTdbTags(e.target.value)}
-                      placeholder="标签1, 标签2"
-                      className="w-full mt-1 text-[10px] bg-surface-elevated border border-border-default rounded px-1.5 py-0.5
-                        text-text-secondary outline-none"
-                    />
-                  ) : displayEntry.keywords?.length > 0 ? (
+                  {displayEntry.keywords?.length > 0 ? (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {displayEntry.keywords.map((kw, i) => (
                         <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800/40 text-text-muted">{kw}</span>

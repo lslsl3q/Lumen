@@ -8,6 +8,7 @@ import type { useDebugState } from '../hooks/useDebugState';
 import type { UseFloatingLayersReturn } from '../components/floating/useFloatingLayers';
 import ActivityBar, { type PanelId, type PanelConfig } from '../components/ActivityBar';
 import SidePanel from '../components/SidePanel';
+import SystemPromptOverlay from '../components/SystemPromptOverlay';
 import ChatMode from './ChatMode';
 import BaseMode from './BaseMode';
 import RpgMode from './RpgMode';
@@ -42,6 +43,14 @@ const MODE_PANELS: Record<string, PanelConfig[]> = {
 function ModeContainer({ debug, floating }: ModeContainerProps) {
   const { activeMode, mounted } = useModeStore();
   const [activePanelId, setActivePanelId] = useState<PanelId | null>('sessions');
+  const [sysPromptEditor, setSysPromptEditor] = useState<{
+    content: string;
+    onSave: (c: string) => void;
+  } | null>(null);
+  const currentCharName = useCharacterStore(s => {
+    const c = s.characters[s.currentCharacterId];
+    return c?.display_name || c?.name;
+  });
 
   const panels = MODE_PANELS[activeMode] || MODE_PANELS.chat;
 
@@ -85,7 +94,10 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
       />
 
       {/* 共享 SidePanel */}
-      <SidePanel activePanelId={activePanelId} />
+      <SidePanel
+        activePanelId={activePanelId}
+        onEditSystemPrompt={(content, onSave) => setSysPromptEditor({ content, onSave })}
+      />
 
       {/* 模式内容区 */}
       <div className="flex-1 overflow-hidden relative">
@@ -110,6 +122,16 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
           </div>
         )}
       </div>
+
+      {/* 系统提示词浮动编辑器 */}
+      {sysPromptEditor && (
+        <SystemPromptOverlay
+          initialContent={sysPromptEditor.content}
+          characterName={currentCharName}
+          onSave={(c) => { sysPromptEditor.onSave(c); setSysPromptEditor(null); }}
+          onClose={() => setSysPromptEditor(null)}
+        />
+      )}
     </div>
   );
 }

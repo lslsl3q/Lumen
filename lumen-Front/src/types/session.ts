@@ -19,4 +19,5 @@ export interface HistoryMessage {
   role: 'user' | 'assistant';
   content: string;
   hidden?: boolean;  // 后端标记：true = 不应展示（防御纵深）
+  metadata?: Record<string, unknown>;
 }

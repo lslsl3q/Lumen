@@ -123,11 +123,69 @@ async def _async_store(content: str, character_id: str, session_id: str,
 
     logger.info(f"日记向量已存储到 agent_knowledge.tdb: {note_id}")
 
+    # ── BM25 写入（FTS5 全文检索） ──
+    try:
+        from lumen.services.knowledge import chunks as knowledge_chunks
+        knowledge_chunks.save_knowledge_chunks_batch(
+            note_id, md_filename,
+            md_filename.split("/")[-1] if "/" in md_filename else md_filename,
+            f"active_{category}", [content],
+            kb_name="agent_knowledge",
+        )
+    except Exception as e:
+        logger.warning(f"日记 BM25 写入失败 ({note_id}): {e}")
+
+    # ── 稀疏向量写入 ──
+    if hasattr(backend, 'encode_with_sparse'):
+        try:
+            from lumen.services.search.sparse_store import save_sparse_batch
+            sparse_result = await backend.encode_with_sparse(content, instruction_type="document")
+            if sparse_result:
+                _, sparse_vec = sparse_result
+                if sparse_vec:
+                    save_sparse_batch(
+                        [{
+                            "node_id": node_id,
+                            "file_id": note_id,
+                            "chunk_index": 0,
+                            "category": f"active_{category}",
+                            "sparse_data": sparse_vec,
+                        }],
+                        kb_name="agent_knowledge",
+                    )
+        except Exception as e:
+            logger.warning(f"日记稀疏向量写入失败 ({note_id}): {e}")
+
+    # ── 句子向量化 ──
+    try:
+        from lumen.services.knowledge._core import _get_sentence_db_for
+        from lumen.services.knowledge.chunker import split_sentences
+        sentence_backend = await get_service("knowledge_sentences")
+        if sentence_backend:
+            sentences = split_sentences(content)
+            if sentences:
+                sentence_vectors = await sentence_backend.encode_batch(sentences)
+                if sentence_vectors:
+                    sdb = _get_sentence_db_for("agent_knowledge")
+                    for j, (sent, svec) in enumerate(zip(sentences, sentence_vectors)):
+                        if svec:
+                            sdb.insert(svec, {
+                                "file_id": note_id,
+                                "source_path": md_filename,
+                                "category": f"active_{category}",
+                                "chunk_index": 0,
+                                "sentence_index": j,
+                                "content": sent,
+                            })
+                    sdb.flush()
+    except Exception as e:
+        logger.warning(f"日记句子向量化失败 ({note_id}): {e}")
+
     # T19: 日记图谱抽取
     try:
         from lumen.services.graph import extract_and_store
         await extract_and_store(
-            content=content, tdb_name="knowledge",
+            content=content, tdb_name="agent_knowledge",
         )
     except Exception:
         pass

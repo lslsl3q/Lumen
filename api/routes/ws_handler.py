@@ -34,6 +34,7 @@ async def handle_chat(ws: WebSocket, client_id: str, msg: dict):
     channel_id = msg.get("channel_id", "")
     response_style = msg.get("response_style", "balanced")
     rpg_mode = msg.get("rpg_mode", False)
+    memory_debug = msg.get("memory_debug", False)
 
     if not content.strip():
         await ws.send_json({"type": "error", "message": "消息不能为空"})
@@ -55,7 +56,7 @@ async def handle_chat(ws: WebSocket, client_id: str, msg: dict):
         else:
             async for event in agent_chat_stream(
                 content, session,
-                memory_debug=False,
+                memory_debug=memory_debug,
                 response_style=response_style,
             ):
                 await ws.send_json(event)

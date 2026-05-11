@@ -7,9 +7,10 @@
     "calculate",
     "web",
     "file_manager",
-    "daily_note"
+    "daily_note",
+    "theme"
   ],
-  "model": "deepseek-reasoner",
+  "model": "deepseek-v4-flash",
   "avatar": "default.png",
   "tool_tips": {},
   "context_size": 200000,

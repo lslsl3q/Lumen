@@ -55,7 +55,8 @@ export function initThemeOverrideCache() {
 
 export async function syncThemeFromBackend() {
   try {
-    const resp = await fetch("/api/theme/current");
+    const API_BASE_URL = 'http://127.0.0.1:8888';
+    const resp = await fetch(`${API_BASE_URL}/api/theme/current`);
     if (!resp.ok) return;
     const data = await resp.json();
     const overrides = data.overrides || {};

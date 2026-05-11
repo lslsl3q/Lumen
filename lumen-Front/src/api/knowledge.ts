@@ -5,20 +5,24 @@ import type { KnowledgeFile, KnowledgeCreatePayload, KnowledgeSearchResponse } f
 
 const API_BASE_URL = 'http://127.0.0.1:8888';
 
-export async function listKnowledgeFiles(category?: string): Promise<KnowledgeFile[]> {
-  const params = category ? `?category=${encodeURIComponent(category)}` : '';
-  const res = await fetch(`${API_BASE_URL}/knowledge/list${params}`);
+export async function listKnowledgeFiles(category?: string, kbName?: string): Promise<KnowledgeFile[]> {
+  const params = new URLSearchParams();
+  if (category) params.set('category', category);
+  if (kbName) params.set('kb_name', kbName);
+  const qs = params.toString();
+  const res = await fetch(`${API_BASE_URL}/knowledge/list${qs ? `?${qs}` : ''}`);
   if (!res.ok) throw new Error(`获取知识库列表失败: ${res.status}`);
   return res.json();
 }
 
-export async function getKnowledgeFile(fileId: string): Promise<KnowledgeFile> {
-  const res = await fetch(`${API_BASE_URL}/knowledge/${encodeURIComponent(fileId)}`);
+export async function getKnowledgeFile(fileId: string, kbName?: string): Promise<KnowledgeFile> {
+  const params = kbName ? `?kb_name=${encodeURIComponent(kbName)}` : '';
+  const res = await fetch(`${API_BASE_URL}/knowledge/${encodeURIComponent(fileId)}${params}`);
   if (!res.ok) throw new Error(`获取文件失败: ${res.status}`);
   return res.json();
 }
 
-export async function createKnowledgeEntry(payload: KnowledgeCreatePayload): Promise<KnowledgeFile> {
+export async function createKnowledgeEntry(payload: KnowledgeCreatePayload & { kb_name?: string }): Promise<KnowledgeFile> {
   const res = await fetch(`${API_BASE_URL}/knowledge/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -35,11 +39,13 @@ export async function uploadKnowledgeFile(
   file: File,
   category: string = 'imports',
   subdir: string = '',
+  kbName: string = 'knowledge',
 ): Promise<KnowledgeFile> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('category', category);
   formData.append('subdir', subdir);
+  formData.append('kb_name', kbName);
   const res = await fetch(`${API_BASE_URL}/knowledge/upload`, {
     method: 'POST',
     body: formData,
@@ -56,11 +62,12 @@ export async function searchKnowledge(
   topK: number = 5,
   minScore: number = 0.3,
   category?: string,
+  kbName?: string,
 ): Promise<KnowledgeSearchResponse> {
   const res = await fetch(`${API_BASE_URL}/knowledge/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, top_k: topK, min_score: minScore, category }),
+    body: JSON.stringify({ query, top_k: topK, min_score: minScore, category, kb_name: kbName }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -69,8 +76,9 @@ export async function searchKnowledge(
   return res.json();
 }
 
-export async function deleteKnowledgeFile(fileId: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/knowledge/${encodeURIComponent(fileId)}`, {
+export async function deleteKnowledgeFile(fileId: string, kbName?: string): Promise<void> {
+  const params = kbName ? `?kb_name=${encodeURIComponent(kbName)}` : '';
+  const res = await fetch(`${API_BASE_URL}/knowledge/${encodeURIComponent(fileId)}${params}`, {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error(`删除失败: ${res.status}`);
@@ -79,18 +87,22 @@ export async function deleteKnowledgeFile(fileId: string): Promise<void> {
 // ── T23 动态知识库 ──
 
 // 扫描变更
-export async function scanKnowledge() {
-  const res = await fetch(`${API_BASE_URL}/knowledge/scan`);
+export async function scanKnowledge(kbName?: string) {
+  const params = kbName ? `?kb_name=${encodeURIComponent(kbName)}` : '';
+  const res = await fetch(`${API_BASE_URL}/knowledge/scan${params}`);
   if (!res.ok) throw new Error('扫描失败');
   return res.json();
 }
 
 // 确认处理变更
 export async function applyScanChanges(changes: {
+  kb_name?: string;
   register_kbs?: string[];
   added?: Array<{ kb: string; path: string; md5: string }>;
   modified?: Array<{ kb: string; path: string; file_id: string }>;
   deleted?: Array<{ kb: string; path: string; file_id: string }>;
+  reindex?: string[];
+  delete?: string[];
 }) {
   const res = await fetch(`${API_BASE_URL}/knowledge/scan/apply`, {
     method: 'POST',
@@ -115,14 +127,6 @@ export async function createKnowledgeBase(name: string) {
     body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error('创建知识库失败');
-  return res.json();
-}
-
-export async function deleteKnowledgeBase(name: string) {
-  const res = await fetch(`${API_BASE_URL}/knowledge/bases/${encodeURIComponent(name)}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error('删除知识库失败');
   return res.json();
 }
 

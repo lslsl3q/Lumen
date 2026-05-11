@@ -14,7 +14,6 @@ from lumen.services.knowledge._core import (
     import_file,
     refine_with_sentences,
     search,
-    search_agent_knowledge,
     delete_file,
     reindex_file,
     close,
@@ -42,7 +41,6 @@ from lumen.services.knowledge.manifest import (
     ensure_manifest_for_existing_kb,
     list_kbs,
     create_kb,
-    delete_kb,
     get_kb,
 )
 

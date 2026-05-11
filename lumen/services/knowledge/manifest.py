@@ -1,7 +1,6 @@
 """_manifest.json 管理 — 每个知识库一个自包含清单"""
 import json
 import os
-import shutil
 from datetime import datetime
 from typing import Optional
 
@@ -72,13 +71,6 @@ def create_kb(name: str, tdb_path: str, graph_path: Optional[str] = None,
     return {"name": name, **manifest}
 
 
-def delete_kb(name: str) -> None:
-    """删除知识库（整个文件夹）"""
-    kb_dir = os.path.join(KNOWLEDGE_LIB_DIR, name)
-    if os.path.exists(kb_dir):
-        shutil.rmtree(kb_dir)
-
-
 def ensure_manifest_for_existing_kb(name: str) -> dict:
     """确保现有知识库有 _manifest.json。如果已有直接返回，否则自动创建。"""
     existing = load_kb_manifest(name)
@@ -93,8 +85,8 @@ def ensure_manifest_for_existing_kb(name: str) -> dict:
         },
         "agent_knowledge": {
             "tdb_path": "data/tdb/api/agent_knowledge.tdb",
-            "graph_path": None,
-            "sentence_path": None,
+            "graph_path": "data/graph/kb_agent_knowledge.tdb",
+            "sentence_path": "data/tdb/local/knowledge_sentences_agent_knowledge.tdb",
         },
     }
     info = defaults.get(name, {

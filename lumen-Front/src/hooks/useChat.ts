@@ -11,6 +11,7 @@ import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
 import { toast } from '../utils/toast';
 import { useWebSocket } from './useWebSocket';
+import { useSessionStore } from '../stores/useSessionStore';
 
 // ── 类型从共享文件导入，re-export 保持兼容 ──
 export type { Message, MessageStep, ThinkStep, ToolStep, TextStep, ToolCall, UseChatReturn } from '../types/chat';
@@ -24,19 +25,13 @@ import {
   nextStepId,
 } from '../types/chat';
 
-// ── 工具函数 ──
-
-/** 工具调用 JSON 标记（历史加载时检测合并） */
+// ReAct 循环中工具调用的标记，用于合并连续 assistant 消息
 const TOOL_CALL_MARKERS = [
-  '{"type": "tool_call',
-  '{"type":"tool_call',
-  '{"type": "tool_call_parallel',
-  '{"type":"tool_call_parallel',
-  '{"calls":',
-  '{"calls" :',
-  '{"tool":',
-  '{"tool" :',
+  '"tool":', '"type": "tool_call', '"calls":',
+  '{"success":', '{"error_code":', '<tool_result', '<<<[TOOL_REQUEST]',
 ];
+
+// ── 工具函数 ──
 
 /** 判断消息是否应从历史显示中过滤 */
 function isToolMessage(msg: HistoryMessage): boolean {
@@ -45,9 +40,6 @@ function isToolMessage(msg: HistoryMessage): boolean {
   if (!content) return false;
   if (content.startsWith('<tool_result')) return true;
   if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
-  for (const marker of TOOL_CALL_MARKERS) {
-    if (content.startsWith(marker)) return true;
-  }
   return false;
 }
 
@@ -64,9 +56,11 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [responseStyle, setResponseStyle] = useState<string>('balanced');
   const [rpgMode, setRpgMode] = useState<boolean>(false);
+
+  // 从 session store 读取 currentSessionId（单一数据源）
+  const getSessionId = useCallback(() => useSessionStore.getState().currentSessionId, []);
 
   // 当前流式中的 assistant 消息 ID
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -174,17 +168,28 @@ export function useChat() {
   });
 
   /** 加载指定会话的历史消息 */
-  const loadHistory = useCallback(async (sessionId: string, characterId?: string) => {
+  const loadHistory = useCallback(async (sessionId: string, _characterId?: string) => {
     try {
       const data = await getHistory(sessionId);
       const rawMessages: Message[] = data.messages
         .filter((msg: HistoryMessage) => !isToolMessage(msg))
-        .map((msg: HistoryMessage) => ({
-          id: `db_${msg.id}`,
-          dbId: msg.id,
-          role: msg.role,
-          content: msg.content,
-        }))
+        .map((msg: HistoryMessage) => {
+          const base: Message = {
+            id: `db_${msg.id}`,
+            dbId: msg.id,
+            role: msg.role,
+            content: msg.content,
+          };
+          // 从 metadata 重建思维气泡 steps
+          const reasoning = msg.metadata?.reasoning_content as string | undefined;
+          if (reasoning && msg.role === 'assistant') {
+            base.steps = [
+              { type: 'think', id: nextStepId(), content: reasoning, done: true },
+              { type: 'text', id: nextStepId(), content: msg.content },
+            ];
+          }
+          return base;
+        })
         .filter((msg: Message) => msg.content.trim().length > 0);
 
       // 合并 ReAct 循环产生的连续 assistant 消息
@@ -201,10 +206,6 @@ export function useChat() {
       }
 
       setMessages(historyMessages.length > 0 ? historyMessages : []);
-      setCurrentSessionId(sessionId);
-      if (characterId) {
-        localStorage.setItem(`lastSession_${characterId}`, sessionId);
-      }
       setError(null);
     } catch (err) {
       console.error('加载历史失败:', err);
@@ -214,7 +215,6 @@ export function useChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setCurrentSessionId(null);
     setError(null);
   }, []);
 
@@ -226,12 +226,12 @@ export function useChat() {
   ) => {
     if (!messageContent.trim()) return;
 
-    let sessionId = currentSessionId;
+    let sessionId = getSessionId();
     if (!sessionId) {
       try {
         const data = await createSession();
         sessionId = data.session_id;
-        setCurrentSessionId(sessionId);
+        useSessionStore.getState().setCurrentSessionId(sessionId);
       } catch (err) {
         console.error('自动创建会话失败:', err);
         setError('创建会话失败');
@@ -269,7 +269,7 @@ export function useChat() {
       response_style: responseStyle,
       rpg_mode: rpgMode,
     });
-  }, [currentSessionId, responseStyle, rpgMode, wsSend]);
+  }, [getSessionId, responseStyle, rpgMode, wsSend]);
 
   const resetChat = useCallback(() => {
     setMessages([]);
@@ -285,44 +285,47 @@ export function useChat() {
   }, []);
 
   const abort = useCallback(() => {
-    wsSend({ type: 'cancel', session_id: currentSessionId || 'default' });
+    wsSend({ type: 'cancel', session_id: getSessionId() || 'default' });
     streamingMsgIdRef.current = null;
     setIsLoading(false);
-  }, [currentSessionId, wsSend]);
+  }, [getSessionId, wsSend]);
 
   const editMessage = useCallback(async (messageId: string, newContent: string) => {
     const msg = messages.find(m => m.id === messageId);
-    if (!msg?.dbId || !currentSessionId) return;
+    const sessionId = getSessionId();
+    if (!msg?.dbId || !sessionId) return;
     try {
-      await editMessageAPI(currentSessionId, msg.dbId, newContent);
+      await editMessageAPI(sessionId, msg.dbId, newContent);
       setMessages(prev => prev.map(m =>
         m.id === messageId ? { ...m, content: newContent } : m
       ));
     } catch (err) {
       console.error('编辑消息失败:', err);
     }
-  }, [messages, currentSessionId]);
+  }, [messages, getSessionId]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
     const msg = messages.find(m => m.id === messageId);
     if (!msg) return;
-    if (!currentSessionId) { toast('未连接到会话，请刷新页面', 'error'); return; }
+    const sessionId = getSessionId();
+    if (!sessionId) { toast('未连接到会话，请刷新页面', 'error'); return; }
     setMessages(prev => prev.filter(m => m.id !== messageId));
     if (!msg.dbId) { console.warn('[useChat] 消息没有 dbId，仅从内存删除:', messageId); return; }
     try {
-      await deleteMessageAPI(currentSessionId, msg.dbId);
+      await deleteMessageAPI(sessionId, msg.dbId);
     } catch (err) {
       console.error('删除消息失败:', err);
       if (err instanceof Error && err.message.includes('404')) return;
       toast('删除可能未生效，切换对话后会自动同步', 'error');
     }
-  }, [messages, currentSessionId]);
+  }, [messages, getSessionId]);
 
   const regenerateMessage = useCallback(async (messageId: string, debugMode: boolean = false, onDebugEvent?: ((event: StreamEvent) => void) | null) => {
     const msg = messages.find(m => m.id === messageId);
-    if (!msg?.dbId || !currentSessionId) return;
+    const sessionId = getSessionId();
+    if (!msg?.dbId || !sessionId) return;
     try {
-      const data = await regenerateMessageAPI(currentSessionId, msg.dbId);
+      const data = await regenerateMessageAPI(sessionId, msg.dbId);
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx >= 0) { setMessages(prev => prev.slice(0, idx)); }
       await sendMessageToAPI(data.user_message, debugMode, onDebugEvent);
@@ -330,20 +333,21 @@ export function useChat() {
       console.error('重新生成失败:', err);
       toast('重新生成失败', 'error');
     }
-  }, [messages, currentSessionId, sendMessageToAPI]);
+  }, [messages, getSessionId, sendMessageToAPI]);
 
   const branchFromMessage = useCallback(async (messageId: string): Promise<string | null> => {
     const msg = messages.find(m => m.id === messageId);
-    if (!msg?.dbId || !currentSessionId) return null;
+    const sessionId = getSessionId();
+    if (!msg?.dbId || !sessionId) return null;
     try {
-      const data = await branchSessionAPI(currentSessionId, msg.dbId);
+      const data = await branchSessionAPI(sessionId, msg.dbId);
       return data.new_session_id;
     } catch (err) {
       console.error('创建分支失败:', err);
       toast('创建分支失败', 'error');
       return null;
     }
-  }, [messages, currentSessionId]);
+  }, [messages, getSessionId]);
 
   return {
     messages,
@@ -355,8 +359,6 @@ export function useChat() {
     loadHistory,
     clearMessages,
     addSystemMessage,
-    currentSessionId,
-    setCurrentSessionId,
     error,
     abort,
     editMessage,

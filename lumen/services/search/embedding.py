@@ -356,6 +356,23 @@ def _build_backend(backend_type: str, model_name: str, api_url: str, api_key: st
         return None
 
 
+def _is_api_knowledge_base(service_name: str) -> bool:
+    """判断 service_name 是否属于 API 阵营的知识库
+
+    默认知识库名称（knowledge / agent_knowledge）直接返回 True；
+    其他名称通过 manifest 的 embedding_camp 字段判断。
+    """
+    if service_name in ("knowledge", "agent_knowledge"):
+        return True
+    try:
+        from lumen.services.knowledge.manifest import load_kb_manifest
+        manifest = load_kb_manifest(service_name)
+        return bool(manifest and manifest.get("embedding_camp") == "api")
+    except Exception as e:
+        logger.warning(f"_is_api_knowledge_base({service_name}) manifest 读取失败: {e}")
+        return False
+
+
 def _resolve_service_config(service_name: str) -> dict:
     """解析指定服务的嵌入配置（两阵营架构）
 
@@ -373,7 +390,7 @@ def _resolve_service_config(service_name: str) -> dict:
     )
 
     # ── 阵营 B：知识库（API 大模型）──
-    if service_name in ("knowledge", "agent_knowledge"):
+    if _is_api_knowledge_base(service_name):
         if not KNOWLEDGE_EMBEDDING_BACKEND:
             return {"backend_type": "", "model_name": "",
                     "api_url": EMBEDDING_API_URL, "api_key": EMBEDDING_API_KEY,
@@ -467,7 +484,7 @@ def resolve_dimensions(service_name: str) -> int:
     from lumen.config import EMBEDDING_LOCAL_DIM, EMBEDDING_API_DIM
 
     # 阵营 B：知识库必须用户显式配置
-    if service_name in ("knowledge", "agent_knowledge"):
+    if _is_api_knowledge_base(service_name):
         if EMBEDDING_API_DIM > 0:
             return EMBEDDING_API_DIM
         raise ValueError(

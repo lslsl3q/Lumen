@@ -302,12 +302,19 @@ class ReActActingComponent(ActingComponent):
                             layer_infos.append({"name": "知识库检索", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
                         elif msg["content"].startswith("<thinking_modules>"):
                             layer_infos.append({"name": "思维簇", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+                # 从 MemoryComponent 读取召回日志
+                recall_log = []
+                if hasattr(self, '_agent') and self._agent:
+                    for comp in self._agent.components:
+                        if comp.name == "memory" and hasattr(comp, 'last_recall_log'):
+                            recall_log = comp.last_recall_log or []
+                            break
                 yield {
                     "type": "memory_debug",
                     "layers": layer_infos,
                     "total_tokens": estimate_messages_tokens(trimmed),
                     "context_size": self.config.get("context_size") or 4096,
-                    "recall_log": [],
+                    "recall_log": recall_log,
                 }
 
             # ── 调用 LLM（流式）──
@@ -415,9 +422,10 @@ class ReActActingComponent(ActingComponent):
                 if current_reasoning_buffer:
                     msg["reasoning_content"] = current_reasoning_buffer
                 self.session.messages.append(msg)
+                meta = {"reasoning_content": current_reasoning_buffer} if current_reasoning_buffer else None
                 msg_id = await _save_and_vectorize(
                     self.session.session_id or "default", "assistant",
-                    clean_content, self.session.character_id,
+                    clean_content, self.session.character_id, metadata=meta,
                 )
                 self.session.messages[-1]["id"] = msg_id
                 if len(self.session.messages) <= 5:
@@ -449,9 +457,10 @@ class ReActActingComponent(ActingComponent):
             if current_reasoning_buffer:
                 msg["reasoning_content"] = current_reasoning_buffer
             self.session.messages.append(msg)
+            meta = {"reasoning_content": current_reasoning_buffer} if current_reasoning_buffer else None
             msg_id = await _save_and_vectorize(
                 self.session.session_id or "default", "assistant",
-                clean_content, self.session.character_id,
+                clean_content, self.session.character_id, metadata=meta,
             )
             self.session.messages[-1]["id"] = msg_id
             yield {"type": "msg_saved", "role": "assistant", "db_id": msg_id}
@@ -498,6 +507,7 @@ class ReActActingComponent(ActingComponent):
         response = await chat(trimmed, self.model, stream=True)
 
         final_reply = ""
+        reasoning_buffer_max = ""
         in_think_max = False
         last_chunk_max = None
         async for chunk in response:
@@ -509,6 +519,7 @@ class ReActActingComponent(ActingComponent):
             # reasoning_content 处理
             reasoning = getattr(delta, 'reasoning_content', None) or getattr(delta, 'reasoning', None)
             if reasoning:
+                reasoning_buffer_max += reasoning
                 if not in_think_max:
                     yield {"type": "think_start"}
                     in_think_max = True
@@ -528,9 +539,10 @@ class ReActActingComponent(ActingComponent):
         log_stream_cache_stats(last_chunk_max)
         clean_reply = _strip_think_tags(final_reply)
         self.session.messages.append({"role": "assistant", "content": clean_reply})
+        meta = {"reasoning_content": reasoning_buffer_max} if reasoning_buffer_max else None
         msg_id = await _save_and_vectorize(
             self.session.session_id or "default", "assistant",
-            clean_reply, self.session.character_id,
+            clean_reply, self.session.character_id, metadata=meta,
         )
         self.session.messages[-1]["id"] = msg_id
         if len(self.session.messages) <= 5:

@@ -539,7 +539,7 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
   if (isUser) {
     return (
       <div className="flex justify-end items-start gap-2" onContextMenu={e => e.preventDefault()}>
-        <div className="max-w-[75%] rounded-lg px-4 py-3 bg-primary/10 border border-primary/20 text-primary/50"
+        <div className="max-w-[75%] rounded-lg px-4 py-3 bg-primary/10 border border-primary/20 text-primary/80"
           data-message-bubble="true"
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
           <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
