@@ -18,9 +18,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from lumen.config import SEMANTIC_VECTORS_DIR, HISTORY_DB
+from lumen.config import SEMANTIC_VECTORS_DIR, GRAPH_META_DB
 VECTORS_DIR = SEMANTIC_VECTORS_DIR
-DB_PATH = HISTORY_DB
+DB_PATH = GRAPH_META_DB
 
 # 默认情绪关键词表（中英文混合，每组 20+ 词）
 DEFAULT_EMOTION_KEYWORDS = {

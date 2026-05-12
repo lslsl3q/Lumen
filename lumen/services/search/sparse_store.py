@@ -1,13 +1,15 @@
 """
 稀疏向量存储服务
 SQLite 存储 + In-memory 缓存 + Dot Product 搜索
-复用 history.db，与 history.py 共享连接
+与 chunks.py 共享 SEARCH_INDEX_DB
 """
 
 import json
 import logging
 import threading
 from typing import Optional
+
+from lumen.services.knowledge.chunks import get_conn
 
 logger = logging.getLogger(__name__)
 
@@ -20,19 +22,27 @@ _cache_lock = threading.Lock()
 
 def _ensure_table():
     """确保 sparse_vectors 表存在"""
-    from lumen.services.storage.history import _get_conn
-    conn = _get_conn()
+    conn = get_conn()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS sparse_vectors (
             node_id INTEGER PRIMARY KEY,
             file_id TEXT NOT NULL,
             chunk_index INTEGER NOT NULL,
             category TEXT DEFAULT '',
-            sparse_data TEXT NOT NULL
+            sparse_data TEXT NOT NULL,
+            kb_name TEXT NOT NULL DEFAULT 'knowledge'
         )
     """)
+    # 幂等：旧表没有 kb_name 列时补加
+    cursor = conn.execute("PRAGMA table_info(sparse_vectors)")
+    col_names = [row[1] for row in cursor.fetchall()]
+    if "kb_name" not in col_names:
+        conn.execute(
+            "ALTER TABLE sparse_vectors ADD COLUMN kb_name TEXT NOT NULL DEFAULT 'knowledge'"
+        )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sv_file ON sparse_vectors(file_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_sv_cat ON sparse_vectors(category)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sv_kb ON sparse_vectors(kb_name)")
     conn.commit()
 
 
@@ -61,10 +71,9 @@ def _ensure_cache():
             return
 
         _ensure_table()
-        from lumen.services.storage.history import _get_conn
-        conn = _get_conn()
+        conn = get_conn()
         rows = conn.execute(
-            "SELECT node_id, file_id, chunk_index, category, sparse_data FROM sparse_vectors"
+            "SELECT node_id, file_id, chunk_index, category, sparse_data, kb_name FROM sparse_vectors"
         ).fetchall()
 
         for row in rows:
@@ -75,6 +84,7 @@ def _ensure_cache():
                     "file_id": row["file_id"],
                     "chunk_index": row["chunk_index"],
                     "category": row["category"],
+                    "kb_name": row["kb_name"] or "knowledge",
                 }
 
         _cache_loaded = True
@@ -88,30 +98,30 @@ def has_sparse_data() -> bool:
     return len(_cache) > 0
 
 
-def save_sparse_batch(items: list[dict]):
+def save_sparse_batch(items: list[dict], kb_name: str = "knowledge"):
     """批量写入稀疏向量
 
     Args:
         items: [{"node_id", "file_id", "chunk_index", "category", "sparse_data"}]
                sparse_data 是 API 原始返回（list 或 dict）
+        kb_name: 知识库名称，默认 "knowledge"
     """
     if not items:
         return
 
     _ensure_table()
-    from lumen.services.storage.history import _get_conn
 
     with _cache_lock:
-        conn = _get_conn()
+        conn = get_conn()
         for item in items:
             raw = item["sparse_data"]
             json_str = json.dumps(raw, ensure_ascii=False)
             conn.execute(
                 """INSERT OR REPLACE INTO sparse_vectors
-                   (node_id, file_id, chunk_index, category, sparse_data)
-                   VALUES (?, ?, ?, ?, ?)""",
+                   (node_id, file_id, chunk_index, category, sparse_data, kb_name)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 (item["node_id"], item["file_id"], item["chunk_index"],
-                 item["category"], json_str),
+                 item["category"], json_str, kb_name),
             )
             # 同步更新内存缓存
             parsed = _parse_sparse(raw)
@@ -121,6 +131,7 @@ def save_sparse_batch(items: list[dict]):
                     "file_id": item["file_id"],
                     "chunk_index": item["chunk_index"],
                     "category": item["category"],
+                    "kb_name": kb_name,
                 }
         conn.commit()
 
@@ -131,6 +142,7 @@ def search_sparse(
     query_sparse: list[dict] | dict,
     category: str = "",
     top_k: int = 5,
+    kb_name: str = "",
 ) -> list[dict]:
     """用 Dot Product 搜索最相似的稀疏向量
 
@@ -138,6 +150,7 @@ def search_sparse(
         query_sparse: API 返回的稀疏向量（list 或 dict 格式）
         category: 按分类过滤（空不过滤）
         top_k: 返回条数
+        kb_name: 按知识库名称过滤（空不过滤）
 
     Returns:
         [{"file_id", "chunk_index", "content_from_meta", "score"}, ...]
@@ -151,6 +164,8 @@ def search_sparse(
     scored = []
     for node_id, doc_dict in _cache.items():
         meta = _cache_meta.get(node_id, {})
+        if kb_name and meta.get("kb_name") != kb_name:
+            continue
         if category and meta.get("category") != category:
             continue
 
@@ -177,14 +192,18 @@ def search_sparse(
     return results
 
 
-def delete_by_file(file_id: str):
+def delete_by_file(file_id: str, kb_name: str = ""):
     """删除指定文件的所有稀疏向量"""
     _ensure_table()
-    from lumen.services.storage.history import _get_conn
 
     with _cache_lock:
-        conn = _get_conn()
-        conn.execute("DELETE FROM sparse_vectors WHERE file_id = ?", (file_id,))
+        conn = get_conn()
+        sql = "DELETE FROM sparse_vectors WHERE file_id = ?"
+        params: list = [file_id]
+        if kb_name:
+            sql += " AND kb_name = ?"
+            params.append(kb_name)
+        conn.execute(sql, params)
         conn.commit()
 
         # 同步清理内存缓存

@@ -169,3 +169,63 @@ export async function deleteSetting(id: string): Promise<void> {
 export function getExportUrl(projectId: string, format: "txt" | "md" | "docx" = "txt"): string {
   return `${BASE}/projects/${encodeURIComponent(projectId)}/export?format=${format}`;
 }
+
+// ── 快照 ──
+
+export interface WritingSnapshot {
+  id: string;
+  project_id: string;
+  type: "auto" | "manual" | "pre_restore";
+  label: string;
+  size_bytes: number;
+  created_at: number;
+  stats?: {
+    chapter_count: number;
+    total_words: number;
+    setting_count: number;
+  };
+}
+
+export interface WritingSnapshotDetail extends WritingSnapshot {
+  data: {
+    project: { id: string; name: string; description: string; metadata: Record<string, unknown> };
+    chapters: Array<{ id: string; title: string; content: string; word_count: number; sort_order: number; volume: string }>;
+    settings: Array<{ id: string; name: string; category: string; content: Record<string, unknown>; parent_id: string | null; sort_order: number; enabled: number }>;
+    snapshot_version: number;
+  };
+}
+
+export async function listSnapshots(projectId: string): Promise<{ items: WritingSnapshot[]; total: number }> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/snapshots`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createSnapshot(projectId: string, label = "", type: "auto" | "manual" = "manual"): Promise<WritingSnapshot> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/snapshots`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, type }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getSnapshotDetail(snapshotId: string): Promise<WritingSnapshotDetail> {
+  const res = await fetch(`${BASE}/snapshots/${encodeURIComponent(snapshotId)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function restoreSnapshot(snapshotId: string): Promise<{ restored_at: number; backup_snapshot_id: string }> {
+  const res = await fetch(`${BASE}/snapshots/${encodeURIComponent(snapshotId)}/restore`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteSnapshot(snapshotId: string): Promise<void> {
+  const res = await fetch(`${BASE}/snapshots/${encodeURIComponent(snapshotId)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}

@@ -8,7 +8,8 @@ import os
 import logging
 from typing import List
 
-from lumen.services.skills import load_skill, _skill_path, SKILLS_DIR
+from lumen.services.skills import load_skill, _skill_path
+from lumen.config import SKILLS_DIR
 from lumen.services.context.token_estimator import estimate_text_tokens
 
 logger = logging.getLogger(__name__)

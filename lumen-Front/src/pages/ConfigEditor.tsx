@@ -82,30 +82,30 @@ function ConfigEditor({ resource: propResource, onBack }: ConfigEditorProps) {
 
   if (isLoading) {
     return (
-      <div className="h-full bg-surface-deep text-slate-200 flex items-center justify-center">
-        <div className="text-slate-600">加载中...</div>
+      <div className="h-full bg-surface-deep text-text-primary flex items-center justify-center">
+        <div className="text-text-muted">加载中...</div>
       </div>
     );
   }
 
   if (!config || !resource) {
     return (
-      <div className="h-full bg-surface-deep text-slate-200 flex items-center justify-center">
-        <div className="text-slate-600">配置不存在</div>
+      <div className="h-full bg-surface-deep text-text-primary flex items-center justify-center">
+        <div className="text-text-muted">配置不存在</div>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-surface-deep text-slate-200">
+    <div className="h-full bg-surface-deep text-text-primary">
       <div className="max-w-3xl mx-auto px-6 py-6">
         {/* 顶栏 */}
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={goBack}
             className="
-              px-3 py-1.5 rounded-lg text-sm text-slate-400
-              hover:text-slate-200 hover:bg-slate-800/60
+              px-3 py-1.5 rounded-lg text-sm text-text-secondary
+              hover:text-text-primary hover:bg-surface-elevated
               transition-all duration-150
             "
           >
@@ -157,7 +157,7 @@ function ToolsViewer({ parsed }: { parsed?: Record<string, ToolDef> }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   if (!parsed) {
-    return <div className="text-slate-600">无工具数据</div>;
+    return <div className="text-text-muted">无工具数据</div>;
   }
 
   const tools = Object.entries(parsed);
@@ -171,14 +171,14 @@ function ToolsViewer({ parsed }: { parsed?: Record<string, ToolDef> }) {
 
   return (
     <div className="space-y-3">
-      <div className="text-sm text-slate-500 mb-4">
+      <div className="text-sm text-text-muted mb-4">
         当前注册 {tools.length} 个工具（只读查看）
       </div>
 
       {tools.map(([name, def]) => (
         <div
           key={name}
-          className="rounded-lg bg-slate-900/60 border border-slate-800/40 overflow-hidden"
+          className="rounded-lg bg-surface-elevated border border-border-default overflow-hidden"
         >
           {/* 工具头 */}
           <button
@@ -186,17 +186,17 @@ function ToolsViewer({ parsed }: { parsed?: Record<string, ToolDef> }) {
             className="
               w-full flex items-center justify-between
               px-4 py-3 text-left
-              hover:bg-slate-800/40 transition-all duration-150
+              hover:bg-primary-subtle transition-all duration-150
             "
           >
             <div>
               <span className="text-sm text-teal-400 font-mono">{name}</span>
               {def.description && (
-                <span className="text-xs text-slate-500 ml-3">{def.description}</span>
+                <span className="text-xs text-text-muted ml-3">{def.description}</span>
               )}
             </div>
             <svg
-              className={`w-4 h-4 text-slate-600 transition-transform ${expanded.has(name) ? 'rotate-180' : ''}`}
+              className={`w-4 h-4 text-text-muted transition-transform ${expanded.has(name) ? 'rotate-180' : ''}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -205,28 +205,28 @@ function ToolsViewer({ parsed }: { parsed?: Record<string, ToolDef> }) {
 
           {/* 展开详情 */}
           {expanded.has(name) && (
-            <div className="px-4 pb-4 space-y-3 border-t border-slate-800/40">
+            <div className="px-4 pb-4 space-y-3 border-t border-border-default">
               {/* 使用指南 */}
               {def.usage_guide && (
                 <div className="mt-3">
-                  <div className="text-xs text-slate-500 mb-1">使用指南</div>
-                  <div className="text-sm text-slate-400">{def.usage_guide}</div>
+                  <div className="text-xs text-text-muted mb-1">使用指南</div>
+                  <div className="text-sm text-text-secondary">{def.usage_guide}</div>
                 </div>
               )}
 
               {/* 参数 */}
               {def.parameters?.properties && (
                 <div>
-                  <div className="text-xs text-slate-500 mb-2">参数</div>
+                  <div className="text-xs text-text-muted mb-2">参数</div>
                   <div className="space-y-2">
                     {Object.entries(def.parameters.properties).map(([paramName, paramDef]) => (
                       <div
                         key={paramName}
-                        className="flex items-start gap-3 px-3 py-2 rounded bg-slate-800/30"
+                        className="flex items-start gap-3 px-3 py-2 rounded bg-primary-subtle"
                       >
-                        <code className="text-xs text-amber-400 font-mono shrink-0">{paramName}</code>
-                        <div className="text-xs text-slate-500">
-                          <span className="text-slate-400">{paramDef.type}</span>
+                        <code className="text-xs text-primary font-mono shrink-0">{paramName}</code>
+                        <div className="text-xs text-text-muted">
+                          <span className="text-text-secondary">{paramDef.type}</span>
                           {paramDef.description && (
                             <span className="ml-2">{paramDef.description}</span>
                           )}

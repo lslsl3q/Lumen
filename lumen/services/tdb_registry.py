@@ -102,14 +102,18 @@ def get_tdb(name: str) -> triviumdb.TriviumDB:
         if tdb_path is None:
             raise ValueError(f"未知 TDB: {name}")
 
-        if not os.path.exists(tdb_path):
-            raise FileNotFoundError(f"TDB 文件不存在: {tdb_path}")
+        # 目录必须存在，但 .tdb 文件可以由 _open_tdb 自动创建
+        tdb_dir = os.path.dirname(tdb_path)
+        if not os.path.exists(tdb_dir):
+            raise FileNotFoundError(f"TDB 目录不存在: {tdb_dir}")
 
         from lumen.services.search.embedding import resolve_dimensions, check_dim_consistency, _save_dim_file
         dim = resolve_dimensions(name)
-        err = check_dim_consistency(tdb_path, dim)
-        if err:
-            raise RuntimeError(err)
+        # 仅文件已存在时检查维度一致性
+        if os.path.exists(tdb_path):
+            err = check_dim_consistency(tdb_path, dim)
+            if err:
+                raise RuntimeError(err)
         db = _open_tdb(tdb_path, dim, _KB_INDEX_FIELDS)
         _save_dim_file(tdb_path, dim)
         _instances[name] = db

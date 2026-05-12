@@ -43,6 +43,7 @@ interface SessionState {
   deleteSession: (sessionId: string) => Promise<string | null>;
   resetSession: (sessionId: string) => Promise<void>;
   initialize: (characterId: string) => Promise<void>;
+  handleCharacterSwitch: (characterId: string) => Promise<void>;
   formatSessionLabel: (sessionId: string) => string;
 }
 
@@ -108,6 +109,19 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       set({ currentSessionId: list[0].session_id, isLoading: false });
     } else {
       set({ isLoading: false });
+    }
+  },
+
+  handleCharacterSwitch: async (characterId: string) => {
+    set({ isLoading: true, filterCharacterId: characterId });
+    const list = await get().refreshSessions(characterId);
+    const lastSessionId = localStorage.getItem(`lastSession_${characterId}`);
+    if (lastSessionId && list.some(s => s.session_id === lastSessionId)) {
+      set({ currentSessionId: lastSessionId, isLoading: false });
+    } else if (list.length > 0) {
+      set({ currentSessionId: list[0].session_id, isLoading: false });
+    } else {
+      set({ currentSessionId: null, isLoading: false });
     }
   },
 

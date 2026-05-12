@@ -12,13 +12,12 @@ import random
 import string
 
 from lumen.types.prompt import CharacterCard
+from lumen.config import CHARACTERS_DIR, AVATARS_DIR
 
 logger = logging.getLogger(__name__)
 
-CHARACTERS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "characters")
 
 def _avatars_dir():
-    from lumen.services.avatar import AVATARS_DIR
     return AVATARS_DIR
 
 

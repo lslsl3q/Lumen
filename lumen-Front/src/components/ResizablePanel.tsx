@@ -53,8 +53,8 @@ function ResizablePanel({
         className={`absolute top-0 right-0 bottom-0 w-[3px] cursor-col-resize z-10
           transition-colors duration-100
           ${isDragging
-            ? 'bg-amber-500/40'
-            : 'hover:bg-amber-500/20'
+            ? 'bg-primary/40'
+            : 'hover:bg-primary/20'
           }`}
         title="拖拽调整宽度 · 双击恢复默认"
       />

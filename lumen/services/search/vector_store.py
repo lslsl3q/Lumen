@@ -116,12 +116,35 @@ def search_similar(
     results = db.search(query_vector, top_k=top_k * 2, min_score=min_score,
                         payload_filter=search_filter)
 
-    hits = []
-    seen = set()
+    # 批量收集 session_id，一次性查 SQLite（避免逐条查询）
+    raw_hits = []
+    session_ids = set()
     for hit in results:
         payload = hit.payload if hasattr(hit, "payload") else {}
+        sid = payload.get("session_id", "")
+        raw_hits.append((hit, payload, sid))
+        if sid:
+            session_ids.add(sid)
+
+    # 批量校验会话是否存在
+    valid_sessions = set()
+    if session_ids:
+        try:
+            from lumen.services.storage import history
+            valid_sessions = history.sessions_exist(session_ids)
+        except Exception:
+            valid_sessions = session_ids  # 校验失败时保守处理，不删任何向量
+
+    hits = []
+    seen = set()
+    orphan_ids = []
+    for hit, payload, sid in raw_hits:
+        # 孤儿向量懒清理
+        if sid and sid not in valid_sessions:
+            orphan_ids.append(hit.id)
+            continue
         # 去重
-        key = (payload.get("session_id", ""), payload.get("content", "")[:100])
+        key = (sid, payload.get("content", "")[:100])
         if key in seen:
             continue
         seen.add(key)
@@ -130,7 +153,7 @@ def search_similar(
             "id": hit.id if hasattr(hit, "id") else None,
             "role": payload.get("role", ""),
             "content": payload.get("content", ""),
-            "session_id": payload.get("session_id", ""),
+            "session_id": sid,
             "created_at": payload.get("created_at", ""),
             "message_id": payload.get("message_id", 0),
             "score": hit.score if hasattr(hit, "score") else 0.0,
@@ -138,7 +161,40 @@ def search_similar(
         if len(hits) >= top_k:
             break
 
+    # 清理孤儿向量
+    if orphan_ids:
+        try:
+            for oid in orphan_ids:
+                db.delete(oid)
+            db.flush()
+            logger.info(f"懒清理 {len(orphan_ids)} 条孤儿向量")
+        except Exception as e:
+            logger.warning(f"孤儿向量清理失败: {e}")
+
     return hits
+
+
+def delete_by_message_id(message_id: int) -> int:
+    """按消息 ID 删除向量，返回删除数量。"""
+    db = _get_db()
+    result = db.tql_mut(f'MATCH (a {{message_id: {message_id}}}) DETACH DELETE a')
+    db.flush()
+    return result.get("affected", 0) if isinstance(result, dict) else 0
+
+
+def delete_by_message_ids(message_ids: list[int]) -> int:
+    """批量按消息 ID 删除向量，返回删除数量。"""
+    if not message_ids:
+        return 0
+    db = _get_db()
+    deleted = 0
+    for message_id in message_ids:
+        result = db.tql_mut(f'MATCH (a {{message_id: {message_id}}}) DETACH DELETE a')
+        if isinstance(result, dict):
+            deleted += int(result.get("affected", 0) or 0)
+    db.flush()
+    return deleted
+
 
 
 def delete_by_session(session_id: str) -> int:

@@ -11,6 +11,8 @@ import { createSession } from '../api/session';
 import { HistoryMessage } from '../types/session';
 import { toast } from '../utils/toast';
 import { useWebSocket } from './useWebSocket';
+import { useSessionStore } from '../stores/useSessionStore';
+import type { MessageStep } from '../types/chat';
 
 // ── 类型从共享文件导入，re-export 保持兼容 ──
 export type { Message, MessageStep, ThinkStep, ToolStep, TextStep, ToolCall, UseChatReturn } from '../types/chat';
@@ -24,28 +26,36 @@ import {
   nextStepId,
 } from '../types/chat';
 
-// ── 工具函数 ──
-
-/** 工具调用 JSON 标记（历史加载时检测合并） */
+// ReAct 循环中工具调用的标记，用于兼容旧历史的连续 assistant 合并
 const TOOL_CALL_MARKERS = [
-  '{"type": "tool_call',
-  '{"type":"tool_call',
-  '{"type": "tool_call_parallel',
-  '{"type":"tool_call_parallel',
-  '{"calls":',
-  '{"calls" :',
-  '{"tool":',
-  '{"tool" :',
+  '"tool":', '"type": "tool_call', '"calls":',
+  '{"success":', '{"error_code":', '<tool_result', '<<<[TOOL_REQUEST]',
 ];
+
+// ── 工具函数 ──
 
 /** 判断消息是否应从历史显示中过滤 */
 function isToolMessage(msg: HistoryMessage): boolean {
-  if (msg.hidden) return true;
+  if (msg.hidden || msg.metadata?.hidden || msg.metadata?.internal) return true;
+  if (['tool_result', 'tool_result_parallel', 'system_feedback'].includes(msg.metadata?.type || '')) return true;
   const content = msg.content.trim();
   if (!content) return false;
   if (content.startsWith('<tool_result')) return true;
   if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
   return false;
+}
+
+function buildHistorySteps(msg: HistoryMessage): MessageStep[] | undefined {
+  if (msg.role !== 'assistant') return undefined;
+  const steps: MessageStep[] = [];
+  const reasoning = msg.metadata?.reasoning_content;
+  if (reasoning) {
+    steps.push({ type: 'think', id: nextStepId(), content: reasoning, done: true });
+  }
+  if (msg.content.trim()) {
+    steps.push({ type: 'text', id: nextStepId(), content: msg.content });
+  }
+  return steps.length > 0 ? steps : undefined;
 }
 
 function generateMessageId(): string {
@@ -61,9 +71,11 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [responseStyle, setResponseStyle] = useState<string>('balanced');
   const [rpgMode, setRpgMode] = useState<boolean>(false);
+
+  // 从 session store 读取 currentSessionId（单一数据源）
+  const getSessionId = useCallback(() => useSessionStore.getState().currentSessionId, []);
 
   // 当前流式中的 assistant 消息 ID
   const streamingMsgIdRef = useRef<string | null>(null);
@@ -156,10 +168,27 @@ export function useChat() {
           setIsLoading(false);
           return [...updated.slice(0, -1), { ...last, steps, isStreaming: false }];
         case 'done': {
-          const updates: Partial<Message> = { isStreaming: false, steps };
+          // 安全机制：强制关闭所有未完成的思考步骤
+          const safeSteps = steps.map(s =>
+            s.type === 'think' && !s.done ? { ...s, done: true } : s
+          );
+          const updates: Partial<Message> = { isStreaming: false, steps: safeSteps };
           if (event.assistant_db_id) updates.dbId = event.assistant_db_id;
           streamingMsgIdRef.current = null;
           setIsLoading(false);
+          // 更新会话标题（后端自动生成）
+          if (event.title) {
+            const sid = getSessionId();
+            if (sid) {
+              const { sessions } = useSessionStore.getState();
+              const idx = sessions.findIndex(s => s.session_id === sid);
+              if (idx >= 0 && !sessions[idx].title) {
+                const updated = [...sessions];
+                updated[idx] = { ...updated[idx], title: event.title as string };
+                useSessionStore.setState({ sessions: updated });
+              }
+            }
+          }
           return [...updated.slice(0, -1), { ...last, ...updates }];
         }
         default:
@@ -171,7 +200,7 @@ export function useChat() {
   });
 
   /** 加载指定会话的历史消息 */
-  const loadHistory = useCallback(async (sessionId: string, characterId?: string) => {
+  const loadHistory = useCallback(async (sessionId: string, _characterId?: string) => {
     try {
       const data = await getHistory(sessionId);
       const rawMessages: Message[] = data.messages
@@ -181,16 +210,19 @@ export function useChat() {
           dbId: msg.id,
           role: msg.role,
           content: msg.content,
+          steps: buildHistorySteps(msg),
         }))
         .filter((msg: Message) => msg.content.trim().length > 0);
 
-      // 合并 ReAct 循环产生的连续 assistant 消息
       const historyMessages: Message[] = [];
       for (const msg of rawMessages) {
         if (msg.role === 'assistant' && historyMessages.length > 0) {
           const prev = historyMessages[historyMessages.length - 1];
           if (prev.role === 'assistant' && TOOL_CALL_MARKERS.some(m => prev.content.includes(m))) {
             prev.content += '\n' + msg.content;
+            if (msg.steps?.length) {
+              prev.steps = [...(prev.steps || []), ...msg.steps];
+            }
             continue;
           }
         }
@@ -198,10 +230,6 @@ export function useChat() {
       }
 
       setMessages(historyMessages.length > 0 ? historyMessages : []);
-      setCurrentSessionId(sessionId);
-      if (characterId) {
-        localStorage.setItem(`lastSession_${characterId}`, sessionId);
-      }
       setError(null);
     } catch (err) {
       console.error('加载历史失败:', err);
@@ -211,7 +239,6 @@ export function useChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    setCurrentSessionId(null);
     setError(null);
   }, []);
 
@@ -220,27 +247,22 @@ export function useChat() {
     messageContent: string,
     _debugMode: boolean = false,
     onDebugEvent?: ((event: StreamEvent) => void) | null,
+    saveUserMessage: boolean = true,
   ) => {
     if (!messageContent.trim()) return;
 
-    let sessionId = currentSessionId;
+    let sessionId = getSessionId();
     if (!sessionId) {
       try {
         const data = await createSession();
         sessionId = data.session_id;
-        setCurrentSessionId(sessionId);
+        useSessionStore.getState().setCurrentSessionId(sessionId);
       } catch (err) {
         console.error('自动创建会话失败:', err);
         setError('创建会话失败');
         return;
       }
     }
-
-    const userMessage: Message = {
-      id: generateMessageId(),
-      role: 'user',
-      content: messageContent,
-    };
 
     const assistantId = generateMessageId();
     const assistantMessage: Message = {
@@ -251,7 +273,18 @@ export function useChat() {
       isStreaming: true,
     };
 
-    setMessages(prev => [...prev, userMessage, assistantMessage]);
+    if (saveUserMessage) {
+      const userMessage: Message = {
+        id: generateMessageId(),
+        role: 'user',
+        content: messageContent,
+      };
+
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
+    } else {
+      setMessages(prev => [...prev, assistantMessage]);
+    }
+
     setInput('');
     setIsLoading(true);
     setError(null);
@@ -265,8 +298,10 @@ export function useChat() {
       session_id: sessionId,
       response_style: responseStyle,
       rpg_mode: rpgMode,
+      memory_debug: _debugMode,
+      save_user_message: saveUserMessage,
     });
-  }, [currentSessionId, responseStyle, rpgMode, wsSend]);
+  }, [getSessionId, responseStyle, rpgMode, wsSend]);
 
   const resetChat = useCallback(() => {
     setMessages([]);
@@ -282,65 +317,69 @@ export function useChat() {
   }, []);
 
   const abort = useCallback(() => {
-    wsSend({ type: 'cancel', session_id: currentSessionId || 'default' });
+    wsSend({ type: 'cancel', session_id: getSessionId() || 'default' });
     streamingMsgIdRef.current = null;
     setIsLoading(false);
-  }, [currentSessionId, wsSend]);
+  }, [getSessionId, wsSend]);
 
   const editMessage = useCallback(async (messageId: string, newContent: string) => {
     const msg = messages.find(m => m.id === messageId);
-    if (!msg?.dbId || !currentSessionId) return;
+    const sessionId = getSessionId();
+    if (!msg?.dbId || !sessionId) return;
     try {
-      await editMessageAPI(currentSessionId, msg.dbId, newContent);
+      await editMessageAPI(sessionId, msg.dbId, newContent);
       setMessages(prev => prev.map(m =>
         m.id === messageId ? { ...m, content: newContent } : m
       ));
     } catch (err) {
       console.error('编辑消息失败:', err);
     }
-  }, [messages, currentSessionId]);
+  }, [messages, getSessionId]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
     const msg = messages.find(m => m.id === messageId);
     if (!msg) return;
-    if (!currentSessionId) { toast('未连接到会话，请刷新页面', 'error'); return; }
+    const sessionId = getSessionId();
+    if (!sessionId) { toast('未连接到会话，请刷新页面', 'error'); return; }
     setMessages(prev => prev.filter(m => m.id !== messageId));
     if (!msg.dbId) { console.warn('[useChat] 消息没有 dbId，仅从内存删除:', messageId); return; }
     try {
-      await deleteMessageAPI(currentSessionId, msg.dbId);
+      await deleteMessageAPI(sessionId, msg.dbId);
     } catch (err) {
       console.error('删除消息失败:', err);
       if (err instanceof Error && err.message.includes('404')) return;
       toast('删除可能未生效，切换对话后会自动同步', 'error');
     }
-  }, [messages, currentSessionId]);
+  }, [messages, getSessionId]);
 
   const regenerateMessage = useCallback(async (messageId: string, debugMode: boolean = false, onDebugEvent?: ((event: StreamEvent) => void) | null) => {
     const msg = messages.find(m => m.id === messageId);
-    if (!msg?.dbId || !currentSessionId) return;
+    const sessionId = getSessionId();
+    if (!msg?.dbId || !sessionId) return;
     try {
-      const data = await regenerateMessageAPI(currentSessionId, msg.dbId);
+      const data = await regenerateMessageAPI(sessionId, msg.dbId);
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx >= 0) { setMessages(prev => prev.slice(0, idx)); }
-      await sendMessageToAPI(data.user_message, debugMode, onDebugEvent);
+      await sendMessageToAPI(data.user_message, debugMode, onDebugEvent, false);
     } catch (err) {
       console.error('重新生成失败:', err);
       toast('重新生成失败', 'error');
     }
-  }, [messages, currentSessionId, sendMessageToAPI]);
+  }, [messages, getSessionId, sendMessageToAPI]);
 
   const branchFromMessage = useCallback(async (messageId: string): Promise<string | null> => {
     const msg = messages.find(m => m.id === messageId);
-    if (!msg?.dbId || !currentSessionId) return null;
+    const sessionId = getSessionId();
+    if (!msg?.dbId || !sessionId) return null;
     try {
-      const data = await branchSessionAPI(currentSessionId, msg.dbId);
+      const data = await branchSessionAPI(sessionId, msg.dbId);
       return data.new_session_id;
     } catch (err) {
       console.error('创建分支失败:', err);
       toast('创建分支失败', 'error');
       return null;
     }
-  }, [messages, currentSessionId]);
+  }, [messages, getSessionId]);
 
   return {
     messages,
@@ -352,8 +391,6 @@ export function useChat() {
     loadHistory,
     clearMessages,
     addSystemMessage,
-    currentSessionId,
-    setCurrentSessionId,
     error,
     abort,
     editMessage,

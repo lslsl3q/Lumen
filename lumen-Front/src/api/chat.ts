@@ -10,7 +10,7 @@ const API_BASE_URL = 'http://127.0.0.1:8888';
  * SSE/WS 事件类型
  */
 export interface StreamEvent {
-  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'rpg_state' | 'done' | 'error' | 'msg_saved';
+  type: 'text' | 'status' | 'tool_start' | 'tool_result' | 'text_clear' | 'text_set' | 'think_start' | 'think_content' | 'think_end' | 'memory_debug' | 'react_trace' | 'rpg_state' | 'done' | 'error' | 'msg_saved' | 'theme_update';
   content?: string;
   status?: string;
   message?: string;
@@ -27,6 +27,7 @@ export interface StreamEvent {
   db_id?: number;
   // done 事件额外字段
   assistant_db_id?: number;
+  title?: string;
   // 请求追踪：writing 消息回传 request_id
   request_id?: string;
   // memory_debug 事件字段
@@ -60,6 +61,9 @@ export interface StreamEvent {
     emotion_scores?: Record<string, number>;
     context_summary?: string;
   };
+  // theme_update 事件字段
+  theme_id?: string;
+  tokens?: Record<string, string>;
 }
 
 /**

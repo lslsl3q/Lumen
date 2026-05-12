@@ -36,7 +36,7 @@ export default function Tooltip({ text, children, delay = 400 }: TooltipProps) {
       })}
       {visible && createPortal(
         <div
-          className="fixed z-[300] px-2 py-1 rounded text-xs text-slate-300 bg-[#2a2926] border border-[#3a3935] shadow-lg pointer-events-none"
+          className="fixed z-[300] px-2 py-1 rounded text-xs text-slate-300 bg-surface-elevated border border-border-default shadow-lg pointer-events-none"
           style={{ left: pos.x, top: pos.y, transform: 'translate(-50%, -100%)' }}
         >
           {text}

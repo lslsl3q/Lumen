@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-05-09（T11 UI 收尾：主题系统 + ActivityBar 跨模式 + 区域差异化）
+**最后更新**：2026-05-12（聊天事件账本 + 历史回放 + memory 向量级联清理）
 
 ---
 
@@ -12,9 +12,8 @@
 ```
 Lumen/
 ├── lumen/                        # 核心代码包（按角色分层）
-│   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、两阵营嵌入、SPARSE_EMBEDDING_ENABLED、日记目录）
+│   ├── config.py                 # 全局配置（AsyncOpenAI客户端、模型选择、两阵营嵌入、路径常量统一入口）
 │   ├── tool.py                   # 工具执行引擎（注册、执行、并行调度、结果格式化）— 对标 CC Tool.ts
-│   ├── query.py                  # [DEPRECATED: T24] 查询引擎（旧 ReAct 循环入口，仅保留 chat_non_stream + validate_tool_call）
 │   ├── agent.py                  # T24 Agent 容器（组件列表 + 信箱 + state + act() 流式决策）
 │   │
 │   ├── components/               # T24 Component 包 — Concordia 风格可插拔组件
@@ -33,14 +32,26 @@ Lumen/
 │   │   ├── gm_resolution.py      # T25 GM 裁决规则组件（STATIC, priority=50, 4步裁决法+JSON schema）
 │   │   ├── writing_context.py    # T11 写作上下文组件（DYNAMIC, priority=25, 章节内容+5种模式提示词+图谱摘要桩）
 │   │   └── react_acting.py       # ReAct 决策循环（LLM→工具→结果→再LLM + _yield_rpg_state + 思考链双轨处理 + T29双system消息构建 + 流式缓存统计）
-│   ├── characters/               # 角色数据（JSON）+ 头像资源（avatars/）
+│   ├── characters/               # [已迁至 data/characters/] 角色数据（JSON）+ 头像资源（avatars/）
 │   │   ├── default.json           # 默认助手（calculate/web/file_manager/daily_note）
 │   │   ├── rpg_gm.json            # RPG 游戏主持人（calculate/dice/rpg）
 │   ├── personas/                 # Persona 用户身份数据（JSON，每个身份一个文件）
-│   ├── worldbooks/               # 世界书数据（JSON，每个条目一个文件）
-│   ├── skills/                   # Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter，含 README.md 开发指南）
+│   ├── worldbooks/               # [已迁至 data/worldbooks/] 世界书数据（JSON，每个条目一个文件）
+│   ├── skills/                   # [已迁至 data/skills/] Skills 数据（目录结构：skill-name/SKILL.md + YAML frontmatter）
 │   ├── hooks/                    # T27 HookBus YAML 规则配置（rpg_hooks.yaml — RPG 伏笔/事件链规则）
-│   ├── data/                     # 运行时数据（history.db、thinking_clusters/、vectors/、graph/extract_prompt.md 等）
+│   ├── data/                     # 运行时数据（所有 .db 文件 + 数据子目录）
+│   │   ├── history.db            # 聊天会话 + 消息 + 摘要 + FTS5 + 频道 + 记忆 + ACL（仅聊天域）
+│   │   ├── writing.db            # 写作域（作品/章节/设定/快照，独立 SQLite）
+│   │   ├── search_index.db       # 搜索域（知识库 chunks + 稀疏向量，独立 SQLite）
+│   │   ├── graph_meta.db         # 图谱域（边元数据溯源 + 语义组，独立 SQLite）
+│   │   ├── characters/           # 角色数据（JSON + avatars/ 头像）
+│   │   ├── worldbooks/           # 世界书数据（JSON）
+│   │   ├── skills/               # Skills 数据（SKILL.md + YAML frontmatter）
+│   │   ├── thinking_clusters/    # 思维簇向量文件
+│   │   ├── vectors/              # 向量文件（TriviumDB）
+│   │   ├── graph/                # 图谱数据（extract_prompt.md 等）
+│   │   ├── knowledge/            # 知识库源文件
+│   │   └── state/                # 运行时状态（active_persona.json 等）
 │   │
 │   ├── core/                     # 大脑 — 会话状态 + 事件处理器 + 深梦境 + RPG 环境 + HookBus
 │   │   ├── session.py            # 会话生命周期（内存+DB双查，Persona切换后reload）
@@ -80,12 +91,13 @@ Lumen/
 │   │   ├── search/               # 搜索子系统（嵌入、向量存储、稀疏检索、网络搜索）
 │   │   │   ├── embedding.py      # 文本嵌入（两阵营架构 + 稀疏向量 encode_with_sparse + instruction_type 预留）
 │   │   │   ├── vector_store.py   # 向量存储（TriviumDB，语义搜索 + 按会话/角色级联删除 + .dim 一致性检查）
-│   │   │   ├── sparse_store.py   # 稀疏向量存储（SQLite + In-memory 缓存 + Dot Product 搜索）
+│   │   │   ├── sparse_store.py   # 稀疏向量存储（复用 chunks.py 的 search_index.db 连接）
 │   │   │   └── web_search.py     # 网络搜索服务（DuckDuckGo）
 │   │   ├── storage/              # 数据持久化（SQLite 存储）
-│   │   │   ├── history.py        # 对话历史（会话、消息、摘要、频道、FTS5全文索引、向量级联删除）
+│   │   │   ├── history.py        # 对话历史（history.db：会话、消息、摘要、频道、FTS5、记忆、ACL）
 │   │   │   ├── world_state.py    # T25 RPG 世界状态黑板（SQLite：位置/HP/属性/房间/rpg_events + T26 认知状态 merge）
-│   │   │   └── writing.py        # T11 写作模式存储（作品/章节/世界观 CRUD，SQLite）
+│   │   │   ├── writing.py        # T11 写作模式存储（writing.db：作品/章节/设定 CRUD，事务保护，公开 get_conn/write_lock）
+│   │   │   └── writing_snapshot.py # T33 快照存储（writing.db：全量 JSON 快照 CRUD + 恢复前自动备份，共享 writing.py 连接/锁）
 │   │   ├── memory/               # 记忆子系统
 │   │   │   ├── __init__.py       # 导出：generate_summary, get_memory_context, vectorize_message...
 │   │   │   ├── _core.py          # 记忆系统核心（异步摘要、记忆注入、向量+BM25 RRF混合检索）
@@ -94,7 +106,7 @@ Lumen/
 │   │   ├── knowledge/            # 知识库子系统
 │   │   │   ├── __init__.py       # 导出：search, upload, list_files, scan...
 │   │   │   ├── _core.py          # 知识库存储核心（双库、access_list、导入/切分/搜索/删除）
-│   │   │   ├── chunks.py         # 知识库 chunks 存储（SQLite + FTS5 BM25，从 history.py 拆出）
+│   │   │   ├── chunks.py         # 知识库 chunks 存储（search_index.db：SQLite + FTS5 BM25，独立连接/锁）
 │   │   │   ├── scanner.py        # T23 扫描服务（MD5变更检测、新知识库发现）
 │   │   │   ├── manifest.py       # T23 注册表（_manifest.json 读写、注册/注销/列表）
 │   │   │   ├── rebuild_text_index.py # 文本索引重建工具
@@ -105,7 +117,7 @@ Lumen/
 │   │   │   ├── _core.py          # T19 图谱核心服务（实体Upsert、边管理、邻居文本召回）
 │   │   │   ├── extract.py        # T19 图谱提取管道（文本→LLM抽取→batch_upsert）
 │   │   │   ├── backup.py         # 图谱备份/恢复（JSON导出+Git提交）
-│   │   │   ├── edge_meta.py      # T19 图谱边元数据（SQLite 溯源，从 history.py 拆出，RESERVED）
+│   │   │   ├── edge_meta.py      # T19 图谱边元数据（graph_meta.db：SQLite 溯源，独立连接/锁）
 │   │   │   ├── search.py         # 图谱搜索
 │   │   │   ├── community.py      # 图谱社区发现
 │   │   │   ├── dedup.py          # 图谱去重
@@ -113,13 +125,13 @@ Lumen/
 │   │   ├── tdb_registry.py       # TDB 实例注册表（统一懒加载 + 动态发现）
 │   │   ├── event_queue.py        # 事件队列（服务层共享，斩断 services→core 循环依赖）
 │   │   ├── ws_manager.py         # T26 WebSocket连接管理器（单例、广播、频道订阅+过滤推送、心跳）
-│   │   ├── semantic_group.py     # T26 语义组服务（SQLite+向量文件，emotion量尺/topic调味料双模式）
+│   │   ├── semantic_group.py     # T26 语义组服务（graph_meta.db：SQLite+向量文件，emotion量尺/topic调味料双模式）
 │   │   ├── mcp_client.py         # MCP 客户端服务（连接外部MCP服务器、发现工具、调用工具）
 │   │   ├── llm.py                # LLM适配器（AsyncOpenAI + build_thinking_params 跨模型翻译 + extra_body/reasoning_effort 透传）
 │   │   ├── fetch.py              # 网页抓取服务（httpx异步）
-│   │   ├── character.py          # 角色文件完整生命周期（list/load/create/update/delete/avatar）
-│   │   ├── worldbook.py          # 世界书数据管理（JSON CRUD + 缓存）
-│   │   ├── skills.py             # Skills 数据管理（Markdown CRUD + 缓存）
+│   │   ├── character.py          # 角色文件完整生命周期（config.py 路径常量：CHARACTERS_DIR/AVATARS_DIR）
+│   │   ├── worldbook.py          # 世界书数据管理（config.py 路径常量：WORLDBOOKS_DIR，JSON CRUD + 缓存）
+│   │   ├── skills.py             # Skills 数据管理（config.py 路径常量：SKILLS_DIR，Markdown CRUD + 缓存）
 │   │   ├── runtime_config.py     # 运行时配置服务（持久化到 runtime_config.json，线程安全读写）
 │   │   ├── thinking_clusters.py  # 思维簇引擎（VCP MetaThinkingManager 重实现）
 │   │   ├── emotion.py            # 【预留】情感引擎
@@ -275,9 +287,6 @@ T11 写作链路（writing.py）：
 Identity(10) → Lore(20) → WritingContext(25) → Memory(30) → Skills(50) → Tool(90)
     ├── lumen/components/writing_context.py（5种模式提示词+章节注入+图谱摘要桩）
     └── lumen/core/environments/writing.py（WritingEnvironment + writing_chat_stream）
-
-旧路径（保留兼容）：
-api/routes/chat.py ──→ lumen/query.py::chat_non_stream()（[DEPRECATED] 非流式，内部已转发 core/agent_chat.py）
 ```
 
 ---

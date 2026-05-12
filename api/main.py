@@ -3,6 +3,7 @@ Lumen API 服务
 用 FastAPI 把核心逻辑包装成 HTTP 接口，供前端调用
 """
 
+import os
 import sys
 import asyncio
 import logging
@@ -88,6 +89,13 @@ async def lifespan(app):
     except Exception as e:
         logger.warning(f"深梦境调度器启动失败: {e}")
 
+    # T11: 初始化内置主题
+    try:
+        from lumen.services import theme as theme_service
+        theme_service.ensure_builtin_themes()
+    except Exception as e:
+        logger.warning(f"主题系统初始化失败: {e}")
+
     yield  # 应用运行中...
 
     # 事件处理器：优雅停机
@@ -111,6 +119,10 @@ async def lifespan(app):
     knowledge.close()
     from lumen.services import access_control
     access_control.close()
+    from lumen.services.storage import theme as theme_storage
+    theme_storage.close_conn()
+    from lumen.services.storage import writing, writing_snapshot
+    writing.close_conn()
 
 
 from fastapi import FastAPI
@@ -137,7 +149,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, avatar, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank, theme
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -149,7 +161,6 @@ app.include_router(persona.router, prefix="/personas", tags=["Persona"])
 app.include_router(authors_note.router, prefix="/authors-note", tags=["Author's Note"])
 app.include_router(models.router, prefix="/models", tags=["模型"])
 app.include_router(worldbook.router, prefix="/worldbooks", tags=["世界书"])
-app.include_router(avatar.router, prefix="/avatars", tags=["头像管理"])
 app.include_router(skills.router, prefix="/skills", tags=["Skills"])
 app.include_router(knowledge.router, prefix="/knowledge", tags=["知识库"])
 app.include_router(memories.router, prefix="/memories", tags=["日记"])
@@ -163,11 +174,12 @@ app.include_router(semantic_group.router, tags=["语义组"])
 app.include_router(writing.router, prefix="/writing", tags=["写作模式"])
 app.include_router(permissions.router, prefix="/permissions", tags=["权限管理"])
 app.include_router(rerank.router, tags=["Rerank"])
+app.include_router(theme.router, prefix="/api/theme", tags=["Theme Management"])
 
-# 挂载头像静态文件目录
-avatars_dir = Path(__file__).parent.parent / "lumen" / "characters" / "avatars"
-avatars_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/avatars", StaticFiles(directory=str(avatars_dir)), name="avatars")
+# 挂载头像静态文件目录（使用 config.py AVATARS_DIR，与 save_avatar() 一致）
+from lumen.config import AVATARS_DIR
+os.makedirs(AVATARS_DIR, exist_ok=True)
+app.mount("/avatars", StaticFiles(directory=AVATARS_DIR), name="avatars")
 
 
 # 根路径健康检查

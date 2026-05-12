@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom';
 import RichTextEditor from './editors/RichTextEditor';
 import * as memoriesApi from '../api/memories';
 import type { MemoryFolder, MemoryItem } from '../api/memories';
-import { listTdbs, listTdbEntries, updateTdbEntry, getTdbFileTree, importTdbFile, getTdbStats } from '../api/tdb';
+import { listTdbs, listTdbEntries, getTdbFileTree, importTdbFile, getTdbStats } from '../api/tdb';
 import { uploadKnowledgeFile, deleteKnowledgeFile, listKnowledgeFiles, scanKnowledge, applyScanChanges } from '../api/knowledge';
 import type { TdbInfo, TdbEntry, TdbFileFolder, TdbStats } from '../api/tdb';
 import TdbFileTree from './TdbFileTree';
@@ -28,13 +28,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  preference: 'text-amber-400',
+  preference: 'text-primary',
   fact: 'text-sky-400',
-  context: 'text-slate-400',
+  context: 'text-text-secondary',
   decision: 'text-emerald-400',
 };
-
-const CATEGORY_OPTIONS = ['context', 'fact', 'preference', 'decision'];
 
 /* ══════════════════════════════════════════
    子组件：文件树（daily_note 用）
@@ -90,18 +88,18 @@ function FolderTree({
             className="w-full flex items-center gap-1.5 px-3 py-1 cursor-pointer group"
           >
             <svg
-              className={`w-3 h-3 text-slate-600 transition-transform duration-150 ${
+              className={`w-3 h-3 text-text-muted transition-transform duration-150 ${
                 expanded[folder.path] ? 'rotate-90' : ''
               }`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
-            <svg className="w-3.5 h-3.5 text-amber-700/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-3.5 h-3.5 text-primary/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
-            <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">
+            <span className="text-xs text-text-secondary group-hover:text-text-primary transition-colors">
               {folder.name}
             </span>
             <span className="text-[10px] text-slate-700 ml-auto">{folder.files.length}</span>
@@ -116,8 +114,8 @@ function FolderTree({
                 onClick={() => onSelect(folder.path, file.name)}
                 className={`w-full flex items-center gap-1.5 pl-8 pr-3 py-1 cursor-pointer transition-colors duration-100
                   ${isActive
-                    ? 'bg-[#CC7C5E]/08 text-slate-200'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
+                    ? 'bg-primary/8 text-text-primary'
+                    : 'text-text-muted hover:text-text-primary hover:bg-slate-800/30'
                   }`}
               >
                 <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -133,21 +131,21 @@ function FolderTree({
 
       {ctxMenu && (
         <div
-          className="fixed z-[200] bg-[#1f1f1c] border border-[#2a2926] rounded-lg shadow-xl
+          className="fixed z-[200] bg-surface-elevated border border-border-default rounded-lg shadow-xl
             py-1 min-w-[140px] overflow-hidden"
           style={{ top: ctxMenu.y, left: ctxMenu.x }}
         >
           <button
             onClick={() => { onOpenInExplorer(ctxMenu.name); setCtxMenu(null); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-slate-400
-              hover:text-slate-200 hover:bg-slate-700/40 cursor-pointer transition-colors"
+            className="w-full text-left px-3 py-1.5 text-xs text-text-secondary
+              hover:text-text-primary hover:bg-slate-700/40 cursor-pointer transition-colors"
           >
             在资源管理器中打开
           </button>
           {folders.find(f => f.name === ctxMenu.name)?.files.length === 0 && (
             <button
               onClick={() => { onDeleteFolder(ctxMenu.name); setCtxMenu(null); }}
-              className="w-full text-left px-3 py-1.5 text-xs text-slate-400
+              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary
                 hover:text-red-400 hover:bg-red-400/08 cursor-pointer transition-colors"
             >
               删除空文件夹
@@ -174,19 +172,19 @@ function SearchResult({
     <div className="group flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-800/30 transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[item.category] || 'text-slate-500'}`}>
+          <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[item.category] || 'text-text-muted'}`}>
             {CATEGORY_LABELS[item.category] || item.category}
           </span>
           {item.importance >= 4 && (
-            <span className="text-[10px] text-amber-500">!</span>
+            <span className="text-[10px] text-primary">!</span>
           )}
           {item.tags.length > 0 && (
-            <span className="text-[10px] text-slate-600">
+            <span className="text-[10px] text-text-muted">
               {item.tags.slice(0, 3).join(', ')}
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">{item.content}</p>
+        <p className="text-xs text-text-primary leading-relaxed line-clamp-3">{item.content}</p>
         <p className="text-[10px] text-slate-700 mt-1">
           {item.created_at ? new Date(item.created_at).toLocaleString('zh-CN') : ''}
         </p>
@@ -244,12 +242,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
   const [tdbStats, setTdbStats] = useState<TdbStats | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<number | null>(null);
   const [tdbSourceFilter, setTdbSourceFilter] = useState('');
-  const [isEditingTdb, setIsEditingTdb] = useState(false);
-  const [editTdbContent, setEditTdbContent] = useState('');
-  const [editTdbCategory, setEditTdbCategory] = useState('');
-  const [editTdbTags, setEditTdbTags] = useState('');
-  const [editTdbImportance, setEditTdbImportance] = useState(3);
-  const [isSavingTdb, setIsSavingTdb] = useState(false);
   /* 源文件视图 */
   const [tdbViewMode, setTdbViewMode] = useState<'entries' | 'files'>('entries');
   const [fileFolders, setFileFolders] = useState<TdbFileFolder[]>([]);
@@ -328,7 +320,6 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     setSelectedEntryId(null);
     setSelectedFilePath(null);
     setTdbSourceFilter('');
-    setIsEditingTdb(false);
     setTdbViewMode('entries');
 
     if (activeTdb === 'daily_note') {
@@ -484,8 +475,8 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               onClick={() => { setActiveTdb(tdb.name); setShowSearch(false); }}
               className={`px-2.5 py-1 rounded-md text-[11px] whitespace-nowrap transition-all duration-150 cursor-pointer
                 ${isActive
-                  ? 'bg-[#2a2926] text-slate-200'
-                  : 'text-slate-600 hover:text-slate-400'
+                  ? 'bg-surface-elevated text-text-primary'
+                  : 'text-text-muted hover:text-text-secondary'
                 }`}
             >
               {label}
@@ -509,7 +500,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               </div>
             ) : (
               <div className="text-center py-16">
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-text-muted">
                   {isSearching ? '搜索中...' : '没有找到匹配的日记'}
                 </p>
               </div>
@@ -522,13 +513,13 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
     return (
       <>
         {/* 左栏：文件树 */}
-        <div className="w-48 flex-shrink-0 border-r border-[#2a2926] bg-[#171715] overflow-y-auto scrollbar-lumen">
-          <div className="px-3 py-2 border-b border-[#2a2926] flex items-center">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600">文件夹</span>
+        <div className="w-48 flex-shrink-0 border-r border-border-default bg-surface-panel overflow-y-auto scrollbar-lumen">
+          <div className="px-3 py-2 border-b border-border-default flex items-center">
+            <span className="text-[10px] uppercase tracking-widest text-text-muted">文件夹</span>
             <button
               onClick={() => setIsCreatingFolder(true)}
               className="ml-auto w-4 h-4 flex items-center justify-center rounded
-                text-slate-700 hover:text-slate-400 hover:bg-slate-700/40
+                text-slate-700 hover:text-text-secondary hover:bg-slate-700/40
                 transition-all duration-150 cursor-pointer"
               title="新建文件夹"
             >
@@ -545,7 +536,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
             onOpenInExplorer={handleOpenInExplorer}
           />
           {isCreatingFolder && (
-            <div className="flex items-center gap-1 px-3 py-1 border-t border-[#2a2926]">
+            <div className="flex items-center gap-1 px-3 py-1 border-t border-border-default">
               <input
                 value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
@@ -554,23 +545,23 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   if (e.key === 'Escape') { setIsCreatingFolder(false); setNewFolderName(''); }
                 }}
                 placeholder="文件夹名"
-                className="flex-1 text-xs bg-[#1C1B19] border border-[#2a2926] rounded
-                  px-2 py-1 text-slate-300 placeholder:text-slate-700
-                  outline-none focus:border-[#CC7C5E]/30"
+                className="flex-1 text-xs bg-surface-elevated border border-border-default rounded
+                  px-2 py-1 text-text-primary placeholder:text-slate-700
+                  outline-none focus:border-primary/30"
                 autoFocus
               />
-              <button onClick={handleCreateFolder} className="text-xs text-slate-500 hover:text-slate-300 cursor-pointer">OK</button>
+              <button onClick={handleCreateFolder} className="text-xs text-text-muted hover:text-text-primary cursor-pointer">OK</button>
             </div>
           )}
         </div>
 
         {/* 中栏：富文本编辑器（替代原 textarea + 预览栏） */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          <div className="px-3 py-1.5 border-b border-[#2a2926] bg-[#1c1c1a]">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600">
+          <div className="px-3 py-1.5 border-b border-border-default bg-surface-elevated">
+            <span className="text-[10px] uppercase tracking-widest text-text-muted">
               {selectedPath ? selectedPath.split('/').pop()?.replace(/\.md$/, '') : '编辑器'}
             </span>
-            {hasFileChanges && <span className="ml-2 text-[10px] text-amber-600">未保存</span>}
+            {hasFileChanges && <span className="ml-2 text-[10px] text-primary">未保存</span>}
           </div>
           {selectedPath ? (
             <RichTextEditor
@@ -587,7 +578,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
                     d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
-                <p className="text-xs text-slate-500">选择文件开始编辑</p>
+                <p className="text-xs text-text-muted">选择文件开始编辑</p>
                 <p className="text-[10px] text-slate-800 mt-1">Ctrl+S 保存</p>
               </div>
             </div>
@@ -620,34 +611,34 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
           minWidth={180}
           maxWidth={400}
           storageKey="lumen_knowledge_sidebar_width"
-          className="border-r border-[#2a2926] bg-[#171715] flex flex-col"
+          className="border-r border-border-default bg-surface-panel flex flex-col"
         >
           {/* 视图切换 + 过滤 */}
-          <div className="px-2 py-2 border-b border-[#2a2926]">
+          <div className="px-2 py-2 border-b border-border-default">
             <div className="flex items-center gap-1.5">
               {fileFolders.length > 0 && (
-                <div className="flex gap-0.5 bg-[#1C1B19] rounded p-0.5">
+                <div className="flex gap-0.5 bg-surface-elevated rounded p-0.5">
                   <button
                     onClick={() => setTdbViewMode('entries')}
                     className={`px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition-colors
-                      ${tdbViewMode === 'entries' ? 'bg-[#2a2926] text-slate-200' : 'text-slate-600 hover:text-slate-400'}`}
+                      ${tdbViewMode === 'entries' ? 'bg-surface-elevated text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
                   >条目</button>
                   <button
                     onClick={() => setTdbViewMode('files')}
                     className={`px-1.5 py-0.5 rounded text-[9px] cursor-pointer transition-colors
-                      ${tdbViewMode === 'files' ? 'bg-[#2a2926] text-slate-200' : 'text-slate-600 hover:text-slate-400'}`}
+                      ${tdbViewMode === 'files' ? 'bg-surface-elevated text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
                   >文件</button>
                 </div>
               )}
               {tdbViewMode === 'entries' && (
                 <>
-                  <span className="text-[10px] text-slate-600">{tdbTotal} 条</span>
+                  <span className="text-[10px] text-text-muted">{tdbTotal} 条</span>
                   {activeTdb === 'knowledge' && (
                     <select
                       value={tdbSourceFilter}
                       onChange={e => setTdbSourceFilter(e.target.value)}
-                      className="ml-auto text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded px-1.5 py-0.5
-                        text-slate-400 outline-none cursor-pointer"
+                      className="ml-auto text-[10px] bg-surface-elevated border border-border-default rounded px-1.5 py-0.5
+                        text-text-secondary outline-none cursor-pointer"
                     >
                       <option value="">全部来源</option>
                       {tdbStats && Object.keys(tdbStats.sources).map(src => (
@@ -660,7 +651,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                 </>
               )}
               {tdbViewMode === 'files' && (
-                <span className="text-[10px] text-slate-600">{fileFolders.reduce((s, f) => s + f.files.length, 0)} 文件</span>
+                <span className="text-[10px] text-text-muted">{fileFolders.reduce((s, f) => s + f.files.length, 0)} 文件</span>
               )}
               {activeTdb === 'knowledge' && (
                 <div className="ml-auto flex items-center gap-1">
@@ -676,7 +667,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       }
                       setIsScanning(false);
                     }}
-                    className="p-1 rounded text-slate-600 hover:text-sky-400 hover:bg-sky-500/10
+                    className="p-1 rounded text-text-muted hover:text-sky-400 hover:bg-sky-500/10
                       transition-colors cursor-pointer"
                     title="扫描知识库变更"
                     disabled={isScanning}
@@ -704,7 +695,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       };
                       input.click();
                     }}
-                    className="p-1 rounded text-slate-600 hover:text-amber-400 hover:bg-amber-500/10
+                    className="p-1 rounded text-text-muted hover:text-primary hover:bg-primary/10
                       transition-colors cursor-pointer"
                     title="上传文件到知识库"
                   >
@@ -720,12 +711,12 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
 
           {/* T23 扫描结果面板 */}
           {showScanPanel && scanResult && (
-            <div className="border-b border-[#2a2926] p-3 bg-[#1C1B19]/50">
+            <div className="border-b border-border-default p-3 bg-surface-elevated/50">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] uppercase tracking-widest text-slate-500">扫描结果</span>
+                <span className="text-[10px] uppercase tracking-widest text-text-muted">扫描结果</span>
                 <button
                   onClick={() => { setShowScanPanel(false); setScanResult(null); }}
-                  className="text-slate-700 hover:text-slate-400 cursor-pointer"
+                  className="text-slate-700 hover:text-text-secondary cursor-pointer"
                 >
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -737,7 +728,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                 <div className="mb-2">
                   <div className="text-[9px] text-emerald-500 mb-1">新知识库</div>
                   {scanResult.new_kbs.map((kb: string) => (
-                    <div key={kb} className="text-[10px] text-slate-400 pl-2">{kb}/</div>
+                    <div key={kb} className="text-[10px] text-text-secondary pl-2">{kb}/</div>
                   ))}
                 </div>
               )}
@@ -746,16 +737,16 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                 <div className="mb-2">
                   <div className="text-[9px] text-sky-400 mb-1">新增文件 ({scanResult.added.length})</div>
                   {scanResult.added.map((f: any, i: number) => (
-                    <div key={i} className="text-[10px] text-slate-400 pl-2">{f.path}</div>
+                    <div key={i} className="text-[10px] text-text-secondary pl-2">{f.path}</div>
                   ))}
                 </div>
               )}
 
               {scanResult.modified?.length > 0 && (
                 <div className="mb-2">
-                  <div className="text-[9px] text-amber-400 mb-1">已修改 ({scanResult.modified.length})</div>
+                  <div className="text-[9px] text-primary mb-1">已修改 ({scanResult.modified.length})</div>
                   {scanResult.modified.map((f: any, i: number) => (
-                    <div key={i} className="text-[10px] text-slate-400 pl-2">{f.path}</div>
+                    <div key={i} className="text-[10px] text-text-secondary pl-2">{f.path}</div>
                   ))}
                 </div>
               )}
@@ -764,13 +755,13 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                 <div className="mb-2">
                   <div className="text-[9px] text-red-400 mb-1">已删除 ({scanResult.deleted.length})</div>
                   {scanResult.deleted.map((f: any, i: number) => (
-                    <div key={i} className="text-[10px] text-slate-400 pl-2">{f.path}</div>
+                    <div key={i} className="text-[10px] text-text-secondary pl-2">{f.path}</div>
                   ))}
                 </div>
               )}
 
               {(!scanResult.new_kbs?.length && !scanResult.added?.length && !scanResult.modified?.length && !scanResult.deleted?.length) && (
-                <p className="text-[10px] text-slate-600">未发现变更</p>
+                <p className="text-[10px] text-text-muted">未发现变更</p>
               )}
 
               {(scanResult.new_kbs?.length || scanResult.added?.length || scanResult.modified?.length || scanResult.deleted?.length) && (
@@ -818,12 +809,12 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       onClick={() => { setSelectedEntryId(entry.id); setSelectedFilePath(null); }}
                       className={`w-full flex flex-col gap-0.5 px-3 py-2 cursor-pointer transition-colors duration-100 text-left
                         ${isActive
-                          ? 'bg-[#CC7C5E]/08 text-slate-200'
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
+                          ? 'bg-primary/8 text-text-primary'
+                          : 'text-text-muted hover:text-text-primary hover:bg-slate-800/30'
                         }`}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[entry.category] || 'text-slate-500'}`}>
+                        <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[entry.category] || 'text-text-muted'}`}>
                           {CATEGORY_LABELS[entry.category] || entry.category || '—'}
                         </span>
                         {entry.source && (
@@ -848,7 +839,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   ).length;
                   if (chunkCount === 0) {
                     return (<>
-                      <span className="text-[9px] text-amber-500/80 mr-1">未导入</span>
+                      <span className="text-[9px] text-primary/80 mr-1">未导入</span>
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
@@ -867,8 +858,8 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                           }
                         }}
                         disabled={importingPaths.has(file.path)}
-                        className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400
-                          hover:bg-amber-500/25 transition-colors flex-shrink-0 cursor-pointer
+                        className="text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary
+                          hover:bg-primary/25 transition-colors flex-shrink-0 cursor-pointer
                           disabled:opacity-40 disabled:cursor-wait"
                       >
                         {importingPaths.has(file.path) ? '导入中...' : '导入'}
@@ -896,7 +887,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                         }
                       }}
                       disabled={importingPaths.has(file.path)}
-                      className="text-[9px] px-1.5 py-0.5 rounded text-slate-600 hover:text-amber-400 hover:bg-amber-500/10
+                      className="text-[9px] px-1.5 py-0.5 rounded text-text-muted hover:text-primary hover:bg-primary/10
                         transition-colors flex-shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-wait"
                       title="重新导入"
                     >
@@ -942,16 +933,16 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     const orphans = knowledgeFiles.filter(f => !filePaths.has(f.source_path));
                     if (orphans.length === 0) return null;
                     return (
-                      <div className="border-t border-[#2a2926] mt-1">
+                      <div className="border-t border-border-default mt-1">
                         <details className="group">
-                          <summary className="px-3 py-2 text-[10px] text-amber-500/70 cursor-pointer hover:text-amber-400 transition-colors">
+                          <summary className="px-3 py-2 text-[10px] text-primary/70 cursor-pointer hover:text-primary transition-colors">
                             孤立条目 ({orphans.length})
                           </summary>
                           <div className="pb-1">
                             {orphans.map(file => (
                               <div key={file.id} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800/20">
-                                <span className="text-[10px] text-slate-500 truncate flex-1">{file.filename}</span>
-                                <span className="text-[9px] text-slate-600">{file.chunk_count}段</span>
+                                <span className="text-[10px] text-text-muted truncate flex-1">{file.filename}</span>
+                                <span className="text-[9px] text-text-muted">{file.chunk_count}段</span>
                                 <button
                                   onClick={async () => {
                                     if (!confirm(`确定清理孤立条目「${file.filename}」吗？`)) return;
@@ -982,36 +973,36 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
         </ResizablePanel>
 
         {/* 中栏：内容详情（只读） */}
-        <div className="flex-1 flex flex-col min-w-0 border-r border-[#2a2926]">
+        <div className="flex-1 flex flex-col min-w-0 border-r border-border-default">
           {displayEntry ? (
             <>
-              <div className="px-4 py-2 border-b border-[#2a2926] bg-[#1c1c1a] flex items-center gap-3">
-                <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[displayEntry.category] || 'text-slate-500'}`}>
+              <div className="px-4 py-2 border-b border-border-default bg-surface-elevated flex items-center gap-3">
+                <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[displayEntry.category] || 'text-text-muted'}`}>
                   {CATEGORY_LABELS[displayEntry.category] || displayEntry.category || '—'}
                 </span>
                 {displayEntry.source && (
-                  <span className="text-[10px] text-slate-600">来源: {displayEntry.source}</span>
+                  <span className="text-[10px] text-text-muted">来源: {displayEntry.source}</span>
                 )}
                 {displayEntry.source_path && (
-                  <span className="text-[10px] text-slate-600 truncate">{displayEntry.source_path}</span>
+                  <span className="text-[10px] text-text-muted truncate">{displayEntry.source_path}</span>
                 )}
                 <span className="text-[10px] text-slate-700 ml-auto">ID: {displayEntry.id}</span>
               </div>
               <div className="flex-1 overflow-y-auto scrollbar-lumen">
                 {/* 文件模式下：显示 chunk 列表 */}
                 {fileChunks.length > 1 && (
-                  <div className="border-b border-[#2a2926]">
-                    <div className="px-4 py-1.5 bg-[#1c1c1a]">
-                      <span className="text-[10px] text-slate-600">{fileChunks.length} 个片段</span>
+                  <div className="border-b border-border-default">
+                    <div className="px-4 py-1.5 bg-surface-elevated">
+                      <span className="text-[10px] text-text-muted">{fileChunks.length} 个片段</span>
                     </div>
                     {fileChunks.map((chunk, idx) => (
                       <button
                         key={chunk.id}
                         onClick={() => setSelectedEntryId(chunk.id)}
-                        className={`w-full text-left px-4 py-2 border-b border-[#2a2926]/50
-                          text-xs hover:text-slate-300 hover:bg-slate-800/30
+                        className={`w-full text-left px-4 py-2 border-b border-border-default/50
+                          text-xs hover:text-text-primary hover:bg-slate-800/30
                           cursor-pointer transition-colors
-                          ${chunk.id === selectedEntryId ? 'bg-[#CC7C5E]/08 text-slate-200' : 'text-slate-500'}
+                          ${chunk.id === selectedEntryId ? 'bg-primary/8 text-text-primary' : 'text-text-muted'}
                         `}
                       >
                         <span className="text-[10px] text-slate-700">#{idx + 1}</span>
@@ -1020,81 +1011,10 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                     ))}
                   </div>
                 )}
-                {/* 内容显示 */}
+                {/* 内容显示（只读） */}
                 <div className="p-4">
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <textarea
-                      value={editTdbContent}
-                      onChange={e => setEditTdbContent(e.target.value)}
-                      className="w-full min-h-[200px] rounded-lg px-3 py-2 bg-slate-800/60 border border-amber-500/20
-                        text-slate-200 text-sm leading-relaxed resize-none outline-none
-                        focus:border-amber-500/40"
-                    />
-                  ) : (
-                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{displayEntry.content}</p>
-                  )}
+                  <p className="text-sm text-text-primary leading-relaxed whitespace-pre-wrap">{displayEntry.content}</p>
                 </div>
-              </div>
-              {/* 操作按钮 */}
-              <div className="px-4 py-2 border-t border-[#2a2926] flex items-center gap-2">
-                {activeTdb === 'knowledge' && (
-                  <>
-                    {isEditingTdb ? (
-                      <>
-                        <button
-                          onClick={async () => {
-                            if (!displayEntry?.id) return;
-                            setIsSavingTdb(true);
-                            try {
-                              const tags = editTdbTags.split(',').map(t => t.trim()).filter(Boolean);
-                              await updateTdbEntry('knowledge', displayEntry!.id!, {
-                                content: editTdbContent,
-                                category: editTdbCategory || undefined,
-                                tags: tags.length > 0 ? tags : undefined,
-                                importance: editTdbImportance,
-                                reindex: true,
-                              });
-                              toast('保存成功（已重向量化）', 'success');
-                              setIsEditingTdb(false);
-                              loadTdbEntries();
-                            } catch (err) {
-                              toast('保存失败', 'error');
-                            } finally {
-                              setIsSavingTdb(false);
-                            }
-                          }}
-                          disabled={isSavingTdb}
-                          className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                            bg-amber-500/20 text-amber-300 hover:bg-amber-500/30
-                            disabled:opacity-50 transition-colors"
-                        >
-                          {isSavingTdb ? '保存中...' : '保存修改'}
-                        </button>
-                        <button
-                          onClick={() => setIsEditingTdb(false)}
-                          className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                            text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors"
-                        >
-                          取消
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setIsEditingTdb(true);
-                          setEditTdbContent(displayEntry.content);
-                          setEditTdbCategory(displayEntry.category);
-                          setEditTdbTags(displayEntry.keywords?.join(', ') || '');
-                          setEditTdbImportance(displayEntry.importance || 3);
-                        }}
-                        className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                          text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-colors"
-                      >
-                        编辑
-                      </button>
-                    )}
-                  </>
-                )}
               </div>
             </>
           ) : (
@@ -1104,7 +1024,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
                     d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
-                <p className="text-xs text-slate-500">选择条目查看内容</p>
+                <p className="text-xs text-text-muted">选择条目查看内容</p>
               </div>
             </div>
           )}
@@ -1112,87 +1032,57 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
 
         {/* 右栏：元信息 */}
         <div className="w-48 flex-shrink-0 flex flex-col">
-          <div className="px-3 py-1.5 border-b border-[#2a2926] bg-[#1c1c1a]">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600">元信息</span>
+          <div className="px-3 py-1.5 border-b border-border-default bg-surface-elevated">
+            <span className="text-[10px] uppercase tracking-widest text-text-muted">元信息</span>
           </div>
           <div className="flex-1 p-3 overflow-y-auto scrollbar-lumen">
             {displayEntry ? (
-              <div className="space-y-2 text-[10px] text-slate-600">
+              <div className="space-y-2 text-[10px] text-text-muted">
                 <div className="flex justify-between">
                   <span>来源</span>
-                  <span className="text-slate-400">{displayEntry.source || '—'}</span>
+                  <span className="text-text-secondary">{displayEntry.source || '—'}</span>
                 </div>
-                {/* 分类：编辑模式下可修改 */}
-                <div>
+                {/* 分类 */}
+                <div className="flex justify-between">
                   <span>分类</span>
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <select
-                      value={editTdbCategory}
-                      onChange={e => setEditTdbCategory(e.target.value)}
-                      className="w-full mt-1 text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded px-1.5 py-0.5
-                        text-slate-400 outline-none cursor-pointer"
-                    >
-                      {CATEGORY_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{CATEGORY_LABELS[opt] || opt}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className={`ml-2 ${CATEGORY_COLORS[displayEntry.category] || 'text-slate-400'}`}>
-                      {CATEGORY_LABELS[displayEntry.category] || displayEntry.category || '—'}
-                    </span>
-                  )}
+                  <span className={`ml-2 ${CATEGORY_COLORS[displayEntry.category] || 'text-text-secondary'}`}>
+                    {CATEGORY_LABELS[displayEntry.category] || displayEntry.category || '—'}
+                  </span>
                 </div>
-                {/* 重要度：编辑模式下可修改 */}
-                <div>
+                {/* 重要度 */}
+                <div className="flex justify-between">
                   <span>重要度</span>
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <input
-                      type="range" min={1} max={5}
-                      value={editTdbImportance}
-                      onChange={e => setEditTdbImportance(Number(e.target.value))}
-                      className="w-full mt-1 accent-amber-500"
-                    />
-                  ) : (
-                    <span className="text-slate-400 ml-2">{displayEntry.importance || '—'}</span>
-                  )}
+                  <span className="text-text-secondary ml-2">{displayEntry.importance || '—'}</span>
                 </div>
-                {/* 标签：编辑模式下可修改 */}
+                {/* 标签 */}
                 <div>
                   <span>标签</span>
-                  {activeTdb === 'knowledge' && isEditingTdb ? (
-                    <input
-                      value={editTdbTags}
-                      onChange={e => setEditTdbTags(e.target.value)}
-                      placeholder="标签1, 标签2"
-                      className="w-full mt-1 text-[10px] bg-[#1C1B19] border border-[#2a2926] rounded px-1.5 py-0.5
-                        text-slate-400 outline-none"
-                    />
-                  ) : displayEntry.keywords?.length > 0 ? (
+                  {displayEntry.keywords?.length > 0 ? (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {displayEntry.keywords.map((kw, i) => (
-                        <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800/40 text-slate-500">{kw}</span>
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800/40 text-text-muted">{kw}</span>
                       ))}
                     </div>
                   ) : null}
                 </div>
                 <div className="flex justify-between">
                   <span>会话</span>
-                  <span className="text-slate-500 font-mono">{displayEntry.session_id?.slice(0, 8) || '—'}</span>
+                  <span className="text-text-muted font-mono">{displayEntry.session_id?.slice(0, 8) || '—'}</span>
                 </div>
                 {displayEntry.role && (
                   <div className="flex justify-between">
                     <span>角色</span>
-                    <span className="text-slate-400">{displayEntry.role}</span>
+                    <span className="text-text-secondary">{displayEntry.role}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span>创建时间</span>
-                  <span className="text-slate-400">{displayEntry.created_at?.slice(0, 16) || '—'}</span>
+                  <span className="text-text-secondary">{displayEntry.created_at?.slice(0, 16) || '—'}</span>
                 </div>
                 {displayEntry.source_path && (
                   <div>
                     <span>源文件</span>
-                    <p className="text-slate-500 mt-0.5 break-all">{displayEntry.source_path}</p>
+                    <p className="text-text-muted mt-0.5 break-all">{displayEntry.source_path}</p>
                   </div>
                 )}
               </div>
@@ -1213,18 +1103,18 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="absolute inset-0 bg-[#1C1B19]/80 animate-overlay-fade-in" />
+      <div className="absolute inset-0 bg-surface-elevated/80 animate-overlay-fade-in" />
 
       <div
         className={`relative flex flex-col overflow-hidden
-          bg-[#1a1a18] border border-[#2a2926]
+          bg-surface-deep border border-border-default
           shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(204,124,94,0.05)]
           animate-modal-in
           ${isFullscreen ? 'rounded-none' : 'rounded-xl'}`}
         style={isFullscreen ? { width: '100%', height: '100%' } : { width: 1152, height: 768 }}
       >
         {/* ── 标题栏 ── */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#2a2926] bg-[#1f1f1c]">
+        <div className="flex items-center gap-3 px-4 py-2.5 border-b border-border-default bg-surface-elevated">
           {/* TDB 标签页 */}
           {renderTdbTabs()}
 
@@ -1237,16 +1127,16 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
                   placeholder="搜索日记..."
-                  className="w-32 text-[11px] bg-[#1C1B19] border border-[#2a2926] rounded-lg
-                    px-2.5 py-1 text-slate-300 placeholder:text-slate-700
-                    outline-none focus:border-[#CC7C5E]/30 transition-colors"
+                  className="w-32 text-[11px] bg-surface-elevated border border-border-default rounded-lg
+                    px-2.5 py-1 text-text-primary placeholder:text-slate-700
+                    outline-none focus:border-primary/30 transition-colors"
                 />
               </div>
               <button
                 onClick={handleSearch}
                 disabled={isSearching}
                 className="px-2 py-1 rounded-lg text-[10px] cursor-pointer
-                  bg-[#2a2926] text-slate-400 hover:text-slate-200
+                  bg-surface-elevated text-text-secondary hover:text-text-primary
                   disabled:opacity-50 transition-colors"
               >
                 {isSearching ? '...' : '搜索'}
@@ -1260,7 +1150,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               <button
                 onClick={handleSaveFile}
                 className="px-3 py-1 rounded-lg text-xs cursor-pointer
-                  bg-[#CC7C5E]/15 text-[#CC7C5E] hover:bg-[#CC7C5E]/25 transition-colors"
+                  bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
               >
                 保存
               </button>
@@ -1269,7 +1159,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               <button
                 onClick={handleDeleteFile}
                 className="px-2 py-1 rounded-lg text-xs cursor-pointer
-                  text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                  text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-colors"
               >
                 删除
               </button>
@@ -1277,7 +1167,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
             <button
               onClick={() => setIsFullscreen(v => !v)}
               className="w-6 h-6 rounded flex items-center justify-center cursor-pointer
-                text-slate-600 hover:text-slate-300 hover:bg-[#2a2926] transition-colors"
+                text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors"
               title={isFullscreen ? '还原' : '全屏'}
             >
               {isFullscreen ? (
@@ -1294,7 +1184,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
             <button
               onClick={(e) => { e.stopPropagation(); onClose(); }}
               className="w-6 h-6 rounded flex items-center justify-center cursor-pointer
-                text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
@@ -1315,14 +1205,14 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
       {confirmDialog && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setConfirmDialog(null)} />
-          <div className="relative bg-[#1f1f1c] border border-[#2a2926] rounded-xl
+          <div className="relative bg-surface-elevated border border-border-default rounded-xl
             shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-5 min-w-[280px]">
-            <p className="text-sm text-slate-300 mb-5">{confirmDialog.message}</p>
+            <p className="text-sm text-text-primary mb-5">{confirmDialog.message}</p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDialog(null)}
                 className="px-4 py-1.5 rounded-lg text-xs cursor-pointer
-                  text-slate-500 hover:text-slate-300 hover:bg-slate-700/40 transition-colors"
+                  text-text-muted hover:text-text-primary hover:bg-slate-700/40 transition-colors"
               >
                 取消
               </button>

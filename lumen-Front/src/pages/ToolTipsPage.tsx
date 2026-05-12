@@ -122,20 +122,20 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full text-xs text-slate-600">
+      <div className="flex items-center justify-center h-full text-xs text-text-muted">
         加载中...
       </div>
     );
   }
 
   return (
-    <div className="flex h-full bg-[#1a1a18]">
+    <div className="flex h-full bg-surface-deep">
       {/* ── 左栏：工具列表 ── */}
-      <div className="w-52 flex-shrink-0 border-r border-[#2a2926] bg-[#171715]
+      <div className="w-52 flex-shrink-0 border-r border-border-default bg-surface-panel
         flex flex-col">
         <div className="px-4 pt-5 pb-3">
-          <h2 className="text-sm font-medium text-slate-300">工具提示词</h2>
-          <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">
+          <h2 className="text-sm font-medium text-text-primary">工具提示词</h2>
+          <p className="text-[10px] text-text-muted mt-1 leading-relaxed">
             编辑 AI 调用每个工具时的行为指南
           </p>
         </div>
@@ -151,13 +151,13 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
                 className={`w-full flex items-center gap-2 px-4 py-2 text-left cursor-pointer
                   transition-colors duration-100
                   ${isActive
-                    ? 'bg-[#CC7C5E]/08 text-slate-200'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-[#1f1f1c]'
+                    ? 'bg-primary/8 text-text-primary'
+                    : 'text-text-muted hover:text-text-primary hover:bg-surface-elevated'
                   }`}
               >
                 <span className="text-xs font-mono truncate flex-1">{name}</span>
                 {isModified && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#CC7C5E] flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
                 )}
               </button>
             );
@@ -170,16 +170,16 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
         {currentDef ? (
           <>
             {/* 工具信息头 */}
-            <div className="px-6 pt-5 pb-4 border-b border-[#2a2926]">
+            <div className="px-6 pt-5 pb-4 border-b border-border-default">
               <div className="flex items-center gap-3 mb-2">
-                <h3 className="text-base font-mono text-slate-200">{selected}</h3>
+                <h3 className="text-base font-mono text-text-primary">{selected}</h3>
                 {hasChanges && (
-                  <span className="text-[10px] text-[#CC7C5E] uppercase tracking-wider">
+                  <span className="text-[10px] text-primary uppercase tracking-wider">
                     未保存
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
+              <p className="text-xs text-text-muted leading-relaxed max-w-xl">
                 {currentDef.description}
               </p>
 
@@ -187,9 +187,9 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
               {params && Object.keys(params).length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
                   {Object.entries(params).map(([pname, pdef]) => (
-                    <span key={pname} className="text-[10px] text-slate-600">
-                      <span className="font-mono text-slate-500">{pname}</span>
-                      <span className="text-slate-700 mx-1">:</span>
+                    <span key={pname} className="text-[10px] text-text-muted">
+                      <span className="font-mono text-text-muted">{pname}</span>
+                      <span className="text-text-dim mx-1">:</span>
                       {pdef.description || pdef.type}
                     </span>
                   ))}
@@ -199,30 +199,30 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
 
             {/* 编辑区 */}
             <div className="flex-1 flex flex-col min-h-0 p-6">
-              <label className="text-[10px] uppercase tracking-widest text-slate-600 mb-2 block">
+              <label className="text-[10px] uppercase tracking-widest text-text-muted mb-2 block">
                 使用指南 (usage_guide)
               </label>
               <textarea
                 value={currentDraft}
                 onChange={e => handleEdit(e.target.value)}
-                className="flex-1 w-full bg-[#1C1B19] border border-[#2a2926] rounded-lg
-                  p-4 text-sm text-slate-300 leading-relaxed
+                className="flex-1 w-full bg-surface-elevated border border-border-default rounded-lg
+                  p-4 text-sm text-text-primary leading-relaxed
                   resize-none outline-none
-                  focus:border-[#CC7C5E]/20 transition-colors
-                  placeholder:text-slate-700"
+                  focus:border-primary/20 transition-colors
+                  placeholder:text-text-dim"
                 placeholder="描述 AI 应在何时、如何使用这个工具..."
                 spellCheck={false}
               />
 
               {/* 操作栏 */}
-              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-[#2a2926]">
+              <div className="flex items-center gap-3 mt-4 pt-3 border-t border-border-default">
                 <button
                   onClick={handleSave}
                   disabled={!hasChanges || isSaving}
                   className={`px-4 py-1.5 rounded-lg text-xs cursor-pointer transition-colors
                     ${hasChanges
-                      ? 'bg-[#CC7C5E]/15 text-[#CC7C5E] hover:bg-[#CC7C5E]/25'
-                      : 'text-slate-700 cursor-not-allowed'
+                      ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                      : 'text-text-dim cursor-not-allowed'
                     }`}
                 >
                   {isSaving ? '保存中...' : '保存'}
@@ -231,18 +231,18 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
                   <button
                     onClick={handleReset}
                     className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                      text-slate-600 hover:text-slate-400 transition-colors"
+                      text-text-muted hover:text-slate-400 transition-colors"
                   >
                     恢复
                   </button>
                 )}
-                <span className="ml-auto text-[10px] text-slate-700">Ctrl+S 保存</span>
+                <span className="ml-auto text-[10px] text-text-dim">Ctrl+S 保存</span>
               </div>
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <p className="text-xs text-slate-700">选择左侧工具开始编辑</p>
+            <p className="text-xs text-text-dim">选择左侧工具开始编辑</p>
           </div>
         )}
       </div>

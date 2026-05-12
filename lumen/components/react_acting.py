@@ -19,10 +19,10 @@ import jsonschema
 from lumen.components.base import ActingComponent
 from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat, build_thinking_params, log_stream_cache_stats
-from lumen.services.context import fold_tool_calls, trim_messages, filter_for_ai
 from lumen.services.context.token_estimator import (
     estimate_text_tokens,
     estimate_messages_tokens,
+    record_usage,
 )
 from lumen.tool import execute_tool, execute_tools_parallel, format_result_for_ai, set_tool_context
 from lumen.tools.parse import parse_tool_call
@@ -80,13 +80,24 @@ def _strip_think_tags(text: str) -> str:
     if not text:
         return ""
     # 匹配完整块: <think...>...</think...> 和 <thinking...>...</thinking...>
-    clean = re.sub(r'<think(?:ing)?[^>]*>.*?(?:</think(?:ing)?\s*>|$)', '', text, flags=re.DOTALL)
+    clean = re.sub(r'<think(?:ing)?[^>]*>.*?(?:</think(?:ing)?\s*/?\s*>|$)', '', text, flags=re.DOTALL)
     # 清除孤立的闭合标签（跨 chunk 拆分导致开标签在上一 chunk 被 strip）
-    clean = re.sub(r'</think(?:ing)?\s*>', '', clean)
+    clean = re.sub(r'</think(?:ing)?\s*/?\s*>', '', clean)
     clean = clean.strip()
     if not clean and '<think' in text:
         return "..."
     return clean
+
+
+def _extract_think_content(text: str) -> str:
+    """从 content 文本中提取 <think...> 标签内的思维内容（不含标签本身）
+
+    用于在剥离前保存思维内容到 metadata，确保历史加载时能重建思维气泡。
+    """
+    if not text or '<think' not in text:
+        return ""
+    parts = re.findall(r'<think(?:ing)?[^>]*>(.*?)(?:</think(?:ing)?\s*/?\s*>|$)', text, re.DOTALL)
+    return "".join(parts).strip()
 
 
 
@@ -94,11 +105,10 @@ def _strip_think_tags(text: str) -> str:
 # ── 消息预处理 ──
 
 def _prepare_messages(messages: list, character_id: str) -> list:
-    """预处理消息：折叠工具调用 → 裁剪上下文 → 过滤 → 模板变量替换"""
+    """预处理消息：构建 LLM 上下文 → 模板变量替换"""
     from lumen.prompt.template import render_messages, collect_variables
-    folded = fold_tool_calls(messages)
-    trimmed = trim_messages(folded)
-    filtered = filter_for_ai(trimmed)
+    from lumen.services.context import build_llm_context
+    filtered = build_llm_context(messages)
     variables = collect_variables(character_id)
     return render_messages(filtered, variables)
 
@@ -130,15 +140,19 @@ async def _save_and_vectorize(session_id: str, role: str, content: str,
                               character_id: str, metadata: dict = None) -> int:
     """保存消息并异步向量化"""
     from lumen.services.storage import history
-    msg_id = history.save_message(session_id, role, content, metadata)
-    if role in ("user", "assistant") and content and len(content) >= 5:
+    meta = dict(metadata or {})
+    meta.setdefault("type", "normal")
+    if meta.get("internal"):
+        meta.setdefault("hidden", True)
+    msg_id = history.save_message(session_id, role, content, meta)
+    if role in ("user", "assistant") and meta.get("type") == "normal" and content and len(content) >= 5:
         from lumen.services.memory import vectorize_message
-        asyncio.create_task(vectorize_message(msg_id, content, role, session_id, character_id))
+        asyncio.create_task(vectorize_message(msg_id, content, role, session_id, character_id, metadata=meta))
     return msg_id
 
 
-async def _auto_title(session_id: str):
-    """后台 fire-and-forget：用 LLM 生成会话标题"""
+async def _auto_title(session_id: str) -> str | None:
+    """用 LLM 生成会话标题，返回标题字符串或 None"""
     try:
         from lumen.services.storage import history as hist
         from lumen.config import DEFAULT_MODEL
@@ -147,12 +161,14 @@ async def _auto_title(session_id: str):
         messages_raw = await asyncio.to_thread(hist.load_session, session_id)
         conversation_lines = []
         for msg in messages_raw[:10]:
+            if msg["role"] not in ("user", "assistant"):
+                continue
             role_label = "用户" if msg["role"] == "user" else "AI"
             content = msg["content"][:150]
             conversation_lines.append(f"{role_label}: {content}")
 
         if not conversation_lines:
-            return
+            return None
 
         conversation_text = "\n".join(conversation_lines)
         resp = await llm_chat(
@@ -173,8 +189,10 @@ async def _auto_title(session_id: str):
         if title:
             await asyncio.to_thread(hist.update_session_title, session_id, title)
             logger.info(f"[自动命名] {session_id} -> {title}")
+            return title
     except Exception as e:
         logger.debug(f"自动命名失败（不影响聊天）: {e}")
+    return None
 
 
 def _validate_tool_call(tool_name: str, tool_params: dict, command: str = "") -> str | None:
@@ -208,11 +226,12 @@ class ReActActingComponent(ActingComponent):
     """ReAct 决策组件：LLM → 工具 → 结果 → 再 LLM 循环"""
 
     def __init__(self, session, character_config: dict, user_input: str,
-                 memory_debug: bool = False):
+                 memory_debug: bool = False, save_user_message: bool = True):
         self.session = session
         self.config = character_config
         self.user_input = user_input
         self.memory_debug = memory_debug
+        self.save_user_message = save_user_message
         self.model = get_model(character_config)
         self.thinking_cfg = character_config.get("thinking") if character_config else None
 
@@ -239,13 +258,20 @@ class ReActActingComponent(ActingComponent):
             self.model, self.thinking_cfg)
 
         # ── 2. 保存用户消息 ──
-        self.session.messages.append({"role": "user", "content": self.user_input})
-        msg_id = await _save_and_vectorize(
-            self.session.session_id or "default", "user",
-            self.user_input, self.session.character_id,
-        )
-        self.session.messages[-1]["id"] = msg_id
-        yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
+        if self.save_user_message:
+            self.session.messages.append({"role": "user", "content": self.user_input})
+            msg_id = await _save_and_vectorize(
+                self.session.session_id or "default", "user",
+                self.user_input, self.session.character_id,
+            )
+            self.session.messages[-1]["id"] = msg_id
+            yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
+        else:
+            if not any(
+                msg.get("role") == "user" and msg.get("content") == self.user_input
+                for msg in reversed(self.session.messages)
+            ):
+                self.session.messages.append({"role": "user", "content": self.user_input})
 
         _clear_cancel(self.session.session_id)
 
@@ -291,8 +317,8 @@ class ReActActingComponent(ActingComponent):
 
             trimmed = _inject_authors_note(trimmed, self.session.session_id)
 
-            # 记忆调试
-            if self.memory_debug and iteration == 0:
+            # 记忆调试：每次迭代都发射，反映上下文变化（工具调用后可能改变 token 分布）
+            if self.memory_debug:
                 layer_infos = self._build_layer_infos()
                 for msg in trimmed:
                     if msg["role"] == "system":
@@ -302,12 +328,19 @@ class ReActActingComponent(ActingComponent):
                             layer_infos.append({"name": "知识库检索", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
                         elif msg["content"].startswith("<thinking_modules>"):
                             layer_infos.append({"name": "思维簇", "content": msg["content"], "tokens": estimate_text_tokens(msg["content"])})
+                # 从 MemoryComponent 读取召回日志
+                recall_log = []
+                if hasattr(self, '_agent') and self._agent:
+                    for comp in self._agent.components:
+                        if comp.name == "memory" and hasattr(comp, 'last_recall_log'):
+                            recall_log = comp.last_recall_log or []
+                            break
                 yield {
                     "type": "memory_debug",
                     "layers": layer_infos,
                     "total_tokens": estimate_messages_tokens(trimmed),
                     "context_size": self.config.get("context_size") or 4096,
-                    "recall_log": [],
+                    "recall_log": recall_log,
                 }
 
             # ── 调用 LLM（流式）──
@@ -357,6 +390,15 @@ class ReActActingComponent(ActingComponent):
 
             log_stream_cache_stats(last_chunk)
 
+            # 记录 token 用量
+            if last_chunk and hasattr(last_chunk, 'usage') and last_chunk.usage:
+                u = last_chunk.usage
+                record_usage(
+                    self.session.session_id,
+                    input_tokens=getattr(u, 'prompt_tokens', 0) or 0,
+                    output_tokens=getattr(u, 'completion_tokens', 0) or 0,
+                )
+
             thinking_ms = round((time.perf_counter() - llm_start) * 1000)
             if _is_cancelled(self.session.session_id):
                 _clear_cancel(self.session.session_id)
@@ -397,12 +439,13 @@ class ReActActingComponent(ActingComponent):
                         f"- No explanatory text before or after the JSON"
                     )
                     clean_content = _strip_think_tags(full_text)
+                    think_meta = current_reasoning_buffer or _extract_think_content(full_text)
                     msg = {"role": "assistant", "content": clean_content}
-                    if current_reasoning_buffer:
-                        msg["reasoning_content"] = current_reasoning_buffer
+                    if think_meta:
+                        msg["reasoning_content"] = think_meta
                     self.session.messages.append(msg)
                     from lumen.services.storage import history
-                    history.save_message(self.session.session_id, "assistant", clean_content)
+                    history.save_message(self.session.session_id, "assistant", clean_content, {"reasoning_content": think_meta} if think_meta else None)
                     self.session.messages.append({"role": "user", "content": error_feedback, "metadata": {"type": "system_feedback"}})
                     history.save_message(self.session.session_id, "user", error_feedback, {"type": "system_feedback"})
                     continue
@@ -411,19 +454,25 @@ class ReActActingComponent(ActingComponent):
                 if tool_iterations > 0:
                     exit_reason = "completed_after_tools"
                 clean_content = _strip_think_tags(full_text)
+                think_meta = current_reasoning_buffer or _extract_think_content(full_text)
                 msg = {"role": "assistant", "content": clean_content}
-                if current_reasoning_buffer:
-                    msg["reasoning_content"] = current_reasoning_buffer
+                if think_meta:
+                    msg["reasoning_content"] = think_meta
                 self.session.messages.append(msg)
+                meta = {"reasoning_content": think_meta} if think_meta else None
                 msg_id = await _save_and_vectorize(
                     self.session.session_id or "default", "assistant",
-                    clean_content, self.session.character_id,
+                    clean_content, self.session.character_id, metadata=meta,
                 )
                 self.session.messages[-1]["id"] = msg_id
+                title = None
                 if len(self.session.messages) <= 5:
-                    asyncio.create_task(_auto_title(self.session.session_id))
+                    title = await _auto_title(self.session.session_id)
                 logger.info(f"[ReAct] 循环结束: {exit_reason}，共 {tool_iterations} 轮工具调用")
-                yield {"type": "done", "exit_reason": exit_reason, "assistant_db_id": msg_id}
+                done_event: dict = {"type": "done", "exit_reason": exit_reason, "assistant_db_id": msg_id}
+                if title:
+                    done_event["title"] = title
+                yield done_event
                 return
 
             # ── 工具调用 ──
@@ -445,13 +494,16 @@ class ReActActingComponent(ActingComponent):
                 }
 
             clean_content = _strip_think_tags(full_text)
+            # 提取思维内容：优先 reasoning_buffer，fallback 到 content 中的 <think/> 标签
+            think_meta = current_reasoning_buffer or _extract_think_content(full_text)
             msg = {"role": "assistant", "content": clean_content}
-            if current_reasoning_buffer:
-                msg["reasoning_content"] = current_reasoning_buffer
+            if think_meta:
+                msg["reasoning_content"] = think_meta
             self.session.messages.append(msg)
+            meta = {"reasoning_content": think_meta} if think_meta else None
             msg_id = await _save_and_vectorize(
                 self.session.session_id or "default", "assistant",
-                clean_content, self.session.character_id,
+                clean_content, self.session.character_id, metadata=meta,
             )
             self.session.messages[-1]["id"] = msg_id
             yield {"type": "msg_saved", "role": "assistant", "db_id": msg_id}
@@ -498,6 +550,7 @@ class ReActActingComponent(ActingComponent):
         response = await chat(trimmed, self.model, stream=True)
 
         final_reply = ""
+        reasoning_buffer_max = ""
         in_think_max = False
         last_chunk_max = None
         async for chunk in response:
@@ -509,6 +562,7 @@ class ReActActingComponent(ActingComponent):
             # reasoning_content 处理
             reasoning = getattr(delta, 'reasoning_content', None) or getattr(delta, 'reasoning', None)
             if reasoning:
+                reasoning_buffer_max += reasoning
                 if not in_think_max:
                     yield {"type": "think_start"}
                     in_think_max = True
@@ -526,16 +580,29 @@ class ReActActingComponent(ActingComponent):
         if in_think_max:
             yield {"type": "think_end"}
         log_stream_cache_stats(last_chunk_max)
+        if last_chunk_max and hasattr(last_chunk_max, 'usage') and last_chunk_max.usage:
+            u = last_chunk_max.usage
+            record_usage(
+                self.session.session_id,
+                input_tokens=getattr(u, 'prompt_tokens', 0) or 0,
+                output_tokens=getattr(u, 'completion_tokens', 0) or 0,
+            )
         clean_reply = _strip_think_tags(final_reply)
+        think_meta = reasoning_buffer_max or _extract_think_content(final_reply)
         self.session.messages.append({"role": "assistant", "content": clean_reply})
+        meta = {"reasoning_content": think_meta} if think_meta else None
         msg_id = await _save_and_vectorize(
             self.session.session_id or "default", "assistant",
-            clean_reply, self.session.character_id,
+            clean_reply, self.session.character_id, metadata=meta,
         )
         self.session.messages[-1]["id"] = msg_id
+        title = None
         if len(self.session.messages) <= 5:
-            asyncio.create_task(_auto_title(self.session.session_id))
-        yield {"type": "done", "exit_reason": "max_iterations", "assistant_db_id": msg_id}
+            title = await _auto_title(self.session.session_id)
+        done_event: dict = {"type": "done", "exit_reason": "max_iterations", "assistant_db_id": msg_id}
+        if title:
+            done_event["title"] = title
+        yield done_event
 
     # ── 辅助方法 ──
 

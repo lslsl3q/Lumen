@@ -18,9 +18,9 @@ export function AiWritingPanel() {
   const noChapter = !activeChapterId || !activeProjectId;
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#141413] border-l border-[#2a2926]">
+    <div className="flex flex-col h-full w-full bg-surface-deep border-l border-border-default">
       {/* 顶栏：WS 状态 + 章节提示 */}
-      <div className="p-3 border-b border-[#2a2926]">
+      <div className="p-3 border-b border-border-default">
         <div className="flex items-center justify-between">
           <span className="text-[11px] uppercase tracking-wider text-slate-500 font-medium">
             AI 对话

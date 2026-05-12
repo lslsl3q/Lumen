@@ -3,7 +3,6 @@ import { useChatMode } from '../hooks/useChatMode';
 import type { useDebugState } from '../hooks/useDebugState';
 import type { UseFloatingLayersReturn } from '../components/floating/useFloatingLayers';
 import ChatPanel from '../components/ChatPanel';
-import SystemPromptOverlay from '../components/SystemPromptOverlay';
 import MemoryWindow from '../components/MemoryWindow';
 import GraphWindow from '../components/GraphWindow';
 import RpgPanel from '../components/RpgPanel';
@@ -47,14 +46,6 @@ function ChatMode({ debug, floating }: ChatModeProps) {
       />
 
       {/* 浮窗 */}
-      {d.sysPromptEditor && (
-        <SystemPromptOverlay
-          initialContent={d.sysPromptEditor.content}
-          characterName={d.characters.currentCharacter?.display_name || d.characters.currentCharacter?.name}
-          onSave={(c) => { d.sysPromptEditor?.onSave(c); d.setSysPromptEditor(null); }}
-          onClose={() => d.setSysPromptEditor(null)}
-        />
-      )}
       {d.memoryWindowOpen && (
         <MemoryWindow
           open

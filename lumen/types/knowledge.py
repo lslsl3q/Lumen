@@ -29,6 +29,7 @@ class KnowledgeCreateRequest(BaseModel):
     content: str = Field(..., description="文件正文内容")
     category: str = Field(default="imports", description="分类")
     subdir: str = Field(default="", description="子目录（如 世界观/地理）")
+    kb_name: str = Field(default="knowledge", description="目标知识库名称")
 
 
 class KnowledgeUpdateRequest(BaseModel):
@@ -55,6 +56,7 @@ class KnowledgeSearchRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=50, description="返回结果数")
     min_score: float = Field(default=0.3, ge=0.0, le=1.0, description="最低相似度")
     category: Optional[str] = Field(default=None, description="按分类过滤")
+    kb_name: str = Field(default="knowledge", description="目标知识库名称")
 
 
 class KnowledgeSearchResult(BaseModel):

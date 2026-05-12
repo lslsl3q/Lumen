@@ -12,6 +12,7 @@ from lumen.services.context.manager import (
     fold_tool_calls,
     filter_for_ai,
     trim_messages,
+    build_llm_context,
 )
 from lumen.services.context.token_estimator import (
     estimate_messages_tokens,

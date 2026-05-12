@@ -6,7 +6,6 @@ import WorldBookList from './pages/WorldBookList';
 import WorldBookEditor from './pages/WorldBookEditor';
 import SkillList from './pages/SkillList';
 import SkillEditor from './pages/SkillEditor';
-import AvatarManager from './pages/AvatarManager';
 import ConfigList from './pages/ConfigList';
 import ConfigEditor from './pages/ConfigEditor';
 import PermissionPage from './pages/PermissionPage';
@@ -116,7 +115,6 @@ function MainLayout() {
             <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
             <Route path="/settings/skills" element={<SkillList />} />
             <Route path="/settings/skills/:id" element={<SkillEditor />} />
-            <Route path="/settings/avatars" element={<AvatarManager />} />
             <Route path="/settings/config" element={<ConfigList />} />
             <Route path="/settings/config/:resource" element={<ConfigEditor />} />
             <Route path="/settings/permissions" element={<PermissionPage />} />

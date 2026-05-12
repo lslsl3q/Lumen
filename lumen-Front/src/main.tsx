@@ -1,3 +1,6 @@
+import { initThemeOverrideCache } from "./stores/useThemeStore";
+initThemeOverrideCache();
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -12,3 +15,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </ThemeProvider>
   </React.StrictMode>
 );
+
+import { syncThemeFromBackend } from "./stores/useThemeStore";
+syncThemeFromBackend();

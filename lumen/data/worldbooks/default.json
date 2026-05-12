@@ -1,0 +1,19 @@
+{
+  "id": "default",
+  "name": "默认示例",
+  "enabled": false,
+  "keywords": [
+    "示例",
+    "测试",
+    "worldbook"
+  ],
+  "case_sensitive": false,
+  "whole_word": true,
+  "content": "【世界书示例】\n\n当你看到「示例」或「测试」这些关键词时，本条目会被激活。\n\n这就是世界书系统的工作原理：根据聊天内容中的关键词，自动注入相关设定到提示词中。",
+  "position": "after_user",
+  "depth": 4,
+  "order": 0,
+  "scan_depth": 10,
+  "character_ids": [],
+  "comment": "这是一个示例条目，用于演示世界书功能。你可以删除或编辑它。"
+}

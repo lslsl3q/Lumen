@@ -15,12 +15,12 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
   const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
   const colorClass =
     pct > 60 ? 'bg-emerald-500' :
-    pct > 30 ? 'bg-amber-500' :
+    pct > 30 ? 'bg-primary' :
     'bg-red-500';
 
   return (
     <div className="flex items-center gap-1.5">
-      <div className="flex-1 h-1.5 bg-[#2a2926] rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${colorClass}`}
           style={{ width: `${pct}%` }}
@@ -38,13 +38,13 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
   const hpPct = (entity.hp / entity.max_hp) * 100;
   const statusColor =
     hpPct > 60 ? 'text-emerald-400' :
-    hpPct > 30 ? 'text-amber-400' :
+    hpPct > 30 ? 'text-primary' :
     'text-red-400';
 
   return (
-    <div className="bg-[#1C1B19] rounded-lg border border-[#2a2926] overflow-hidden">
+    <div className="bg-surface-elevated rounded-lg border border-surface-elevated overflow-hidden">
       <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#2a2926]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-elevated/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className={`w-1.5 h-1.5 rounded-full ${statusColor} flex-shrink-0`} />
@@ -61,7 +61,7 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
         <HpBar hp={entity.hp} maxHp={entity.max_hp} />
       </div>
       {expanded && (
-        <div className="px-3 pb-2.5 space-y-1 border-t border-[#2a2926] pt-2">
+        <div className="px-3 pb-2.5 space-y-1 border-t border-surface-elevated pt-2">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Heart className="w-3 h-3 text-red-400" />
             <span>生命值</span>
@@ -110,7 +110,7 @@ function EmotionBar({ name, value }: { name: string; value: number }) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-[11px] text-slate-400 w-10 text-right flex-shrink-0">{label}</span>
-      <div className="flex-1 h-1.5 bg-[#2a2926] rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700 ease-out"
           style={{ width: `${pct}%`, backgroundColor: color }}
@@ -146,9 +146,9 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
   if (!hasContent) return null;
 
   return (
-    <div className="border-t border-[#1a1a19]">
+    <div className="border-t border-border-default">
       <button
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#2a2926]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface-elevated/50 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <Brain className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
@@ -176,10 +176,10 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
           {/* 当前目标 */}
           {goals && goals.length > 0 && (
             <div className="flex items-start gap-1.5">
-              <Target className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+              <Target className="w-3 h-3 text-primary mt-0.5 flex-shrink-0" />
               <div className="flex flex-wrap gap-1">
                 {goals.map((g, i) => (
-                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/30 text-amber-300">
+                  <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-primary/30 text-primary">
                     {g}
                   </span>
                 ))}
@@ -223,10 +223,10 @@ function RpgStatusPanel({ roomState, playerId }: RpgStatusPanelProps) {
   });
 
   return (
-    <div className="w-64 flex flex-col bg-[#111110] border-r border-[#1a1a19] flex-shrink-0">
+    <div className="w-64 flex flex-col bg-surface-deep border-r border-border-default flex-shrink-0">
       {/* 面板头部 */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1a1a19]">
-        <Swords className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-default">
+        <Swords className="w-3.5 h-3.5 text-primary flex-shrink-0" />
         <span className="text-sm font-medium text-slate-300 truncate">
           {roomState.roomName || '等待进入...'}
         </span>

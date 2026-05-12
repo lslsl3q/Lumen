@@ -14,10 +14,9 @@ import re
 import logging
 from typing import List, Dict, Optional
 from lumen.types.skills import SkillCard
+from lumen.config import SKILLS_DIR
 
 logger = logging.getLogger(__name__)
-
-SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "skills")
 
 _cached_skills: Optional[List[Dict]] = None
 

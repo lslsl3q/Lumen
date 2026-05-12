@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "active_provider": "",
+  "top_k": 10,
+  "min_score": 0.3,
+  "providers": []
+}

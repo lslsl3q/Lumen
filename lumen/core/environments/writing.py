@@ -85,6 +85,7 @@ def _build_writing_agent(
         },
         user_input=user_input,
         memory_debug=False,
+        save_user_message=True,
     )
 
     return agent

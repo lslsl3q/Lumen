@@ -11,7 +11,7 @@
  * 使用 @theme 指令定义自定义设计令牌
  */
 @theme {
-  /* === 自定义颜色扩展 — 暖灰色调（slate 覆盖，温和提亮版） === */
+  /* === 静态色阶（不随主题变化）=== */
   --color-slate-50: #FAFAF8;
   --color-slate-100: #F3F3F0;
   --color-slate-200: #EBEAE6;
@@ -24,7 +24,6 @@
   --color-slate-900: #262422;
   --color-slate-950: #1C1B19;
 
-  /* === 自定义颜色扩展 — 琥珀色阶（amber 覆盖） === */
   --color-amber-50: #FEF6F2;
   --color-amber-100: #FDE8DF;
   --color-amber-200: #F5CFC0;
@@ -37,121 +36,64 @@
   --color-amber-900: #5C2F20;
   --color-amber-950: #331610;
 
-  /* === 语义色（CSS 变量驱动） === */
+  /* === 语义色（引用 CSS 变量，随主题切换）=== */
   --color-primary: var(--color-primary);
-  --color-primary-light: var(--color-primary-light);
   --color-primary-dim: var(--color-primary-dim);
-
-  --color-accent: var(--color-accent);
-  --color-accent-light: var(--color-accent-light);
-
+  --color-primary-deep: var(--color-primary-deep);
+  --color-primary-subtle: var(--color-primary-subtle);
+  --color-primary-foreground: var(--color-primary-foreground);
   --color-success: var(--color-success);
   --color-success-light: var(--color-success-light);
-
   --color-error: var(--color-error);
   --color-error-light: var(--color-error-light);
+  --color-warning: var(--color-warning);
+  --color-surface-deep: var(--color-surface-deep);
+  --color-surface-base: var(--color-surface-base);
+  --color-surface: var(--color-surface);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-surface-rail: var(--color-surface-rail);
+  --color-surface-panel: var(--color-surface-panel);
+  --color-surface-canvas: var(--color-surface-canvas);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-dim: var(--color-text-dim);
+  --color-border-default: var(--color-border);
+  --color-border-subtle: var(--color-border-subtle);
 
-  --color-surface-deep: var(--color-bg-deep);
-  --color-surface-base: var(--color-bg-base);
-  --color-surface: var(--color-bg-surface);
-  --color-surface-elevated: var(--color-bg-elevated);
+  /* === 间距 === */
+  --spacing-tight: var(--spacing-tight);
+  --spacing-normal: var(--spacing-normal);
+  --spacing-relaxed: var(--spacing-relaxed);
+  --spacing-spacious: var(--spacing-spacious);
 
-  /* 区域色（ActivityBar / SidePanel / ChatPanel）*/
-  --color-surface-rail: var(--color-bg-rail);
-  --color-surface-panel: var(--color-bg-panel);
-  --color-surface-canvas: var(--color-bg-canvas);
+  /* === 阴影 === */
+  --shadow-subtle: var(--shadow-subtle);
+  --shadow-card: var(--shadow-card);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-deep: var(--shadow-deep);
 
-  /* === 自定义边框颜色 === */
-  --border-color-theme: var(--color-border);
-  --border-color-theme-subtle: var(--color-border-subtle);
+  /* === 圆角 === */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
 
-  /* === 字体家族 === */
+  /* === 动画时长 === */
+  --duration-instant: var(--duration-instant);
+  --duration-fast: var(--duration-fast);
+  --duration-normal: var(--duration-normal);
+  --duration-slow: var(--duration-slow);
+
+  /* === 缓动函数 === */
+  --ease-default: var(--ease-default);
+  --ease-spring: var(--ease-spring);
+  --ease-decelerate: var(--ease-decelerate);
+
+  /* === 字体 === */
   --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-}
-
-/* === Lumen 设计令牌 — 暖室台灯（Claude Desktop 风格） ===
- *
- * 核心理念：暖灰色底色 + 橙棕 accent，温暖专注
- * 所有颜色集中定义在这里，组件通过 CSS 变量或 Tailwind 语义名引用。
- *
- * 将来做主题系统时，只需切换这套变量即可全局换色。
- */
-:root {
-  /* === 全局字体 === */
-  font-family: var(--font-body);
-
-  /* === 主色 — 橙棕色系列（暖光） === */
-  --color-primary: #CC7C5E;         /* amber-400 — 暖棕 accent */
-  --color-primary-dim: #B86A4A;     /* amber-500 — 深暖棕 */
-  --color-primary-deep: #A05838;    /* amber-600 — 更深 */
-  --color-primary-subtle: rgba(204, 124, 94, 0.08);  /* 极淡暖棕背景 */
-
-  /* 状态色 — 保持简洁 */
-  --color-success: #10b981;         /* emerald-500 */
-  --color-success-light: #34d399;   /* emerald-400 */
-  --color-error: #ef4444;           /* red-500 */
-  --color-error-light: #f87171;     /* red-400 */
-
-  /* 背景色 — 暖灰系列（温和提亮版） */
-  --color-bg-deep: #1C1B19;         /* ~11% 亮度，从 #141413 提亮 */
-  --color-bg-base: #262422;         /* ~15% 亮度，从 #1F1F1E 提亮 */
-  --color-bg-surface: #363432;      /* ~21% 亮度，从 #333230 微调 */
-  --color-bg-elevated: #4C4A47;     /* ~30% 亮度，从 #4A4744 微调 */
-
-  /* 区域背景色 — 2-4% 明度差（ActivityBar 最深 → ChatPanel 最亮）*/
-  --color-bg-rail: #171614;          /* ActivityBar — 最深 */
-  --color-bg-panel: #262422;         /* SidePanel — 中间 */
-  --color-bg-canvas: #2E2C2A;        /* ChatPanel — 最亮 */
-
-  /* 文字色 — 次要文字微调，提升可读性 */
-  --color-text-primary: #EBEAE6;    /* 从 #E8E7E3 微亮 */
-  --color-text-secondary: #B5AFA5;  /* 从 #ABA499 微亮 */
-  --color-text-muted: #948E84;      /* 从 #8A8478 微亮 */
-  --color-text-dim: #757068;        /* 从 #6A655C 微亮 */
-
-  /* 边框 — 随背景提亮调整 */
-  --color-border: rgba(76, 74, 71, 0.6);
-  --color-border-subtle: rgba(76, 74, 71, 0.4);
-
-  /* 发光效果 — 暖棕 accent */
-  --glow-primary: rgba(204, 124, 94, 0.15);
-  --glow-subtle: rgba(204, 124, 94, 0.08);
-
-  /* === Shadcn 语义变量 — 暗色主题（映射到 Lumen 设计令牌） === */
-  --background: #1C1B19;                          /* bg-deep */
-  --foreground: #EBEAE6;                          /* text-primary */
-  --card: #262422;                                /* bg-base */
-  --card-foreground: #EBEAE6;
-  --popover: #262422;
-  --popover-foreground: #EBEAE6;
-  --primary: #CC7C5E;                             /* amber-400 */
-  --primary-foreground: #1C1B19;
-  --secondary: #363432;                           /* bg-surface */
-  --secondary-foreground: #EBEAE6;
-  --muted: #363432;
-  --muted-foreground: #B5AFA5;
-  --accent: #363432;
-  --accent-foreground: #EBEAE6;
-  --destructive: #ef4444;
-  --border: rgba(76, 74, 71, 0.6);
-  --input: rgba(76, 74, 71, 0.6);
-  --ring: #CC7C5E;
-  --chart-1: #CC7C5E;
-  --chart-2: #B5AFA5;
-  --chart-3: #757068;
-  --chart-4: #4C4A47;
-  --chart-5: #363432;
-  --radius: 0.625rem;
-  --sidebar: #262422;
-  --sidebar-foreground: #EBEAE6;
-  --sidebar-primary: #CC7C5E;
-  --sidebar-primary-foreground: #1C1B19;
-  --sidebar-accent: #363432;
-  --sidebar-accent-foreground: #EBEAE6;
-  --sidebar-border: rgba(76, 74, 71, 0.4);
-  --sidebar-ring: #CC7C5E;
 }
 
 /* === 自定义动画 === */
@@ -266,60 +208,15 @@
 }
 /* ---break---
  */
-@theme inline {
-  --font-heading: var(--font-display);
-  --font-sans: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-foreground: var(--foreground);
-  --color-background: var(--background);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-/* ---break---
- */
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border-default;
     /* 全局滚动条：细圆条，无箭头 */
     scrollbar-width: thin;
     scrollbar-color: rgba(138, 132, 120, 0.2) transparent;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-surface-canvas text-text-primary;
   }
   html {
     @apply font-sans;

@@ -1,10 +1,10 @@
 /**
  * 模型列表状态管理 Hook
  *
- * 职责：加载可用模型列表
+ * 职责：加载可用模型列表，支持手动刷新
  * 遵循单向依赖：hook → api/models.ts
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { listModels } from '../api/models';
 import type { ModelInfo } from '../api/models';
 
@@ -15,25 +15,30 @@ export function useModels() {
   const [isLoading, setIsLoading] = useState(_cached === null);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    if (_cached !== null) return;
-    let cancelled = false;
+  const fetchModels = useCallback(() => {
+    setIsLoading(true);
+    setError(false);
     listModels()
       .then(data => {
-        if (!cancelled) {
-          _cached = data.models;
-          setModels(data.models);
-          setIsLoading(false);
-        }
+        _cached = data.models;
+        setModels(data.models);
+        setIsLoading(false);
       })
       .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setIsLoading(false);
-        }
+        setError(true);
+        setIsLoading(false);
       });
-    return () => { cancelled = true; };
   }, []);
 
-  return { models, isLoading, error };
+  useEffect(() => {
+    if (_cached !== null) return;
+    fetchModels();
+  }, [fetchModels]);
+
+  const refresh = useCallback(() => {
+    _cached = null;
+    fetchModels();
+  }, [fetchModels]);
+
+  return { models, isLoading, error, refresh };
 }

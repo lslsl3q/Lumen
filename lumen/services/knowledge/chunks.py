@@ -1,19 +1,42 @@
 """
 知识库 chunks 的 SQLite + FTS5 BM25 存储
 
-从 history.py 拆出：知识库文本片段的 CRUD + 全文检索。
+知识库文本片段的 CRUD + 全文检索。
+独立 DB 文件，不再依赖 history.py。
 """
 
 import logging
+import os
+import sqlite3
+import threading
 
-from lumen.services.storage.history import _get_conn, _write_lock
+from lumen.config import SEARCH_INDEX_DB
 
 logger = logging.getLogger(__name__)
+
+DB_PATH = SEARCH_INDEX_DB
+_local = threading.local()
+write_lock = threading.Lock()
+
+
+def get_conn() -> sqlite3.Connection:
+    if not hasattr(_local, "conn") or _local.conn is None:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True)
+        _local.conn.row_factory = sqlite3.Row
+        _local.conn.execute("PRAGMA journal_mode=WAL")
+    return _local.conn
+
+
+def close_conn():
+    if hasattr(_local, "conn") and _local.conn is not None:
+        _local.conn.close()
+        _local.conn = None
 
 
 def _ensure_table():
     """初始化 knowledge_chunks 表 + FTS5 索引（幂等）"""
-    conn = _get_conn()
+    conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS knowledge_chunks (
@@ -23,9 +46,22 @@ def _ensure_table():
             filename TEXT,
             category TEXT DEFAULT 'imports',
             chunk_index INTEGER DEFAULT 0,
-            content TEXT NOT NULL
+            content TEXT NOT NULL,
+            kb_name TEXT NOT NULL DEFAULT 'knowledge'
         )
     """)
+    # 幂等：旧表没有 kb_name 列时补加
+    col_check = cursor.execute(
+        "PRAGMA table_info(knowledge_chunks)"
+    ).fetchall()
+    col_names = [row[1] for row in col_check]
+    if "kb_name" not in col_names:
+        cursor.execute(
+            "ALTER TABLE knowledge_chunks ADD COLUMN kb_name TEXT NOT NULL DEFAULT 'knowledge'"
+        )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_kc_kb ON knowledge_chunks(kb_name)"
+    )
     existing = cursor.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_chunks_fts'"
     ).fetchone()
@@ -45,18 +81,19 @@ def save_knowledge_chunks_batch(
     filename: str,
     category: str,
     chunks: list[str],
+    kb_name: str = "knowledge",
 ):
     """批量保存知识库 chunks（一次锁，多次插入）"""
     import jieba
 
-    with _write_lock:
-        conn = _get_conn()
+    with write_lock:
+        conn = get_conn()
         for i, content in enumerate(chunks):
             cursor = conn.execute(
                 """INSERT INTO knowledge_chunks
-                   (file_id, source_path, filename, category, chunk_index, content)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (file_id, source_path, filename, category, i, content),
+                   (file_id, source_path, filename, category, chunk_index, content, kb_name)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (file_id, source_path, filename, category, i, content, kb_name),
             )
             row_id = cursor.lastrowid
             try:
@@ -74,6 +111,7 @@ def search_knowledge_bm25(
     keywords: list[str],
     category: str = "",
     limit: int = 10,
+    kb_name: str = "",
 ) -> list[dict]:
     """FTS5 BM25 搜索知识库 chunks
 
@@ -81,6 +119,7 @@ def search_knowledge_bm25(
         keywords: jieba 提取的关键词列表
         category: 按分类过滤（空不过滤）
         limit: 最多返回条数
+        kb_name: 按知识库名称过滤（空不过滤）
 
     Returns:
         [{"file_id", "source_path", "filename", "category", "chunk_index", "content", "bm25_score"}, ...]
@@ -89,7 +128,7 @@ def search_knowledge_bm25(
         return []
 
     query = " OR ".join(f'"{kw}"' for kw in keywords)
-    conn = _get_conn()
+    conn = get_conn()
 
     try:
         sql = """
@@ -100,6 +139,9 @@ def search_knowledge_bm25(
             WHERE knowledge_chunks_fts MATCH ?
         """
         params: list = [query]
+        if kb_name:
+            sql += " AND k.kb_name = ?"
+            params.append(kb_name)
         if category:
             sql += " AND k.category = ?"
             params.append(category)
@@ -125,13 +167,16 @@ def search_knowledge_bm25(
     return results
 
 
-def delete_knowledge_chunks(file_id: str) -> int:
+def delete_knowledge_chunks(file_id: str, kb_name: str = "") -> int:
     """删除指定文件的所有 chunks + FTS5 索引，返回删除数量"""
-    with _write_lock:
-        conn = _get_conn()
-        rows = conn.execute(
-            "SELECT id FROM knowledge_chunks WHERE file_id = ?", (file_id,)
-        ).fetchall()
+    with write_lock:
+        conn = get_conn()
+        sql = "SELECT id FROM knowledge_chunks WHERE file_id = ?"
+        params: list = [file_id]
+        if kb_name:
+            sql += " AND kb_name = ?"
+            params.append(kb_name)
+        rows = conn.execute(sql, params).fetchall()
         if not rows:
             return 0
         ids = [row["id"] for row in rows]

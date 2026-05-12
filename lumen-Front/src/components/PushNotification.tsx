@@ -18,9 +18,9 @@ interface PushNotificationProps {
 function getLevelStyles(level: PushNotificationType['level']) {
   switch (level) {
     case 'success': return { border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-400' };
-    case 'warning': return { border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-400' };
+    case 'warning': return { border: 'border-primary/40', bg: 'bg-primary/10', text: 'text-primary' };
     case 'error':   return { border: 'border-red-500/40', bg: 'bg-red-500/10', text: 'text-red-400' };
-    default:        return { border: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-400' };
+    default:        return { border: 'border-primary/40', bg: 'bg-primary/10', text: 'text-primary' };
   }
 }
 
@@ -49,7 +49,7 @@ function PushNotification({ notifications, onDismiss }: PushNotificationProps) {
             key={n.id}
             className={`
               flex items-start gap-3 px-4 py-3 rounded-lg
-              bg-slate-900/95 backdrop-blur-sm
+              bg-surface-deep backdrop-blur-sm
               border ${styles.border}
               shadow-lg shadow-black/20
               animate-slide-in
@@ -62,14 +62,14 @@ function PushNotification({ notifications, onDismiss }: PushNotificationProps) {
 
             {/* 内容 */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200">{n.title}</p>
-              <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.body}</p>
+              <p className="text-sm font-medium text-text-primary">{n.title}</p>
+              <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{n.body}</p>
             </div>
 
             {/* 关闭按钮 */}
             <button
               onClick={() => onDismiss(n.id)}
-              className="text-slate-500 hover:text-slate-300 text-xs shrink-0 mt-0.5 transition-colors"
+              className="text-text-muted hover:text-text-primary text-xs shrink-0 mt-0.5 transition-colors"
             >
               ✕
             </button>

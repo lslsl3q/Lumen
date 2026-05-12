@@ -54,8 +54,11 @@ def _walk_files(directory: str) -> list[str]:
     return results
 
 
-def scan_knowledge_lib() -> dict:
-    """扫描整个知识库目录，返回变更列表。
+def scan_knowledge_lib(kb_name: Optional[str] = None) -> dict:
+    """扫描知识库目录，返回变更列表。
+
+    Args:
+        kb_name: 指定只扫描某个知识库，None 则扫描全部
 
     Returns:
         {
@@ -70,7 +73,9 @@ def scan_knowledge_lib() -> dict:
 
     result = {"new_kbs": [], "added": [], "modified": [], "deleted": []}
 
-    for entry in sorted(os.listdir(KNOWLEDGE_LIB_DIR)):
+    entries_to_scan = [kb_name] if kb_name else sorted(os.listdir(KNOWLEDGE_LIB_DIR))
+
+    for entry in entries_to_scan:
         entry_path = os.path.join(KNOWLEDGE_LIB_DIR, entry)
         if not os.path.isdir(entry_path):
             continue

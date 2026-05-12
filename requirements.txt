@@ -13,6 +13,7 @@ trafilatura
 # 文件工具
 send2trash>=1.8.0
 PyPDF2>=3.0.0
+python-docx>=0.8.11
 
 # 中文分词
 jieba>=0.42

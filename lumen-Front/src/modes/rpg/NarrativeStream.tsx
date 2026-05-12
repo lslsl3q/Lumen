@@ -58,9 +58,9 @@ function NarrativeStream({ messages, isLoading }: NarrativeStreamProps) {
             {isLoading && (
               <div className="flex justify-center py-4">
                 <div className="flex gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50 animate-pulse" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50 animate-pulse [animation-delay:200ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500/50 animate-pulse [animation-delay:400ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-pulse [animation-delay:200ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/50 animate-pulse [animation-delay:400ms]" />
                 </div>
               </div>
             )}

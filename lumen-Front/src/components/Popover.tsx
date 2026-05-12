@@ -118,7 +118,7 @@ export default function Popover({
         <div
           ref={panelRef}
           className={`fixed z-[200] min-w-[180px] rounded-lg
-            bg-[#1a1a19] border border-[#3a3935]
+            bg-surface-elevated border border-border-default
             shadow-[0_8px_32px_rgba(0,0,0,0.4)]
             animate-in fade-in duration-100
             ${className}`}

@@ -9,9 +9,9 @@ function InfoPanel() {
   const offline = channelMembers.filter((m) => !m.online);
 
   return (
-    <div className="w-48 flex flex-col bg-[#0f0f0e] border-l border-[#1a1a19]">
+    <div className="w-48 flex flex-col bg-surface-deep border-l border-border-default">
       {/* 标题 */}
-      <div className="h-10 flex items-center gap-2 px-3 border-b border-[#1a1a19]">
+      <div className="h-10 flex items-center gap-2 px-3 border-b border-border-default">
         <Users size={13} className="text-[#555]" />
         <span className="text-[10px] font-semibold text-[#555] uppercase tracking-widest">
           在线 — {online.length}
@@ -40,7 +40,7 @@ function InfoPanel() {
                     {member.name[0]}
                   </div>
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full
-                    bg-[#4ade80] border-2 border-[#0f0f0e]" />
+                    bg-emerald-400 border-2 border-surface-deep" />
                 </div>
                 <span className="text-xs text-[#aaa]">{member.name}</span>
               </div>
@@ -64,7 +64,7 @@ function InfoPanel() {
                         {member.name[0]}
                       </div>
                       <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full
-                        bg-[#555] border-2 border-[#0f0f0e]" />
+                        bg-[#555] border-2 border-surface-deep" />
                     </div>
                     <span className="text-xs text-[#666]">{member.name}</span>
                   </div>

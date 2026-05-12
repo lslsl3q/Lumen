@@ -1,5 +1,5 @@
 /**
- * TDB 条目浏览/编辑 API
+ * TDB 条目浏览 API（只读，chunk 编辑请改源文件 → 重导）
  */
 const API_BASE_URL = 'http://127.0.0.1:8888';
 
@@ -40,15 +40,6 @@ export interface TdbStats {
   statuses: Record<string, number>;
 }
 
-export interface TdbEntryUpdate {
-  content?: string;
-  source?: string;
-  category?: string;
-  tags?: string[];
-  importance?: number;
-  reindex?: boolean;
-}
-
 export async function listTdbEntries(params: {
   name: string;
   source?: string;
@@ -71,20 +62,6 @@ export async function listTdbEntries(params: {
 export async function getTdbStats(name: string): Promise<TdbStats> {
   const res = await fetch(`${API_BASE_URL}/tdb/${name}/stats`);
   if (!res.ok) throw new Error(`统计失败: ${res.status}`);
-  return res.json();
-}
-
-export async function updateTdbEntry(
-  name: string,
-  entryId: number,
-  body: TdbEntryUpdate,
-): Promise<{ id: number; updated: boolean }> {
-  const res = await fetch(`${API_BASE_URL}/tdb/${name}/entries/${entryId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`更新失败: ${res.status}`);
   return res.json();
 }
 

@@ -10,11 +10,9 @@ import re
 import logging
 from typing import List, Dict, Optional
 from lumen.types.worldbook import WorldBookEntry, WorldBookCreateRequest, WorldBookUpdateRequest
+from lumen.config import WORLDBOOKS_DIR
 
 logger = logging.getLogger(__name__)
-
-# 世界书条目文件夹
-WORLDBOOKS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "worldbooks")
 
 # 模块级缓存
 _cached_entries: Optional[List[Dict]] = None

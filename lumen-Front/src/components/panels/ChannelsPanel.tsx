@@ -40,13 +40,13 @@ function ChannelsPanel() {
   return (
     <div className="h-full flex flex-col" onClick={closeContextMenu}>
       {/* 顶部工具栏 */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-[#1a1a19]">
+      <div className="h-10 flex items-center justify-between px-3 border-b border-border-default">
         <span className="text-xs font-medium text-[#888] tracking-wide">频道</span>
         <div className="flex gap-1">
           <button
             onClick={() => setShowCreate(true)}
             className="w-6 h-6 flex items-center justify-center rounded
-              text-[#666] hover:text-[#CC7C5E] hover:bg-[#CC7C5E15] transition-colors cursor-pointer"
+              text-[#666] hover:text-primary hover:bg-primary/8 transition-colors cursor-pointer"
             title="创建频道"
           >
             <Plus size={14} />
@@ -83,7 +83,7 @@ function ChannelsPanel() {
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer
                   transition-colors duration-150 group
                   ${activeChannelId === channel.id
-                    ? 'bg-[#CC7C5E18] text-[#CC7C5E]'
+                    ? 'bg-primary/9 text-primary'
                     : 'text-[#888] hover:bg-[#ffffff06] hover:text-[#bbb]'
                   }`}
               >
@@ -106,7 +106,7 @@ function ChannelsPanel() {
         <>
           <div className="fixed inset-0 z-40" onClick={closeContextMenu} />
           <div
-            className="fixed z-50 bg-[#1a1a19] border border-[#2a2a28] rounded-lg
+            className="fixed z-50 bg-surface-deep border border-border-default rounded-lg
               shadow-[0_4px_16px_rgba(0,0,0,0.4)] py-1 min-w-[120px]"
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}

@@ -1,19 +1,17 @@
 /**
- * WritingIconStrip — 写作模式左侧窄图标条（浮动）
+ * WritingIconStrip — 写作模式右侧图标条（flex 子元素）
  *
- * 参考 Author 的侧边图标导航：
- * - 极窄（48px），纯图标 + tooltip
- * - 点击弹出浮动面板
- * - 不是全局 active bar（那是跨模式导航）
+ * 始终在布局最右侧，宽度 48px，纯图标 + tooltip。
+ * 面板在图标条左侧展开，不是全局 active bar（那是跨模式导航）。
  */
 import {
   FileText, BookOpen, User, MapPin, Globe, Package,
-  ListTree, Download,
+  ListTree, FileOutput, MessageSquare, History,
 } from "lucide-react";
 
 export type WritingPanelType =
   | "chapters" | "project" | "characters" | "locations"
-  | "world" | "items" | "outline" | "export" | null;
+  | "world" | "items" | "outline" | "export" | "snapshots" | "chat" | null;
 
 interface WritingIconStripProps {
   activePanel: WritingPanelType;
@@ -49,7 +47,9 @@ const BOTTOM_ICONS: {
   icon: typeof FileText;
   label: string;
 }[] = [
-  { id: "export", icon: Download, label: "导出" },
+  { id: "export", icon: FileOutput, label: "导出" },
+  { id: "snapshots", icon: History, label: "快照管理" },
+  { id: "chat", icon: MessageSquare, label: "AI 聊天" },
 ];
 
 function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
@@ -65,8 +65,8 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
       title={label}
       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors cursor-pointer
         ${isActive
-          ? "bg-amber-400/15 text-amber-400"
-          : "text-slate-600 hover:text-slate-300 hover:bg-[#1f1f1c]"
+          ? "bg-primary/15 text-primary"
+          : "text-slate-600 hover:text-slate-300 hover:bg-surface-elevated"
         }`}
     >
       <Icon className="w-[18px] h-[18px]" />
@@ -76,7 +76,7 @@ function IconBtn({ id, icon: Icon, label, isActive, onToggle }: {
 
 export function WritingIconStrip({ activePanel, onToggle }: WritingIconStripProps) {
   return (
-    <div className="absolute left-0 top-0 bottom-0 w-12 z-20 flex flex-col items-center py-3 bg-[#141413]/95 backdrop-blur-sm border-r border-[#2a2926] select-none">
+    <div className="w-12 flex flex-col items-center py-3 bg-surface-deep/95 backdrop-blur-sm border-l border-border-default select-none">
       {/* 顶部：章节 + 作品管理 */}
       <div className="flex flex-col gap-0.5">
         {TOP_ICONS.map((item) => (
@@ -85,7 +85,7 @@ export function WritingIconStrip({ activePanel, onToggle }: WritingIconStripProp
       </div>
 
       {/* 分割线 */}
-      <div className="w-5 h-px bg-[#2a2926] my-2" />
+      <div className="w-5 h-px bg-border-default my-2" />
 
       {/* 中间：世界观设定 */}
       <div className="flex flex-col gap-0.5">

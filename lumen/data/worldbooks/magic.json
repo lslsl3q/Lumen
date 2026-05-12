@@ -1,0 +1,18 @@
+{
+  "id": "magic",
+  "name": "魔法系统",
+  "enabled": true,
+  "keywords": [
+    "魔法",
+    "咒语"
+  ],
+  "case_sensitive": false,
+  "whole_word": true,
+  "content": "在这个世界中，魔法是通过魔力水晶施法的。",
+  "position": "before_user",
+  "depth": 4,
+  "order": 1,
+  "scan_depth": 10,
+  "character_ids": [],
+  "comment": "魔法设定"
+}

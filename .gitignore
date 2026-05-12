@@ -75,9 +75,6 @@ lumen/data/assets/avatars/
 lumen/skills/*
 !lumen/skills/README.md
 
-# 前端公共资源（头像上传目录，运行时生成）
-lumen-Front/public/avatars/
-
 # ========================================
 # 测试和覆盖率
 # ========================================

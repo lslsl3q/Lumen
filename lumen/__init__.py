@@ -8,9 +8,6 @@ __version__ = "0.1.0"
 # 会话管理（core/）
 from lumen.core.session import ChatSession, SessionManager, get_session_manager
 
-# 聊天功能（core/）
-from lumen.query import validate_tool_call, chat_non_stream
-
 # 上下文管理（services/context/）
 from lumen.services.context import trim_messages, fold_tool_calls, filter_for_ai
 
@@ -53,10 +50,6 @@ __all__ = [
     "ChatSession",
     "SessionManager",
     "get_session_manager",
-
-    # 聊天功能
-    "validate_tool_call",
-    "chat_non_stream",
 
     # 上下文管理
     "trim_messages",
