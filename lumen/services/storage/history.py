@@ -679,6 +679,19 @@ def list_sessions(limit: int = 20, character_id: str | None = None) -> list[Sess
     ]
 
 
+def sessions_exist(session_ids: set[str]) -> set[str]:
+    """批量检查会话是否存在，返回存在的 session_id 集合"""
+    if not session_ids:
+        return set()
+    conn = _get_conn()
+    placeholders = ",".join("?" * len(session_ids))
+    rows = conn.execute(
+        f"SELECT id FROM sessions WHERE id IN ({placeholders})",
+        list(session_ids),
+    ).fetchall()
+    return {row["id"] for row in rows}
+
+
 def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
     """获取单个会话的基本信息（从数据库查询，不依赖内存）"""
     conn = _get_conn()
