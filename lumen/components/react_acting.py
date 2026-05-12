@@ -317,8 +317,8 @@ class ReActActingComponent(ActingComponent):
 
             trimmed = _inject_authors_note(trimmed, self.session.session_id)
 
-            # 记忆调试
-            if self.memory_debug and iteration == 0:
+            # 记忆调试：每次迭代都发射，反映上下文变化（工具调用后可能改变 token 分布）
+            if self.memory_debug:
                 layer_infos = self._build_layer_infos()
                 for msg in trimmed:
                     if msg["role"] == "system":

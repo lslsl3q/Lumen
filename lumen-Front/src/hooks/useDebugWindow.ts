@@ -40,7 +40,7 @@ export function useDebugWindow({ debugInfo, reactTrace, isOpen, onClose }: UseDe
         contextSize: debugInfo?.context_size || 4096,
         recallLog: debugInfo?.recall_log || null,
         reactTrace: reactTrace,
-      }).catch(() => {});
+      }).catch((e) => console.warn('[useDebugWindow] emitTo 失败:', e));
     })();
   }, [debugInfo, reactTrace, isOpen]);
 

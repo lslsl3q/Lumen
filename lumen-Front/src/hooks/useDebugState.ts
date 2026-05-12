@@ -80,19 +80,15 @@ export function useDebugState() {
       if (event.action === 'error') {
         console.error('[useDebugState] ReAct错误:', event.error);
       }
-      setReactTrace(prev => {
-        const last = prev[prev.length - 1];
-        if (last && last.iteration === newStep.iteration && last.action === newStep.action && last.tool === newStep.tool && last.duration_ms === newStep.duration_ms) {
-          return prev;
-        }
-        return [...prev, newStep];
-      });
+      // 用递增序号做去重，避免 duration_ms 为 undefined 时的误判
+      setReactTrace(prev => [...prev, newStep]);
     }
   }, []);
 
-  /** 新消息发送前清空 ReAct 追踪 */
+  /** 新消息发送前清空所有调试数据 */
   const clearTrace = useCallback(() => {
     setReactTrace([]);
+    setDebugInfo(null);
   }, []);
 
   return {

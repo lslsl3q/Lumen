@@ -107,9 +107,11 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
       if (chat.isLoading) chat.abort();
       chat.loadHistory(sessionId, characters.currentCharacterId);
       rpg.resetRpgState();
+      debug.clearTrace();
       setRpgPanelOpen(false);
     } else {
       chat.resetChat();
+      debug.clearTrace();
     }
   }, [sessions.currentSessionId, sessions.isLoading]);
 
