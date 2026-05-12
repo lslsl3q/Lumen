@@ -34,8 +34,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   decision: 'text-emerald-400',
 };
 
-const CATEGORY_OPTIONS = ['context', 'fact', 'preference', 'decision'];
-
 /* ══════════════════════════════════════════
    子组件：文件树（daily_note 用）
    ══════════════════════════════════════════ */

@@ -68,6 +68,7 @@ def _build_chat_agent(
     character_config: dict,
     user_input: str,
     memory_debug: bool = False,
+    save_user_message: bool = True,
 ) -> Agent:
     """构建 Chat 模式的 Agent（注册所有标准组件）"""
     agent = Agent("chat")
@@ -93,6 +94,7 @@ def _build_chat_agent(
         character_config=character_config,
         user_input=user_input,
         memory_debug=memory_debug,
+        save_user_message=save_user_message,
     )
 
     return agent
@@ -103,6 +105,7 @@ async def agent_chat_stream(
     session: ChatSession,
     memory_debug: bool = False,
     response_style: str = "balanced",
+    save_user_message: bool = True,
 ) -> AsyncGenerator[dict, None]:
     """Agent 驱动的流式对话（替代 query.py::chat_stream）
 
@@ -120,7 +123,13 @@ async def agent_chat_stream(
 
     _ensure_hookbus()
 
-    agent = _build_chat_agent(session, character_config, user_input, memory_debug)
+    agent = _build_chat_agent(
+        session,
+        character_config,
+        user_input,
+        memory_debug,
+        save_user_message=save_user_message,
+    )
 
     context = {
         "character": character_config,

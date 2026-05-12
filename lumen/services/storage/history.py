@@ -508,6 +508,26 @@ def new_session(character_id: str = "default") -> str:
     return session_id
 
 
+def _normalize_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    meta = dict(metadata or {})
+    msg_type = meta.setdefault("type", "normal")
+    meta.setdefault("folded", False)
+    if msg_type in ("tool_result", "tool_result_parallel", "system_feedback"):
+        meta.setdefault("internal", True)
+    if meta.get("internal"):
+        meta.setdefault("hidden", True)
+    return meta
+
+
+def _message_is_vectorizable(role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
+    if role not in ("user", "assistant") or not content or len(content) < 5:
+        return False
+    meta = _normalize_metadata(metadata)
+    if meta.get("internal") or meta.get("hidden") or meta.get("vectorizable") is False:
+        return False
+    return meta.get("type", "normal") == "normal"
+
+
 def save_message(session_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> int:
     """保存一条消息到数据库
 
@@ -521,7 +541,8 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
         消息 ID（用于后续向量存储）
     """
     now = datetime.now().isoformat()
-    metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+    normalized_meta = _normalize_metadata(metadata)
+    metadata_json = json.dumps(normalized_meta, ensure_ascii=False)
 
     with _write_lock:
         conn = _get_conn()
@@ -535,8 +556,7 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
         )
         conn.commit()
         msg_id = cursor.lastrowid or 0
-        # 同步 FTS5 索引（jieba 分词后存入）
-        if role != "system" and content and len(content) >= 5:
+        if _message_is_vectorizable(role, content, normalized_meta):
             try:
                 import jieba
                 tokens = " ".join(jieba.cut(content))
@@ -587,6 +607,16 @@ def delete_message(msg_id: int) -> bool:
         cursor = conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
         conn.commit()
         return cursor.rowcount > 0
+
+
+def list_message_ids_from(session_id: str, from_id: int) -> list[int]:
+    """列出某会话指定 ID 及之后的消息 ID。"""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id FROM messages WHERE session_id = ? AND id >= ? ORDER BY id",
+        (session_id, from_id),
+    ).fetchall()
+    return [row["id"] for row in rows]
 
 
 def delete_messages_from(session_id: str, from_id: int) -> int:

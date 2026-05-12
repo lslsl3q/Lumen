@@ -68,18 +68,23 @@ def fold_tool_calls(messages: list[Message]) -> list[Message]:
 
 
 def filter_for_ai(messages: list[Message]) -> list[Message]:
-    """过滤消息，只发送给 AI 未折叠的
+    """过滤消息，只发送给 AI 可用的上下文投影。
 
-    Args:
-        messages: 消息列表
-
-    Returns:
-        过滤后的消息列表
+    Render History 可以保留完整事件账本；LLM Context 只接收未折叠、非内部的
+    用户消息和助手最终文本，避免历史 reasoning / tool 过程污染下一轮判断。
     """
-    return [
-        msg for msg in messages
-        if not msg.get("metadata", {}).get("folded", False)
-    ]
+    filtered = []
+    for msg in messages:
+        metadata = msg.get("metadata", {})
+        if metadata.get("folded", False) or metadata.get("internal", False):
+            continue
+        msg_type = metadata.get("type", "normal")
+        if msg_type in ("reasoning", "tool_call", "tool_result", "tool_result_parallel", "system_feedback"):
+            continue
+        if msg.get("role") not in ("system", "user", "assistant"):
+            continue
+        filtered.append(msg)
+    return filtered
 
 
 # ========================================
@@ -87,27 +92,19 @@ def filter_for_ai(messages: list[Message]) -> list[Message]:
 # ========================================
 
 def trim_messages(messages: list[Message], max_messages: int = 50) -> list[Message]:
-    """截断太长的聊天历史
-
-    保留规则：
-    1. 系统提示词（第一条）永远保留
-    2. 最新的对话保留
-    3. 中间老的对话删掉
-
-    Args:
-        messages: 消息列表
-        max_messages: 最多保留多少条消息（不算系统提示词）
-
-    Returns:
-        裁剪后的消息列表
-    """
-    if len(messages) <= max_messages + 1:  # +1 是系统提示词
+    """截断太长的聊天历史"""
+    if len(messages) <= max_messages + 1:
         return messages
-
-    # 第一条是系统提示词，必须保留
     system_msg = messages[0]
-
-    # 只保留最近的消息
-    recent = messages[-(max_messages):]
-
+    recent = messages[-max_messages:]
     return [system_msg] + recent
+
+
+def build_llm_context(messages: list[Message], max_messages: int = 50) -> list[Message]:
+    """构建下一轮 LLM 上下文投影。
+
+    先折叠工具调用，再裁剪长度，最后过滤 internal / folded 消息。
+    """
+    folded = fold_tool_calls(messages)
+    trimmed = trim_messages(folded, max_messages=max_messages)
+    return filter_for_ai(trimmed)

@@ -208,6 +208,7 @@ export function useChatMode({ debug, floating }: UseChatModeParams) {
 
   // Regenerate
   const handleRegenerate = useCallback(async (messageId: string) => {
+    debug.clearTrace();
     rpg.resetRpgState();
     const onEvent = (event: StreamEvent) => {
       if (event.type === 'rpg_state') {

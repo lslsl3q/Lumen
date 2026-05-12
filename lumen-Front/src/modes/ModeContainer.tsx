@@ -48,7 +48,7 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
     onSave: (c: string) => void;
   } | null>(null);
   const currentCharName = useCharacterStore(s => {
-    const c = s.characters[s.currentCharacterId];
+    const c = s.characters.find(ch => ch.id === s.currentCharacterId);
     return c?.display_name || c?.name;
   });
 

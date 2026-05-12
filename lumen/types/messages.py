@@ -15,9 +15,12 @@ from typing import TypedDict
 class MessageType:
     """消息类型常量"""
     NORMAL = "normal"
+    REASONING = "reasoning"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
     TOOL_RESULT_PARALLEL = "tool_result_parallel"
+    SYSTEM_FEEDBACK = "system_feedback"
+    COMPACT_SUMMARY = "compact_summary"
 
 
 # ========================================
@@ -28,8 +31,21 @@ class MessageMetadata(TypedDict, total=False):
     """消息元数据"""
     type: str
     folded: bool
+    hidden: bool
+    internal: bool
+    vectorizable: bool
+    source_message_id: int
+    event_id: str
+    step_seq: int
+    reasoning_content: str
     tool_name: str
     tool_count: int
+    tool_command: str
+    tool_params: dict
+    tool_call: dict
+    tool_calls: list[dict]
+    success: bool
+    error: str
 
 
 class Message(TypedDict, total=False):

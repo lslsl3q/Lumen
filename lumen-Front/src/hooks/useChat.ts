@@ -12,6 +12,7 @@ import { HistoryMessage } from '../types/session';
 import { toast } from '../utils/toast';
 import { useWebSocket } from './useWebSocket';
 import { useSessionStore } from '../stores/useSessionStore';
+import type { MessageStep } from '../types/chat';
 
 // ── 类型从共享文件导入，re-export 保持兼容 ──
 export type { Message, MessageStep, ThinkStep, ToolStep, TextStep, ToolCall, UseChatReturn } from '../types/chat';
@@ -25,7 +26,7 @@ import {
   nextStepId,
 } from '../types/chat';
 
-// ReAct 循环中工具调用的标记，用于合并连续 assistant 消息
+// ReAct 循环中工具调用的标记，用于兼容旧历史的连续 assistant 合并
 const TOOL_CALL_MARKERS = [
   '"tool":', '"type": "tool_call', '"calls":',
   '{"success":', '{"error_code":', '<tool_result', '<<<[TOOL_REQUEST]',
@@ -35,12 +36,26 @@ const TOOL_CALL_MARKERS = [
 
 /** 判断消息是否应从历史显示中过滤 */
 function isToolMessage(msg: HistoryMessage): boolean {
-  if (msg.hidden) return true;
+  if (msg.hidden || msg.metadata?.hidden || msg.metadata?.internal) return true;
+  if (['tool_result', 'tool_result_parallel', 'system_feedback'].includes(msg.metadata?.type || '')) return true;
   const content = msg.content.trim();
   if (!content) return false;
   if (content.startsWith('<tool_result')) return true;
   if (content.startsWith('{"success"') || content.startsWith('{"error_code"')) return true;
   return false;
+}
+
+function buildHistorySteps(msg: HistoryMessage): MessageStep[] | undefined {
+  if (msg.role !== 'assistant') return undefined;
+  const steps: MessageStep[] = [];
+  const reasoning = msg.metadata?.reasoning_content;
+  if (reasoning) {
+    steps.push({ type: 'think', id: nextStepId(), content: reasoning, done: true });
+  }
+  if (msg.content.trim()) {
+    steps.push({ type: 'text', id: nextStepId(), content: msg.content });
+  }
+  return steps.length > 0 ? steps : undefined;
 }
 
 function generateMessageId(): string {
@@ -190,33 +205,21 @@ export function useChat() {
       const data = await getHistory(sessionId);
       const rawMessages: Message[] = data.messages
         .filter((msg: HistoryMessage) => !isToolMessage(msg))
-        .map((msg: HistoryMessage) => {
-          const base: Message = {
-            id: `db_${msg.id}`,
-            dbId: msg.id,
-            role: msg.role,
-            content: msg.content,
-          };
-          // 从 metadata 重建思维气泡 steps
-          const reasoning = msg.metadata?.reasoning_content as string | undefined;
-          if (reasoning && msg.role === 'assistant') {
-            base.steps = [
-              { type: 'think', id: nextStepId(), content: reasoning, done: true },
-              { type: 'text', id: nextStepId(), content: msg.content },
-            ];
-          }
-          return base;
-        })
+        .map((msg: HistoryMessage) => ({
+          id: `db_${msg.id}`,
+          dbId: msg.id,
+          role: msg.role,
+          content: msg.content,
+          steps: buildHistorySteps(msg),
+        }))
         .filter((msg: Message) => msg.content.trim().length > 0);
 
-      // 合并 ReAct 循环产生的连续 assistant 消息
       const historyMessages: Message[] = [];
       for (const msg of rawMessages) {
         if (msg.role === 'assistant' && historyMessages.length > 0) {
           const prev = historyMessages[historyMessages.length - 1];
           if (prev.role === 'assistant' && TOOL_CALL_MARKERS.some(m => prev.content.includes(m))) {
             prev.content += '\n' + msg.content;
-            // 合并 steps（保留每轮的思维链和工具调用）
             if (msg.steps?.length) {
               prev.steps = [...(prev.steps || []), ...msg.steps];
             }
@@ -244,6 +247,7 @@ export function useChat() {
     messageContent: string,
     _debugMode: boolean = false,
     onDebugEvent?: ((event: StreamEvent) => void) | null,
+    saveUserMessage: boolean = true,
   ) => {
     if (!messageContent.trim()) return;
 
@@ -260,12 +264,6 @@ export function useChat() {
       }
     }
 
-    const userMessage: Message = {
-      id: generateMessageId(),
-      role: 'user',
-      content: messageContent,
-    };
-
     const assistantId = generateMessageId();
     const assistantMessage: Message = {
       id: assistantId,
@@ -275,7 +273,18 @@ export function useChat() {
       isStreaming: true,
     };
 
-    setMessages(prev => [...prev, userMessage, assistantMessage]);
+    if (saveUserMessage) {
+      const userMessage: Message = {
+        id: generateMessageId(),
+        role: 'user',
+        content: messageContent,
+      };
+
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
+    } else {
+      setMessages(prev => [...prev, assistantMessage]);
+    }
+
     setInput('');
     setIsLoading(true);
     setError(null);
@@ -290,6 +299,7 @@ export function useChat() {
       response_style: responseStyle,
       rpg_mode: rpgMode,
       memory_debug: _debugMode,
+      save_user_message: saveUserMessage,
     });
   }, [getSessionId, responseStyle, rpgMode, wsSend]);
 
@@ -350,7 +360,7 @@ export function useChat() {
       const data = await regenerateMessageAPI(sessionId, msg.dbId);
       const idx = messages.findIndex(m => m.id === messageId);
       if (idx >= 0) { setMessages(prev => prev.slice(0, idx)); }
-      await sendMessageToAPI(data.user_message, debugMode, onDebugEvent);
+      await sendMessageToAPI(data.user_message, debugMode, onDebugEvent, false);
     } catch (err) {
       console.error('重新生成失败:', err);
       toast('重新生成失败', 'error');

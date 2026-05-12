@@ -174,6 +174,29 @@ def search_similar(
     return hits
 
 
+def delete_by_message_id(message_id: int) -> int:
+    """按消息 ID 删除向量，返回删除数量。"""
+    db = _get_db()
+    result = db.tql_mut(f'MATCH (a {{message_id: {message_id}}}) DETACH DELETE a')
+    db.flush()
+    return result.get("affected", 0) if isinstance(result, dict) else 0
+
+
+def delete_by_message_ids(message_ids: list[int]) -> int:
+    """批量按消息 ID 删除向量，返回删除数量。"""
+    if not message_ids:
+        return 0
+    db = _get_db()
+    deleted = 0
+    for message_id in message_ids:
+        result = db.tql_mut(f'MATCH (a {{message_id: {message_id}}}) DETACH DELETE a')
+        if isinstance(result, dict):
+            deleted += int(result.get("affected", 0) or 0)
+    db.flush()
+    return deleted
+
+
+
 def delete_by_session(session_id: str) -> int:
     """用 TQL 按 session_id 批量删除向量，返回删除数量"""
     db = _get_db()

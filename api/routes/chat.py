@@ -4,9 +4,12 @@
 
 import asyncio
 import json
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -126,6 +129,7 @@ async def stream_chat(req: StreamRequest):
                     req.message, session,
                     memory_debug=req.memory_debug,
                     response_style=req.response_style,
+                    save_user_message=True,
                 ):
                     yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
@@ -149,13 +153,15 @@ async def stream_chat(req: StreamRequest):
     return StreamingResponse(generate(), media_type="text/event-stream", headers=headers)
 
 
-def _is_tool_message(msg: dict) -> bool:
-    """判断是否为工具调用/结果/系统反馈消息（不应展示给用户）"""
-    # metadata 驱动：统一过滤所有内部消息
+def _message_is_hidden(msg: dict) -> bool:
+    """判断历史消息是否应默认隐藏。"""
     meta = msg.get("metadata")
-    if isinstance(meta, dict) and meta.get("type") in (
-        "tool_result", "tool_result_parallel", "system_feedback",
-    ):
+    if isinstance(meta, dict):
+        if meta.get("hidden") or meta.get("internal"):
+            return True
+        if meta.get("type") in ("tool_result", "tool_result_parallel", "system_feedback"):
+            return True
+    if msg.get("role") == "system":
         return True
     content = msg.get("content", "").strip()
     if msg.get("role") == "user":
@@ -198,11 +204,11 @@ async def get_history(session_id: str = "default"):
                 "id": msg.get("id"),
                 "role": msg["role"],
                 "content": msg["content"],
-                "hidden": False,
+                "hidden": _message_is_hidden(msg),
                 "metadata": msg.get("metadata"),
             }
             for msg in messages
-            if msg["role"] in ("user", "assistant") and not _is_tool_message(msg)
+            if msg["role"] in ("user", "assistant") and not _message_is_hidden(msg)
         ]
 
         return {"messages": result}
@@ -256,28 +262,9 @@ async def edit_message(req: MessageEditRequest):
 
     # 同步更新 memory.tdb 向量
     try:
-        from lumen.services.tdb_registry import get_tdb
-        db = get_tdb("memory")
-        for nid in db.all_node_ids():
-            try:
-                payload = db.get_payload(nid)
-            except Exception:
-                continue
-            if not payload:
-                continue
-            if payload.get("message_id") == req.message_id:
-                # 重新向量化
-                from lumen.services.search.embedding import get_service
-                backend = await get_service("memory")
-                if backend:
-                    new_vector = await backend.encode(req.content)
-                    if new_vector:
-                        payload["content"] = req.content
-                        db.update_vector(nid, new_vector)
-                        db.update_payload(nid, payload)
-                        db.flush()
-                        logger.info(f"消息编辑同步向量: message_id={req.message_id}, node={nid}")
-                break
+        from lumen.services.search.vector_store import delete_by_message_id
+        deleted = delete_by_message_id(req.message_id)
+        logger.info(f"消息编辑删除旧向量: message_id={req.message_id}, count={deleted}")
     except Exception as e:
         logger.warning(f"消息编辑向量同步失败: {e}")
 
@@ -301,32 +288,33 @@ async def delete_message(req: MessageDeleteRequest):
 
     # 同步删除 memory.tdb 向量
     try:
-        from lumen.services.tdb_registry import get_tdb
-        db = get_tdb("memory")
-        for nid in db.all_node_ids():
-            try:
-                payload = db.get_payload(nid)
-            except Exception:
-                continue
-            if not payload:
-                continue
-            if payload.get("message_id") == req.message_id:
-                db.delete(nid)
-                db.flush()
-                logger.info(f"消息删除同步向量: message_id={req.message_id}, node={nid}")
-                break
+        from lumen.services.search.vector_store import delete_by_message_id
+        deleted = delete_by_message_id(req.message_id)
+        logger.info(f"消息删除同步向量: message_id={req.message_id}, count={deleted}")
     except Exception as e:
         logger.warning(f"消息删除向量同步失败: {e}")
 
     return {"success": True}
 
 
+def _delete_memory_vectors_from(session_id: str, from_message_id: int) -> int:
+    """删除某会话指定消息 ID 及之后的 memory.tdb 向量。"""
+    try:
+        from lumen.services.storage import history as history_service
+        from lumen.services.search.vector_store import delete_by_message_ids
+        message_ids = history_service.list_message_ids_from(session_id, from_message_id)
+        return delete_by_message_ids(message_ids)
+    except Exception as e:
+        logger.warning(f"批量删除消息向量失败: {e}")
+        return 0
+
+
 @router.post("/regenerate")
 async def regenerate_message(req: RegenerateRequest):
     """重新生成 AI 回复
 
-    删除该 AI 消息及之后的所有消息，返回触发回复所需的用户消息内容。
-    前端收到后用该内容重新调用流式接口。
+    删除该 AI 消息及之后的所有消息和向量，返回触发回复所需的用户消息内容。
+    前端收到后会重新调用流式接口，但不会再次保存用户消息。
     """
     from lumen.services.storage import history as history_service
 
@@ -348,7 +336,8 @@ async def regenerate_message(req: RegenerateRequest):
     if not user_message:
         raise HTTPException(status_code=400, detail="未找到对应的用户消息")
 
-    # 删除该消息及之后的所有消息（DB + 内存）
+    # 删除该消息及之后的所有消息（DB + 内存 + 向量）
+    _delete_memory_vectors_from(req.session_id, req.message_id)
     await asyncio.to_thread(history_service.delete_messages_from, req.session_id, req.message_id)
     session.messages = [msg for msg in session.messages
                         if msg.get("id") is not None and msg["id"] < req.message_id]

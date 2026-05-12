@@ -19,7 +19,6 @@ import jsonschema
 from lumen.components.base import ActingComponent
 from lumen.config import get_model, MAX_TOOL_ITERATIONS
 from lumen.services.llm import chat, build_thinking_params, log_stream_cache_stats
-from lumen.services.context import fold_tool_calls, trim_messages, filter_for_ai
 from lumen.services.context.token_estimator import (
     estimate_text_tokens,
     estimate_messages_tokens,
@@ -106,11 +105,10 @@ def _extract_think_content(text: str) -> str:
 # ── 消息预处理 ──
 
 def _prepare_messages(messages: list, character_id: str) -> list:
-    """预处理消息：折叠工具调用 → 裁剪上下文 → 过滤 → 模板变量替换"""
+    """预处理消息：构建 LLM 上下文 → 模板变量替换"""
     from lumen.prompt.template import render_messages, collect_variables
-    folded = fold_tool_calls(messages)
-    trimmed = trim_messages(folded)
-    filtered = filter_for_ai(trimmed)
+    from lumen.services.context import build_llm_context
+    filtered = build_llm_context(messages)
     variables = collect_variables(character_id)
     return render_messages(filtered, variables)
 
@@ -142,10 +140,14 @@ async def _save_and_vectorize(session_id: str, role: str, content: str,
                               character_id: str, metadata: dict = None) -> int:
     """保存消息并异步向量化"""
     from lumen.services.storage import history
-    msg_id = history.save_message(session_id, role, content, metadata)
-    if role in ("user", "assistant") and content and len(content) >= 5:
+    meta = dict(metadata or {})
+    meta.setdefault("type", "normal")
+    if meta.get("internal"):
+        meta.setdefault("hidden", True)
+    msg_id = history.save_message(session_id, role, content, meta)
+    if role in ("user", "assistant") and meta.get("type") == "normal" and content and len(content) >= 5:
         from lumen.services.memory import vectorize_message
-        asyncio.create_task(vectorize_message(msg_id, content, role, session_id, character_id))
+        asyncio.create_task(vectorize_message(msg_id, content, role, session_id, character_id, metadata=meta))
     return msg_id
 
 
@@ -224,11 +226,12 @@ class ReActActingComponent(ActingComponent):
     """ReAct 决策组件：LLM → 工具 → 结果 → 再 LLM 循环"""
 
     def __init__(self, session, character_config: dict, user_input: str,
-                 memory_debug: bool = False):
+                 memory_debug: bool = False, save_user_message: bool = True):
         self.session = session
         self.config = character_config
         self.user_input = user_input
         self.memory_debug = memory_debug
+        self.save_user_message = save_user_message
         self.model = get_model(character_config)
         self.thinking_cfg = character_config.get("thinking") if character_config else None
 
@@ -255,13 +258,20 @@ class ReActActingComponent(ActingComponent):
             self.model, self.thinking_cfg)
 
         # ── 2. 保存用户消息 ──
-        self.session.messages.append({"role": "user", "content": self.user_input})
-        msg_id = await _save_and_vectorize(
-            self.session.session_id or "default", "user",
-            self.user_input, self.session.character_id,
-        )
-        self.session.messages[-1]["id"] = msg_id
-        yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
+        if self.save_user_message:
+            self.session.messages.append({"role": "user", "content": self.user_input})
+            msg_id = await _save_and_vectorize(
+                self.session.session_id or "default", "user",
+                self.user_input, self.session.character_id,
+            )
+            self.session.messages[-1]["id"] = msg_id
+            yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
+        else:
+            if not any(
+                msg.get("role") == "user" and msg.get("content") == self.user_input
+                for msg in reversed(self.session.messages)
+            ):
+                self.session.messages.append({"role": "user", "content": self.user_input})
 
         _clear_cancel(self.session.session_id)
 

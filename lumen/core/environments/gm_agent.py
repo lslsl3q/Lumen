@@ -84,6 +84,7 @@ def _build_gm_agent(
         character_config={"name": "GM", "response_style": "balanced"},
         user_input=action_content,
         memory_debug=False,
+        save_user_message=True,
     )
 
     return agent
