@@ -503,7 +503,8 @@ function MessageBubble({ message, characterName, characterAvatar, editingId, edi
       return (
         <div className="flex justify-start items-start gap-2" onContextMenu={e => e.preventDefault()}>
           <Avatar src={characterAvatar} name={characterName} />
-          <div className="max-w-[75%]" data-message-bubble="true"
+          <div className="max-w-[75%] rounded-lg px-4 py-3 bg-border-subtle border border-primary/10 text-text-primary"
+            data-message-bubble="true"
             onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(message.id, e); }}>
             {renderStepsContent(message, showThinking, showTools)}
           </div>

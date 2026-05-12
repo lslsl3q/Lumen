@@ -147,14 +147,18 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
               ...updated.slice(0, -1),
               { ...last, steps, isStreaming: false },
             ];
-          case "done":
+          case "done": {
+            const safeSteps = steps.map(s =>
+              s.type === 'think' && !s.done ? { ...s, done: true } : s
+            );
             streamingMsgIdRef.current = null;
             requestIdRef.current = null;
             setIsLoading(false);
             return [
               ...updated.slice(0, -1),
-              { ...last, steps, isStreaming: false },
+              { ...last, steps: safeSteps, isStreaming: false },
             ];
+          }
           default:
             return prev;
         }

@@ -27,6 +27,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RefreshCw } from 'lucide-react';
 
 interface ToolInfo {
   name: string;
@@ -109,7 +110,7 @@ export default function CharacterPanel({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [availableTools, setAvailableTools] = useState<ToolInfo[]>([]);
-  const { models: availableModels } = useModels();
+  const { models: availableModels, refresh: refreshModels, isLoading: modelsLoading } = useModels();
   const { skills: availableSkills } = useSkills();
 
   const updateForm = useCallback((patch: Partial<CharacterFormData>) => {
@@ -404,14 +405,26 @@ export default function CharacterPanel({
           {/* 模型与上下文 */}
           <div className="px-3 pt-3 space-y-2.5">
             <div>
-              <Label className="text-[10px] text-text-muted uppercase tracking-wider mb-1">模型</Label>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-[10px] text-text-muted uppercase tracking-wider">模型</Label>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-elevated"
+                  onClick={refreshModels}
+                  disabled={modelsLoading}
+                  title="刷新模型列表"
+                >
+                  <RefreshCw className={`h-3 w-3 ${modelsLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
               <Select
                 value={form.model || ''}
                 onValueChange={v => updateForm({ model: v || undefined })}
               >
                 <SelectTrigger
                   size="sm"
-                  className="mt-0.5 w-full bg-surface-elevated border-border-default text-xs text-text-primary
+                  className="w-full bg-surface-elevated border-border-default text-xs text-text-primary
                     focus:border-primary/40 h-8 data-placeholder:text-text-dim"
                 >
                   <SelectValue placeholder="选择模型" />

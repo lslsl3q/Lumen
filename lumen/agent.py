@@ -116,6 +116,7 @@ class Agent:
         if self.act_component is None:
             raise RuntimeError(f"Agent {self.id} 没有 ActingComponent")
 
+        self.act_component._agent = self
         exit_reason = ""
         async for token in self.act_component.decide(
             static_prompt, dynamic_prompt, short_term_history

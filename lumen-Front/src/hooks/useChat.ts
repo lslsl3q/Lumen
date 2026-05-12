@@ -153,10 +153,27 @@ export function useChat() {
           setIsLoading(false);
           return [...updated.slice(0, -1), { ...last, steps, isStreaming: false }];
         case 'done': {
-          const updates: Partial<Message> = { isStreaming: false, steps };
+          // 安全机制：强制关闭所有未完成的思考步骤
+          const safeSteps = steps.map(s =>
+            s.type === 'think' && !s.done ? { ...s, done: true } : s
+          );
+          const updates: Partial<Message> = { isStreaming: false, steps: safeSteps };
           if (event.assistant_db_id) updates.dbId = event.assistant_db_id;
           streamingMsgIdRef.current = null;
           setIsLoading(false);
+          // 更新会话标题（后端自动生成）
+          if (event.title) {
+            const sid = getSessionId();
+            if (sid) {
+              const { sessions } = useSessionStore.getState();
+              const idx = sessions.findIndex(s => s.session_id === sid);
+              if (idx >= 0 && !sessions[idx].title) {
+                const updated = [...sessions];
+                updated[idx] = { ...updated[idx], title: event.title as string };
+                useSessionStore.setState({ sessions: updated });
+              }
+            }
+          }
           return [...updated.slice(0, -1), { ...last, ...updates }];
         }
         default:
@@ -199,6 +216,10 @@ export function useChat() {
           const prev = historyMessages[historyMessages.length - 1];
           if (prev.role === 'assistant' && TOOL_CALL_MARKERS.some(m => prev.content.includes(m))) {
             prev.content += '\n' + msg.content;
+            // 合并 steps（保留每轮的思维链和工具调用）
+            if (msg.steps?.length) {
+              prev.steps = [...(prev.steps || []), ...msg.steps];
+            }
             continue;
           }
         }
@@ -268,6 +289,7 @@ export function useChat() {
       session_id: sessionId,
       response_style: responseStyle,
       rpg_mode: rpgMode,
+      memory_debug: _debugMode,
     });
   }, [getSessionId, responseStyle, rpgMode, wsSend]);
 

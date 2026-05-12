@@ -27,6 +27,7 @@ export interface StreamEvent {
   db_id?: number;
   // done 事件额外字段
   assistant_db_id?: number;
+  title?: string;
   // 请求追踪：writing 消息回传 request_id
   request_id?: string;
   // memory_debug 事件字段
