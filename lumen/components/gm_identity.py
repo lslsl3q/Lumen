@@ -1,14 +1,11 @@
 """GM Agent DM 人格组件 — 注入叙事风格和行为准则"""
 
-import os
 import logging
 
-from lumen.config import DATA_DIR
 from lumen.components.base import ContextComponent, PromptZone
+from lumen.prompt.template_engine import render, TemplateError
 
 logger = logging.getLogger(__name__)
-
-_IDENTITY_FILE = os.path.join(DATA_DIR, "gm", "identity.md")
 
 _DEFAULT_IDENTITY = """\
 你是一位经验丰富的游戏主持人（Game Master）。
@@ -39,8 +36,7 @@ class GMIdentityComponent(ContextComponent):
 
     async def pre_act(self, context: dict) -> str:
         try:
-            with open(_IDENTITY_FILE, "r", encoding="utf-8") as f:
-                content = f.read().strip()
-            return content if content else _DEFAULT_IDENTITY
-        except FileNotFoundError:
+            result = render("gm/identity", {})
+            return result if result.strip() else _DEFAULT_IDENTITY
+        except TemplateError:
             return _DEFAULT_IDENTITY

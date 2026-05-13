@@ -105,12 +105,9 @@ def _extract_think_content(text: str) -> str:
 # ── 消息预处理 ──
 
 def _prepare_messages(messages: list, character_id: str) -> list:
-    """预处理消息：构建 LLM 上下文 → 模板变量替换"""
-    from lumen.prompt.template import render_messages, collect_variables
+    """预处理消息：构建 LLM 上下文"""
     from lumen.services.context import build_llm_context
-    filtered = build_llm_context(messages)
-    variables = collect_variables(character_id)
-    return render_messages(filtered, variables)
+    return build_llm_context(messages)
 
 
 def _find_last_user_index(messages: list) -> int:
@@ -235,6 +232,15 @@ class ReActActingComponent(ActingComponent):
         self.model = get_model(character_config)
         self.thinking_cfg = character_config.get("thinking") if character_config else None
 
+    def _get_user_content(self) -> str:
+        """构建用户消息：将模板 User 区内容（如章节上下文）拼在用户输入前面"""
+        user_section = ""
+        if hasattr(self, '_agent') and self._agent and hasattr(self._agent, '_act_context'):
+            user_section = self._agent._act_context.get("_writing_user_section", "")
+        if user_section:
+            return f"{user_section}\n\n{self.user_input}"
+        return self.user_input
+
     async def decide(
         self,
         static_prompt: str,
@@ -258,20 +264,21 @@ class ReActActingComponent(ActingComponent):
             self.model, self.thinking_cfg)
 
         # ── 2. 保存用户消息 ──
+        user_content = self._get_user_content()
         if self.save_user_message:
-            self.session.messages.append({"role": "user", "content": self.user_input})
+            self.session.messages.append({"role": "user", "content": user_content})
             msg_id = await _save_and_vectorize(
                 self.session.session_id or "default", "user",
-                self.user_input, self.session.character_id,
+                user_content, self.session.character_id,
             )
             self.session.messages[-1]["id"] = msg_id
             yield {"type": "msg_saved", "role": "user", "db_id": msg_id}
         else:
             if not any(
-                msg.get("role") == "user" and msg.get("content") == self.user_input
+                msg.get("role") == "user" and msg.get("content") == user_content
                 for msg in reversed(self.session.messages)
             ):
-                self.session.messages.append({"role": "user", "content": self.user_input})
+                self.session.messages.append({"role": "user", "content": user_content})
 
         _clear_cancel(self.session.session_id)
 

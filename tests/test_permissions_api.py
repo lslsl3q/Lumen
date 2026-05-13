@@ -31,14 +31,13 @@ async def test_get_character_permissions_empty(transport, tmp_db):
 async def test_set_and_get_permissions(transport, tmp_db):
     """设置权限后可以获取"""
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.put("/permissions/character/char_a", json={
+        resp = await client.put("/permissions/character/char_a", params={
             "resource_type": "knowledge",
             "resource_id": "knowledge",
-            "entries": [
-                {"folder_path": "/地理", "action": "read", "access": "allow"},
-                {"folder_path": "/机密", "action": "read", "access": "deny"},
-            ],
-        })
+        }, json=[
+            {"folder_path": "/地理", "action": "read"},
+            {"folder_path": "/机密", "action": "read"},
+        ])
         assert resp.status_code == 200
 
         resp = await client.get("/permissions/character/char_a", params={
@@ -54,16 +53,18 @@ async def test_set_and_get_permissions(transport, tmp_db):
 async def test_get_resource_permissions(transport, tmp_db):
     """按资源反查角色权限"""
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        await client.put("/permissions/character/char_a", json={
+        await client.put("/permissions/character/char_a", params={
             "resource_type": "knowledge",
             "resource_id": "knowledge",
-            "entries": [{"folder_path": "/地理", "action": "read", "access": "allow"}],
-        })
-        await client.put("/permissions/character/char_b", json={
+        }, json=[
+            {"folder_path": "/地理", "action": "read"},
+        ])
+        await client.put("/permissions/character/char_b", params={
             "resource_type": "knowledge",
             "resource_id": "knowledge",
-            "entries": [{"folder_path": "/地理", "action": "read", "access": "allow"}],
-        })
+        }, json=[
+            {"folder_path": "/地理", "action": "read"},
+        ])
 
         resp = await client.get("/permissions/resource/knowledge/knowledge", params={
             "folder_path": "/地理",

@@ -163,8 +163,8 @@
     }
   },
   "web": {
-    "description": "网络工具，支持互联网搜索和网页内容抓取",
-    "usage_guide": "search搜索互联网获取实时信息（新闻/天气/价格等），fetch抓取指定URL的网页正文。通常先search获取URL列表，再用fetch读取详情。",
+    "description": "网络工具，支持互联网搜索、网页抓取和多页爬取",
+    "usage_guide": "search搜索互联网获取实时信息，fetch抓取单个URL的网页正文，crawl从起始URL爬取多个关联页面（适合文档站、博客系列）。通常先search获取URL列表，再用crawl或fetch读取内容。",
     "commands": {
       "search": {
         "description": "搜索互联网获取实时信息",
@@ -184,6 +184,21 @@
           "properties": {
             "url": { "type": "string", "description": "网页URL" },
             "max_length": { "type": "integer", "description": "返回内容最大字符数，默认5000" }
+          },
+          "required": ["url"]
+        }
+      },
+      "crawl": {
+        "description": "从起始URL爬取多个关联页面，适合文档站、博客系列等多页内容获取",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string", "description": "起始URL（必填）" },
+            "max_pages": { "type": "integer", "description": "最大抓取页数，默认20，最多50" },
+            "max_depth": { "type": "integer", "description": "最大链接深度，默认3，最多5" },
+            "path_prefix": { "type": "string", "description": "只爬此路径前缀下的页面，如 /docs/" },
+            "max_content_length": { "type": "integer", "description": "每页最大字符数，默认5000" },
+            "max_total_length": { "type": "integer", "description": "总内容最大字符数，0=不限制，默认0" }
           },
           "required": ["url"]
         }

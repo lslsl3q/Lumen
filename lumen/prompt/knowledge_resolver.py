@@ -1,13 +1,17 @@
 """
-Lumen - 知识库占位符解析器
-解析 system_prompt 中的占位符，检索后替换
+DEPRECATED: 被 ACL + LoreComponent + WorldBook 替代
 
-语法：
+原功能：
   {{分类名}}     — 全文注入（加载分类下所有文件）
   [[分类名]]     — RAG 语义检索（按用户输入搜索相关片段）
   [[文件名.md]]  — 精确到文件的 RAG 检索
 
-匹配规则：占位符名称 → category 精确匹配 / filename 包含匹配 / source_path 包含匹配
+不再需要的理由：
+  - ACL 控制角色能访问哪些知识库（替代占位符的"声明式选择"）
+  - LoreComponent 自动语义检索 ACL 允许范围内的内容（替代 [[RAG]] 语义检索）
+  - WorldBook 关键词匹配 + always-on 覆盖精确注入场景（替代 {{全文注入}}）
+
+Phase 2 将完全删除此模块。Phase 1 仅标记 deprecated，保持 react_acting.py 的调用兼容。
 """
 
 import re

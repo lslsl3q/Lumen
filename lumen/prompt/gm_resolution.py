@@ -1,7 +1,8 @@
 """
 T22 GM 裁决 Prompt 加载器
 
-从 lumen/data/gm/resolution_prompt.md 加载提示词，支持热编辑。
+系统提示词从 Jinja2 模板加载（lumen/data/templates/gm/），支持热编辑。
+用户提示词模板保留 .format() 占位符，在运行时填充。
 Concordia 4 步链式思考浓缩为单次 JSON 输出。
 """
 
@@ -9,6 +10,7 @@ import os
 import logging
 
 from lumen.config import DATA_DIR
+from lumen.prompt.template_engine import render as j2_render, TemplateError
 
 logger = logging.getLogger(__name__)
 
@@ -104,32 +106,44 @@ def _parse_prompt_file(content: str) -> dict:
     return result
 
 
+def _load_system_prompt(template_name: str, fallback: str) -> str:
+    """从 Jinja2 模板加载系统提示词，失败则用回退值"""
+    try:
+        result = j2_render(template_name, {})
+        return result if result.strip() else fallback
+    except TemplateError:
+        return fallback
+
+
 def load_prompts() -> dict:
-    """从文件加载提示词（每次调用都读文件，支持热编辑）
+    """加载 GM 裁决提示词（系统提示词走 Jinja2 模板，用户模板走旧文件）
 
     Returns:
         {"full_system": str, "full_user": str, "light_system": str, "light_user": str}
     """
+    # 系统提示词：Jinja2 模板（热编辑 + /templates API 管理）
+    full_system = _load_system_prompt("gm/resolution_full_system", _DEFAULT_FULL_SYSTEM)
+    light_system = _load_system_prompt("gm/resolution_light_system", _DEFAULT_LIGHT_SYSTEM)
+
+    # 用户提示词模板：保留旧文件解析（运行时 .format() 填充）
+    full_user = _DEFAULT_FULL_USER
+    light_user = _DEFAULT_LIGHT_USER
     try:
         with open(_PROMPT_FILE, "r", encoding="utf-8") as f:
-            content = f.read()
-        return _parse_prompt_file(content)
+            parsed = _parse_prompt_file(f.read())
+        full_user = parsed.get("full_user", _DEFAULT_FULL_USER)
+        light_user = parsed.get("light_user", _DEFAULT_LIGHT_USER)
     except FileNotFoundError:
-        logger.info(f"GM 裁决提示词文件不存在，使用内置默认值: {_PROMPT_FILE}")
-        return {
-            "full_system": _DEFAULT_FULL_SYSTEM,
-            "full_user": _DEFAULT_FULL_USER,
-            "light_system": _DEFAULT_LIGHT_SYSTEM,
-            "light_user": _DEFAULT_LIGHT_USER,
-        }
+        pass
     except Exception as e:
-        logger.warning(f"GM 裁决提示词文件读取失败，使用内置默认值: {e}")
-        return {
-            "full_system": _DEFAULT_FULL_SYSTEM,
-            "full_user": _DEFAULT_FULL_USER,
-            "light_system": _DEFAULT_LIGHT_SYSTEM,
-            "light_user": _DEFAULT_LIGHT_USER,
-        }
+        logger.warning(f"GM 裁决用户提示词文件读取失败: {e}")
+
+    return {
+        "full_system": full_system,
+        "full_user": full_user,
+        "light_system": light_system,
+        "light_user": light_user,
+    }
 
 
 def get_prompt_file_path() -> str:

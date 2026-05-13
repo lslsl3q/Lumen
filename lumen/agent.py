@@ -117,6 +117,8 @@ class Agent:
             raise RuntimeError(f"Agent {self.id} 没有 ActingComponent")
 
         self.act_component._agent = self
+        self._act_context = context  # 让 ActingComponent 能读取组件写入的 context
+
         exit_reason = ""
         async for token in self.act_component.decide(
             static_prompt, dynamic_prompt, short_term_history

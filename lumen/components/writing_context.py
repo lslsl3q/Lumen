@@ -2,7 +2,7 @@
 T11 WritingContextComponent — 写作模式上下文注入
 
 注入当前章节内容 + 世界观摘要（角色/地点/物品/世界设定）+ 写作指令。
-续写/润色/扩写/精简四种模式各自有不同的提示词模板。
+提示词模板通过 Jinja2 引擎从 lumen/data/templates/writing/ 加载。
 """
 
 import asyncio
@@ -10,35 +10,9 @@ import logging
 import re
 
 from lumen.components.base import ContextComponent, PromptZone
+from lumen.prompt.template_engine import render, render_message, TemplateError, build_context
 
 logger = logging.getLogger(__name__)
-
-MODE_PROMPTS = {
-    "continue": (
-        "你是一个专业的小说续写助手。基于当前章节内容和世界观设定，"
-        "自然地延续剧情。注意：保持角色性格一致、文风统一、伏笔连贯。"
-        "输出纯续写文字，不要加任何解释或标记。"
-    ),
-    "rewrite": (
-        "你是一个专业的小说润色助手。根据用户的要求优化选中文字，"
-        "保持原意和风格，提升表达质量。只输出润色后的文字，不加解释。"
-    ),
-    "expand": (
-        "你是一个专业的小说扩写助手。根据用户指定的方向，"
-        "在原有内容基础上展开描写——增加细节、对话、心理活动、环境描写等。"
-        "保持角色性格和文风一致。只输出扩写后的文字。"
-    ),
-    "condense": (
-        "你是一个专业的小说精简助手。根据用户要求精简文字，"
-        "保留核心情节和关键信息，去除冗余描写。"
-        "保持文风和节奏感。只输出精简后的文字。"
-    ),
-    "chat": (
-        "你是一个专业的小说创作顾问。围绕用户的创作进行讨论——"
-        "分析角色动机、讨论剧情走向、建议写作技巧、梳理伏笔线索。"
-        "像一位经验丰富的编辑一样提供有价值、有深度的建议。"
-    ),
-}
 
 CATEGORY_LABELS = {
     "character": "角色",
@@ -88,31 +62,34 @@ class WritingContextComponent(ContextComponent):
         selected_text = context.get("selected_text", "")
         book_name = context.get("book_name", "")
 
-        parts = []
+        # Content truncation — business logic stays in code
+        content_truncated = False
+        if chapter_content and len(chapter_content) > 4000:
+            chapter_content = chapter_content[-4000:]
+            content_truncated = True
 
-        mode_prompt = MODE_PROMPTS.get(ai_mode, MODE_PROMPTS["chat"])
-        parts.append(mode_prompt)
+        codex_context = await self._get_graph_summary(context)
 
-        parts.append(f"当前作品：《{book_name}》")
-        parts.append(f"当前章节：「{chapter_title}」")
+        template_context = build_context(
+            character_id=context.get("character_id", "default"),
+            book_name=book_name,
+            chapter_title=chapter_title,
+            chapter_content=chapter_content,
+            content_truncated=content_truncated,
+            selected_text=selected_text,
+            codex_context=codex_context,
+        )
 
-        if chapter_content:
-            max_chars = 4000
-            content_snippet = chapter_content[-max_chars:] if len(chapter_content) > max_chars else chapter_content
-            if len(content_snippet) < len(chapter_content):
-                parts.append(f"章节末尾内容（前文已省略 {len(chapter_content) - len(content_snippet)} 字）：\n---\n{content_snippet}\n---")
-            else:
-                parts.append(f"章节完整内容：\n---\n{content_snippet}\n---")
+        try:
+            system_part, user_part = render_message(f"writing/{ai_mode}", template_context)
+        except TemplateError:
+            logger.error("Template render failed for writing mode '%s'", ai_mode, exc_info=True)
+            return ""
 
-        if selected_text and ai_mode in ("rewrite", "expand", "condense"):
-            action_verbs = {"rewrite": "润色", "expand": "扩写", "condense": "精简"}
-            parts.append(f"需要{action_verbs[ai_mode]}的选中文字：\n---\n{selected_text}\n---")
+        if user_part:
+            context["_writing_user_section"] = user_part
 
-        graph_summary = await self._get_graph_summary(context)
-        if graph_summary:
-            parts.append(graph_summary)
-
-        return "\n\n".join(parts)
+        return system_part
 
     async def _get_graph_summary(self, context: dict) -> str:
         """从 SQLite writing_settings 获取世界观摘要

@@ -1,0 +1,29 @@
+---
+name: "精简"
+type: text_replacement
+category: writing
+---
+
+# --- SYSTEM ---
+你是一个专业的小说精简助手。根据用户要求精简文字，保留核心情节和关键信息，去除冗余描写。保持文风和节奏感。只输出精简后的文字。
+
+# --- USER ---
+当前作品：《{{ book_name }}》
+当前章节：「{{ chapter_title }}」
+{% if chapter_content %}
+
+章节{{ "末尾内容（前文已省略）" if content_truncated else "完整内容" }}：
+---
+{{ chapter_content }}
+---
+{% endif %}
+{% if selected_text %}
+
+需要精简的选中文字：
+---
+{{ selected_text }}
+---
+{% endif %}
+{% include "components/codex.md.j2" %}
+{% include "components/personas.md.j2" %}
+{% include "components/additional_context.md.j2" %}

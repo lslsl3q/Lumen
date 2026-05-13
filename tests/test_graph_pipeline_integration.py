@@ -272,9 +272,7 @@ class TestDedupExactMatch:
 
     def test_all_entities_resolved(self):
         idx = self._build_index()
-        result = asyncio.get_event_loop().run_until_complete(
-            dedup_entities(_entities(), idx)
-        )
+        result = asyncio.run(dedup_entities(_entities(), idx))
         for ent in result:
             assert ent.get("_resolved") is True, f"{ent['name']} 未被去重"
 
@@ -286,9 +284,7 @@ class TestDedupExactMatch:
 
     def test_no_new_entities_on_second_write(self):
         idx = self._build_index()
-        deduped = asyncio.get_event_loop().run_until_complete(
-            dedup_entities(_entities(), idx)
-        )
+        deduped = asyncio.run(dedup_entities(_entities(), idx))
         result = batch_upsert(
             "knowledge", deduped, _edges(),
             source_path=SRC, episode_id=0,
@@ -334,9 +330,7 @@ class TestIncrementalWrite:
                 idx.add(eid, _normalize_name(ent["name"]), ent.get("aliases", []))
 
         extra = _extra_entities()
-        deduped = asyncio.get_event_loop().run_until_complete(
-            dedup_entities(extra, idx)
-        )
+        deduped = asyncio.run(dedup_entities(extra, idx))
 
         result = batch_upsert(
             "knowledge", deduped, _extra_edges(),

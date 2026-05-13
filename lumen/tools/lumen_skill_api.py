@@ -54,6 +54,28 @@ def fetch(url: str, max_length: int = 5000) -> str:
     return _call_tool("web", {"url": url, "max_length": max_length}, command="fetch")
 
 
+def crawl(url: str, max_pages: int = 20, max_depth: int = 3, path_prefix: str = "", max_content_length: int = 5000) -> str:
+    """多页爬取，从起始 URL 爬取关联页面
+
+    Args:
+        url: 起始 URL
+        max_pages: 最大抓取页数
+        max_depth: 最大链接深度
+        path_prefix: 只爬此路径前缀下的页面
+        max_content_length: 每页最大字符数
+
+    Returns:
+        格式化的多页内容文本
+    """
+    return _call_tool("web", {
+        "url": url,
+        "max_pages": max_pages,
+        "max_depth": max_depth,
+        "path_prefix": path_prefix,
+        "max_content_length": max_content_length,
+    }, command="crawl")
+
+
 def read_file(path: str) -> str:
     """读取文件内容
 
