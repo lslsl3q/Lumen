@@ -3,13 +3,12 @@
  *
  * TipTap 3.x 编辑器，HTML 格式存储，500ms 自动保存。
  * 布局：工具栏（全宽）→ 中间行（纸张 + children 面板）→ 状态栏（全宽）。
- * Ctrl+J 打开内联 AI 菜单。Ctrl+F 打开查找替换。
+ * Ctrl+F 打开查找替换。
  */
 import { useRef, useEffect, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { defaultExtensions } from "../../components/editors/extensions";
 import { useWritingStore } from "../../stores/useWritingStore";
-import { InlineAiMenu } from "./InlineAiMenu";
 import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
 import { Popover, PopoverTrigger, PopoverContent } from "../../components/ui/popover";
 import {
@@ -383,11 +382,6 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
   const ghostRangeRef = useRef<{ from: number; to: number } | null>(null);
   const lastGhostRequestRef = useRef<string | null>(null);
 
-  const [inlineMenu, setInlineMenu] = useState<{
-    visible: boolean;
-    position: { top: number; left: number } | null;
-  }>({ visible: false, position: null });
-
   const [showFindReplace, setShowFindReplace] = useState(false);
 
   const editor = useEditor({
@@ -421,25 +415,9 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     },
   });
 
-  // Ctrl+J: 内联 AI
+  // Ctrl+F: 查找替换
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "j") {
-        e.preventDefault();
-        if (!editor || !activeChapterId) return;
-        if (inlineMenu.visible) {
-          setInlineMenu({ visible: false, position: null });
-          return;
-        }
-        const { view } = editor;
-        const { from } = view.state.selection;
-        const coords = view.coordsAtPos(from);
-        setInlineMenu({
-          visible: true,
-          position: { top: coords.bottom + 8, left: coords.left },
-        });
-      }
-      // Ctrl+F: 查找替换
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
         e.preventDefault();
         setShowFindReplace((prev) => !prev);
@@ -447,7 +425,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [editor, activeChapterId, inlineMenu.visible]);
+  }, []);
 
   // 章节切换
   useEffect(() => {
@@ -462,7 +440,6 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     ghostRangeRef.current = null;
     lastGhostRequestRef.current = null;
     clearGhostText();
-    setInlineMenu({ visible: false, position: null });
     setShowFindReplace(false);
 
     if (activeChapterId && activeChapter) {
@@ -573,7 +550,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
             <div className="absolute inset-0 flex items-center justify-center z-10">
               <div className="text-center text-text-muted">
                 <p className="text-sm mb-1">选择或创建章节开始写作</p>
-                <p className="text-[11px]">Ctrl+S 保存 · Ctrl+J AI · Ctrl+F 查找</p>
+                <p className="text-[11px]">Ctrl+S 保存 · Ctrl+F 查找</p>
               </div>
             </div>
           )}
@@ -590,14 +567,6 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
                 onClick={() => {
                   clearGhostText();
                   ghostRangeRef.current = null;
-                  // 重新打开 Ctrl+J 面板让用户选择模式
-                  const { view } = editor;
-                  const { from } = view.state.selection;
-                  const coords = view.coordsAtPos(from);
-                  setInlineMenu({
-                    visible: true,
-                    position: { top: coords.bottom + 8, left: coords.left },
-                  });
                 }}
                 className="px-2 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30 cursor-pointer text-[11px]"
               >
@@ -612,14 +581,6 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       </div>
 
       <StatusBar editor={editor} />
-
-      {inlineMenu.visible && (
-        <InlineAiMenu
-          editor={editor}
-          position={inlineMenu.position}
-          onClose={() => setInlineMenu({ visible: false, position: null })}
-        />
-      )}
     </div>
   );
 }
