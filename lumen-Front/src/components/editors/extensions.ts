@@ -38,7 +38,7 @@ export const defaultExtensions = [
   CharacterCount,
   TaskList,
   TaskItem.configure({ nested: true }),
-  Highlight,
+  Highlight.configure({ multicolor: true }),
   Underline,
   TextAlign.configure({
     types: ["heading", "paragraph"],

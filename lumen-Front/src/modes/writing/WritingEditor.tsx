@@ -1,7 +1,7 @@
 /**
  * WritingEditor — 写作编辑区域
  *
- * TipTap 3.x 编辑器，Markdown 格式存储，500ms 自动保存。
+ * TipTap 3.x 编辑器，HTML 格式存储，500ms 自动保存。
  * 布局：工具栏（全宽）→ 中间行（纸张 + children 面板）→ 状态栏（全宽）。
  * Ctrl+J 打开内联 AI 菜单。Ctrl+F 打开查找替换。
  */
@@ -10,6 +10,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import { defaultExtensions } from "../../components/editors/extensions";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { InlineAiMenu } from "./InlineAiMenu";
+import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
 import { Popover, PopoverTrigger, PopoverContent } from "../../components/ui/popover";
 import {
   Bold, Italic, Underline, Strikethrough, Code, Quote,
@@ -582,6 +583,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
         <div className="flex-1 writing-paper-container scrollbar-lumen relative">
           <div className="writing-paper">
             <EditorContent editor={editor} />
+            <SelectionToolbar editor={editor} />
           </div>
 
           {!activeChapterId && (

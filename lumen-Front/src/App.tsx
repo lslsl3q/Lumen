@@ -17,6 +17,7 @@ import { useDebugState } from './hooks/useDebugState';
 import { useDebugWindow } from './hooks/useDebugWindow';
 import { usePush } from './hooks/usePush';
 import { TOAST_EVENT, type ToastLevel } from './utils/toast';
+import { TooltipProvider } from './components/ui/tooltip';
 
 interface EBProps { children: ReactNode }
 interface EBState { hasError: boolean; error: Error | null }
@@ -41,9 +42,11 @@ class ErrorBoundary extends Component<EBProps, EBState> {
 
 function App() {
   return (
-    <HashRouter>
-      <AppContent />
-    </HashRouter>
+    <TooltipProvider delay={300}>
+      <HashRouter>
+        <AppContent />
+      </HashRouter>
+    </TooltipProvider>
   );
 }
 
