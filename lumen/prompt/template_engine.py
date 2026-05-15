@@ -64,8 +64,26 @@ def _filter_default_if_empty(value, default=""):
     return value
 
 
+def _filter_exclude_presets(text: str, presets: str) -> str:
+    """从自由文本中去掉已匹配的预设选项，只保留用户自定义指令
+
+    presets 为逗号分隔的预设关键词列表。
+    """
+    if not text:
+        return ""
+    keywords = [k.strip() for k in presets.split(",") if k.strip()]
+    result = text
+    for kw in keywords:
+        result = result.replace(kw, "")
+    # 清除残余的逗号、顿号和多余空白
+    import re
+    result = re.sub(r"[,，、]\s*[,，、]*", "", result)
+    return result.strip()
+
+
 _env.filters["join_zh"] = _filter_join_zh
 _env.filters["default_if_empty"] = _filter_default_if_empty
+_env.filters["exclude_presets"] = _filter_exclude_presets
 
 
 # ── 自定义全局函数（可在模板中直接调用）──

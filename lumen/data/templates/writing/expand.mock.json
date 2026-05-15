@@ -3,5 +3,8 @@
   "chapter_title": "第三章 迷雾中的线索",
   "chapter_content": "张三推开了那扇尘封已久的木门。",
   "content_truncated": false,
-  "selected_text": "张三推开了那扇尘封已久的木门。"
+  "selected_text": "张三推开了那扇尘封已久的木门。",
+  "selected_word_count": 16,
+  "instructions": "感官细节,情感描写",
+  "target_words": "翻倍"
 }
