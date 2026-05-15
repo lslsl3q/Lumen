@@ -7,9 +7,8 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { Undo2, Redo2, Bold, Italic, Underline, Strikethrough, Highlighter, Code, Ban, ChevronDown } from "lucide-react";
+import { Undo2, Redo2, Bold, Italic, Underline, Strikethrough, Highlighter, Code, Ban, ChevronDown, Quote, List, ListOrdered, IndentIncrease, IndentDecrease, UnfoldVertical, RefreshCw, FoldVertical } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
-import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 
 // 半透明基色 — 自动适配深浅模式（normal blend 叠加背景）
 const HIGHLIGHT_COLORS = [
@@ -20,25 +19,19 @@ const HIGHLIGHT_COLORS = [
   { label: "Purple", color: "rgba(140, 80, 200, 0.32)" },
 ];
 
-// 带 Tooltip 的工具按钮
-function ToolBtn({ onClick, active, title, children }: {
+// 简单工具按钮（Bubble Menu 不需要 Tooltip）
+function ToolBtn({ onClick, active, children }: {
   onClick: () => void;
   active?: boolean;
-  title: string;
   children: React.ReactNode;
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger
-        onClick={onClick}
-        className={`selection-toolbar-btn ${active ? "active" : ""}`}
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={6}>
-        {title}
-      </TooltipContent>
-    </Tooltip>
+    <button
+      onClick={onClick}
+      className={`selection-toolbar-btn ${active ? "active" : ""}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -85,17 +78,15 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
   }, [editor]);
 
   const el = ref.current;
-  const h = el?.offsetHeight ?? 68;
-  const w = el?.offsetWidth ?? 200;
+  const w = el?.offsetWidth ?? 0;
 
-  let pos: { left: number; top: number } | null = null;
+  let pos: { left: number; bottom: number } | null = null;
   if (anchor) {
-    const scrollEl = (editor.view.dom as HTMLElement).closest(".writing-paper-container");
-    const bounds = (scrollEl ?? (editor.view.dom as HTMLElement)).getBoundingClientRect();
+    const editorBounds = (editor.view.dom as HTMLElement).getBoundingClientRect();
     let left = anchor.left;
-    if (left + w > bounds.right) left = bounds.right - w;
-    if (left < bounds.left) left = bounds.left;
-    pos = { left, top: anchor.top - h - 8 };
+    if (left + w > editorBounds.right) left = editorBounds.right - w;
+    if (left < editorBounds.left) left = editorBounds.left;
+    pos = { left, bottom: window.innerHeight - anchor.top + 8 };
   }
 
   return createPortal(
@@ -105,7 +96,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
       style={{
         position: "fixed",
         left: pos ? pos.left : -9999,
-        top: pos ? pos.top : -9999,
+        bottom: pos ? pos.bottom : -9999,
         zIndex: 99999,
         visibility: pos ? "visible" : "hidden",
         pointerEvents: pos ? "auto" : "none",
@@ -116,26 +107,26 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
       <div className="selection-toolbar-bar">
         <span className="selection-toolbar-info">{charCount} 字</span>
         <span className="selection-toolbar-divider" />
-        <ToolBtn onClick={() => editor.chain().focus().undo().run()} title="撤销" >
+        <ToolBtn onClick={() => editor.chain().focus().undo().run()} >
           <Undo2 size={15} />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().redo().run()} title="重做" >
+        <ToolBtn onClick={() => editor.chain().focus().redo().run()} >
           <Redo2 size={15} />
         </ToolBtn>
       </div>
 
       {/* 第二排：格式化 */}
       <div className="selection-toolbar-bar">
-        <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")} title="加粗">
+        <ToolBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive("bold")}>
           <Bold size={15} />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")} title="斜体">
+        <ToolBtn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive("italic")}>
           <Italic size={15} />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")} title="下划线">
+        <ToolBtn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive("underline")}>
           <Underline size={15} />
         </ToolBtn>
-        <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")} title="删除线">
+        <ToolBtn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive("strike")}>
           <Strikethrough size={15} />
         </ToolBtn>
 
@@ -170,10 +161,148 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
           </PopoverContent>
         </Popover>
 
-        <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")} title="行内代码">
+        <ToolBtn onClick={() => editor.chain().focus().toggleCode().run()} active={editor.isActive("code")}>
           <Code size={15} />
         </ToolBtn>
+
+        {/* 段落格式 — 分割线隔开 */}
+        <span className="selection-toolbar-divider" />
+
+        <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")}>
+          <Quote size={15} />
+        </ToolBtn>
+
+        {/* Heading 选择器 */}
+        <Popover>
+          <PopoverTrigger
+            className={`selection-toolbar-btn highlight-trigger ${editor.isActive("heading") ? "active" : ""}`}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1 }}>H</span>
+            <ChevronDown size={9} fill="currentColor" className="highlight-trigger-arrow" />
+          </PopoverTrigger>
+          <PopoverContent sideOffset={4} className="highlight-color-popover !border-0">
+            <button
+              className="highlight-color-item"
+              onClick={() => editor.chain().focus().setParagraph().run()}
+            >
+              <Ban size={16} className="highlight-none-icon" />
+              <span className="highlight-color-label">None</span>
+            </button>
+            <span className="highlight-color-divider" />
+            {([1, 2, 3] as const).map((level) => (
+              <button
+                key={level}
+                className={`highlight-color-item ${editor.isActive("heading", { level }) ? "selected" : ""}`}
+                onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700, width: 16, textAlign: "center" }}>H{level}</span>
+                <span className="highlight-color-label">Heading {level}</span>
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        {/* List 选择器 */}
+        <Popover>
+          <PopoverTrigger
+            className={`selection-toolbar-btn highlight-trigger ${editor.isActive("bulletList") || editor.isActive("orderedList") ? "active" : ""}`}
+          >
+            <ListOrdered size={15} />
+            <ChevronDown size={9} fill="currentColor" className="highlight-trigger-arrow" />
+          </PopoverTrigger>
+          <PopoverContent sideOffset={4} className="highlight-color-popover !border-0">
+            <button
+              className={`highlight-color-item ${editor.isActive("bulletList") ? "selected" : ""}`}
+              onClick={() => editor.chain().focus().toggleBulletList().run()}
+            >
+              <List size={16} />
+              <span className="highlight-color-label">Bullet List</span>
+            </button>
+            <button
+              className={`highlight-color-item ${editor.isActive("orderedList") ? "selected" : ""}`}
+              onClick={() => editor.chain().focus().toggleOrderedList().run()}
+            >
+              <ListOrdered size={16} />
+              <span className="highlight-color-label">Ordered List</span>
+            </button>
+            <span className="highlight-color-divider" />
+            <button
+              className="highlight-color-item"
+              onClick={() => editor.chain().focus().sinkListItem("listItem").run()}
+            >
+              <IndentIncrease size={16} />
+              <span className="highlight-color-label">Increase Level</span>
+            </button>
+            <button
+              className="highlight-color-item"
+              onClick={() => editor.chain().focus().liftListItem("listItem").run()}
+            >
+              <IndentDecrease size={16} />
+              <span className="highlight-color-label">Decrease Level</span>
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
+
+      {/* 第三排：AI 操作 — 选中超 3 字才显示 */}
+      {charCount > 3 && (
+      <div className="selection-toolbar-row-separated">
+        <Popover>
+          <PopoverTrigger className="selection-toolbar-btn-ai" title="扩写">
+            <UnfoldVertical size={14} />
+            <span className="selection-toolbar-btn-ai-label">扩写</span>
+          </PopoverTrigger>
+          <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
+            <span className="ai-action-title">扩写</span>
+            <span className="highlight-color-divider" />
+            <button className="highlight-color-item" onClick={() => {/* TODO: trigger expand */}}>
+              <span className="highlight-color-label">Generate</span>
+            </button>
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger className="selection-toolbar-btn-ai" title="改写">
+            <RefreshCw size={14} />
+            <span className="selection-toolbar-btn-ai-label">改写</span>
+          </PopoverTrigger>
+          <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
+            <span className="ai-action-title">改写</span>
+            <span className="highlight-color-divider" />
+            <button className="highlight-color-item" onClick={() => {/* TODO: trigger rewrite */}}>
+              <span className="highlight-color-label">Generate</span>
+            </button>
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger className="selection-toolbar-btn-ai" title="精简">
+            <FoldVertical size={14} />
+            <span className="selection-toolbar-btn-ai-label">精简</span>
+          </PopoverTrigger>
+          <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
+            <span className="ai-action-title">精简</span>
+            <span className="highlight-color-divider" />
+            <button className="highlight-color-item" onClick={() => {/* TODO: trigger condense */}}>
+              <span className="highlight-color-label">Generate</span>
+            </button>
+          </PopoverContent>
+        </Popover>
+
+        <Popover>
+          <PopoverTrigger className="selection-toolbar-btn-ai" title="预设">
+            <span className="selection-toolbar-btn-ai-label">预设</span>
+          </PopoverTrigger>
+          <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
+            <span className="ai-action-title">预设</span>
+            <span className="highlight-color-divider" />
+            <button className="highlight-color-item" onClick={() => {/* TODO: create preset */}}>
+              <span className="highlight-color-label">Create New</span>
+            </button>
+          </PopoverContent>
+        </Popover>
+      </div>
+      )}
     </div>,
     document.body,
   );

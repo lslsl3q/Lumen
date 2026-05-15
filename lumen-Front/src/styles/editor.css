@@ -1023,6 +1023,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
   padding: 2px;
+  gap: 1px;
 }
 
 .selection-toolbar-info {
@@ -1040,6 +1041,7 @@
   align-self: stretch;
   background: rgba(255, 255, 255, 0.15);
   flex-shrink: 0;
+  margin: 0 2px;
 }
 
 .selection-toolbar-btn {
@@ -1070,6 +1072,45 @@
 .selection-toolbar-btn:disabled {
   opacity: 0.3;
   cursor: default;
+}
+
+/* 第三排：独立 AI 操作按钮 */
+.selection-toolbar-row-separated {
+  display: flex;
+  gap: 3px;
+}
+
+.selection-toolbar-btn-ai {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 3px;
+  background: #3f3f46;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.selection-toolbar-btn-ai:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.selection-toolbar-btn-ai-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.ai-action-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 2px 4px;
 }
 
 /* 高亮颜色选择器 */
@@ -1113,6 +1154,10 @@
 .highlight-color-item:hover {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.95);
+}
+
+.highlight-color-item.selected {
+  color: #60a5fa;
 }
 
 .highlight-none-icon {

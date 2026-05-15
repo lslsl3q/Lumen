@@ -13,12 +13,10 @@ import { InlineAiMenu } from "./InlineAiMenu";
 import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
 import { Popover, PopoverTrigger, PopoverContent } from "../../components/ui/popover";
 import {
-  Bold, Italic, Underline, Strikethrough, Code, Quote,
-  List, ListOrdered, Heading1, Heading2, Heading3, Minus,
+  Minus,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   Superscript, Subscript, Link, RemoveFormatting, Search,
   Table, ImagePlus, Palette, Eye, Type,
-  IndentIncrease, IndentDecrease,
 } from "lucide-react";
 
 /* ── 工具栏 ── */
@@ -44,26 +42,11 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
   };
 
   const items = [
-    { icon: Heading1, cmd: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), active: "heading", activeOpt: { level: 1 } },
-    { icon: Heading2, cmd: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), active: "heading", activeOpt: { level: 2 } },
-    { icon: Heading3, cmd: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), active: "heading", activeOpt: { level: 3 } },
-    { type: "divider" as const },
-    { icon: Bold, cmd: () => editor.chain().focus().toggleBold().run(), active: "bold" },
-    { icon: Italic, cmd: () => editor.chain().focus().toggleItalic().run(), active: "italic" },
-    { icon: Underline, cmd: () => editor.chain().focus().toggleUnderline().run(), active: "underline" },
-    { icon: Strikethrough, cmd: () => editor.chain().focus().toggleStrike().run(), active: "strike" },
     { icon: Superscript, cmd: () => editor.chain().focus().toggleSuperscript().run(), active: "superscript" },
     { icon: Subscript, cmd: () => editor.chain().focus().toggleSubscript().run(), active: "subscript" },
-    { icon: Code, cmd: () => editor.chain().focus().toggleCode().run(), active: "code" },
     { type: "divider" as const },
-    { icon: Quote, cmd: () => editor.chain().focus().toggleBlockquote().run(), active: "blockquote" },
-    { icon: List, cmd: () => editor.chain().focus().toggleBulletList().run(), active: "bulletList" },
-    { icon: ListOrdered, cmd: () => editor.chain().focus().toggleOrderedList().run(), active: "orderedList" },
     { icon: Minus, cmd: () => editor.chain().focus().setHorizontalRule().run(), active: null },
     { icon: Table, cmd: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(), active: null },
-    { type: "divider" as const },
-    { icon: IndentIncrease, cmd: () => editor.chain().focus().sinkListItem("listItem").run(), active: null },
-    { icon: IndentDecrease, cmd: () => editor.chain().focus().liftListItem("listItem").run(), active: null },
     { type: "divider" as const },
     { icon: AlignLeft, cmd: () => editor.chain().focus().setTextAlign("left").run(), active: { textAlign: "left" } },
     { icon: AlignCenter, cmd: () => editor.chain().focus().setTextAlign("center").run(), active: { textAlign: "center" } },
