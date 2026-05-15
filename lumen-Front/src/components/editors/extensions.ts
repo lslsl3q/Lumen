@@ -1,7 +1,8 @@
 /**
  * TipTap 3.x 默认扩展配置
  *
- * 从 @tiptap/* 原生导入，移除 novel 依赖。
+ * 内容以 HTML 存储（更健壮），不再用 Markdown 做中间格式。
+ * tiptap-markdown 仅用于导入/导出，不参与日常编辑。
  */
 import StarterKit from "@tiptap/starter-kit";
 import TaskList from "@tiptap/extension-task-list";
@@ -20,19 +21,16 @@ import Image from "@tiptap/extension-image";
 import { TextStyle } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import FontFamily from "@tiptap/extension-font-family";
-import { Markdown } from "tiptap-markdown";
 import { FocusModeExtension } from "./FocusModeExtension";
 import { GhostTextExtension } from "./GhostTextExtension";
+import { SlashCommandExtension } from "./SlashCommandExtension";
+import { SceneBeatNode } from "./SceneBeatNode";
 
 export const defaultExtensions = [
   StarterKit.configure({
     heading: { levels: [1, 2, 3] },
-  }),
-  Markdown.configure({
-    transformPastedText: true,
-    transformCopiedText: true,
-    breaks: true,
-    html: false,
+    link: false,
+    underline: false,
   }),
   Placeholder.configure({
     placeholder: "开始写作…",
@@ -60,4 +58,6 @@ export const defaultExtensions = [
   FontFamily,
   FocusModeExtension,
   GhostTextExtension,
+  SlashCommandExtension,
+  SceneBeatNode,
 ];

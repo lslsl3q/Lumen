@@ -131,6 +131,15 @@ const ITEM_FIELDS: FieldDef[] = [
   { key: "text", label: "详细描述", type: "textarea", rows: 5, placeholder: "物品的详细描述和来历…" },
 ];
 
+/* ── AI 上下文追踪模式（所有类别共用）── */
+
+const TRACKING_OPTIONS = [
+  { value: "always",      label: "始终注入", color: "bg-primary/15 text-primary" },
+  { value: "detected",    label: "自动检测", color: "bg-blue-400/15 text-blue-300" },
+  { value: "anti_spoiler", label: "防剧透",   color: "bg-amber-400/15 text-amber-300" },
+];
+
+
 const CATEGORY_CONFIG: Record<string, { category: string; fields: FieldDef[] }> = {
   characters: { category: "character", fields: CHARACTER_FIELDS },
   locations: { category: "location", fields: LOCATION_FIELDS },
@@ -417,6 +426,40 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
           }}
           className="w-full mt-1 bg-surface-elevated border border-border-default rounded-lg px-3 py-2 text-[15px] text-text-primary outline-none focus:border-primary/30"
         />
+      </div>
+
+      {/* AI 上下文控制 */}
+      <div>
+        <label className="text-[10px] text-text-muted uppercase tracking-wider font-medium">AI 上下文</label>
+        <div className="mt-1.5 flex items-center gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            {TRACKING_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => updateField("_tracking", opt.value)}
+                className={`px-3 py-1.5 rounded-lg text-[12px] transition-colors cursor-pointer border
+                  ${(content._tracking ?? "detected") === opt.value
+                    ? `border-primary/30 ${opt.color}`
+                    : "border-border-default text-text-muted hover:text-text-primary hover:border-slate-600"
+                  }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={async () => {
+              await updateSetting(setting.id, { enabled: setting.enabled ? 0 : 1 });
+            }}
+            className={`ml-auto text-[11px] px-3 py-1.5 rounded-lg border transition-colors cursor-pointer
+              ${setting.enabled
+                ? "border-green-500/30 text-green-400 bg-green-500/10"
+                : "border-border-default text-text-muted line-through"
+              }`}
+          >
+            {setting.enabled ? "启用" : "禁用"}
+          </button>
+        </div>
       </div>
 
       {/* 类别专属字段 */}

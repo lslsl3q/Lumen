@@ -113,10 +113,12 @@ async def lifespan(app):
         logger.warning(f"深梦境调度器停止失败: {e}")
 
     # 退出清理
-    from lumen.services.storage import history, vector_store, knowledge
+    from lumen.services.storage import history
+    from lumen.services.search import vector_store
+    from lumen.services.knowledge import close as close_knowledge
     history.close_conn()
     vector_store.close()
-    knowledge.close()
+    close_knowledge()
     from lumen.services import access_control
     access_control.close()
     from lumen.services.storage import theme as theme_storage

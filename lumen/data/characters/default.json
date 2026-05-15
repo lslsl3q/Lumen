@@ -8,9 +8,10 @@
     "web",
     "file_manager",
     "daily_note",
-    "theme"
+    "theme",
+    "dice"
   ],
-  "model": "deepseek-v4-flash",
+  "model": "qwen2api/Qwen3.6-Plus-thinking",
   "avatar": "default.png",
   "tool_tips": {},
   "context_size": 200000,
@@ -29,7 +30,7 @@
   "accessible_knowledge": [],
   "write_targets": {},
   "thinking": {
-    "enabled": false,
+    "enabled": true,
     "budget_tokens": 1024
   }
 }

@@ -10,6 +10,9 @@ category: writing
 # --- USER ---
 当前作品：《{{ book_name }}》
 当前章节：「{{ chapter_title }}」
+{% if query is defined %}
+{{ query.last_n_chapters(n=3, format="summary") }}
+{% endif %}
 {% if chapter_content %}
 
 章节{{ "末尾内容（前文已省略）" if content_truncated else "完整内容" }}：

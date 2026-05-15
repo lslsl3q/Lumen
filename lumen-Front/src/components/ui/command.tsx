@@ -25,7 +25,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex size-full flex-col overflow-hidden rounded-xl! bg-surface-elevated p-1 text-text-primary",
+        "flex size-full flex-col overflow-hidden rounded! bg-surface-elevated p-1 text-text-primary",
         className
       )}
       {...props}
@@ -55,7 +55,7 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
+          "top-1/3 translate-y-0 overflow-hidden rounded! p-0",
           className
         )}
         showCloseButton={showCloseButton}

@@ -1,181 +1,118 @@
 import type { Editor, Range } from "@tiptap/core";
 
-interface SuggestionItem {
+export interface SlashCommandItem {
   title: string;
   description?: string;
   searchTerms?: string[];
-  icon?: JSX.Element;
+  category?: "ai" | "codex" | "formatting" | "other";
+  iconSvg?: string;
   command: (props: { editor: Editor; range: Range }) => void;
 }
 
-// 内联 SVG 图标，避免引入 lucide-react
+// ── SVG 图标字符串（避免引入 react-dom/server） ──
 
-const IconH1 = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6v12M4 12h8M12 6v12M17 12l3-2v8" />
-  </svg>
-);
+const beatIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5M12 3.75v16.5M8.25 8.25l7.5 7.5M15.75 8.25l-7.5 7.5"/></svg>';
 
-const IconH2 = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6v12M4 12h8M12 6v12M18 10a2 2 0 11-2 2m4 4h-4" />
-  </svg>
-);
+const continueIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>';
 
-const IconH3 = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6v12M4 12h8M12 6v12M17.5 10.5a2 2 0 11-1 3.5h-1.5m2.5 2.5a2 2 0 11-1.5-3.5" />
-  </svg>
-);
+const codexIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>';
 
-const IconList = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-  </svg>
-);
+const lineIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M3 12h18"/></svg>';
 
-const IconOrderedList = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6h11M10 12h11M10 18h11M4 6v4M3 20h2M4 14c1 0 2-.5 2-1.5S5 11 4 11H3l1.5-1" />
-  </svg>
-);
+const sectionIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 17.25h16.5M3.75 12h16.5"/></svg>';
 
-const IconCheck = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M3 6h18M3 12h18M3 18h18" />
-  </svg>
-);
+const noteIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>';
 
-const IconQuote = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10 11V8a2 2 0 00-2-2H6a2 2 0 00-2 2v3a2 2 0 002 2h2m0 0v4m0-4h2m6-3V8a2 2 0 00-2-2h-2a2 2 0 00-2 2v3a2 2 0 002 2h2m0 0v4m0-4h2" />
-  </svg>
-);
+// ── 命令列表（对应 NovelCrafter 6 项） ──
 
-const IconCode = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 9.75L16.5 12l-2.25 2.25m-4.5 0L7.5 12l2.25-2.25M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z" />
-  </svg>
-);
-
-const IconText = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h10.5" />
-  </svg>
-);
-
-const IconLine = () => (
-  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" d="M3 12h18" />
-  </svg>
-);
-
-export const suggestionItems: SuggestionItem[] = [
+export const allCommands: SlashCommandItem[] = [
+  // ── AI ──
   {
-    title: "文本",
-    description: "普通段落文本",
-    searchTerms: ["text", "paragraph", "p"],
-    icon: <IconText />,
+    title: "场景节拍",
+    description: "AI 微控制器 — 写指令，AI 写正文",
+    searchTerms: ["scene", "beat", "节拍", "场景"],
+    category: "ai",
+    iconSvg: beatIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleNode("paragraph", "paragraph").run();
+      try {
+        editor
+          .chain()
+          .focus()
+          .insertContentAt(range, {
+            type: "sceneBeat",
+            attrs: { beatType: "beat", maxWords: 400 },
+          })
+          .run();
+      } catch (e) {
+        console.error("[SlashCmd] SceneBeat command error:", e);
+      }
     },
   },
   {
-    title: "标题 1",
-    description: "大标题",
-    searchTerms: ["title", "heading", "h1"],
-    icon: <IconH1 />,
+    title: "续写场景",
+    description: "创建新场景节拍继续写作",
+    searchTerms: ["continue", "writing", "续写", "继续"],
+    category: "ai",
+    iconSvg: continueIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setNode("heading", { level: 1 }).run();
+      editor.chain().focus().deleteRange(range).insertSceneBeat({
+        beatType: "continue",
+        maxWords: 400,
+      }).run();
     },
   },
+
+  // ── Codex ──
   {
-    title: "标题 2",
-    description: "中标题",
-    searchTerms: ["subtitle", "heading", "h2"],
-    icon: <IconH2 />,
+    title: "法典演进",
+    description: "追踪角色/世界观在章节中的发展",
+    searchTerms: ["codex", "progression", "法典", "演进", "设定"],
+    category: "codex",
+    iconSvg: codexIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setNode("heading", { level: 2 }).run();
+      editor.chain().focus().deleteRange(range).insertContent({
+        type: "codexProgression",
+      }).run();
     },
   },
-  {
-    title: "标题 3",
-    description: "小标题",
-    searchTerms: ["subtitle", "heading", "h3"],
-    icon: <IconH3 />,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setNode("heading", { level: 3 }).run();
-    },
-  },
-  {
-    title: "列表",
-    description: "无序列表",
-    searchTerms: ["bullet", "list", "unordered"],
-    icon: <IconList />,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBulletList().run();
-    },
-  },
-  {
-    title: "编号列表",
-    description: "有序编号列表",
-    searchTerms: ["ordered", "numbered"],
-    icon: <IconOrderedList />,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleOrderedList().run();
-    },
-  },
-  {
-    title: "待办",
-    description: "任务清单",
-    searchTerms: ["todo", "task", "check", "checkbox"],
-    icon: <IconCheck />,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleTaskList().run();
-    },
-  },
-  {
-    title: "引用",
-    description: "引用块",
-    searchTerms: ["quote", "blockquote"],
-    icon: <IconQuote />,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBlockquote().run();
-    },
-  },
-  {
-    title: "代码块",
-    description: "代码片段",
-    searchTerms: ["code", "codeblock"],
-    icon: <IconCode />,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
-    },
-  },
+
+  // ── 格式 ──
   {
     title: "分割线",
     description: "水平分割线",
-    searchTerms: ["horizontal", "rule", "line", "divider"],
-    icon: <IconLine />,
+    searchTerms: ["horizontal", "rule", "line", "divider", "分割线"],
+    category: "formatting",
+    iconSvg: lineIcon,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHorizontalRule().run();
     },
   },
   {
-    title: "表格",
-    description: "插入 3×3 表格",
-    searchTerms: ["table", "grid", "biaoge"],
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <rect x="1" y="1" width="14" height="14" rx="1" />
-        <line x1="1" y1="5.5" x2="15" y2="5.5" />
-        <line x1="1" y1="10" x2="15" y2="10" />
-        <line x1="5.5" y1="1" x2="5.5" y2="15" />
-        <line x1="10.5" y1="1" x2="10.5" y2="15" />
-      </svg>
-    ),
+    title: "段落区",
+    description: "可折叠的上下文容器",
+    searchTerms: ["section", "context", "段落", "区", "上下文"],
+    category: "formatting",
+    iconSvg: sectionIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+      editor.chain().focus().deleteRange(range).insertContent({
+        type: "writingSection",
+      }).run();
+    },
+  },
+
+  // ── 其他 ──
+  {
+    title: "笔记",
+    description: "作者笔记（可排除字数统计）",
+    searchTerms: ["note", "笔记", "备注"],
+    category: "other",
+    iconSvg: noteIcon,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertContent({
+        type: "writingNote",
+      }).run();
     },
   },
 ];
+
+export const suggestionItems = allCommands;

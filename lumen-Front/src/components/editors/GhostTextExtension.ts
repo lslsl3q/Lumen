@@ -1,8 +1,8 @@
 /**
- * GhostTextExtension — AI 续写幽灵文字 Mark
+ * GhostTextExtension — AI 续写预览文字 Mark
  *
- * 插入的光标后文字标记为 ghostText（半透明倾斜），
- * Tab 接受（移除 mark 保留文字），Esc 拒绝（删除所有 ghost 文字）。
+ * 插入的文字标记为 ghostText（蓝色正文字体），
+ * Tab/Apply 接受（移除 mark 保留文字），Esc 拒绝（删除所有 ghost 文字）。
  */
 import { Mark } from "@tiptap/core";
 
@@ -39,11 +39,32 @@ export const GhostTextExtension = Mark.create({
           commands.setMark(this.name),
       acceptGhost:
         () =>
-        ({ commands }) =>
-          commands.unsetMark(this.name),
+        ({ state, view }: any) => {
+          const tr = state.tr;
+          const ghostMarkType = state.schema.marks.ghostText;
+          if (!ghostMarkType) return false;
+
+          let found = false;
+          // 从后往前移除 mark，避免位置偏移
+          const ranges: Array<{ from: number; to: number }> = [];
+          state.doc.descendants((node: any, pos: number) => {
+            if (!node.isText) return;
+            if (node.marks.some((m: any) => m.type.name === "ghostText")) {
+              ranges.push({ from: pos, to: pos + node.nodeSize });
+              found = true;
+            }
+          });
+
+          if (!found) return false;
+
+          for (let i = ranges.length - 1; i >= 0; i--) {
+            tr.removeMark(ranges[i].from, ranges[i].to, ghostMarkType);
+          }
+          view.dispatch(tr);
+          return true;
+        },
       rejectGhost:
         () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ({ state, view }: any) => {
           const tr = state.tr;
           let deleted = 0;
@@ -69,7 +90,24 @@ export const GhostTextExtension = Mark.create({
       Tab: ({ editor }) => {
         const hasGhost = hasGhostMark(editor.state.doc);
         if (!hasGhost) return false;
-        editor.chain().focus().unsetMark("ghostText").run();
+        // 直接用 view.dispatch，绕过 chain
+        const { state, view } = editor;
+        const tr = state.tr;
+        const ghostMarkType = state.schema.marks.ghostText;
+        let found = false;
+        const ranges: Array<{ from: number; to: number }> = [];
+        state.doc.descendants((node: any, pos: number) => {
+          if (!node.isText) return;
+          if (node.marks.some((m: any) => m.type.name === "ghostText")) {
+            ranges.push({ from: pos, to: pos + node.nodeSize });
+            found = true;
+          }
+        });
+        if (!found) return false;
+        for (let i = ranges.length - 1; i >= 0; i--) {
+          tr.removeMark(ranges[i].from, ranges[i].to, ghostMarkType);
+        }
+        view.dispatch(tr);
         return true;
       },
       Escape: ({ editor }) => {

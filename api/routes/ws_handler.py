@@ -138,6 +138,9 @@ async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
     user_input = msg.get("content", "")
     request_id = msg.get("request_id", "")
 
+    if ai_mode == "beat_generate":
+        user_input = msg.get("beat_text") or user_input
+
     if not book_id:
         await ws.send_json({"type": "error", "message": "未指定作品", "request_id": request_id})
         return
@@ -152,6 +155,12 @@ async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
             book_name=book_name,
             selected_text=selected_text,
             user_input=user_input,
+            extra_context={
+                "beat_text": msg.get("beat_text", ""),
+                "beat_context": msg.get("beat_context", ""),
+                "max_words": msg.get("max_words"),
+                "model_id": msg.get("model_id", ""),
+            } if ai_mode == "beat_generate" else None,
         ):
             event["request_id"] = request_id
             await ws.send_json(event)

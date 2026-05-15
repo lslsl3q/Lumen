@@ -111,14 +111,12 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
         {/* ── Popover 按钮：图片 / 颜色 / 链接 ── */}
 
         <Popover open={activePopover === "image"} onOpenChange={(o) => { if (!o) { setActivePopover(null); setPopoverValue(""); } }}>
-          <PopoverTrigger>
-            <button
-              onClick={() => openPopover("image")}
-              className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
-              title="插入图片"
-            >
-              <ImagePlus className="w-4 h-4" />
-            </button>
+          <PopoverTrigger
+            onClick={() => openPopover("image")}
+            className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
+            title="插入图片"
+          >
+            <ImagePlus className="w-4 h-4" />
           </PopoverTrigger>
           <PopoverContent side="bottom" align="center" className="w-64 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
             <p className="text-[11px] text-text-secondary">图片地址</p>
@@ -141,14 +139,12 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
         </Popover>
 
         <Popover open={activePopover === "color"} onOpenChange={(o) => { if (!o) { setActivePopover(null); setPopoverValue(""); } }}>
-          <PopoverTrigger>
-            <button
-              onClick={() => openPopover("color", editor.getAttributes("textStyle").color ?? "#CC7C5E")}
-              className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
-              title="文字颜色"
-            >
-              <Palette className="w-4 h-4" />
-            </button>
+          <PopoverTrigger
+            onClick={() => openPopover("color", editor.getAttributes("textStyle").color ?? "#CC7C5E")}
+            className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
+            title="文字颜色"
+          >
+            <Palette className="w-4 h-4" />
           </PopoverTrigger>
           <PopoverContent side="bottom" align="center" className="w-52 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
             <p className="text-[11px] text-text-secondary">文字颜色</p>
@@ -178,18 +174,16 @@ function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: 
         </Popover>
 
         <Popover open={activePopover === "link"} onOpenChange={(o) => { if (!o) { setActivePopover(null); setPopoverValue(""); } }}>
-          <PopoverTrigger>
-            <button
-              onClick={() => {
-                const href = editor.isActive("link") ? editor.getAttributes("link").href ?? "" : "";
-                openPopover("link", href);
-              }}
-              className={`p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0
-                ${editor.isActive("link") ? "text-primary bg-primary/10" : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"}`}
-              title="链接"
-            >
-              <Link className="w-4 h-4" />
-            </button>
+          <PopoverTrigger
+            onClick={() => {
+              const href = editor.isActive("link") ? editor.getAttributes("link").href ?? "" : "";
+              openPopover("link", href);
+            }}
+            className={`p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0
+              ${editor.isActive("link") ? "text-primary bg-primary/10" : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"}`}
+            title="链接"
+          >
+            <Link className="w-4 h-4" />
           </PopoverTrigger>
           <PopoverContent side="bottom" align="center" className="w-64 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
             <p className="text-[11px] text-text-secondary">链接地址</p>
@@ -394,6 +388,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
   const ghostTextContent = useWritingStore((s) => s.ghostTextContent);
   const ghostRequestId = useWritingStore((s) => s.ghostRequestId);
   const clearGhostText = useWritingStore((s) => s.clearGhostText);
+  const aiMode = useWritingStore((s) => s.aiMode);
 
   const activeChapter = chapters.find((c) => c.id === activeChapterId);
 
@@ -433,10 +428,10 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       }
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
-        const md = (ed as any).storage?.markdown?.getMarkdown?.() ?? "";
+        const html = ed.getHTML();
         const currentChapterId = useWritingStore.getState().activeChapterId;
         if (currentChapterId) {
-          updateChapter(currentChapterId, { content: md });
+          updateChapter(currentChapterId, { content: html });
         }
       }, 500);
     },
@@ -512,30 +507,37 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       return;
     }
     const { aiMode } = useWritingStore.getState();
-    if (!["continue", "rewrite", "expand", "condense"].includes(aiMode)) return;
+    if (!["continue", "rewrite", "expand", "condense", "beat_generate"].includes(aiMode)) return;
 
     isInternalUpdate.current = true;
-    const { from } = editor.state.selection;
+
+    // 将纯文本转为 HTML 段落，确保 TipTap 创建正确的 block 节点
+    const htmlContent = ghostTextContent
+      .split(/\n/)
+      .filter(Boolean)
+      .map((p) => `<p>${p}</p>`)
+      .join("");
+
+    const insertPos = ghostRangeRef.current?.from ?? editor.state.selection.from;
 
     if (!ghostRangeRef.current) {
+      editor.chain().focus().insertContentAt(insertPos, htmlContent).run();
+      const endPos = editor.state.selection.from;
       editor.chain()
-        .focus()
-        .insertContentAt(from, ghostTextContent)
-        .setTextSelection({ from, to: from + ghostTextContent.length })
+        .setTextSelection({ from: insertPos, to: endPos })
         .setMark("ghostText")
         .run();
-      ghostRangeRef.current = { from, to: from + ghostTextContent.length };
+      ghostRangeRef.current = { from: insertPos, to: endPos };
     } else {
       const range = ghostRangeRef.current;
       try {
+        editor.chain().focus().deleteRange(range).insertContentAt(range.from, htmlContent).run();
+        const endPos = editor.state.selection.from;
         editor.chain()
-          .focus()
-          .deleteRange(range)
-          .insertContentAt(range.from, ghostTextContent)
-          .setTextSelection({ from: range.from, to: range.from + ghostTextContent.length })
+          .setTextSelection({ from: range.from, to: endPos })
           .setMark("ghostText")
           .run();
-        ghostRangeRef.current = { from: range.from, to: range.from + ghostTextContent.length };
+        ghostRangeRef.current = { from: range.from, to: endPos };
       } catch {
         ghostRangeRef.current = null;
       }
@@ -591,7 +593,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
             </div>
           )}
 
-          {ghostTextContent && ghostRequestId && (
+          {ghostTextContent && ghostRequestId && aiMode !== "beat_generate" && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2
               flex items-center gap-2 px-3 py-1.5 rounded-lg
               bg-primary/10 border border-primary/20 text-[11px] text-primary/80

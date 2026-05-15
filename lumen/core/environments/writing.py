@@ -29,6 +29,7 @@ def _build_writing_agent(
     book_name: str,
     selected_text: str = "",
     user_input: str = "",
+    extra_context: dict | None = None,
 ) -> "Agent":
     """构建临时 WritingAgent（每次请求创建，用完即弃）
 
@@ -45,6 +46,13 @@ def _build_writing_agent(
     Returns:
         配置好的 Writing Agent
     """
+    session_messages = [
+        {"role": "system", "content": ""},
+        {"role": "user", "content": user_input or "请开始写作"},
+    ]
+    if extra_context:
+        session_messages[1]["content"] = extra_context.get("beat_text") or user_input or "请开始写作"
+
     from lumen.agent import Agent
     from lumen.components import (
         IdentityComponent,
@@ -71,10 +79,7 @@ def _build_writing_agent(
     temp_session = SimpleNamespace(
         session_id=f"writing_{book_id}_{chapter_id}",
         character_id="writing",
-        messages=[
-            {"role": "system", "content": ""},
-            {"role": "user", "content": user_input or "请开始写作"},
-        ],
+        messages=session_messages,
     )
 
     agent.act_component = ReActActingComponent(
@@ -100,6 +105,7 @@ async def writing_chat_stream(
     book_name: str = "",
     selected_text: str = "",
     user_input: str = "",
+    extra_context: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Writing Agent 流式响应 — 核心入口
 
@@ -135,6 +141,8 @@ async def writing_chat_stream(
         },
         "character_id": "writing",
     }
+    if extra_context:
+        context.update(extra_context)
 
     # 创建临时 WritingAgent
     agent = _build_writing_agent(
@@ -146,6 +154,7 @@ async def writing_chat_stream(
         book_name=book_name,
         selected_text=selected_text,
         user_input=user_input,
+        extra_context=extra_context,
     )
 
     # ReAct 循环 → SSE 事件流

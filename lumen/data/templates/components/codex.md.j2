@@ -4,7 +4,6 @@ type: prompt_component
 category: components
 ---
 
-{% if codex_context %}
-
-{{ codex_context }}
+{% if query is defined %}
+{{ query.codex_injection(text=chapter_content) }}
 {% endif %}

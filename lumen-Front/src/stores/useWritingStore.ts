@@ -5,7 +5,7 @@ import { create } from "zustand";
 import type { WritingProject, WritingChapter, WritingSetting, WritingSnapshot } from "../api/writing";
 import * as writingApi from "../api/writing";
 
-export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense";
+export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
 
 interface WritingState {
   // 数据

@@ -3,7 +3,7 @@
 > **用途**：新会话读此文件了解项目文件布局和模块依赖。
 > **维护**：增删文件或改变职责时更新。规则见 CLAUDE.md 工作流程第 2 条。
 
-**最后更新**：2026-05-13（T35 Web 爬虫工具 + services/web/ 目录重组）
+**最后更新**：2026-05-14（T36 写作 Context Query Engine + services/writing/ 目录）
 
 ---
 
@@ -30,7 +30,7 @@ Lumen/
 │   │   ├── cognitive_state.py    # T25 认知状态组件（DYNAMIC, priority=35, goals/attention/emotions LLM自动更新 + T26 emotion_scores）
 │   │   ├── time_context.py       # T26 时间上下文组件（DYNAMIC, priority=25, 当前时间+星期+会话时长）
 │   │   ├── gm_resolution.py      # T25 GM 裁决规则组件（STATIC, priority=50, 4步裁决法+JSON schema）
-│   │   ├── writing_context.py    # T11 写作上下文组件（DYNAMIC, priority=25, Jinja2模板渲染5种模式prompt+图谱摘要）
+│   │   ├── writing_context.py    # T11/T36 写作上下文组件（DYNAMIC, priority=25, 创建ContextQueryService→模板按需查询）
 │   │   └── react_acting.py       # ReAct 决策循环（LLM→工具→结果→再LLM + _yield_rpg_state + 思考链双轨处理 + T29双system消息构建 + 流式缓存统计）
 │   ├── characters/               # [已迁至 data/characters/] 角色数据（JSON）+ 头像资源（avatars/）
 │   │   ├── default.json           # 默认助手（calculate/web/file_manager/daily_note）
@@ -99,6 +99,8 @@ Lumen/
 │   │   │   ├── world_state.py    # T25 RPG 世界状态黑板（SQLite：位置/HP/属性/房间/rpg_events + T26 认知状态 merge）
 │   │   │   ├── writing.py        # T11 写作模式存储（writing.db：作品/章节/设定 CRUD，事务保护，公开 get_conn/write_lock）
 │   │   │   └── writing_snapshot.py # T33 快照存储（writing.db：全量 JSON 快照 CRUD + 恢复前自动备份，共享 writing.py 连接/锁）
+│   │   ├── writing/              # T36 写作模式查询引擎（按需查询章节/设定，模板主动查询而非全量注入）
+│   │   │   └── context_query.py  # ContextQueryService + _TemplateQueryProxy（章节前文/后文/摘要/设定查询/codex注入算法）
 │   │   ├── memory/               # 记忆子系统
 │   │   │   ├── __init__.py       # 导出：generate_summary, get_memory_context, vectorize_message...
 │   │   │   ├── _core.py          # 记忆系统核心（异步摘要、记忆注入、向量+BM25 RRF混合检索）
@@ -291,7 +293,8 @@ GMIdentity(10) → TimeContext(25) → GMWorldContext(30) → CognitiveState(35)
 
 T11 写作链路（writing.py）：
 Identity(10) → Lore(20) → WritingContext(25) → Memory(30) → Skills(50) → Tool(90)
-    ├── lumen/components/writing_context.py（Jinja2模板渲染5种模式prompt+图谱摘要）
+    ├── lumen/components/writing_context.py（创建ContextQueryService→proxy传入模板→按需查询章节/设定）
+    └── lumen/services/writing/context_query.py（章节前文/后文/摘要/设定查询/codex注入算法）
     ├── lumen/prompt/template_engine.py（Jinja2 SandboxedEnvironment + context builder + render）
     └── lumen/core/environments/writing.py（WritingEnvironment + writing_chat_stream）
 ```

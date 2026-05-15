@@ -81,10 +81,10 @@ const RichTextEditor = forwardRef<RichTextEditorRef, RichTextEditorProps>(
         },
       },
       onUpdate: ({ editor: ed }) => {
-        const md = (ed as any).storage?.markdown?.getMarkdown?.() ?? "";
-        internalRef.current = md;
+        const html = ed.getHTML();
+        internalRef.current = html;
         isInternalUpdate.current = true;
-        onChange(md);
+        onChange(html);
         requestAnimationFrame(() => { isInternalUpdate.current = false; });
       },
       immediatelyRender: false,

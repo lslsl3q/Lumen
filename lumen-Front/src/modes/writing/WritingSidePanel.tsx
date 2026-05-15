@@ -227,6 +227,15 @@ const ITEM_FIELDS: FieldDef[] = [
   { key: "text", label: "描述", type: "textarea", placeholder: "物品的详细描述和来历…", rows: 4 },
 ];
 
+/* ── AI 上下文追踪模式（所有类别共用）── */
+
+const TRACKING_OPTIONS = [
+  { value: "always",      label: "始终注入", color: "bg-primary/15 text-primary" },
+  { value: "detected",    label: "自动检测", color: "bg-blue-400/15 text-blue-300" },
+  { value: "anti_spoiler", label: "防剧透",   color: "bg-amber-400/15 text-amber-300" },
+];
+
+
 /* ══════════════════════════════════════
    通用设定面板（带类别专属编辑器）
    ══════════════════════════════════════ */
@@ -378,6 +387,34 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
             value={setting.name}
             onUpdate={async (v) => { if (v.trim()) await onUpdate(setting.id, { name: v }); }}
           />
+
+          {/* AI 上下文控制 */}
+          <div>
+            <label className="text-[10px] text-text-muted uppercase tracking-wider">AI 上下文</label>
+            <div className="mt-1 flex items-center gap-2">
+              <ChipSelect
+                options={TRACKING_OPTIONS}
+                value={content._tracking ?? "detected"}
+                onChange={async (v) => {
+                  await onUpdate(setting.id, {
+                    content: { ...content, _tracking: v },
+                  } as any);
+                }}
+              />
+              <button
+                onClick={async () => {
+                  await onUpdate(setting.id, { enabled: setting.enabled ? 0 : 1 });
+                }}
+                className={`ml-auto text-[10px] px-2 py-0.5 rounded border transition-colors cursor-pointer
+                  ${setting.enabled
+                    ? "border-green-500/30 text-green-400 bg-green-500/10"
+                    : "border-border-default text-text-muted line-through"
+                  }`}
+              >
+                {setting.enabled ? "启用" : "禁用"}
+              </button>
+            </div>
+          </div>
 
           {/* 类别专属字段 */}
           {fieldConfig.map((field) => {
