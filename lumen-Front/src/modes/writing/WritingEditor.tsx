@@ -5,11 +5,17 @@
  * 布局：工具栏（全宽）→ 中间行（纸张 + children 面板）→ 状态栏（全宽）。
  * Ctrl+F 打开查找替换。
  */
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useEditor, EditorContent } from "@tiptap/react";
+import { Fragment as PMFragment } from "@tiptap/pm/model";
+import { Selection as PMSelection } from "@tiptap/pm/state";
 import { defaultExtensions } from "../../components/editors/extensions";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
+import { GenerationBar } from "../../components/editors/GenerationBar";
+import { useWebSocket } from "../../hooks/useWebSocket";
+import type { StreamEvent } from "../../api/chat";
 import { Popover, PopoverTrigger, PopoverContent } from "../../components/ui/popover";
 import {
   Minus,
@@ -366,6 +372,8 @@ function StatusBar({ editor }: { editor: any }) {
 
 /* ── 主组件 ── */
 
+type TextActionMode = "expand" | "rewrite" | "condense";
+
 export function WritingEditor({ children }: { children?: React.ReactNode }) {
   const { chapters, activeChapterId, updateChapter } = useWritingStore();
   const ghostTextContent = useWritingStore((s) => s.ghostTextContent);
@@ -382,6 +390,28 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
   const ghostRangeRef = useRef<{ from: number; to: number } | null>(null);
   const lastGhostRequestRef = useRef<string | null>(null);
 
+  // 替换模式：保存被替换的原始选区信息
+  const ghostReplaceRef = useRef<{ from: number; to: number; originalText: string } | null>(null);
+
+  // 当前 WS 请求 ID（用于匹配 expand/rewrite/condense 响应）
+  const requestIdRef = useRef<string | null>(null);
+
+  // ── GenerationBar 状态 ──
+  const [genBarStatus, setGenBarStatus] = useState<"generating" | "done" | null>(null);
+  const [genBarAnchor, setGenBarAnchor] = useState<{ left: number; top: number } | null>(null);
+  const genWordCountRef = useRef(0);
+  const retryParamsRef = useRef<{
+    mode: TextActionMode;
+    selectedText: string;
+    textBefore: string;
+    textAfter: string;
+    bookId: string;
+    chapterId: string;
+    chapterTitle: string;
+    chapterContent: string;
+    bookName: string;
+  } | null>(null);
+
   const [showFindReplace, setShowFindReplace] = useState(false);
 
   const editor = useEditor({
@@ -396,7 +426,6 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     onUpdate: ({ editor: ed }) => {
       if (isInternalUpdate.current) return;
       useWritingStore.setState({ contentDirty: true });
-      // 打字机模式：滚动光标到视口中央
       if (useWritingStore.getState().typewriterMode) {
         requestAnimationFrame(() => {
           try {
@@ -414,6 +443,195 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       }, 500);
     },
   });
+
+  // ── WebSocket 消息处理（必须在 editor 之后）──
+
+  const { sendMessage: wsSend } = useWebSocket(
+    useCallback((event: StreamEvent) => {
+      const mode = useWritingStore.getState().aiMode;
+      if (!["expand", "rewrite", "condense"].includes(mode)) return;
+      if (!requestIdRef.current || event.request_id !== requestIdRef.current) return;
+
+      if (event.type === "text" && event.content) {
+        const current = useWritingStore.getState().ghostTextContent;
+        useWritingStore.getState().setGhostText(current + event.content, requestIdRef.current);
+        genWordCountRef.current = (current + event.content).length;
+      } else if (event.type === "done") {
+        requestIdRef.current = null;
+        setGenBarStatus("done");
+      } else if (event.type === "error") {
+        if (editor) editor.commands.rejectGhost();
+        ghostReplaceRef.current = null;
+        requestIdRef.current = null;
+        setGenBarStatus(null);
+        clearGhostText();
+      }
+    }, [editor, clearGhostText]),
+  );
+
+  // ── 触发 AI 文本操作 ──
+
+  const triggerWritingAction = useCallback((mode: TextActionMode) => {
+    if (!editor) return;
+    const { from, to, empty } = editor.state.selection;
+    if (empty || to - from < 3) return;
+
+    const activeProjectId = useWritingStore.getState().activeProjectId;
+    const activeChapterId = useWritingStore.getState().activeChapterId;
+    const activeProject = useWritingStore.getState().getActiveProject();
+    const activeChapter = useWritingStore.getState().getActiveChapter();
+    if (!activeProjectId || !activeChapterId || !activeProject || !activeChapter) return;
+
+    const selectedText = editor.state.doc.textBetween(from, to, "\n");
+
+    // 提取选区前后上下文（各 500 字）
+    const textBefore = editor.state.doc.textBetween(Math.max(0, from - 500), from, "\n");
+    const textAfter = editor.state.doc.textBetween(to, Math.min(editor.state.doc.content.size, to + 500), "\n");
+
+    const requestId = crypto.randomUUID();
+    requestIdRef.current = requestId;
+
+    // 保存替换数据，供 ghost text useEffect 和 Esc 恢复使用
+    ghostReplaceRef.current = { from, to, originalText: selectedText };
+    const gs = (editor.storage as any).ghostText;
+    if (gs) gs.replaceData = { from, originalText: selectedText };
+
+    useWritingStore.setState({ aiMode: mode });
+    clearGhostText();
+    setGenBarStatus("generating");
+    genWordCountRef.current = 0;
+
+    // 立即定位 GenerationBar（不等到 ghost text 到达）
+    try {
+      const coords = editor.view.coordsAtPos(from);
+      setGenBarAnchor({ left: coords.left, top: coords.top });
+    } catch { /* position invalid */ }
+
+    const chapterContent = activeChapter.content ?? "";
+    const trimmedContent = chapterContent.length > 8000 ? chapterContent.slice(-8000) : chapterContent;
+
+    retryParamsRef.current = {
+      mode, selectedText, textBefore, textAfter,
+      bookId: activeProjectId, chapterId: activeChapterId,
+      chapterTitle: activeChapter.title,
+      chapterContent: trimmedContent,
+      bookName: activeProject.name,
+    };
+
+    wsSend({
+      type: "writing",
+      ai_mode: mode,
+      book_id: activeProjectId,
+      chapter_id: activeChapterId,
+      chapter_title: activeChapter.title,
+      chapter_content: trimmedContent,
+      book_name: activeProject.name,
+      selected_text: selectedText,
+      text_before_selection: textBefore,
+      text_after_selection: textAfter,
+      content: "",
+      request_id: requestId,
+    });
+  }, [editor, clearGhostText, wsSend]);
+
+  // ── GenerationBar 定位追踪 ──
+
+  useEffect(() => {
+    if (!genBarStatus || !editor) return;
+
+    const updatePos = () => {
+      const range = ghostRangeRef.current;
+      if (!range) return;
+      try {
+        const coords = editor.view.coordsAtPos(range.from);
+        setGenBarAnchor({ left: coords.left, top: coords.top });
+      } catch { /* position invalid */ }
+    };
+
+    updatePos();
+
+    const scrollEl = (editor.view.dom as HTMLElement).closest(".writing-editor-scroll");
+    scrollEl?.addEventListener("scroll", updatePos, { passive: true });
+    window.addEventListener("resize", updatePos, { passive: true });
+    return () => {
+      scrollEl?.removeEventListener("scroll", updatePos);
+      window.removeEventListener("resize", updatePos);
+    };
+  }, [genBarStatus, editor]);
+
+  // ── GenerationBar 回调 ──
+
+  const handleGenApply = useCallback(() => {
+    if (requestIdRef.current) {
+      wsSend({ type: "cancel", session_id: `writing_direct_${requestIdRef.current}` });
+    }
+    requestIdRef.current = null;
+    if (editor) editor.commands.acceptGhost();
+    ghostReplaceRef.current = null;
+    setGenBarStatus(null);
+    setGenBarAnchor(null);
+    clearGhostText();
+  }, [editor, clearGhostText, wsSend]);
+
+  const handleGenDiscard = useCallback(() => {
+    if (requestIdRef.current) {
+      wsSend({ type: "cancel", session_id: `writing_direct_${requestIdRef.current}` });
+    }
+    requestIdRef.current = null;
+    if (editor) editor.commands.rejectGhost();
+    ghostReplaceRef.current = null;
+    setGenBarStatus(null);
+    setGenBarAnchor(null);
+    clearGhostText();
+  }, [editor, clearGhostText, wsSend]);
+
+  const handleGenStop = useCallback(() => {
+    if (requestIdRef.current) {
+      wsSend({ type: "cancel", session_id: `writing_direct_${requestIdRef.current}` });
+    }
+    if (editor) editor.commands.rejectGhost();
+    ghostReplaceRef.current = null;
+    requestIdRef.current = null;
+    setGenBarStatus(null);
+    setGenBarAnchor(null);
+    clearGhostText();
+  }, [editor, clearGhostText, wsSend]);
+
+  const handleGenRetry = useCallback(() => {
+    if (!editor || !retryParamsRef.current) return;
+    const p = retryParamsRef.current;
+
+    // 删掉当前 ghost text（不恢复原文，直接替换）
+    const range = ghostRangeRef.current;
+    if (range) {
+      isInternalUpdate.current = true;
+      editor.chain().focus().deleteRange(range).run();
+      requestAnimationFrame(() => { isInternalUpdate.current = false; });
+    }
+    ghostRangeRef.current = null;
+    clearGhostText();
+
+    // 重新发送请求
+    const requestId = crypto.randomUUID();
+    requestIdRef.current = requestId;
+    genWordCountRef.current = 0;
+    setGenBarStatus("generating");
+
+    wsSend({
+      type: "writing",
+      ai_mode: p.mode,
+      book_id: p.bookId,
+      chapter_id: p.chapterId,
+      chapter_title: p.chapterTitle,
+      chapter_content: p.chapterContent,
+      book_name: p.bookName,
+      selected_text: p.selectedText,
+      text_before_selection: p.textBefore,
+      text_after_selection: p.textAfter,
+      content: "",
+      request_id: requestId,
+    });
+  }, [editor, clearGhostText, wsSend]);
 
   // Ctrl+F: 查找替换
   useEffect(() => {
@@ -439,6 +657,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     }
     ghostRangeRef.current = null;
     lastGhostRequestRef.current = null;
+    ghostReplaceRef.current = null;
     clearGhostText();
     setShowFindReplace(false);
 
@@ -455,7 +674,23 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     }
   }, [activeChapterId, activeChapter, editor]);
 
-  // Ghost Text 流式渲染
+  // Ghost Text 流式渲染 — 使用原始 ProseMirror transaction，避免 insertContentAt 的 HTML 解析问题
+  const buildGhostNodes = useCallback((text: string, schema: any) => {
+    const ghostMark = schema.marks.ghostText.create();
+    const lines = text.split("\n");
+    const nodes: any[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i]) {
+        nodes.push(schema.text(lines[i], [ghostMark]));
+      }
+      if (i < lines.length - 1) {
+        const hardBreak = schema.nodes.hardBreak;
+        if (hardBreak) nodes.push(hardBreak.create());
+      }
+    }
+    return nodes;
+  }, []);
+
   useEffect(() => {
     if (!editor) return;
     if (ghostRequestId && ghostRequestId !== lastGhostRequestRef.current) {
@@ -467,44 +702,60 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       lastGhostRequestRef.current = null;
       return;
     }
-    const { aiMode } = useWritingStore.getState();
-    if (!["continue", "rewrite", "expand", "condense", "beat_generate"].includes(aiMode)) return;
+    const { aiMode: mode } = useWritingStore.getState();
+    if (!["continue", "rewrite", "expand", "condense", "beat_generate"].includes(mode)) return;
 
     isInternalUpdate.current = true;
 
-    // 将纯文本转为 HTML 段落，确保 TipTap 创建正确的 block 节点
-    const htmlContent = ghostTextContent
-      .split(/\n/)
-      .filter(Boolean)
-      .map((p) => `<p>${p}</p>`)
-      .join("");
+    const { state, view } = editor;
+    const { schema } = state;
 
-    const insertPos = ghostRangeRef.current?.from ?? editor.state.selection.from;
+    // 构建 ghost 内容节点（带 ghost mark 的 text + HardBreak）
+    const nodes = buildGhostNodes(ghostTextContent, schema);
+    if (nodes.length === 0) {
+      requestAnimationFrame(() => { isInternalUpdate.current = false; });
+      return;
+    }
+
+    const fragment = PMFragment.from(nodes);
 
     if (!ghostRangeRef.current) {
-      editor.chain().focus().insertContentAt(insertPos, htmlContent).run();
-      const endPos = editor.state.selection.from;
-      editor.chain()
-        .setTextSelection({ from: insertPos, to: endPos })
-        .setMark("ghostText")
-        .run();
+      // ── 首次插入 ──
+      let insertPos: number;
+      const { tr } = state;
+
+      if (ghostReplaceRef.current) {
+        const { from, to } = ghostReplaceRef.current;
+        tr.delete(from, to);
+        insertPos = from;
+      } else {
+        insertPos = state.selection.from;
+      }
+
+      tr.insert(insertPos, fragment);
+      const endPos = insertPos + fragment.size;
+      tr.setSelection(PMSelection.near(tr.doc.resolve(endPos)));
+      view.dispatch(tr);
+
       ghostRangeRef.current = { from: insertPos, to: endPos };
     } else {
+      // ── 更新（删除旧 ghost，插入新内容）──
       const range = ghostRangeRef.current;
-      try {
-        editor.chain().focus().deleteRange(range).insertContentAt(range.from, htmlContent).run();
-        const endPos = editor.state.selection.from;
-        editor.chain()
-          .setTextSelection({ from: range.from, to: endPos })
-          .setMark("ghostText")
-          .run();
-        ghostRangeRef.current = { from: range.from, to: endPos };
-      } catch {
-        ghostRangeRef.current = null;
-      }
+      const { tr } = state;
+      tr.delete(range.from, range.to);
+      tr.insert(range.from, fragment);
+      const endPos = range.from + fragment.size;
+      tr.setSelection(PMSelection.near(tr.doc.resolve(endPos)));
+      view.dispatch(tr);
+
+      ghostRangeRef.current = { from: range.from, to: endPos };
     }
+
+    const gs = (editor.storage as any).ghostText;
+    if (gs) gs.ghostRange = ghostRangeRef.current;
+
     requestAnimationFrame(() => { isInternalUpdate.current = false; });
-  }, [ghostTextContent, ghostRequestId, editor]);
+  }, [ghostTextContent, ghostRequestId, editor, buildGhostNodes]);
 
   // Tab/Esc 检测
   useEffect(() => {
@@ -522,6 +773,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       if (!hasGhost && ghostRangeRef.current) {
         ghostRangeRef.current = null;
         lastGhostRequestRef.current = null;
+        ghostReplaceRef.current = null;
         clearGhostText();
       }
     };
@@ -540,10 +792,10 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       {/* 中间行：纸张 + 侧面板 */}
       <div className="flex-1 flex overflow-hidden">
         {/* 纸张容器 */}
-        <div className="flex-1 writing-paper-container scrollbar-lumen relative">
-          <div className="writing-paper">
+        <div className="flex-1 writing-editor-scroll scrollbar-lumen relative">
+          <div className="writing-editor-content">
             <EditorContent editor={editor} />
-            <SelectionToolbar editor={editor} />
+            <SelectionToolbar editor={editor} onAiAction={triggerWritingAction} hidden={!!genBarStatus} />
           </div>
 
           {!activeChapterId && (
@@ -555,7 +807,8 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
             </div>
           )}
 
-          {ghostTextContent && ghostRequestId && aiMode !== "beat_generate" && (
+          {/* 续写模式底部提示条（continue 模式专用） */}
+          {ghostTextContent && ghostRequestId && aiMode === "continue" && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2
               flex items-center gap-2 px-3 py-1.5 rounded-lg
               bg-primary/10 border border-primary/20 text-[11px] text-primary/80
@@ -581,6 +834,36 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       </div>
 
       <StatusBar editor={editor} />
+
+      {/* GenerationBar — 用 Zustand ghostTextContent 作为主可见性守卫（同步更新，无 batch 延迟） */}
+      {(() => {
+        const barVisible = !!(genBarStatus && genBarAnchor && (genBarStatus === "generating" || ghostTextContent));
+        return createPortal(
+          <div
+            onMouseDown={(e) => e.preventDefault()}
+            style={{
+              position: "fixed",
+              left: barVisible ? genBarAnchor!.left : -9999,
+              bottom: barVisible ? window.innerHeight - genBarAnchor!.top + 8 : -9999,
+              zIndex: 99999,
+              visibility: barVisible ? "visible" : "hidden",
+              pointerEvents: barVisible ? "auto" : "none",
+            }}
+            contentEditable={false}
+          >
+            <GenerationBar
+              status={genBarStatus ?? "done"}
+              model="AI"
+              wordCount={genWordCountRef.current}
+              onApply={handleGenApply}
+              onRetry={handleGenRetry}
+              onDiscard={handleGenDiscard}
+              onStop={handleGenStop}
+            />
+          </div>,
+          document.body,
+        );
+      })()}
     </div>
   );
 }
