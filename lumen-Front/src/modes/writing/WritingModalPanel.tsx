@@ -7,8 +7,9 @@
 import React, { useEffect, useState } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { getExportUrl } from "../../api/writing";
-import type { WritingPanelType } from "./WritingIconStrip";
 import type { WritingSetting } from "../../api/writing";
+
+type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
 import {
   Plus, Trash2, X, Download, Edit3, Search,
   ChevronRight, ChevronDown,

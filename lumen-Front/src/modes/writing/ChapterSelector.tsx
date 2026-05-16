@@ -16,19 +16,17 @@ export function ChapterSelector() {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded text-sm font-medium text-stone-300 hover:bg-gray-800 transition-colors max-w-[200px]"
-          type="button"
-          aria-label="Change chapter/scene"
-        >
-          <span className="truncate">{activeChapterLabel}</span>
-          <ChevronDown className="w-3 h-3 flex-none text-gray-400" />
-        </button>
+      <PopoverTrigger
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-sm font-medium text-stone-300 hover:bg-gray-800 transition-colors max-w-[200px]"
+        type="button"
+        aria-label="Change chapter/scene"
+      >
+        <span className="truncate">{activeChapterLabel}</span>
+        <ChevronDown className="w-3 h-3 flex-none text-gray-400" />
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-64 p-1 bg-gray-900 border-gray-700 rounded-lg shadow-xl max-h-[400px] overflow-y-auto"
+        className="w-64 p-1 bg-gray-900 border-gray-800 rounded-lg shadow-xl max-h-[400px] overflow-y-auto"
       >
         {chapters?.map((ch) => (
           <button

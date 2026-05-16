@@ -16,18 +16,16 @@ export function FormatPanel({ editor, onToggleFindReplace }: FormatPanelProps) {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-semibold text-stone-400 hover:text-stone-300 hover:bg-gray-800 transition-colors"
-          type="button"
-        >
-          <Type className="w-4 h-4" />
-          <span className="hidden sm:inline">Format</span>
-        </button>
+      <PopoverTrigger
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs font-semibold text-stone-400 hover:text-stone-300 hover:bg-gray-800 transition-colors"
+        type="button"
+      >
+        <Type className="w-4 h-4" />
+        <span className="hidden sm:inline">Format</span>
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-auto p-1 bg-gray-900 border-gray-700 rounded-lg shadow-xl"
+        className="w-auto p-1 bg-gray-900 border-gray-800 rounded-lg shadow-xl"
       >
         <div className="flex flex-wrap gap-0.5 max-w-[280px]">
           <FormatButton icon={Superscript} label="上标" active={editor.isActive("superscript")} onClick={() => editor.chain().focus().toggleSuperscript().run()} />

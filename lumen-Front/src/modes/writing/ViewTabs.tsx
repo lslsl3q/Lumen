@@ -25,7 +25,7 @@ export function ViewTabs({ activeView, onViewChange }: ViewTabsProps) {
           disabled={v.disabled}
           className={cn(
             "text-xs font-semibold rounded px-2.5 py-1.5 transition-colors",
-            "focus-visible:ring-2 focus-visible:ring-gray-600 focus-visible:ring-offset-2",
+            "focus-visible:ring-2 focus-visible:ring-gray-700 focus-visible:ring-offset-2",
             activeView === v.id
               ? "bg-gray-800 text-stone-300"
               : "bg-transparent text-stone-400 hover:text-stone-300",

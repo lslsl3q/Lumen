@@ -8,9 +8,10 @@
 import { useEffect, useState } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { getExportUrl } from "../../api/writing";
-import type { WritingPanelType } from "./WritingIconStrip";
 import type { WritingSetting } from "../../api/writing";
 import { Plus, Trash2, X, Download, Edit3, FileText, ChevronDown, ChevronRight } from "lucide-react";
+
+type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
 
 interface WritingSidePanelProps {
   panel: WritingPanelType;
