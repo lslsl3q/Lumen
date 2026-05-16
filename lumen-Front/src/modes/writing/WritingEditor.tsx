@@ -20,6 +20,7 @@ import { ViewTabs, type WritingView } from "./ViewTabs";
 import { FormatPanel } from "./FormatPanel";
 import { ChapterSelector } from "./ChapterSelector";
 import { SceneMetaColumn, type SceneMeta } from "./SceneMetaColumn";
+import { BeatNavigator, type BeatInfo } from "./BeatNavigator";
 import { cn } from "../../lib/utils";
 import { Eye, Type } from "lucide-react";
 
@@ -266,6 +267,11 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
   // ── SceneMeta 光标追踪状态 ──
   const [activeSceneMeta, setActiveSceneMeta] = useState<SceneMeta | null>(null);
 
+  // ── BeatNavigator 状态 ──
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [beatMarkers, setBeatMarkers] = useState<BeatInfo[]>([]);
+  const [contentHeight, setContentHeight] = useState(0);
+
   const editor = useEditor({
     extensions: defaultExtensions,
     content: "",
@@ -351,6 +357,34 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
     return () => {
       editor.off("selectionUpdate", updateActiveScene);
     };
+  }, [editor]);
+
+  // ── BeatNavigator 位置追踪 ──
+  useEffect(() => {
+    if (!editor) return;
+    const updateMarkers = () => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const beats = container.querySelectorAll('[data-beat-type]');
+      const markers: BeatInfo[] = [];
+      beats.forEach((el, i) => {
+        const htmlEl = el as HTMLElement;
+        const beatType = htmlEl.getAttribute('data-beat-type') || 'beat';
+        // Color based on beat type
+        const color = beatType === 'beat' ? '#6366f1' : '#10b981';
+        markers.push({
+          id: `beat-${i}`,
+          color,
+          label: beatType === 'beat' ? `Scene Beat ${i + 1}` : `Continue ${i + 1}`,
+          offsetTop: htmlEl.offsetTop,
+          height: htmlEl.offsetHeight,
+        });
+      });
+      setBeatMarkers(markers);
+      setContentHeight(container.scrollHeight);
+    };
+    editor.on("update", updateMarkers);
+    return () => { editor.off("update", updateMarkers); };
   }, [editor]);
 
   // ── 触发 AI 文本操作 ──
@@ -703,7 +737,7 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
 
       {/* 编辑区 + 侧面板 */}
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 writing-editor-scroll scrollbar-lumen relative">
+        <div ref={scrollContainerRef} className="flex-1 writing-editor-scroll scrollbar-lumen relative">
           <div className="writing-editor-content">
             <EditorContent editor={editor} />
             <SelectionToolbar editor={editor} onAiAction={triggerWritingAction} hidden={!!genBarStatus} />
@@ -739,6 +773,13 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
             </div>
           )}
         </div>
+
+        {/* BeatNavigator — 彩色滚动条标记 */}
+        <BeatNavigator
+          scrollContainerRef={scrollContainerRef}
+          beats={beatMarkers}
+          totalHeight={contentHeight}
+        />
 
         {/* SceneMetaColumn — 场景节拍元数据列 */}
         <SceneMetaColumn scene={activeSceneMeta} />
