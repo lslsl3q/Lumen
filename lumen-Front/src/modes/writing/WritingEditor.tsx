@@ -2,7 +2,7 @@
  * WritingEditor — 写作编辑区域
  *
  * TipTap 3.x 编辑器，HTML 格式存储，500ms 自动保存。
- * 布局：工具栏（全宽）→ 中间行（纸张 + children 面板）→ 状态栏（全宽）。
+ * 布局：紧凑工具栏（48px）→ 编辑区 → 浮动组件。
  * Ctrl+F 打开查找替换。
  */
 import { useRef, useEffect, useState, useCallback } from "react";
@@ -16,194 +16,90 @@ import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
 import { GenerationBar } from "../../components/editors/GenerationBar";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import type { StreamEvent } from "../../api/chat";
-import { Popover, PopoverTrigger, PopoverContent } from "../../components/ui/popover";
-import {
-  Minus,
-  AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Superscript, Subscript, Link, RemoveFormatting, Search,
-  Table, ImagePlus, Palette, Eye, Type,
-} from "lucide-react";
+import { ViewTabs, type WritingView } from "./ViewTabs";
+import { FormatPanel } from "./FormatPanel";
+import { ChapterSelector } from "./ChapterSelector";
+import { SceneMetaColumn, type SceneMeta } from "./SceneMetaColumn";
+import { cn } from "../../lib/utils";
+import { Eye, Type } from "lucide-react";
 
-/* ── 工具栏 ── */
+/* ── 保存状态指示点 ── */
 
-function EditorToolbar({ editor, onFindReplace }: { editor: any; onFindReplace: () => void }) {
-  const [activePopover, setActivePopover] = useState<string | null>(null);
-  const [popoverValue, setPopoverValue] = useState("");
-
-  const sanitizeUrl = (url: string) => {
-    const trimmed = url.trim();
-    if (/^(javascript|data|vbscript):/i.test(trimmed)) return "";
-    return trimmed;
-  };
-
-  const openPopover = (id: string, initial = "") => {
-    setPopoverValue(initial);
-    setActivePopover(id);
-  };
-
-  const applyPopover = (action: (val: string) => void) => {
-    action(popoverValue);
-    setActivePopover(null);
-  };
-
-  const items = [
-    { icon: Superscript, cmd: () => editor.chain().focus().toggleSuperscript().run(), active: "superscript" },
-    { icon: Subscript, cmd: () => editor.chain().focus().toggleSubscript().run(), active: "subscript" },
-    { type: "divider" as const },
-    { icon: Minus, cmd: () => editor.chain().focus().setHorizontalRule().run(), active: null },
-    { icon: Table, cmd: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(), active: null },
-    { type: "divider" as const },
-    { icon: AlignLeft, cmd: () => editor.chain().focus().setTextAlign("left").run(), active: { textAlign: "left" } },
-    { icon: AlignCenter, cmd: () => editor.chain().focus().setTextAlign("center").run(), active: { textAlign: "center" } },
-    { icon: AlignRight, cmd: () => editor.chain().focus().setTextAlign("right").run(), active: { textAlign: "right" } },
-    { icon: AlignJustify, cmd: () => editor.chain().focus().setTextAlign("justify").run(), active: { textAlign: "justify" } },
-    { type: "divider" as const },
-    { icon: RemoveFormatting, cmd: () => editor.chain().focus().clearNodes().unsetAllMarks().run(), active: null },
-    { icon: Search, cmd: onFindReplace, active: null },
-  ];
-
+function SaveStatusDot({ status }: { status: string }) {
   return (
-    <div className="writing-toolbar-wrapper">
-      <div className="writing-toolbar-inner">
-        {items.map((item, i) => {
-          if ("type" in item && item.type === "divider") {
-            return <div key={i} className="w-px h-4 bg-surface-elevated mx-0.5 flex-shrink-0" />;
-          }
-          const Icon = (item as any).icon;
-          const activeVal = (item as any).active;
-          let isActive = false;
-          if (activeVal) {
-            if (typeof activeVal === "object") {
-              const [key, val] = Object.entries(activeVal)[0];
-              isActive = editor.isActive(key, val);
-            } else {
-              const opt = (item as any).activeOpt;
-              isActive = opt ? editor.isActive(activeVal, opt) : editor.isActive(activeVal);
-            }
-          }
-          return (
-            <button
-              key={i}
-              onClick={(item as any).cmd}
-              className={`p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0
-                ${isActive
-                  ? "text-primary bg-primary/10"
-                  : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"
-                }`}
-              title={(item as any).active || "action"}
-            >
-              <Icon className="w-4 h-4" />
-            </button>
-          );
-        })}
+    <span
+      className={cn(
+        "w-2 h-2 rounded-full flex-shrink-0",
+        status === "saved" ? "bg-green-500" :
+        status === "saving" ? "bg-yellow-500 animate-pulse" :
+        "bg-gray-500"
+      )}
+      title={status}
+    />
+  );
+}
 
-        {/* ── Popover 按钮：图片 / 颜色 / 链接 ── */}
+/* ── 紧凑工具栏（48px 单行） ── */
 
-        <Popover open={activePopover === "image"} onOpenChange={(o) => { if (!o) { setActivePopover(null); setPopoverValue(""); } }}>
-          <PopoverTrigger
-            onClick={() => openPopover("image")}
-            className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
-            title="插入图片"
-          >
-            <ImagePlus className="w-4 h-4" />
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-64 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
-            <p className="text-[11px] text-text-secondary">图片地址</p>
-            <input
-              autoFocus
-              value={popoverValue}
-              onChange={(e) => setPopoverValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); applyPopover((v) => { const safe = sanitizeUrl(v); if (safe) editor.chain().focus().setImage({ src: safe }).run(); }); }
-                if (e.key === "Escape") setActivePopover(null);
-              }}
-              placeholder="https://..."
-              className="w-full bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
-            />
-            <div className="flex justify-end gap-1">
-              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
-              <button onClick={() => applyPopover((v) => { const safe = sanitizeUrl(v); if (safe) editor.chain().focus().setImage({ src: safe }).run(); })} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
-            </div>
-          </PopoverContent>
-        </Popover>
+interface EditorToolbarProps {
+  editor: any;
+  activeView: WritingView;
+  onViewChange: (view: WritingView) => void;
+  onToggleFindReplace: () => void;
+  wordCount: number;
+  saveStatus: string;
+  focusMode: boolean;
+  typewriterMode: boolean;
+  onToggleFocus: () => void;
+  onToggleTypewriter: () => void;
+}
 
-        <Popover open={activePopover === "color"} onOpenChange={(o) => { if (!o) { setActivePopover(null); setPopoverValue(""); } }}>
-          <PopoverTrigger
-            onClick={() => openPopover("color", editor.getAttributes("textStyle").color ?? "#CC7C5E")}
-            className="p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0 text-text-muted hover:text-text-primary hover:bg-surface-elevated"
-            title="文字颜色"
-          >
-            <Palette className="w-4 h-4" />
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-52 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
-            <p className="text-[11px] text-text-secondary">文字颜色</p>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={popoverValue || "#CC7C5E"}
-                onChange={(e) => setPopoverValue(e.target.value)}
-                className="w-8 h-8 rounded border border-border-default cursor-pointer bg-transparent"
-              />
-              <input
-                value={popoverValue}
-                onChange={(e) => setPopoverValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); applyPopover((v) => { if (/^#[0-9a-fA-F]{3,8}$/.test(v.trim()) || /^[a-zA-Z]+$/.test(v.trim())) editor.chain().focus().setColor(v.trim()).run(); }); }
-                  if (e.key === "Escape") setActivePopover(null);
-                }}
-                placeholder="#CC7C5E"
-                className="flex-1 bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
-              />
-            </div>
-            <div className="flex justify-end gap-1">
-              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
-              <button onClick={() => applyPopover((v) => { if (/^#[0-9a-fA-F]{3,8}$/.test(v.trim()) || /^[a-zA-Z]+$/.test(v.trim())) editor.chain().focus().setColor(v.trim()).run(); })} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
-            </div>
-          </PopoverContent>
-        </Popover>
+function EditorToolbar({
+  editor,
+  activeView,
+  onViewChange,
+  onToggleFindReplace,
+  wordCount,
+  saveStatus,
+  focusMode,
+  typewriterMode,
+  onToggleFocus,
+  onToggleTypewriter,
+}: EditorToolbarProps) {
+  return (
+    <div className="flex items-center justify-between h-12 px-3 bg-surface-deep border-b border-border-default flex-shrink-0">
+      {/* 左侧：视图标签 */}
+      <ViewTabs activeView={activeView} onViewChange={onViewChange} />
 
-        <Popover open={activePopover === "link"} onOpenChange={(o) => { if (!o) { setActivePopover(null); setPopoverValue(""); } }}>
-          <PopoverTrigger
-            onClick={() => {
-              const href = editor.isActive("link") ? editor.getAttributes("link").href ?? "" : "";
-              openPopover("link", href);
-            }}
-            className={`p-1 rounded text-[13px] transition-colors cursor-pointer flex-shrink-0
-              ${editor.isActive("link") ? "text-primary bg-primary/10" : "text-text-muted hover:text-text-primary hover:bg-surface-elevated"}`}
-            title="链接"
-          >
-            <Link className="w-4 h-4" />
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="center" className="w-64 bg-surface-elevated border border-border-default rounded-lg p-3 space-y-2">
-            <p className="text-[11px] text-text-secondary">链接地址</p>
-            <input
-              autoFocus
-              value={popoverValue}
-              onChange={(e) => setPopoverValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  applyPopover((v) => {
-                    const safe = sanitizeUrl(v);
-                    if (safe) editor.chain().focus().extendMarkRange("link").setLink({ href: safe }).run();
-                    else editor.chain().focus().extendMarkRange("link").unsetLink().run();
-                  });
-                }
-                if (e.key === "Escape") setActivePopover(null);
-              }}
-              placeholder="https://..."
-              className="w-full bg-surface-deep border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
-            />
-            <div className="flex justify-end gap-1">
-              <button onClick={() => setActivePopover(null)} className="px-2 py-0.5 text-[11px] rounded text-text-muted hover:text-text-primary cursor-pointer">取消</button>
-              <button onClick={() => applyPopover((v) => {
-                const safe = sanitizeUrl(v);
-                if (safe) editor.chain().focus().extendMarkRange("link").setLink({ href: safe }).run();
-                else editor.chain().focus().extendMarkRange("link").unsetLink().run();
-              })} className="px-2 py-0.5 text-[11px] rounded bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">确认</button>
-            </div>
-          </PopoverContent>
-        </Popover>
+      {/* 右侧：章节 + 统计 + 操作 */}
+      <div className="flex items-center gap-2">
+        <ChapterSelector />
+        <span className="text-[11px] text-text-muted tabular-nums">{wordCount} 词</span>
+        <SaveStatusDot status={saveStatus} />
+        <FormatPanel editor={editor} onToggleFindReplace={onToggleFindReplace} />
+        <div className="w-px h-4 bg-border-default mx-0.5" />
+        <button
+          onClick={onToggleFocus}
+          className={cn(
+            "p-1 rounded transition-colors cursor-pointer",
+            focusMode ? "text-primary" : "text-text-muted hover:text-text-secondary"
+          )}
+          title="专注模式"
+          type="button"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onToggleTypewriter}
+          className={cn(
+            "p-1 rounded transition-colors cursor-pointer",
+            typewriterMode ? "text-primary" : "text-text-muted hover:text-text-secondary"
+          )}
+          title="打字机模式"
+          type="button"
+        >
+          <Type className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
@@ -313,63 +209,6 @@ function FindReplaceBar({ editor, onClose }: { editor: any; onClose: () => void 
   );
 }
 
-/* ── 状态栏 ── */
-
-function StatusBar({ editor }: { editor: any }) {
-  const chapters = useWritingStore((s) => s.chapters);
-  const activeChapterId = useWritingStore((s) => s.activeChapterId);
-  const focusMode = useWritingStore((s) => s.focusMode);
-  const typewriterMode = useWritingStore((s) => s.typewriterMode);
-  const toggleFocusMode = useWritingStore((s) => s.toggleFocusMode);
-  const toggleTypewriterMode = useWritingStore((s) => s.toggleTypewriterMode);
-  const ch = chapters.find((c) => c.id === activeChapterId);
-  const saveStatus = useWritingStore((s) => s.saveStatus);
-  const lastSavedAt = useWritingStore((s) => s.lastSavedAt);
-  const chars = editor?.storage?.characterCount?.characters?.() ?? 0;
-  const words = editor?.storage?.characterCount?.words?.() ?? 0;
-
-  return (
-    <div className="writing-statusbar-wrapper">
-      <div className="writing-statusbar-inner">
-        <span>{ch?.title ?? "未选择章节"}</span>
-        {(saveStatus === "saving" || saveStatus === "error") && (
-          <span className={saveStatus === "error" ? "text-red-400" : "text-text-muted"}>
-            {saveStatus === "saving" ? "保存中..." : "保存失败"}
-          </span>
-        )}
-        {saveStatus === "saved" && lastSavedAt && (
-          <span className="text-text-muted">
-            {Math.floor((Date.now() - lastSavedAt) / 1000) < 60 ? "已保存" : `已保存 ${new Date(lastSavedAt).toLocaleTimeString()}`}
-          </span>
-        )}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => { toggleFocusMode(); editor?.commands?.toggleFocusMode?.(); }}
-            className={`cursor-pointer transition-colors ${focusMode ? "text-primary" : "text-text-muted hover:text-text-secondary"}`}
-            title="专注模式"
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => {
-              toggleTypewriterMode();
-              const el = editor?.view?.dom as HTMLElement;
-              el?.classList.toggle("typewriter-mode", !typewriterMode);
-            }}
-            className={`cursor-pointer transition-colors ${typewriterMode ? "text-primary" : "text-text-muted hover:text-text-secondary"}`}
-            title="打字机模式"
-          >
-            <Type className="w-3.5 h-3.5" />
-          </button>
-          <span className="text-text-muted">|</span>
-          <span>{chars} 字符</span>
-          <span>{words} 词</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── 主组件 ── */
 
 type TextActionMode = "expand" | "rewrite" | "condense";
@@ -380,6 +219,16 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
   const ghostRequestId = useWritingStore((s) => s.ghostRequestId);
   const clearGhostText = useWritingStore((s) => s.clearGhostText);
   const aiMode = useWritingStore((s) => s.aiMode);
+
+  // ── 工具栏所需 store 状态 ──
+  const saveStatus = useWritingStore((s) => s.saveStatus);
+  const focusMode = useWritingStore((s) => s.focusMode);
+  const typewriterMode = useWritingStore((s) => s.typewriterMode);
+  const toggleFocusMode = useWritingStore((s) => s.toggleFocusMode);
+  const toggleTypewriterMode = useWritingStore((s) => s.toggleTypewriterMode);
+
+  // ── 视图标签状态 ──
+  const [activeView, setActiveView] = useState<WritingView>("write");
 
   const activeChapter = chapters.find((c) => c.id === activeChapterId);
 
@@ -413,6 +262,9 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
   } | null>(null);
 
   const [showFindReplace, setShowFindReplace] = useState(false);
+
+  // ── SceneMeta 光标追踪状态 ──
+  const [activeSceneMeta, setActiveSceneMeta] = useState<SceneMeta | null>(null);
 
   const editor = useEditor({
     extensions: defaultExtensions,
@@ -468,6 +320,38 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
       }
     }, [editor, clearGhostText]),
   );
+
+  // ── SceneMeta 光标追踪 ──
+  useEffect(() => {
+    if (!editor) return;
+    const updateActiveScene = () => {
+      const pos = editor.state.selection.$head;
+      // Walk up the node tree to find the nearest sceneBeat node
+      for (let d = pos.depth; d > 0; d--) {
+        const node = pos.node(d);
+        if (node.type.name === "sceneBeat") {
+          setActiveSceneMeta({
+            id: crypto.randomUUID(),
+            beatType: node.attrs.beatType || "beat",
+            title: node.attrs.beatType === "beat" ? "SCENE BEAT" : "CONTINUE WRITING",
+            wordCount: node.textContent.length,
+            maxWords: node.attrs.maxWords || 400,
+            status: node.attrs.status || "idle",
+            modelId: node.attrs.modelId || "",
+            contextIds: node.attrs.contextIds || [],
+            collapsed: node.attrs.collapsed || false,
+          });
+          return;
+        }
+      }
+      // Cursor is not inside any sceneBeat — clear the metadata
+      setActiveSceneMeta(null);
+    };
+    editor.on("selectionUpdate", updateActiveScene);
+    return () => {
+      editor.off("selectionUpdate", updateActiveScene);
+    };
+  }, [editor]);
 
   // ── 触发 AI 文本操作 ──
 
@@ -784,14 +668,41 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
 
   if (!editor) return null;
 
+  // ── 工具栏数据 ──
+  const wordCount = editor?.storage?.characterCount?.words?.() ?? 0;
+
+  const handleToggleFocus = () => {
+    toggleFocusMode();
+    editor?.commands?.toggleFocusMode?.();
+  };
+
+  const handleToggleTypewriter = () => {
+    toggleTypewriterMode();
+    const el = editor?.view?.dom as HTMLElement;
+    el?.classList.toggle("typewriter-mode", !typewriterMode);
+  };
+
   return (
     <div className="flex flex-col h-full bg-surface-deep">
-      <EditorToolbar editor={editor} onFindReplace={() => setShowFindReplace((p) => !p)} />
+      {/* 紧凑工具栏 */}
+      <EditorToolbar
+        editor={editor}
+        activeView={activeView}
+        onViewChange={setActiveView}
+        onToggleFindReplace={() => setShowFindReplace((p) => !p)}
+        wordCount={wordCount}
+        saveStatus={saveStatus}
+        focusMode={focusMode}
+        typewriterMode={typewriterMode}
+        onToggleFocus={handleToggleFocus}
+        onToggleTypewriter={handleToggleTypewriter}
+      />
+
+      {/* 查找替换 */}
       {showFindReplace && <FindReplaceBar editor={editor} onClose={() => setShowFindReplace(false)} />}
 
-      {/* 中间行：纸张 + 侧面板 */}
+      {/* 编辑区 + 侧面板 */}
       <div className="flex-1 flex overflow-hidden">
-        {/* 纸张容器 */}
         <div className="flex-1 writing-editor-scroll scrollbar-lumen relative">
           <div className="writing-editor-content">
             <EditorContent editor={editor} />
@@ -829,11 +740,12 @@ export function WritingEditor({ children }: { children?: React.ReactNode }) {
           )}
         </div>
 
+        {/* SceneMetaColumn — 场景节拍元数据列 */}
+        <SceneMetaColumn scene={activeSceneMeta} />
+
         {/* 侧面板（章节、AI 聊天、图标条）由 WritingMode 传入 */}
         {children}
       </div>
-
-      <StatusBar editor={editor} />
 
       {/* GenerationBar — 用 Zustand ghostTextContent 作为主可见性守卫（同步更新，无 batch 延迟） */}
       {(() => {
