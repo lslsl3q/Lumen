@@ -44,17 +44,9 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 const MODAL_PANELS: WritingPanelType[] = ["project", "characters", "locations", "world", "items", "outline", "export"];
 
 export default function WritingMode() {
-  const { isChatPanelOpen, toggleChatPanel, activeProjectId } = useWritingStore();
+  const { isChatPanelOpen, activeProjectId } = useWritingStore();
 
-  const [activePanel, setActivePanel] = useState<WritingPanelType>(null);
-
-  const handleTogglePanel = (panel: WritingPanelType) => {
-    if (panel === "chat") {
-      toggleChatPanel();
-      return;
-    }
-    setActivePanel((prev) => (prev === panel ? null : panel));
-  };
+  const [activePanel, setActivePanel] = useState<WritingPanelType | null>(null);
 
   const isModal = activePanel ? MODAL_PANELS.includes(activePanel) : false;
 
@@ -100,7 +92,7 @@ export default function WritingMode() {
       )}
 
       {/* 模态弹窗 */}
-      {isModal && (
+      {isModal && activePanel && (
         <WritingModalPanel panel={activePanel} onClose={() => setActivePanel(null)} />
       )}
     </ErrorBoundary>
