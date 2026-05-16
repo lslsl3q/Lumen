@@ -1,12 +1,12 @@
 /**
  * WritingMode — 写作模式主组件
  *
- * WritingEditor 内部布局：工具栏（全宽）→ 中间行（纸张 + 侧面板）→ 状态栏（全宽）。
- * 侧面板（章节/AI聊天/图标条）作为 children 注入，只在中间行展开，不挤压上下栏。
+ * 写作模式使用独立布局，不通过 ActivityBar + SidePanel。
+ * 布局结构：WritingSidebar（折叠/展开） + WritingEditor（主编辑区）。
  * 设定面板（人物/地点/世界/物品/大纲/导出/作品管理）为居中模态弹窗。
  */
 import { useState, useEffect, Component } from "react";
-import { WritingIconStrip, type WritingPanelType } from "./writing/WritingIconStrip";
+import { WritingSidebar } from "./writing/WritingSidebar";
 import { ChaptersSidePanel } from "./writing/ChaptersSidePanel";
 import { WritingModalPanel } from "./writing/WritingModalPanel";
 import { WritingEditor } from "./writing/WritingEditor";
@@ -14,6 +14,8 @@ import { AiWritingPanel } from "./writing/AiWritingPanel";
 import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import * as writingApi from "../api/writing";
+
+type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -75,8 +77,8 @@ export default function WritingMode() {
 
   return (
     <ErrorBoundary>
-      <div className="h-full w-full bg-surface-deep relative overflow-hidden">
-
+      <div className="flex h-full w-full overflow-hidden">
+        <WritingSidebar />
         <WritingEditor>
           {/* 章节侧栏（从右侧展开） */}
           {activePanel === "chapters" && (
@@ -89,22 +91,18 @@ export default function WritingMode() {
               <AiWritingPanel />
             </div>
           )}
-
-          {/* 图标条（始终在最右侧） */}
-          <WritingIconStrip activePanel={activePanel} onToggle={handleTogglePanel} />
         </WritingEditor>
-
-        {/* 快照面板 */}
-        {activePanel === "snapshots" && (
-          <SnapshotPanel onClose={() => setActivePanel(null)} />
-        )}
-
-        {/* 模态弹窗 */}
-        {isModal && (
-          <WritingModalPanel panel={activePanel} onClose={() => setActivePanel(null)} />
-        )}
-
       </div>
+
+      {/* 快照面板 */}
+      {activePanel === "snapshots" && (
+        <SnapshotPanel onClose={() => setActivePanel(null)} />
+      )}
+
+      {/* 模态弹窗 */}
+      {isModal && (
+        <WritingModalPanel panel={activePanel} onClose={() => setActivePanel(null)} />
+      )}
     </ErrorBoundary>
   );
 }

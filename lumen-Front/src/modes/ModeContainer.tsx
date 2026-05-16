@@ -19,7 +19,7 @@ interface ModeContainerProps {
   floating: UseFloatingLayersReturn;
 }
 
-/** 各模式的面板配置 */
+/** 各模式的面板配置（写作模式使用独立布局，不在此列） */
 const MODE_PANELS: Record<string, PanelConfig[]> = {
   chat: [
     { id: 'sessions', title: '会话' },
@@ -30,9 +30,6 @@ const MODE_PANELS: Record<string, PanelConfig[]> = {
     { id: 'channels', title: '频道' },
     { id: 'character', title: '角色' },
     { id: 'persona', title: '身份' },
-  ],
-  writing: [
-    { id: 'character', title: '角色' },
   ],
   rpg: [
     { id: 'character', title: '角色' },
@@ -79,6 +76,11 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
     }
   }, [debug.debugMode, debug.toggleDebug]);
 
+  // 写作模式使用独立布局，跳过 ActivityBar + SidePanel
+  if (activeMode === 'writing' && mounted.has('writing')) {
+    return <WritingMode />;
+  }
+
   return (
     <div className="flex-1 overflow-hidden relative flex">
       {/* 共享 ActivityBar */}
@@ -114,11 +116,6 @@ function ModeContainer({ debug, floating }: ModeContainerProps) {
         {mounted.has('rpg') && (
           <div className={activeMode === 'rpg' ? 'absolute inset-0 flex' : 'hidden'}>
             <RpgMode />
-          </div>
-        )}
-        {mounted.has('writing') && (
-          <div className={activeMode === 'writing' ? 'absolute inset-0 flex' : 'hidden'}>
-            <WritingMode />
           </div>
         )}
       </div>
