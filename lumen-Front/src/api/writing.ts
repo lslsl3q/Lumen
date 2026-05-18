@@ -15,6 +15,16 @@ export interface WritingProject {
   updated_at: number;
 }
 
+export interface WritingAct {
+  id: string;
+  project_id: string;
+  title: string;
+  numerate: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface WritingChapter {
   id: string;
   act_id: string;

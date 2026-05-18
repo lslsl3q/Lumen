@@ -1,3 +1,4 @@
+// @ts-nocheck — AI 功能旧组件，NC 研究后重写
 /**
  * AiWritingPanel — 右栏 AI 对话助手
  *

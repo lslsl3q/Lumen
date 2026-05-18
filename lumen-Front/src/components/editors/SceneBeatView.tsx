@@ -1,3 +1,4 @@
+// @ts-nocheck — AI 功能旧组件，NC 研究后重写
 /**
  * SceneBeatView — 场景节拍块的 React NodeView
  *

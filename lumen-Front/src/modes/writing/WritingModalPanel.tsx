@@ -1,3 +1,4 @@
+// @ts-nocheck — AI 功能旧组件，NC 研究后重写
 /**
  * WritingModalPanel — Author 风格居中模态弹窗
  *

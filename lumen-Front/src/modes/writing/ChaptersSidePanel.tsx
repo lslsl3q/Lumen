@@ -1,3 +1,4 @@
+// @ts-nocheck — AI 功能旧组件，NC 研究后重写
 /**
  * ChaptersSidePanel — 章节侧栏（从右侧展开的 flex 子面板）
  */

@@ -39,7 +39,7 @@ export default function DashboardMode() {
     try {
       const project = await createProject("新小说");
       await setActiveProject(project.id);
-      const act = await useWritingStore.getState().createAct("Act 1");
+      const act = await useWritingStore.getState().createAct("卷一");
       const chapter = await useWritingStore.getState().createChapter(act.id, "第一章");
       await useWritingStore.getState().createScene(chapter.id);
       switchMode("writing");

@@ -7,11 +7,8 @@
  */
 import { useState, useEffect, Component } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
-import { ChaptersSidePanel } from "./writing/ChaptersSidePanel";
-import { WritingModalPanel } from "./writing/WritingModalPanel";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
-import { AiWritingPanel } from "./writing/AiWritingPanel";
 import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import * as writingApi from "../api/writing";
@@ -42,15 +39,12 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
   }
 }
 
-const MODAL_PANELS: WritingPanelType[] = ["project", "characters", "locations", "world", "items", "outline", "export"];
 
 export default function WritingMode() {
   const { isChatPanelOpen, activeProjectId } = useWritingStore();
 
   const [activePanel, setActivePanel] = useState<WritingPanelType | null>(null);
   const [viewMode, setViewMode] = useState<"write" | "plan">("write");
-
-  const isModal = activePanel ? MODAL_PANELS.includes(activePanel) : false;
 
   // 自动快照：每 15 分钟检查 contentDirty 后触发
   useEffect(() => {
@@ -91,12 +85,9 @@ export default function WritingMode() {
 
         {viewMode === "write" ? (
           <WritingEditor>
-            {activePanel === "chapters" && (
-              <ChaptersSidePanel onClose={() => setActivePanel(null)} />
-            )}
             {isChatPanelOpen && (
-              <div className="w-[380px] flex-shrink-0 border-l border-border-default">
-                <AiWritingPanel />
+              <div className="w-[380px] flex-shrink-0 border-l border-border-default flex items-center justify-center text-text-muted text-sm">
+                AI 面板（NC 研究后重写）
               </div>
             )}
           </WritingEditor>
@@ -110,10 +101,7 @@ export default function WritingMode() {
         <SnapshotPanel onClose={() => setActivePanel(null)} />
       )}
 
-      {/* 模态弹窗 */}
-      {isModal && activePanel && (
-        <WritingModalPanel panel={activePanel} onClose={() => setActivePanel(null)} />
-      )}
+      {/* 模态弹窗（NC 研究后重写） */}
     </ErrorBoundary>
   );
 }

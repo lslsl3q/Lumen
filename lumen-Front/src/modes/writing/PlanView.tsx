@@ -52,10 +52,10 @@ export function PlanView() {
         if (parentId) await store.createScene(parentId);
         break;
       case "chapter":
-        if (parentId) await store.createChapter(parentId, "New Chapter");
+        if (parentId) await store.createChapter(parentId, "新章节");
         break;
       case "act":
-        await store.createAct("New Act");
+        await store.createAct("新卷");
         break;
     }
     if (activeProjectId) await loadManuscript(activeProjectId);

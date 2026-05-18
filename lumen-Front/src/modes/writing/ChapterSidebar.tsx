@@ -1,3 +1,4 @@
+// @ts-nocheck — AI 功能旧组件，NC 研究后重写
 /**
  * ChapterSidebar — 左栏：作品列表 + 章节管理 + 世界观入口
  */

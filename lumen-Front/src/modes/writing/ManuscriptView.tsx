@@ -38,11 +38,11 @@ export function ManuscriptView() {
         break;
       case "chapter": {
         const act = acts.find((a) => a.id === parentId);
-        if (act && parentId) await store.createChapter(parentId, "New Chapter");
+        if (act && parentId) await store.createChapter(parentId, "新章节");
         break;
       }
       case "act":
-        await store.createAct("New Act");
+        await store.createAct("新卷");
         break;
     }
   };
@@ -76,7 +76,7 @@ export function ManuscriptView() {
               return (
                 <InsertButton
                   key={`add-sc-${item.chapter_id}`}
-                  label="+ New Scene"
+                  label="+ 新场景"
                   onClick={() => handleInsert("scene", item.chapter_id as string)}
                 />
               );
@@ -84,7 +84,7 @@ export function ManuscriptView() {
               return (
                 <InsertButton
                   key={`add-ch-${item.act_id}`}
-                  label="+ New Chapter"
+                  label="+ 新章节"
                   onClick={() => handleInsert("chapter", item.act_id as string)}
                 />
               );
@@ -92,7 +92,7 @@ export function ManuscriptView() {
               return (
                 <InsertButton
                   key="add-act"
-                  label="+ New Act"
+                  label="+ 新卷"
                   onClick={() => handleInsert("act")}
                 />
               );
