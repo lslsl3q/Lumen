@@ -54,9 +54,7 @@ export function ManuscriptView() {
         {items.map((item, i) => {
           switch (item.type) {
             case "act": {
-              const prevItem = i > 0 ? items[i - 1] : null;
-              const isFirst = prevItem?.type !== "act";
-              return <ActHeader key={item.id} act={item as any} isFirst={isFirst} />;
+              return <ActHeader key={item.id} act={item as any} isFirst={i === 0} />;
             }
             case "chapter": {
               const prevItem = i > 0 ? items[i - 1] : null;

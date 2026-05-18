@@ -12,6 +12,7 @@ import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
+import { Eye, Type } from "lucide-react";
 import * as writingApi from "../api/writing";
 
 type WritingView = "plan" | "write" | "chat" | "review";
@@ -22,6 +23,20 @@ const VIEW_TABS: { id: WritingView; label: string; disabled: boolean }[] = [
   { id: "chat", label: "Chat", disabled: true },
   { id: "review", label: "Review", disabled: true },
 ];
+
+function SaveStatusDot({ status }: { status: string }) {
+  return (
+    <span
+      className={cn(
+        "w-1.5 h-1.5 rounded-full flex-shrink-0",
+        status === "saved" ? "bg-green-500" :
+        status === "saving" ? "bg-yellow-500 animate-pulse" :
+        "bg-gray-500"
+      )}
+      title={status}
+    />
+  );
+}
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -49,6 +64,17 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 
 export default function WritingMode() {
   const { isChatPanelOpen, activeProjectId } = useWritingStore();
+  const saveStatus = useWritingStore((s) => s.saveStatus);
+  const focusMode = useWritingStore((s) => s.focusMode);
+  const typewriterMode = useWritingStore((s) => s.typewriterMode);
+  const toggleFocusMode = useWritingStore((s) => s.toggleFocusMode);
+  const toggleTypewriterMode = useWritingStore((s) => s.toggleTypewriterMode);
+  const acts = useWritingStore((s) => s.acts);
+  const totalWords = acts.reduce((sum, act) => {
+    return sum + ((act as any).chapters || []).reduce((cSum: number, ch: any) => {
+      return cSum + (ch.scenes || []).reduce((sSum: number, sc: any) => sSum + (sc.word_count || 0), 0);
+    }, 0);
+  }, 0);
   const [viewMode, setViewMode] = useState<WritingView>("write");
 
   // 自动快照
@@ -75,25 +101,51 @@ export default function WritingMode() {
 
         {/* 主内容区 */}
         <div className="flex flex-col flex-1 min-w-0 h-full">
-          {/* 顶部 tabs — 写作模式：Plan | Write | Chat | Review */}
+          {/* 顶部合并工具栏 — tabs 左侧 + 格式工具右侧 */}
           <div className="flex-none h-11 flex items-center px-3 border-b border-border-default bg-surface-deep gap-0.5">
-            {VIEW_TABS.map((tab) => (
+            {/* 左侧：View tabs */}
+            <div className="flex items-center gap-0.5">
+              {VIEW_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => !tab.disabled && setViewMode(tab.id)}
+                  disabled={tab.disabled}
+                  className={cn(
+                    "text-xs font-semibold rounded px-3 py-1.5 transition-colors",
+                    viewMode === tab.id
+                      ? "bg-gray-800 text-stone-200"
+                      : "bg-transparent text-stone-400 hover:text-stone-300",
+                    tab.disabled && "opacity-40 pointer-events-none"
+                  )}
+                  type="button"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* 右侧：格式工具 */}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-[11px] text-text-muted tabular-nums">{totalWords} 词</span>
+              <SaveStatusDot status={saveStatus} />
+              <div className="w-px h-3 bg-border-default mx-0.5" />
               <button
-                key={tab.id}
-                onClick={() => !tab.disabled && setViewMode(tab.id)}
-                disabled={tab.disabled}
-                className={cn(
-                  "text-xs font-semibold rounded px-3 py-1.5 transition-colors",
-                  viewMode === tab.id
-                    ? "bg-gray-800 text-stone-200"
-                    : "bg-transparent text-stone-400 hover:text-stone-300",
-                  tab.disabled && "opacity-40 pointer-events-none"
-                )}
+                onClick={toggleFocusMode}
+                className={cn("p-1 rounded transition-colors cursor-pointer", focusMode ? "text-primary" : "text-text-muted hover:text-text-secondary")}
+                title="专注模式"
                 type="button"
               >
-                {tab.label}
+                <Eye className="w-3.5 h-3.5" />
               </button>
-            ))}
+              <button
+                onClick={toggleTypewriterMode}
+                className={cn("p-1 rounded transition-colors cursor-pointer", typewriterMode ? "text-primary" : "text-text-muted hover:text-text-secondary")}
+                title="打字机模式"
+                type="button"
+              >
+                <Type className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           {/* 内容 */}
