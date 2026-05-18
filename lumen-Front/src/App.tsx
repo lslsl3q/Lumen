@@ -2,6 +2,8 @@ import { Component, type ReactNode, useEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import TitleBar from './components/TitleBar';
 import ModeContainer from './modes/ModeContainer';
+import DashboardMode from './modes/DashboardMode';
+import { useModeStore } from './stores/useModeStore';
 import WorldBookList from './pages/WorldBookList';
 import WorldBookEditor from './pages/WorldBookEditor';
 import SkillList from './pages/SkillList';
@@ -66,6 +68,8 @@ function MainLayout() {
   const debug = useDebugState();
   const location = useLocation();
   const isSettingsRoute = location.pathname.startsWith('/settings');
+  const activeMode = useModeStore((s) => s.activeMode);
+  const isDashboard = activeMode === 'dashboard' && !isSettingsRoute;
 
   useDebugWindow({
     debugInfo: debug.debugInfo,
@@ -110,22 +114,28 @@ function MainLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-950">
-      <ErrorBoundary><TitleBar /></ErrorBoundary>
-      <div className="flex-1 overflow-hidden flex flex-col">
-        {isSettingsRoute ? (
-          <Routes>
-            <Route path="/settings/worldbooks" element={<WorldBookList />} />
-            <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
-            <Route path="/settings/skills" element={<SkillList />} />
-            <Route path="/settings/skills/:id" element={<SkillEditor />} />
-            <Route path="/settings/config" element={<ConfigList />} />
-            <Route path="/settings/config/:resource" element={<ConfigEditor />} />
-            <Route path="/settings/permissions" element={<PermissionPage />} />
-          </Routes>
-        ) : (
-          <ModeContainer floating={floating} debug={debug} />
-        )}
-      </div>
+      {isDashboard ? (
+        <DashboardMode />
+      ) : (
+        <>
+          <ErrorBoundary><TitleBar /></ErrorBoundary>
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {isSettingsRoute ? (
+              <Routes>
+                <Route path="/settings/worldbooks" element={<WorldBookList />} />
+                <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
+                <Route path="/settings/skills" element={<SkillList />} />
+                <Route path="/settings/skills/:id" element={<SkillEditor />} />
+                <Route path="/settings/config" element={<ConfigList />} />
+                <Route path="/settings/config/:resource" element={<ConfigEditor />} />
+                <Route path="/settings/permissions" element={<PermissionPage />} />
+              </Routes>
+            ) : (
+              <ModeContainer floating={floating} debug={debug} />
+            )}
+          </div>
+        </>
+      )}
 
       <div id="overlay-root" />
       <FloatingLayerHost floating={floating} />

@@ -39,6 +39,13 @@ export interface ThemeTokens {
   borderDefault: string;
   borderSubtle: string;
 
+  // === 交互层 ===
+  surfaceTint: string;
+  hoverSurface: string;
+  interactiveHover: string;
+  ghostText: string;
+  selectionBg: string;
+
   // === 发光效果 ===
   glowPrimary: string;
   glowSubtle: string;

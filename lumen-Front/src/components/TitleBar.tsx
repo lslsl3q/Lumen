@@ -1,25 +1,26 @@
 /**
- * TitleBar — 自定义标题栏
+ * TitleBar — 自定义标题栏（面包屑导航）
  *
- * 三段式：左侧品牌 | 中间模式切换 | 右侧功能+窗口控制
- * data-tauri-drag-region 只应用在空白区域，按钮不在 drag region 内
+ * 三段式：左侧品牌+面包屑 | 中间拖拽区 | 右侧功能+窗口控制
+ * 不在 Dashboard 时显示（Dashboard 有自己的顶栏）
  */
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import ModeSwitch from './ModeSwitch';
 import { useModeStore } from '../stores/useModeStore';
+import { useWritingStore } from '../stores/useWritingStore';
 import { useTheme } from '../lib/theme/context';
 import type { AppMode } from '../stores/useModeStore';
 
-const MODES: { key: AppMode; label: string }[] = [
-  { key: 'chat', label: '聊天' },
-  { key: 'base', label: '基地' },
-  { key: 'writing', label: '写作' },
-];
+const MODE_LABELS: Record<AppMode, string> = {
+  dashboard: '',
+  chat: '聊天',
+  base: '暗影之城',
+  rpg: '暗影之城',
+  writing: '',
+};
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-/** 还原图标 */
 function RestoreIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor">
@@ -29,12 +30,32 @@ function RestoreIcon() {
   );
 }
 
-/** 最大化图标 */
 function MaximizeIcon() {
   return (
     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor">
       <rect x="2" y="2" width="12" height="12" rx="1" strokeWidth="1.2" />
     </svg>
+  );
+}
+
+function Breadcrumb({ items }: { items: { label: string; onClick?: () => void }[] }) {
+  return (
+    <nav className="flex items-center gap-1.5 text-xs">
+      {items.map((item, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-text-dim">/</span>}
+          <button
+            onClick={item.onClick}
+            className={`truncate max-w-[200px] ${item.onClick
+              ? 'text-text-muted hover:text-text-secondary transition-colors duration-150 cursor-pointer'
+              : 'text-text-secondary'
+            }`}
+          >
+            {item.label}
+          </button>
+        </span>
+      ))}
+    </nav>
   );
 }
 
@@ -45,6 +66,14 @@ function TitleBar() {
   const { activeMode, switchMode } = useModeStore();
   const { theme, themes, setTheme, isDark } = useTheme();
 
+  // Writing mode context — direct selectors for proper reactivity
+  const activeProjectId = useWritingStore((s) => s.activeProjectId);
+  const projects = useWritingStore((s) => s.projects);
+  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const activeChapterId = useWritingStore((s) => s.activeChapterId);
+  const chapters = useWritingStore((s) => s.chapters);
+  const activeChapter = chapters.find((c) => c.id === activeChapterId);
+
   useEffect(() => {
     if (!appWindow) return;
     appWindow.isMaximized().then(setIsMaximized).catch(() => {});
@@ -53,7 +82,7 @@ function TitleBar() {
       try {
         const maximized = await appWindow.isMaximized();
         setIsMaximized(maximized);
-      } catch { /* 窗口可能已关闭 */ }
+      } catch { /* window may be closed */ }
     });
 
     return () => {
@@ -72,35 +101,41 @@ function TitleBar() {
     setIsPinned(next);
   };
 
-  // RPG 模式时高亮基地按钮
-  const displayMode = activeMode === 'rpg' ? 'base' : activeMode;
+  // Build breadcrumb items
+  const breadcrumbItems = useMemo(() => {
+    const items: { label: string; onClick?: () => void }[] = [];
+
+    if (activeMode === 'writing' && activeProject) {
+      items.push({ label: activeProject.name });
+      if (activeChapter) {
+        items.push({ label: activeChapter.title });
+      }
+    } else {
+      const label = MODE_LABELS[activeMode];
+      if (label) items.push({ label });
+    }
+
+    return items;
+  }, [activeMode, activeProject, activeChapter]);
 
   return (
     <div className="h-9 flex items-center bg-surface-rail/80 border-b border-border-default select-none relative">
-      {/* 左侧品牌 — 拖拽区 */}
-      <div data-tauri-drag-region className="flex items-center gap-2 pl-4 h-full cursor-default">
-        <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
-        <span className="text-sm font-light tracking-widest text-text-secondary uppercase font-display">
-          Lumen
-        </span>
+      {/* 左侧：Logo + 面包屑 */}
+      <div className="flex items-center gap-2 pl-4 h-full shrink-0">
+        <button
+          onClick={() => switchMode('dashboard')}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-150 cursor-pointer"
+          title="回到大堂"
+        >
+          <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
+        </button>
+        {breadcrumbItems.length > 0 && <Breadcrumb items={breadcrumbItems} />}
       </div>
 
-      {/* 左侧填充 — 拖拽区 */}
+      {/* 中间填充 — 拖拽区 */}
       <div data-tauri-drag-region className="flex-1 h-full cursor-default" />
 
-      {/* 中间模式切换 — 绝对定位居中 */}
-      <div className="absolute left-1/2 -translate-x-1/2">
-        <ModeSwitch
-          modes={MODES}
-          activeMode={displayMode}
-          onSwitch={switchMode}
-        />
-      </div>
-
-      {/* 右侧填充 — 拖拽区 */}
-      <div data-tauri-drag-region className="flex-1 h-full cursor-default" />
-
-      {/* 右侧窗口控制 — 不带 drag region */}
+      {/* 右侧窗口控制 */}
       <div className="flex items-center h-full">
         {/* 置顶 */}
         <button

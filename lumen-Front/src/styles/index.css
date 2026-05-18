@@ -61,6 +61,13 @@
   --color-border-default: var(--color-border);
   --color-border-subtle: var(--color-border-subtle);
 
+  /* === 交互 === */
+  --color-surface-tint: var(--color-surface-tint);
+  --color-hover-surface: var(--color-hover-surface);
+  --color-interactive-hover: var(--color-interactive-hover);
+  --color-ghost-text: var(--color-ghost-text);
+  --color-selection-bg: var(--color-selection-bg);
+
   /* === 间距 === */
   --spacing-tight: var(--spacing-tight);
   --spacing-normal: var(--spacing-normal);
