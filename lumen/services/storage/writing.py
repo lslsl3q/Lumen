@@ -539,3 +539,46 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
             except json.JSONDecodeError:
                 pass
     return d
+
+
+# ── 手稿批量加载 ──
+
+def get_manuscript(project_id: str) -> dict:
+    """Return full manuscript tree: acts -> chapters -> scenes (nested)."""
+    conn = get_conn()
+    acts = list_acts(project_id)
+    result_acts = []
+    for act in acts:
+        act_dict = dict(act)
+        chapters = list_chapters_by_act(act["id"])
+        act_chapters = []
+        for ch in chapters:
+            ch_dict = dict(ch)
+            scenes = list_scenes(ch["id"])
+            # Scenes already have their content JSON-parsed by _row_to_dict
+            ch_dict["scenes"] = scenes
+            act_chapters.append(ch_dict)
+        act_dict["chapters"] = act_chapters
+        result_acts.append(act_dict)
+    return {"acts": result_acts}
+
+
+def get_manuscript_flat(project_id: str) -> list[dict]:
+    """Return flat list with type field for frontend iteration.
+
+    Order: Act > Chapter > Scene > separator > AddScene > AddChapter > AddAct
+    """
+    items: list[dict] = []
+    for act in list_acts(project_id):
+        items.append({"type": "act", **dict(act)})
+        for ch in list_chapters_by_act(act["id"]):
+            items.append({"type": "chapter", **dict(ch)})
+            scenes = list_scenes(ch["id"])
+            for i, sc in enumerate(scenes):
+                if i > 0:
+                    items.append({"type": "separator"})
+                items.append({"type": "scene", **dict(sc)})
+            items.append({"type": "add-scene", "chapter_id": ch["id"]})
+        items.append({"type": "add-chapter", "act_id": act["id"]})
+    items.append({"type": "add-act", "project_id": project_id})
+    return items
