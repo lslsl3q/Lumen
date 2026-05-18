@@ -1,10 +1,10 @@
-import type { WritingChapterV2 } from "../../api/writing";
+import type { WritingChapter } from "../../api/writing";
 
 export function ChapterHeader({
   chapter,
   isAfterAct,
 }: {
-  chapter: WritingChapterV2;
+  chapter: WritingChapter;
   isAfterAct: boolean;
 }) {
   return (

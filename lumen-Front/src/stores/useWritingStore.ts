@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, WritingChapterV2, WritingScene, WritingSetting, WritingSnapshot } from "../api/writing";
+import type { WritingProject, WritingAct, WritingChapter, WritingScene, WritingSetting, WritingSnapshot } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -49,8 +49,8 @@ interface WritingState {
   deleteActAction: (id: string) => Promise<void>;
 
   // Chapters
-  createChapter: (actId: string, title?: string) => Promise<WritingChapterV2>;
-  updateChapterAction: (id: string, data: Partial<WritingChapterV2>) => Promise<void>;
+  createChapter: (actId: string, title?: string) => Promise<WritingChapter>;
+  updateChapterAction: (id: string, data: Partial<WritingChapter>) => Promise<void>;
   deleteChapterAction: (id: string) => Promise<void>;
 
   // Scenes
@@ -173,7 +173,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   createChapter: async (actId, title) => {
     const { activeProjectId } = get();
     if (!activeProjectId) throw new Error("No project selected");
-    const chapter = await writingApi.createChapterV2(actId, activeProjectId, title);
+    const chapter = await writingApi.createChapter(actId, activeProjectId, title);
     await get().loadManuscript(activeProjectId);
     return chapter;
   },

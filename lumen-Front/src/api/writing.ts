@@ -17,28 +17,6 @@ export interface WritingProject {
 
 export interface WritingChapter {
   id: string;
-  project_id: string;
-  title: string;
-  content: string;
-  word_count: number;
-  sort_order: number;
-  volume: string;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface WritingAct {
-  id: string;
-  project_id: string;
-  title: string;
-  numerate: number;
-  sort_order: number;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface WritingChapterV2 {
-  id: string;
   act_id: string;
   project_id: string;
   title: string;
@@ -63,7 +41,7 @@ export interface WritingScene {
 
 export interface ManuscriptTree {
   acts: Array<WritingAct & {
-    chapters: Array<WritingChapterV2 & { scenes: WritingScene[] }>;
+    chapters: Array<WritingChapter & { scenes: WritingScene[] }>;
   }>;
 }
 
@@ -132,17 +110,7 @@ export async function listChapters(projectId: string): Promise<WritingChapter[]>
   return res.json();
 }
 
-export async function createChapter(projectId: string, title = "新章节", volume = ""): Promise<WritingChapter> {
-  const res = await fetch(`${BASE}/chapters`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, title, volume }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function createChapterV2(actId: string, projectId: string, title = ""): Promise<WritingChapterV2> {
+export async function createChapter(actId: string, projectId: string, title = ""): Promise<WritingChapter> {
   const res = await fetch(`${BASE}/chapters`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -170,15 +138,6 @@ export async function updateChapter(id: string, data: Partial<WritingChapter>): 
 
 export async function deleteChapter(id: string): Promise<void> {
   const res = await fetch(`${BASE}/chapters/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function reorderChapters(projectId: string, orderedIds: string[]): Promise<void> {
-  const res = await fetch(`${BASE}/chapters/reorder`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, ordered_ids: orderedIds }),
-  });
   if (!res.ok) throw new Error(await res.text());
 }
 
@@ -305,20 +264,6 @@ export async function getManuscriptFlat(projectId: string): Promise<ManuscriptFl
   return res.json();
 }
 
-// ── Migration ──
-
-export async function getMigrationStatus(): Promise<{ needs_migration: boolean }> {
-  const res = await fetch(`${BASE}/system/migration-status`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function runMigration(): Promise<{ status: string; migrated: number }> {
-  const res = await fetch(`${BASE}/system/run-migration`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
 // ── 快照 ──
 
 export interface WritingSnapshot {
@@ -338,7 +283,13 @@ export interface WritingSnapshot {
 export interface WritingSnapshotDetail extends WritingSnapshot {
   data: {
     project: { id: string; name: string; description: string; metadata: Record<string, unknown> };
-    chapters: Array<{ id: string; title: string; content: string; word_count: number; sort_order: number; volume: string }>;
+    acts?: Array<{
+      id: string; title: string; numerate: number; sort_order: number;
+      chapters: Array<{
+        id: string; title: string; numerate: number; show_number: number; sort_order: number;
+        scenes: Array<{ id: string; content: string; summary: string; subtitle: string; sort_order: number }>;
+      }>;
+    }>;
     settings: Array<{ id: string; name: string; category: string; content: Record<string, unknown>; parent_id: string | null; sort_order: number; enabled: number }>;
     snapshot_version: number;
   };

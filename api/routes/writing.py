@@ -22,7 +22,6 @@ from lumen.services.storage.writing import (
 from lumen.services.storage.writing_snapshot import (
     create_snapshot, list_snapshots, get_snapshot_detail, restore_snapshot, delete_snapshot,
 )
-from lumen.services.storage.writing_migration import needs_migration, run_migration
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -529,19 +528,3 @@ async def api_get_manuscript(project_id: str):
 @router.get("/projects/{project_id}/manuscript-flat")
 async def api_get_manuscript_flat(project_id: str):
     return await asyncio.to_thread(get_manuscript_flat, project_id)
-
-
-# ── Migration ──
-
-@router.get("/system/migration-status")
-async def api_migration_status():
-    return {"needs_migration": await asyncio.to_thread(needs_migration)}
-
-
-@router.post("/system/run-migration")
-async def api_run_migration():
-    try:
-        result = await asyncio.to_thread(run_migration)
-        return {"status": "ok", **result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
