@@ -7,6 +7,7 @@
 依赖方向：只 import services/storage/writing.py，不 import components/ 或 core/。
 """
 
+import json
 import re
 import logging
 from typing import Any
@@ -49,6 +50,22 @@ def _strip_html(text: str) -> str:
     if not text:
         return ""
     return _HTML_TAG_RE.sub("", text).strip()
+
+
+def _pm_json_text(content_str: str) -> str:
+    """Extract plain text from ProseMirror JSON content string."""
+    try:
+        doc = json.loads(content_str)
+    except (json.JSONDecodeError, TypeError):
+        return content_str if isinstance(content_str, str) else ""
+    texts = []
+    def walk(node):
+        if node.get("type") == "text" and node.get("text"):
+            texts.append(node["text"])
+        for child in node.get("content", []):
+            walk(child)
+    walk(doc)
+    return "\n".join(texts)
 
 
 def _format_entity(name: str, content: dict) -> str:
@@ -115,20 +132,24 @@ def _format_settings_grouped(settings: list[dict]) -> str:
 
 
 def _chapter_summary(ch: dict) -> str:
-    """格式化单个章节的摘要（前 500 字）"""
-    content = _strip_html(ch.get("content", ""))
+    """Format chapter summary from its scenes' text (first 500 chars)."""
+    from lumen.services.storage.writing import list_scenes
+    scenes = list_scenes(ch.get("id", ""))
+    combined = " ".join(_pm_json_text(s.get("content", "{}")) for s in scenes)
     title = ch.get("title", "未命名章节")
     order = ch.get("sort_order", "?")
-    summary = content[:_SUMMARY_LENGTH] + ("…" if len(content) > _SUMMARY_LENGTH else "")
+    summary = combined[:_SUMMARY_LENGTH] + ("..." if len(combined) > _SUMMARY_LENGTH else "")
     return f"第{order + 1}章 {title}\n{summary}"
 
 
 def _chapter_full(ch: dict) -> str:
-    """格式化单个章节的完整内容"""
-    content = ch.get("content", "")
+    """Format full chapter text from all scenes."""
+    from lumen.services.storage.writing import list_scenes
     title = ch.get("title", "未命名章节")
     order = ch.get("sort_order", "?")
-    return f"第{order + 1}章 {title}\n---\n{content}\n---"
+    scenes = list_scenes(ch.get("id", ""))
+    combined = "\n---\n".join(_pm_json_text(s.get("content", "{}")) for s in scenes)
+    return f"第{order + 1}章 {title}\n---\n{combined}\n---"
 
 
 def _chapter_title(ch: dict) -> str:
