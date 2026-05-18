@@ -274,9 +274,9 @@ function CodexPanel() {
         </Popover>
       </div>
 
-      {/* Category list */}
+      {/* Category list — only show categories with items */}
       <div className="flex-1 overflow-y-auto">
-        {grouped.map((cat) => (
+        {grouped.filter((cat) => cat.items.length > 0).map((cat) => (
           <CodexCategory
             key={cat.id}
             label={cat.label}
@@ -310,25 +310,37 @@ function CodexCategory({
 
   return (
     <div className="border-b border-[var(--color-border)]/50">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors"
-        type="button"
-      >
-        <Icon className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
-        <span className="text-[12px] font-semibold text-[var(--color-text-secondary)] truncate">
-          {label}
-        </span>
-        <span className="ml-auto text-[10px] text-[var(--color-text-dim)] flex-none">
-          {items.length} {items.length === 1 ? "entry" : "entries"}
-        </span>
-        {open ? (
-          <ChevronDown className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
-        )}
-      </button>
+      {/* Category header — label + count + Add entry inline */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/5 rounded transition-colors text-left"
+          type="button"
+        >
+          <Icon className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
+          <span className="text-[12px] font-semibold text-[var(--color-text-secondary)] truncate">
+            {label}
+          </span>
+          <span className="text-[10px] text-[var(--color-text-dim)] flex-none">
+            {items.length} {items.length === 1 ? "entry" : "entries"}
+          </span>
+          {open ? (
+            <ChevronDown className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
+          ) : (
+            <ChevronRight className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
+          )}
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onAdd(); }}
+          className="flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 rounded transition-colors flex-none"
+          type="button"
+        >
+          <Plus className="w-3 h-3" />
+          Add entry
+        </button>
+      </div>
 
+      {/* Items */}
       {open && (
         <div className="pb-1">
           {items.map((item) => (
@@ -350,14 +362,6 @@ function CodexCategory({
               暂无条目
             </div>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onAdd(); }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--color-text-dim)] hover:bg-white/5 cursor-pointer transition-colors text-left"
-            type="button"
-          >
-            <Plus className="w-3 h-3" />
-            Add entry
-          </button>
         </div>
       )}
     </div>
