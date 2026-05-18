@@ -27,26 +27,31 @@ export type ChapterFilter =
   | { type: "chapter"; chapterId: string };
 
 export function ChapterSelector() {
-  const chapters = useWritingStore((s) => s.chapters);
-  const activeChapterId = useWritingStore((s) => s.activeChapterId);
-  const setActiveChapter = useWritingStore((s) => s.setActiveChapter);
+  const acts = useWritingStore((s) => s.acts);
 
-  const activeChapter = chapters?.find((c) => c.id === activeChapterId);
+  // Flatten acts → chapters from new tree structure
+  const allChapters = useMemo(() => {
+    const result: { id: string; title: string; actTitle: string }[] = [];
+    for (const act of acts) {
+      const chs = (act as any).chapters || [];
+      for (const ch of chs) {
+        result.push({ id: ch.id, title: ch.title, actTitle: act.title || "未分组" });
+      }
+    }
+    return result;
+  }, [acts]);
 
-  // 按 volume 分组
+  // 按 act 分组
   const grouped = useMemo(() => {
-    const map = new Map<string, typeof chapters>();
-    for (const ch of chapters ?? []) {
-      const vol = ch.volume || "未分组";
-      if (!map.has(vol)) map.set(vol, []);
-      map.get(vol)!.push(ch);
+    const map = new Map<string, typeof allChapters>();
+    for (const ch of allChapters) {
+      if (!map.has(ch.actTitle)) map.set(ch.actTitle, []);
+      map.get(ch.actTitle)!.push(ch);
     }
     return Array.from(map.entries());
-  }, [chapters]);
+  }, [allChapters]);
 
-  // 显示标签
-  const label = activeChapter?.title || "全部章节";
-  const subLabel = activeChapter?.volume || "";
+  const label = "全部章节";
 
   return (
     <Popover>
@@ -59,11 +64,6 @@ export function ChapterSelector() {
           <span className="text-[13px] font-medium text-stone-200 truncate leading-tight">
             {label}
           </span>
-          {subLabel && (
-            <span className="text-[10px] text-stone-500 leading-tight">
-              {subLabel}
-            </span>
-          )}
         </div>
         <ChevronDown className="w-3.5 h-3.5 flex-none text-stone-500" />
       </PopoverTrigger>
@@ -99,20 +99,16 @@ export function ChapterSelector() {
         {/* 分隔线 */}
         <div className="h-px bg-gray-800 my-1" />
 
-        {/* 按 Volume 分组 */}
-        {grouped.map(([volume, chs]) => (
-          <div key={volume}>
-            {/* Volume/Act 头 */}
+        {/* 按 Act 分组 */}
+        {grouped.map(([actTitle, chs]) => (
+          <div key={actTitle}>
             <button
-              onClick={() => {
-                /* 选整个 volume — 可过滤显示该卷所有章节 */
-              }}
               className="w-full flex items-center gap-1.5 px-3 pt-2 pb-1 hover:bg-gray-800 rounded transition-colors"
               type="button"
             >
               <Layers className="w-3 h-3 text-stone-500" />
               <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wide">
-                {volume}
+                {actTitle}
               </span>
               <span className="ml-auto text-[10px] text-stone-600">
                 {chs.length} 章
@@ -121,23 +117,14 @@ export function ChapterSelector() {
             {chs.map((ch) => (
               <button
                 key={ch.id}
-                onClick={() => setActiveChapter?.(ch.id)}
                 className={cn(
                   "w-full text-left px-3 py-1.5 pl-7 rounded flex items-center gap-2 text-sm transition-colors",
-                  "hover:bg-gray-800",
-                  ch.id === activeChapterId
-                    ? "bg-gray-800 text-stone-200"
-                    : "text-stone-400"
+                  "hover:bg-gray-800 text-stone-400"
                 )}
                 type="button"
               >
                 <FileText className="w-3 h-3 flex-none text-stone-500" />
                 <span className="truncate">{ch.title}</span>
-                {ch.word_count > 0 && (
-                  <span className="ml-auto text-[10px] text-stone-600 flex-none">
-                    {ch.word_count}字
-                  </span>
-                )}
               </button>
             ))}
           </div>
