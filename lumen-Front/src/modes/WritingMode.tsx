@@ -66,42 +66,27 @@ export default function WritingMode() {
   return (
     <ErrorBoundary>
       <div className="flex h-full w-full overflow-hidden">
-        <WritingSidebar />
-        {/* View mode tabs */}
-        <div className="flex items-center h-10 px-3 bg-surface-deep border-b border-border-default gap-2">
-          <button
-            className={`text-xs px-3 py-1 rounded cursor-pointer ${viewMode === "write" ? "bg-primary/10 text-primary" : "text-text-muted hover:text-text-secondary"}`}
-            onClick={() => setViewMode("write")}
-          >
-            Write
-          </button>
-          <button
-            className={`text-xs px-3 py-1 rounded cursor-pointer ${viewMode === "plan" ? "bg-primary/10 text-primary" : "text-text-muted hover:text-text-secondary"}`}
-            onClick={() => setViewMode("plan")}
-          >
-            Plan
-          </button>
-        </div>
+        <WritingSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
 
-        {viewMode === "write" ? (
-          <WritingEditor>
-            {isChatPanelOpen && (
-              <div className="w-[380px] flex-shrink-0 border-l border-border-default flex items-center justify-center text-text-muted text-sm">
-                AI 面板（NC 研究后重写）
-              </div>
-            )}
-          </WritingEditor>
-        ) : (
-          <PlanView />
-        )}
+        <div className="flex flex-1 min-w-0 h-full">
+          {viewMode === "write" ? (
+            <WritingEditor>
+              {isChatPanelOpen && (
+                <div className="w-[380px] flex-shrink-0 border-l border-border-default flex items-center justify-center text-text-muted text-sm">
+                  AI 面板（NC 研究后重写）
+                </div>
+              )}
+            </WritingEditor>
+          ) : (
+            <PlanView />
+          )}
+        </div>
       </div>
 
       {/* 快照面板 */}
       {activePanel === "snapshots" && (
         <SnapshotPanel onClose={() => setActivePanel(null)} />
       )}
-
-      {/* 模态弹窗（NC 研究后重写） */}
     </ErrorBoundary>
   );
 }
