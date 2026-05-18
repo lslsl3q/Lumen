@@ -1636,3 +1636,33 @@
 .generation-bar-sep {
   opacity: 0.4;
 }
+
+/* ── Multi-editor manuscript layout ── */
+
+.writing-manuscript-scroll {
+  scroll-behavior: smooth;
+}
+
+.scene-section {
+  position: relative;
+  margin: 0;
+  padding: 16px 0;
+}
+
+.scene-section .ProseMirror {
+  padding: 16px;
+}
+
+.act-row-header {
+  position: relative;
+  margin-top: 80px;
+  border-top: 3px solid var(--color-border-subtle);
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+
+.chapter-row-header {
+  border-top: 1px solid var(--color-border-subtle);
+  margin: 2.5em 0 1em;
+  padding-top: 2.5em;
+}

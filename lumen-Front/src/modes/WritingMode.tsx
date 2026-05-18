@@ -10,6 +10,7 @@ import { WritingSidebar } from "./writing/WritingSidebar";
 import { ChaptersSidePanel } from "./writing/ChaptersSidePanel";
 import { WritingModalPanel } from "./writing/WritingModalPanel";
 import { WritingEditor } from "./writing/WritingEditor";
+import { PlanView } from "./writing/PlanView";
 import { AiWritingPanel } from "./writing/AiWritingPanel";
 import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
@@ -48,6 +49,7 @@ export default function WritingMode() {
   const { isChatPanelOpen, activeProjectId } = useWritingStore();
 
   const [activePanel, setActivePanel] = useState<WritingPanelType | null>(null);
+  const [viewMode, setViewMode] = useState<"write" | "plan">("write");
 
   // 数据迁移状态
   const [migrationNeeded, setMigrationNeeded] = useState(false);
@@ -120,19 +122,36 @@ export default function WritingMode() {
       <ErrorBoundary>
       <div className="flex h-full w-full overflow-hidden">
         <WritingSidebar />
-        <WritingEditor>
-          {/* 章节侧栏（从右侧展开） */}
-          {activePanel === "chapters" && (
-            <ChaptersSidePanel onClose={() => setActivePanel(null)} />
-          )}
+        {/* View mode tabs */}
+        <div className="flex items-center h-10 px-3 bg-surface-deep border-b border-border-default gap-2">
+          <button
+            className={`text-xs px-3 py-1 rounded cursor-pointer ${viewMode === "write" ? "bg-primary/10 text-primary" : "text-text-muted hover:text-text-secondary"}`}
+            onClick={() => setViewMode("write")}
+          >
+            Write
+          </button>
+          <button
+            className={`text-xs px-3 py-1 rounded cursor-pointer ${viewMode === "plan" ? "bg-primary/10 text-primary" : "text-text-muted hover:text-text-secondary"}`}
+            onClick={() => setViewMode("plan")}
+          >
+            Plan
+          </button>
+        </div>
 
-          {/* AI 聊天面板 */}
-          {isChatPanelOpen && (
-            <div className="w-[380px] flex-shrink-0 border-l border-border-default">
-              <AiWritingPanel />
-            </div>
-          )}
-        </WritingEditor>
+        {viewMode === "write" ? (
+          <WritingEditor>
+            {activePanel === "chapters" && (
+              <ChaptersSidePanel onClose={() => setActivePanel(null)} />
+            )}
+            {isChatPanelOpen && (
+              <div className="w-[380px] flex-shrink-0 border-l border-border-default">
+                <AiWritingPanel />
+              </div>
+            )}
+          </WritingEditor>
+        ) : (
+          <PlanView />
+        )}
       </div>
 
       {/* 快照面板 */}
