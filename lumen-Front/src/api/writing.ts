@@ -17,14 +17,37 @@ export interface WritingProject {
 
 export interface WritingChapter {
   id: string;
+  act_id: string;
   project_id: string;
   title: string;
-  content: string;
-  word_count: number;
+  numerate: number;
+  show_number: number;
   sort_order: number;
-  volume: string;
   created_at: number;
   updated_at: number;
+}
+
+export interface WritingScene {
+  id: string;
+  chapter_id: string;
+  content: string;
+  summary: string;
+  subtitle: string;
+  scene_number: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ManuscriptTree {
+  acts: Array<WritingAct & {
+    chapters: Array<WritingChapter & { scenes: WritingScene[] }>;
+  }>;
+}
+
+export interface ManuscriptFlatItem {
+  type: "act" | "chapter" | "scene" | "separator" | "add-scene" | "add-chapter" | "add-act";
+  [key: string]: any;
 }
 
 export interface WritingSetting {
@@ -87,11 +110,11 @@ export async function listChapters(projectId: string): Promise<WritingChapter[]>
   return res.json();
 }
 
-export async function createChapter(projectId: string, title = "新章节", volume = ""): Promise<WritingChapter> {
+export async function createChapter(actId: string, projectId: string, title = ""): Promise<WritingChapter> {
   const res = await fetch(`${BASE}/chapters`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, title, volume }),
+    body: JSON.stringify({ act_id: actId, project_id: projectId, title }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -115,15 +138,6 @@ export async function updateChapter(id: string, data: Partial<WritingChapter>): 
 
 export async function deleteChapter(id: string): Promise<void> {
   const res = await fetch(`${BASE}/chapters/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function reorderChapters(projectId: string, orderedIds: string[]): Promise<void> {
-  const res = await fetch(`${BASE}/chapters/reorder`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, ordered_ids: orderedIds }),
-  });
   if (!res.ok) throw new Error(await res.text());
 }
 
@@ -170,6 +184,86 @@ export function getExportUrl(projectId: string, format: "txt" | "md" | "docx" = 
   return `${BASE}/projects/${encodeURIComponent(projectId)}/export?format=${format}`;
 }
 
+// ── Acts ──
+
+export async function listActs(projectId: string): Promise<WritingAct[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/acts`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createAct(projectId: string, title = "", numerate = true): Promise<WritingAct> {
+  const res = await fetch(`${BASE}/acts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, title, numerate }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateAct(id: string, data: Partial<WritingAct>): Promise<WritingAct> {
+  const res = await fetch(`${BASE}/acts/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteAct(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/acts/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── Scenes ──
+
+export async function listScenes(chapterId: string): Promise<WritingScene[]> {
+  const res = await fetch(`${BASE}/chapters/${encodeURIComponent(chapterId)}/scenes`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createScene(chapterId: string): Promise<WritingScene> {
+  const res = await fetch(`${BASE}/scenes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chapter_id: chapterId }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateScene(id: string, data: Partial<WritingScene>): Promise<WritingScene> {
+  const res = await fetch(`${BASE}/scenes/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteScene(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/scenes/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── Manuscript ──
+
+export async function getManuscript(projectId: string): Promise<ManuscriptTree> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/manuscript`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getManuscriptFlat(projectId: string): Promise<ManuscriptFlatItem[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/manuscript-flat`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 // ── 快照 ──
 
 export interface WritingSnapshot {
@@ -189,7 +283,13 @@ export interface WritingSnapshot {
 export interface WritingSnapshotDetail extends WritingSnapshot {
   data: {
     project: { id: string; name: string; description: string; metadata: Record<string, unknown> };
-    chapters: Array<{ id: string; title: string; content: string; word_count: number; sort_order: number; volume: string }>;
+    acts?: Array<{
+      id: string; title: string; numerate: number; sort_order: number;
+      chapters: Array<{
+        id: string; title: string; numerate: number; show_number: number; sort_order: number;
+        scenes: Array<{ id: string; content: string; summary: string; subtitle: string; sort_order: number }>;
+      }>;
+    }>;
     settings: Array<{ id: string; name: string; category: string; content: Record<string, unknown>; parent_id: string | null; sort_order: number; enabled: number }>;
     snapshot_version: number;
   };

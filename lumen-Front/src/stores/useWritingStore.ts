@@ -1,21 +1,18 @@
-/**
- * T11 useWritingStore — 写作模式全局状态
- */
 import { create } from "zustand";
-import type { WritingProject, WritingChapter, WritingSetting, WritingSnapshot } from "../api/writing";
+import type { WritingProject, WritingAct, WritingChapter, WritingScene, WritingSetting, WritingSnapshot } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
 
 interface WritingState {
-  // 数据
+  // Data
   projects: WritingProject[];
   activeProjectId: string | null;
-  chapters: WritingChapter[];
-  activeChapterId: string | null;
+  acts: WritingAct[];
+  activeSceneId: string | null;
   settings: WritingSetting[];
 
-  // UI 状态
+  // UI
   aiMode: AiMode;
   sidebarWidth: number;
   isChatPanelOpen: boolean;
@@ -25,61 +22,68 @@ interface WritingState {
   toggleFocusMode: () => void;
   toggleTypewriterMode: () => void;
 
-  // Ghost Text（AI 续写流式预览）
+  // Ghost Text
   ghostTextContent: string;
   ghostRequestId: string | null;
   setGhostText: (content: string, requestId: string) => void;
   clearGhostText: () => void;
 
-  // 保存状态
+  // Save
   saveStatus: "saved" | "saving" | "error";
   lastSavedAt: number | null;
   contentDirty: boolean;
 
-  // 快照
-  snapshots: WritingSnapshot[];
-  loadSnapshots: (projectId: string) => Promise<void>;
-  createManualSnapshot: (label?: string) => Promise<void>;
-  restoreFromSnapshot: (snapshotId: string) => Promise<void>;
-  deleteSnapshotAction: (snapshotId: string) => Promise<void>;
-
-  // 作品
+  // Projects
   loadProjects: () => Promise<void>;
   createProject: (name: string) => Promise<WritingProject>;
   updateProject: (id: string, data: Partial<WritingProject>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   setActiveProject: (id: string) => Promise<void>;
 
-  // 章节
-  loadChapters: (projectId: string) => Promise<void>;
-  createChapter: (title: string, volume?: string) => Promise<WritingChapter>;
-  updateChapter: (id: string, data: Partial<WritingChapter>) => Promise<void>;
-  renameChapter: (id: string, title: string) => Promise<void>;
-  deleteChapter: (id: string) => Promise<void>;
-  reorderChapters: (orderedIds: string[]) => Promise<void>;
-  setActiveChapter: (id: string) => void;
+  // Manuscript
+  loadManuscript: (projectId: string) => Promise<void>;
 
-  // 设定
+  // Acts
+  createAct: (title?: string) => Promise<WritingAct>;
+  updateActAction: (id: string, data: Partial<WritingAct>) => Promise<void>;
+  deleteActAction: (id: string) => Promise<void>;
+
+  // Chapters
+  createChapter: (actId: string, title?: string) => Promise<WritingChapter>;
+  updateChapterAction: (id: string, data: Partial<WritingChapter>) => Promise<void>;
+  deleteChapterAction: (id: string) => Promise<void>;
+
+  // Scenes
+  createScene: (chapterId: string) => Promise<WritingScene>;
+  updateSceneContent: (sceneId: string, content: object) => Promise<void>;
+  deleteSceneAction: (sceneId: string) => Promise<void>;
+  setActiveScene: (sceneId: string | null) => void;
+
+  // Settings
   loadSettings: (projectId: string) => Promise<void>;
   createSetting: (name: string, category?: string, parentId?: string | null) => Promise<WritingSetting>;
   updateSetting: (id: string, data: Partial<WritingSetting>) => Promise<void>;
   deleteSetting: (id: string) => Promise<void>;
 
+  // Snapshots
+  snapshots: WritingSnapshot[];
+  loadSnapshots: (projectId: string) => Promise<void>;
+  createManualSnapshot: (label?: string) => Promise<void>;
+  restoreFromSnapshot: (snapshotId: string) => Promise<void>;
+  deleteSnapshotAction: (snapshotId: string) => Promise<void>;
+
   // UI
   setAiMode: (mode: AiMode) => void;
   setSidebarWidth: (w: number) => void;
   toggleChatPanel: () => void;
-
-  // 获取当前章节内容（从 store 中）
-  getActiveChapter: () => WritingChapter | undefined;
   getActiveProject: () => WritingProject | undefined;
 }
 
 export const useWritingStore = create<WritingState>((set, get) => ({
   projects: [],
   activeProjectId: null,
-  chapters: [],
-  activeChapterId: null,
+  acts: [],
+  activeSceneId: null,
   settings: [],
   aiMode: "chat",
   sidebarWidth: 280,
@@ -87,16 +91,20 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   isLoaded: false,
   focusMode: false,
   typewriterMode: false,
-  toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
-  toggleTypewriterMode: () => set((s) => ({ typewriterMode: !s.typewriterMode })),
-  ghostTextContent: "",
-  ghostRequestId: null,
   saveStatus: "saved",
   lastSavedAt: null,
   contentDirty: false,
   snapshots: [],
+  ghostTextContent: "",
+  ghostRequestId: null,
 
-  // ── 作品 ──
+  toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
+  toggleTypewriterMode: () => set((s) => ({ typewriterMode: !s.typewriterMode })),
+  setGhostText: (content, requestId) => set({ ghostTextContent: content, ghostRequestId: requestId }),
+  clearGhostText: () => set({ ghostTextContent: "", ghostRequestId: null }),
+  setAiMode: (mode) => set({ aiMode: mode }),
+  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(200, Math.min(500, w)) }),
+  toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
 
   loadProjects: async () => {
     const projects = await writingApi.listProjects();
@@ -105,8 +113,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   createProject: async (name) => {
     const project = await writingApi.createProject(name);
-    set((s) => ({ projects: [project, ...s.projects], activeProjectId: project.id, chapters: [], activeChapterId: null, settings: [] }));
-    // 新项目没有章节，但需加载设定（可能为空）
+    set((s) => ({ projects: [project, ...s.projects], activeProjectId: project.id, acts: [], activeSceneId: null, settings: [] }));
     await get().loadSettings(project.id);
     return project;
   },
@@ -121,79 +128,91 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({
       projects: s.projects.filter((p) => p.id !== id),
       activeProjectId: s.activeProjectId === id ? null : s.activeProjectId,
-      chapters: s.activeProjectId === id ? [] : s.chapters,
-      activeChapterId: s.activeProjectId === id ? null : s.activeChapterId,
+      acts: s.activeProjectId === id ? [] : s.acts,
+      activeSceneId: s.activeProjectId === id ? null : s.activeSceneId,
     }));
   },
 
   setActiveProject: async (id) => {
-    set({ activeProjectId: id, chapters: [], activeChapterId: null, settings: [] });
+    set({ activeProjectId: id, acts: [], activeSceneId: null, settings: [] });
     if (id) {
-      await get().loadChapters(id);
+      await get().loadManuscript(id);
       await get().loadSettings(id);
     }
   },
 
-  // ── 章节 ──
-
-  loadChapters: async (projectId) => {
-    const chapters = await writingApi.listChapters(projectId);
-    set({ chapters });
+  loadManuscript: async (projectId) => {
+    try {
+      const data = await writingApi.getManuscript(projectId);
+      set({ acts: data.acts as WritingAct[] });
+    } catch {
+      set({ acts: [] });
+    }
   },
 
-  createChapter: async (title, volume = "") => {
+  createAct: async (title) => {
     const { activeProjectId } = get();
-    if (!activeProjectId) throw new Error("未选择作品");
-    const chapter = await writingApi.createChapter(activeProjectId, title, volume);
-    set((s) => ({ chapters: [...s.chapters, chapter], activeChapterId: chapter.id }));
+    if (!activeProjectId) throw new Error("No project selected");
+    const act = await writingApi.createAct(activeProjectId, title);
+    await get().loadManuscript(activeProjectId);
+    return act;
+  },
+
+  updateActAction: async (id, data) => {
+    const { activeProjectId } = get();
+    await writingApi.updateAct(id, data);
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
+
+  deleteActAction: async (id) => {
+    const { activeProjectId } = get();
+    await writingApi.deleteAct(id);
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
+
+  createChapter: async (actId, title) => {
+    const { activeProjectId } = get();
+    if (!activeProjectId) throw new Error("No project selected");
+    const chapter = await writingApi.createChapter(actId, activeProjectId, title);
+    await get().loadManuscript(activeProjectId);
     return chapter;
   },
 
-  updateChapter: async (id, data) => {
+  updateChapterAction: async (id, data) => {
+    const { activeProjectId } = get();
+    await writingApi.updateChapter(id, data);
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
+
+  deleteChapterAction: async (id) => {
+    const { activeProjectId } = get();
+    await writingApi.deleteChapter(id);
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
+
+  createScene: async (chapterId) => {
+    const scene = await writingApi.createScene(chapterId);
+    set({ activeSceneId: scene.id });
+    if (get().activeProjectId) await get().loadManuscript(get().activeProjectId!);
+    return scene;
+  },
+
+  updateSceneContent: async (sceneId, content) => {
     set({ saveStatus: "saving" });
     try {
-      const chapter = await writingApi.updateChapter(id, data);
-      set((s) => ({
-        chapters: s.chapters.map((c) => (c.id === id ? chapter : c)),
-        saveStatus: "saved",
-        lastSavedAt: Date.now(),
-        contentDirty: false,
-      }));
+      await writingApi.updateScene(sceneId, { content: content as any });
+      set({ saveStatus: "saved", lastSavedAt: Date.now(), contentDirty: false });
     } catch {
       set({ saveStatus: "error" });
     }
   },
 
-  deleteChapter: async (id) => {
-    await writingApi.deleteChapter(id);
-    set((s) => ({
-      chapters: s.chapters.filter((c) => c.id !== id),
-      activeChapterId: s.activeChapterId === id ? null : s.activeChapterId,
-    }));
+  deleteSceneAction: async (sceneId) => {
+    await writingApi.deleteScene(sceneId);
+    if (get().activeProjectId) await get().loadManuscript(get().activeProjectId!);
   },
 
-  renameChapter: async (id, title) => {
-    const chapter = await writingApi.updateChapter(id, { title });
-    set((s) => ({
-      chapters: s.chapters.map((c) => (c.id === id ? chapter : c)),
-    }));
-  },
-
-  reorderChapters: async (orderedIds) => {
-    const { activeProjectId } = get();
-    if (!activeProjectId) return;
-    await writingApi.reorderChapters(activeProjectId, orderedIds);
-    set((s) => ({
-      chapters: orderedIds.map((id, i) => {
-        const ch = s.chapters.find((c) => c.id === id);
-        return ch ? { ...ch, sort_order: i } : ch;
-      }).filter(Boolean) as typeof s.chapters,
-    }));
-  },
-
-  setActiveChapter: (id) => set({ activeChapterId: id }),
-
-  // ── 设定 ──
+  setActiveScene: (sceneId) => set({ activeSceneId: sceneId }),
 
   loadSettings: async (projectId) => {
     const settings = await writingApi.listSettings(projectId);
@@ -202,7 +221,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   createSetting: async (name, category = "custom", parentId = null) => {
     const { activeProjectId } = get();
-    if (!activeProjectId) throw new Error("未选择作品");
+    if (!activeProjectId) throw new Error("No project selected");
     const setting = await writingApi.createSetting(activeProjectId, name, category, parentId);
     set((s) => ({ settings: [...s.settings, setting] }));
     return setting;
@@ -212,11 +231,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set({ saveStatus: "saving" });
     try {
       const setting = await writingApi.updateSetting(id, data);
-      set((s) => ({
-        settings: s.settings.map((st) => (st.id === id ? setting : st)),
-        saveStatus: "saved",
-        lastSavedAt: Date.now(),
-      }));
+      set((s) => ({ settings: s.settings.map((st) => (st.id === id ? setting : st)), saveStatus: "saved", lastSavedAt: Date.now() }));
     } catch {
       set({ saveStatus: "error" });
     }
@@ -224,16 +239,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   deleteSetting: async (id) => {
     await writingApi.deleteSetting(id);
-    set((s) => ({
-      settings: s.settings.filter((st) => st.id !== id && st.parent_id !== id),
-    }));
+    set((s) => ({ settings: s.settings.filter((st) => st.id !== id && st.parent_id !== id) }));
   },
-
-  // ── UI ──
-
-  setAiMode: (mode) => set({ aiMode: mode }),
-  setSidebarWidth: (w) => set({ sidebarWidth: Math.max(200, Math.min(500, w)) }),
-  toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
 
   loadSnapshots: async (projectId) => {
     const { items } = await writingApi.listSnapshots(projectId);
@@ -249,15 +256,12 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   restoreFromSnapshot: async (snapshotId) => {
     await writingApi.restoreSnapshot(snapshotId);
-    const { activeProjectId, activeChapterId } = get();
+    const { activeProjectId } = get();
     if (activeProjectId) {
-      // 先清空 activeChapterId 触发编辑器卸载内容
-      set({ activeChapterId: null });
-      await get().loadChapters(activeProjectId);
+      set({ activeSceneId: null });
+      await get().loadManuscript(activeProjectId);
       await get().loadSettings(activeProjectId);
       await get().loadSnapshots(activeProjectId);
-      // 恢复 activeChapterId 触发编辑器重新加载
-      if (activeChapterId) set({ activeChapterId });
     }
   },
 
@@ -266,15 +270,6 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({ snapshots: s.snapshots.filter((snap) => snap.id !== snapshotId) }));
   },
 
-  setGhostText: (content, requestId) => set({ ghostTextContent: content, ghostRequestId: requestId }),
-  clearGhostText: () => set({ ghostTextContent: "", ghostRequestId: null }),
-
-  // ── 访问器 ──
-
-  getActiveChapter: () => {
-    const { chapters, activeChapterId } = get();
-    return chapters.find((c) => c.id === activeChapterId);
-  },
   getActiveProject: () => {
     const { projects, activeProjectId } = get();
     return projects.find((p) => p.id === activeProjectId);

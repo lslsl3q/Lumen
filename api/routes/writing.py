@@ -3,6 +3,7 @@ T11 写作模式 REST API — 作品/章节/世界观设定 CRUD
 """
 
 import asyncio
+import json
 import logging
 import re
 from fastapi import APIRouter, HTTPException
@@ -13,6 +14,10 @@ from lumen.services.storage.writing import (
     create_project, list_projects, get_project, update_project, delete_project,
     create_chapter, list_chapters, get_chapter, update_chapter, delete_chapter, reorder_chapters,
     create_setting, list_settings, get_setting, update_setting, delete_setting, reorder_settings,
+    # NEW:
+    create_act, list_acts, get_act, update_act, delete_act, reorder_acts,
+    create_scene, list_scenes, get_scene, update_scene, delete_scene, reorder_scenes,
+    get_manuscript, get_manuscript_flat,
 )
 from lumen.services.storage.writing_snapshot import (
     create_snapshot, list_snapshots, get_snapshot_detail, restore_snapshot, delete_snapshot,
@@ -23,6 +28,57 @@ router = APIRouter()
 
 
 # ── 请求模型 ──
+
+class CreateActRequest(BaseModel):
+    project_id: str
+    title: str = ""
+    numerate: bool = True
+
+
+class UpdateActRequest(BaseModel):
+    title: str | None = None
+    numerate: bool | None = None
+
+
+class ReorderActsRequest(BaseModel):
+    project_id: str
+    ordered_ids: list[str]
+
+
+class CreateChapterV2Request(BaseModel):
+    act_id: str
+    project_id: str
+    title: str = ""
+
+
+class UpdateChapterV2Request(BaseModel):
+    title: str | None = None
+    numerate: bool | None = None
+    show_number: bool | None = None
+
+
+class ReorderChaptersV2Request(BaseModel):
+    act_id: str
+    ordered_ids: list[str]
+
+
+class CreateSceneRequest(BaseModel):
+    chapter_id: str
+    content: dict | None = None
+    summary: str = ""
+    subtitle: str = ""
+
+
+class UpdateSceneRequest(BaseModel):
+    content: dict | None = None
+    summary: str | None = None
+    subtitle: str | None = None
+
+
+class ReorderScenesRequest(BaseModel):
+    chapter_id: str
+    ordered_ids: list[str]
+
 
 class CreateProjectRequest(BaseModel):
     name: str
@@ -165,6 +221,47 @@ async def api_reorder_chapters(req: ReorderChaptersRequest):
     return {"status": "reordered"}
 
 
+# ── Act ──
+
+@router.get("/projects/{project_id}/acts")
+async def api_list_acts(project_id: str):
+    return await asyncio.to_thread(list_acts, project_id)
+
+
+@router.post("/acts")
+async def api_create_act(req: CreateActRequest):
+    return await asyncio.to_thread(create_act, req.project_id, req.title, req.numerate)
+
+
+@router.get("/acts/{act_id}")
+async def api_get_act(act_id: str):
+    a = await asyncio.to_thread(get_act, act_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="Act not found")
+    return a
+
+
+@router.patch("/acts/{act_id}")
+async def api_update_act(act_id: str, req: UpdateActRequest):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    a = await asyncio.to_thread(update_act, act_id, **updates)
+    if not a:
+        raise HTTPException(status_code=404, detail="Act not found")
+    return a
+
+
+@router.delete("/acts/{act_id}")
+async def api_delete_act(act_id: str):
+    await asyncio.to_thread(delete_act, act_id)
+    return {"status": "deleted"}
+
+
+@router.post("/acts/reorder")
+async def api_reorder_acts(req: ReorderActsRequest):
+    await asyncio.to_thread(reorder_acts, req.project_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
 # ── 世界观设定 ──
 
 @router.get("/projects/{project_id}/settings")
@@ -205,6 +302,47 @@ async def api_delete_setting(setting_id: str):
 @router.post("/settings/reorder")
 async def api_reorder_settings(req: ReorderSettingsRequest):
     await asyncio.to_thread(reorder_settings, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# ── Scene ──
+
+@router.get("/chapters/{chapter_id}/scenes")
+async def api_list_scenes(chapter_id: str):
+    return await asyncio.to_thread(list_scenes, chapter_id)
+
+
+@router.post("/scenes")
+async def api_create_scene(req: CreateSceneRequest):
+    return await asyncio.to_thread(create_scene, req.chapter_id, req.content, req.summary, req.subtitle)
+
+
+@router.get("/scenes/{scene_id}")
+async def api_get_scene(scene_id: str):
+    s = await asyncio.to_thread(get_scene, scene_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return s
+
+
+@router.patch("/scenes/{scene_id}")
+async def api_update_scene(scene_id: str, req: UpdateSceneRequest):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    s = await asyncio.to_thread(update_scene, scene_id, **updates)
+    if not s:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return s
+
+
+@router.delete("/scenes/{scene_id}")
+async def api_delete_scene(scene_id: str):
+    await asyncio.to_thread(delete_scene, scene_id)
+    return {"status": "deleted"}
+
+
+@router.post("/scenes/reorder")
+async def api_reorder_scenes(req: ReorderScenesRequest):
+    await asyncio.to_thread(reorder_scenes, req.chapter_id, req.ordered_ids)
     return {"status": "reordered"}
 
 
@@ -254,93 +392,74 @@ async def api_delete_snapshot(snapshot_id: str):
 
 # ── 导出 ──
 
+def _pm_json_to_plain_text(content_str: str) -> str:
+    """Extract plain text from ProseMirror JSON."""
+    try:
+        doc = json.loads(content_str) if isinstance(content_str, str) else content_str
+    except json.JSONDecodeError:
+        return content_str
+    texts = []
+    def walk(node):
+        if node.get("type") == "text" and node.get("text"):
+            texts.append(node["text"])
+        for child in node.get("content", []):
+            walk(child)
+    walk(doc)
+    return "\n\n".join(texts)
+
+
+def _pm_json_to_markdown(content_str: str) -> str:
+    """Convert ProseMirror JSON to basic Markdown."""
+    try:
+        doc = json.loads(content_str) if isinstance(content_str, str) else content_str
+    except json.JSONDecodeError:
+        return content_str
+    lines = []
+    def walk(node):
+        t = node.get("type", "")
+        if t == "heading":
+            lines.append("#" * node.get("attrs", {}).get("level", 1) + " " + _collect_text(node))
+        elif t == "paragraph":
+            lines.append(_collect_text(node))
+        elif t == "bulletList":
+            for item in node.get("content", []):
+                lines.append("- " + _collect_text(item))
+        elif t == "orderedList":
+            for i, item in enumerate(node.get("content", []), 1):
+                lines.append(f"{i}. " + _collect_text(item))
+        elif t == "blockquote":
+            for child in node.get("content", []):
+                lines.append("> " + _collect_text(child))
+        else:
+            for child in node.get("content", []):
+                walk(child)
+    walk(doc)
+    return "\n\n".join(lines)
+
+
+def _collect_text(node) -> str:
+    texts = []
+    def walk(n):
+        if n.get("type") == "text" and n.get("text"):
+            texts.append(n["text"])
+        for child in n.get("content", []):
+            walk(child)
+    walk(node)
+    return "".join(texts)
+
+
 def _safe_filename(name: str) -> str:
     """清理文件名：去除路径分隔符、换行、控制字符"""
     return re.sub(r'[/\\:\n\r\t\0]', '_', name).strip('. ')
 
 
-def _md_to_plain_text(content: str) -> str:
-    """Markdown 转纯文本：保留用户分割符（6+连续符号独占一行），段落加全角空格缩进。"""
-    lines = content.split("\n")
-    result = []
-    for line in lines:
-        stripped = line.strip()
-        # 分割符：独占一行 + 6个以上连续符号 → 原样保留
-        if re.match(r'^[-=_*·※]{6,}\s*$', stripped):
-            result.append("")
-            result.append(stripped)
-            result.append("")
-            continue
-        # 去标题标记
-        stripped = re.sub(r'^#{1,6}\s*', '', stripped)
-        # 去粗体/斜体（注意不匹配分割符）
-        stripped = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', stripped)
-        stripped = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', stripped)
-        # 去行内代码
-        stripped = re.sub(r'`([^`]+)`', r'\1', stripped)
-        # 去图片（必须在链接之前，否则 ! 被 link 正则吃掉）
-        stripped = re.sub(r'!\[([^\]]*)\]\([^)]+\)', r'\1', stripped)
-        # 去链接保留文本
-        stripped = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', stripped)
-        # 去短分割线（3-5个连续 - 在行首）
-        if re.match(r'^[-]{3,5}\s*$', stripped):
-            continue
-        # 非空行加全角空格缩进
-        if stripped:
-            stripped = "　　" + stripped
-        result.append(stripped)
-    # 清理连续空行（最多保留两个换行）
-    text = "\n".join(result)
-    text = re.sub(r'\n{4,}', '\n\n\n', text)
-    return text.strip()
-
-
-def _generate_docx(title: str, chapters: list[dict]) -> bytes:
-    """在同步线程中生成 DOCX 文件。"""
-    from docx import Document
-    from docx.shared import Pt
-    from io import BytesIO
-
-    doc = Document()
-    doc.add_heading(title, level=0)
-
-    for ch in chapters:
-        vol = ch.get("volume", "")
-        heading = f"{vol + ' · ' if vol else ''}{ch['title']}"
-        doc.add_heading(heading, level=1)
-
-        content = ch.get("content", "")
-        for line in content.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            if line.startswith("### "):
-                doc.add_heading(line[4:], level=3)
-            elif line.startswith("## "):
-                doc.add_heading(line[3:], level=2)
-            elif line.startswith("# "):
-                doc.add_heading(line[2:], level=1)
-            elif re.match(r'^[-=_*·※]{6,}\s*$', line):
-                continue  # 分割符在 DOCX 中跳过
-            else:
-                clean = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', line)
-                clean = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', clean)
-                clean = re.sub(r'`([^`]+)`', r'\1', clean)
-                p = doc.add_paragraph(clean)
-                for run in p.runs:
-                    run.font.size = Pt(12)
-
-    buf = BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
-
-
 @router.get("/projects/{project_id}/export")
 async def api_export_project(project_id: str, format: str = "txt"):
-    """导出整本作品为 TXT / Markdown / DOCX"""
-    chapters = await asyncio.to_thread(list_chapters, project_id)
-    if not chapters:
-        raise HTTPException(404, "没有章节可导出")
+    """Export entire project as TXT / Markdown / DOCX from new acts/chapters/scenes model."""
+    manuscript = await asyncio.to_thread(get_manuscript, project_id)
+    acts = manuscript.get("acts", [])
+    if not acts:
+        raise HTTPException(404, "No content to export")
 
     project = await asyncio.to_thread(get_project, project_id)
     title = project["name"] if project else "未命名"
@@ -348,27 +467,64 @@ async def api_export_project(project_id: str, format: str = "txt"):
 
     if format == "md":
         parts = [f"# {title}\n\n"]
-        for ch in chapters:
-            vol = ch.get("volume", "")
-            parts.append(f"## {vol + ' · ' if vol else ''}{ch['title']}\n\n")
-            parts.append(f"{ch.get('content', '')}\n\n---\n\n")
+        for act in acts:
+            parts.append(f"## Act: {act['title']}\n\n")
+            for ch in act.get("chapters", []):
+                parts.append(f"### {ch['title']}\n\n")
+                for sc in ch.get("scenes", []):
+                    parts.append(_pm_json_to_markdown(sc.get("content", "{}")))
+                    parts.append("\n\n---\n\n")
         return PlainTextResponse("".join(parts), media_type="text/markdown",
                                  headers={"Content-Disposition": f"attachment; filename={safe_title}.md"})
 
     elif format == "docx":
-        buf_data = await asyncio.to_thread(_generate_docx, title, chapters)
+        from docx import Document
+        from docx.shared import Pt
+        from io import BytesIO
+
+        doc = Document()
+        doc.add_heading(title, level=0)
+        for act in acts:
+            doc.add_heading(f"Act: {act['title']}", level=1)
+            for ch in act.get("chapters", []):
+                doc.add_heading(ch["title"], level=2)
+                for sc in ch.get("scenes", []):
+                    text = _pm_json_to_plain_text(sc.get("content", "{}"))
+                    for line in text.split("\n"):
+                        line = line.strip()
+                        if line:
+                            p = doc.add_paragraph(line)
+                            for run in p.runs:
+                                run.font.size = Pt(12)
+        buf = BytesIO()
+        doc.save(buf)
+        buf_data = buf.getvalue()
         return StreamingResponse(
             iter([buf_data]),
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers={"Content-Disposition": f"attachment; filename={safe_title}.docx"},
         )
 
-    else:  # txt 默认
+    else:  # txt
         parts = [f"{title}\n{'=' * len(title)}\n\n"]
-        for ch in chapters:
-            vol = ch.get("volume", "")
-            parts.append(f"{vol + ' · ' if vol else ''}{ch['title']}\n{'-' * 20}\n\n")
-            content = _md_to_plain_text(ch.get("content", ""))
-            parts.append(f"{content}\n\n")
+        for act in acts:
+            parts.append(f"Act: {act['title']}\n\n")
+            for ch in act.get("chapters", []):
+                parts.append(f"  {ch['title']}\n  {'-' * 20}\n\n")
+                for sc in ch.get("scenes", []):
+                    parts.append(_pm_json_to_plain_text(sc.get("content", "{}")))
+                    parts.append("\n\n")
         return PlainTextResponse("".join(parts), media_type="text/plain",
                                  headers={"Content-Disposition": f"attachment; filename={safe_title}.txt"})
+
+
+# ── Manuscript (bulk) ──
+
+@router.get("/projects/{project_id}/manuscript")
+async def api_get_manuscript(project_id: str):
+    return await asyncio.to_thread(get_manuscript, project_id)
+
+
+@router.get("/projects/{project_id}/manuscript-flat")
+async def api_get_manuscript_flat(project_id: str):
+    return await asyncio.to_thread(get_manuscript_flat, project_id)
