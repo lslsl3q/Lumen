@@ -233,9 +233,9 @@ function CodexPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search + New */}
-      <div className="flex-none flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border)]">
-        <div className="flex-1 flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 border border-[var(--color-border)]">
+      {/* Toolbar — search | filter | New Entry | display */}
+      <div className="flex-none flex items-center gap-1.5 px-2 py-2 border-b border-[var(--color-border)]">
+        <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-white/5 border border-[var(--color-border)]">
           <Search className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
           <input
             className="flex-1 bg-transparent text-[12px] text-[var(--color-text-secondary)] outline-none placeholder:text-[var(--color-text-dim)]"
@@ -244,12 +244,21 @@ function CodexPanel() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <button
+          className="size-7 flex items-center justify-center rounded-md text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 transition-colors"
+          type="button"
+          title="Filter"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M10 14h4M12 19" />
+          </svg>
+        </button>
         <Popover>
           <PopoverTrigger
-            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium text-[var(--color-text-muted)] hover:bg-white/5 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition-colors cursor-pointer"
             type="button"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-3 h-3" />
             New Entry
           </PopoverTrigger>
           <PopoverContent
@@ -272,6 +281,13 @@ function CodexPanel() {
             ))}
           </PopoverContent>
         </Popover>
+        <button
+          className="size-7 flex items-center justify-center rounded-md text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 transition-colors"
+          type="button"
+          title="Display settings"
+        >
+          <Settings className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Category list — only show categories with items */}
