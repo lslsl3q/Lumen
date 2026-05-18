@@ -1664,22 +1664,28 @@
 /* Act header — thick border + large gap */
 .act-row-header {
   position: relative;
-  border-top: 3.57px solid #3f3f46;
+  border-top: 3px solid var(--color-border-subtle);
   margin-top: 80px;
-  padding-top: 80px;
-  padding-bottom: 24px;
+  padding-top: 64px;
+  padding-bottom: 64px;
 }
 .act-row-header.is-first {
-  margin-top: 20vh;
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
 }
 
-/* Chapter header — compact, no thick border */
+/* Chapter header — dashed border separator */
 .chapter-row-header {
+  border-top: 1px dashed var(--color-border-subtle);
   margin-top: 2.5em;
   margin-bottom: 1em;
+  padding-top: 2.5em;
 }
 .chapter-row-header.after-act {
+  border-top: none;
   margin-top: 16px;
+  padding-top: 0;
 }
 
 /* Insert buttons — aligned styling */
@@ -1701,6 +1707,7 @@
 }
 .insert-btn-scene { margin-top: 32px; }
 .insert-btn-chapter {
+  border-top: 1px dashed var(--color-border-subtle);
   margin-top: 24px;
   padding-top: 24px;
 }

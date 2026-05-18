@@ -186,9 +186,9 @@ async def api_list_chapters(project_id: str):
 
 
 @router.post("/chapters")
-async def api_create_chapter(req: CreateChapterRequest):
+async def api_create_chapter(req: CreateChapterV2Request):
     return await asyncio.to_thread(
-        create_chapter, req.project_id, req.title, req.volume
+        create_chapter, req.act_id, req.project_id, req.title
     )
 
 
