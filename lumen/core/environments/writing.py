@@ -1,16 +1,18 @@
 """
 T11 WritingEnvironment — 写作模式环境
 
-5 种 AI 模式路由：
-- chat:      对话讨论（完整 Agent act()，有思想、有记忆）
-- continue:  续写（Agent 感知当前章节 + 图谱 + 伏笔 → 生成续写）
-- rewrite:   润色（Agent 理解选中文字 + 上下文 → 改写）
-- expand:    扩写（Agent 在原有内容基础上展开描写）
-- condense:  精简（Agent 去除冗余，保留核心）
+两种 AI 管道：
 
-全部走 Agent 管道（不是裸 LLM），Agent 有身份、有知识、有记忆。
+1. 直接管道（direct_writing_stream）— 模板渲染 + 直调 LLM
+   用于：continue / expand / rewrite / condense / beat_generate
+   无 Agent、无 ReAct、无 persona、无记忆。纯文本变换。
+
+2. Agent 管道（writing_chat_stream）— 完整 Agent act()
+   用于：chat（写作协同编辑、多轮对话、diff 式修改）
+   有身份、有知识、有记忆、有工具。
 """
 
+import asyncio
 import logging
 from typing import AsyncGenerator
 
@@ -18,6 +20,105 @@ from lumen.core.environments.base import BaseEnvironment
 from lumen.types.agent_message import AgentMessage
 
 logger = logging.getLogger(__name__)
+
+
+# ── 直接管道：模板渲染 + LLM 流式调用 ──
+
+
+async def direct_writing_stream(
+    ai_mode: str,
+    book_id: str,
+    chapter_id: str,
+    chapter_title: str = "",
+    chapter_content: str = "",
+    book_name: str = "",
+    selected_text: str = "",
+    text_before_selection: str = "",
+    text_after_selection: str = "",
+    beat_text: str = "",
+    beat_context: str = "",
+    max_words: int | None = None,
+    model_id: str = "",
+) -> AsyncGenerator[dict, None]:
+    """直接模板渲染 + LLM 调用，不经过 Agent 管道
+
+    用于 continue / expand / rewrite / condense / beat_generate。
+    无 persona、无记忆、无 ReAct。
+    """
+    from lumen.prompt.template_engine import render_message, build_context, TemplateError
+    from lumen.services.writing.context_query import ContextQueryService, _TemplateQueryProxy
+    from lumen.services.llm import chat
+    from lumen.config import DEFAULT_MODEL
+
+    model = model_id or DEFAULT_MODEL
+
+    # Content truncation
+    content_truncated = False
+    if chapter_content and len(chapter_content) > 4000:
+        chapter_content = chapter_content[-4000:]
+        content_truncated = True
+
+    # 构建上下文查询服务（codex 注入）
+    svc = ContextQueryService(book_id, chapter_id)
+    if book_id:
+        await asyncio.to_thread(svc.preload)
+    query_proxy = _TemplateQueryProxy(svc)
+
+    template_context = build_context(
+        character_id="writing",
+        book_name=book_name,
+        chapter_title=chapter_title,
+        chapter_content=chapter_content,
+        content_truncated=content_truncated,
+        selected_text=selected_text,
+        selected_word_count=len(selected_text) if selected_text else 0,
+        text_before_selection=text_before_selection,
+        text_after_selection=text_after_selection,
+        beat_text=beat_text,
+        beat_context=beat_context,
+        max_words=max_words,
+        query=query_proxy,
+    )
+
+    try:
+        system_part, user_part = render_message(f"writing/{ai_mode}", template_context)
+    except TemplateError as e:
+        yield {"type": "error", "message": f"模板错误: {e}"}
+        return
+
+    messages = []
+    if system_part:
+        messages.append({"role": "system", "content": system_part})
+    if user_part:
+        messages.append({"role": "user", "content": user_part})
+
+    if not messages:
+        yield {"type": "error", "message": "模板渲染结果为空"}
+        return
+
+    # 直调 LLM，流式返回
+    try:
+        response = await chat(
+            messages=messages,
+            model=model,
+            stream=True,
+        )
+
+        async for chunk in response:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield {"type": "text", "content": delta.content}
+
+        yield {"type": "done", "exit_reason": "completed"}
+
+    except Exception as e:
+        logger.error("[Writing Direct] LLM 调用失败: %s", e)
+        yield {"type": "error", "message": str(e)}
+
+
+# ── Agent 管道：完整 Agent act() ──
 
 
 def _build_writing_agent(
@@ -33,18 +134,7 @@ def _build_writing_agent(
 ) -> "Agent":
     """构建临时 WritingAgent（每次请求创建，用完即弃）
 
-    Args:
-        book_id: 作品 ID（用于 TriviumDB writing.tdb 隔离）
-        chapter_id: 章节 ID
-        ai_mode: chat/continue/rewrite/expand/condense
-        chapter_title: 章节标题
-        chapter_content: 章节内容
-        book_name: 作品名
-        selected_text: 选中的文字（润色/扩写/精简模式用）
-        user_input: 用户输入
-
-    Returns:
-        配置好的 Writing Agent
+    仅用于 chat 模式。
     """
     session_messages = [
         {"role": "system", "content": ""},
@@ -66,15 +156,13 @@ def _build_writing_agent(
 
     agent = Agent(f"writing-{book_id}")
 
-    # ContextComponents — 按 priority 排序拼写 system prompt
-    agent.add_component(IdentityComponent())          # priority=10, STATIC
-    agent.add_component(WritingContextComponent())     # priority=25, DYNAMIC
-    agent.add_component(LoreComponent())              # priority=20→实际30, DYNAMIC
-    agent.add_component(MemoryComponent())            # priority=30, DYNAMIC
-    agent.add_component(SkillsComponent())            # priority=50, STATIC
-    agent.add_component(ToolComponent())              # priority=90, STATIC
+    agent.add_component(IdentityComponent())
+    agent.add_component(WritingContextComponent())
+    agent.add_component(LoreComponent())
+    agent.add_component(MemoryComponent())
+    agent.add_component(SkillsComponent())
+    agent.add_component(ToolComponent())
 
-    # ActingComponent — ReAct 循环
     from types import SimpleNamespace
     temp_session = SimpleNamespace(
         session_id=f"writing_{book_id}_{chapter_id}",
@@ -107,24 +195,10 @@ async def writing_chat_stream(
     user_input: str = "",
     extra_context: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
-    """Writing Agent 流式响应 — 核心入口
+    """Writing Agent 流式响应 — 仅用于 chat 模式
 
     创建临时 WritingAgent → ReAct 循环 → yield SSE 事件 → 销毁
-
-    Args:
-        book_id: 作品 ID
-        chapter_id: 章节 ID
-        ai_mode: chat/continue/rewrite/expand/condense
-        chapter_title: 章节标题
-        chapter_content: 章节内容
-        book_name: 作品名
-        selected_text: 选中的文本（润色/扩写/精简模式）
-        user_input: 用户输入
-
-    Yields:
-        SSEEvent dict（text/tool_start/tool_result/done）
     """
-    # 构建上下文
     context = {
         "book_id": book_id,
         "chapter_id": chapter_id,
@@ -144,7 +218,6 @@ async def writing_chat_stream(
     if extra_context:
         context.update(extra_context)
 
-    # 创建临时 WritingAgent
     agent = _build_writing_agent(
         book_id=book_id,
         chapter_id=chapter_id,
@@ -157,13 +230,12 @@ async def writing_chat_stream(
         extra_context=extra_context,
     )
 
-    # ReAct 循环 → SSE 事件流
     async for event in agent.act(context, short_term_history=[]):
         yield event
 
 
 class WritingEnvironment(BaseEnvironment):
-    """写作环境 — 续写/润色/扩写/精简/对话，全部走 Agent 管道"""
+    """写作环境 — chat 走 Agent 管道，其余走直接管道"""
 
     def __init__(self, message_bus):
         super().__init__(message_bus)
@@ -174,37 +246,44 @@ class WritingEnvironment(BaseEnvironment):
         target_id: str | None,
         msg: AgentMessage,
     ) -> AsyncGenerator[dict, None]:
-        """处理写作消息，yield SSE 事件
-
-        msg.metadata 必须包含:
-            ai_mode: chat/continue/rewrite/expand/condense
-            book_id: 作品 ID
-            chapter_id: 章节 ID
-        """
         content = msg.get("content", "")
         metadata = msg.get("metadata", {})
 
         ai_mode = metadata.get("ai_mode", "chat")
         book_id = metadata.get("book_id", "")
         chapter_id = metadata.get("chapter_id", "")
-        chapter_title = metadata.get("chapter_title", "")
-        chapter_content = metadata.get("chapter_content", "")
-        book_name = metadata.get("book_name", "")
-        selected_text = metadata.get("selected_text", "")
 
         if not book_id:
             yield {"type": "text", "content": "[错误] 未指定作品"}
             yield {"type": "done", "exit_reason": "missing_book_id"}
             return
 
-        async for event in writing_chat_stream(
-            book_id=book_id,
-            chapter_id=chapter_id,
-            ai_mode=ai_mode,
-            chapter_title=chapter_title,
-            chapter_content=chapter_content,
-            book_name=book_name,
-            selected_text=selected_text,
-            user_input=content,
-        ):
-            yield event
+        if ai_mode == "chat":
+            async for event in writing_chat_stream(
+                book_id=book_id,
+                chapter_id=chapter_id,
+                ai_mode=ai_mode,
+                chapter_title=metadata.get("chapter_title", ""),
+                chapter_content=metadata.get("chapter_content", ""),
+                book_name=metadata.get("book_name", ""),
+                selected_text=metadata.get("selected_text", ""),
+                user_input=content,
+            ):
+                yield event
+        else:
+            async for event in direct_writing_stream(
+                ai_mode=ai_mode,
+                book_id=book_id,
+                chapter_id=chapter_id,
+                chapter_title=metadata.get("chapter_title", ""),
+                chapter_content=metadata.get("chapter_content", ""),
+                book_name=metadata.get("book_name", ""),
+                selected_text=metadata.get("selected_text", ""),
+                text_before_selection=metadata.get("text_before_selection", ""),
+                text_after_selection=metadata.get("text_after_selection", ""),
+                beat_text=metadata.get("beat_text", ""),
+                beat_context=metadata.get("beat_context", ""),
+                max_words=metadata.get("max_words"),
+                model_id=metadata.get("model_id", ""),
+            ):
+                yield event

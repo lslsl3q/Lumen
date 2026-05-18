@@ -1,3 +1,9 @@
+/**
+ * BeatNavigator — 24px sticky 导航面板
+ *
+ * 深色背景 + 彩色 beat 标记 + viewport 指示器 + 点击跳转。
+ * sticky top-0 粘在滚动容器右边缘，不随内容滚动。
+ */
 import { useRef, useEffect, useState, useCallback } from "react";
 
 export interface BeatInfo {
@@ -52,7 +58,8 @@ export function BeatNavigator({
   return (
     <div
       ref={navRef}
-      className="relative w-3 flex-none bg-gray-900 cursor-pointer"
+      className="w-6 flex-none shrink-0 sticky top-0 h-full cursor-pointer select-none overflow-visible"
+      style={{ background: "rgb(24, 24, 27)" }}
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const y = e.clientY - rect.top;
@@ -63,26 +70,36 @@ export function BeatNavigator({
         }
       }}
     >
-      {/* Beat markers */}
-      {beats.map((beat) => (
-        <div
-          key={beat.id}
-          className="absolute left-0.5 right-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-          style={{
-            top: `${beat.offsetTop * scale}px`,
-            height: `${Math.max(2, beat.height * scale)}px`,
-            backgroundColor: beat.color,
-          }}
-          title={beat.label}
-        />
-      ))}
+      {/* Beat markers — 彩色色块贴左 */}
+      {beats.map((beat) => {
+        const top = beat.offsetTop * scale;
+        const height = Math.max(2, beat.height * scale);
+        const inViewport = top + height >= viewportStart && top <= viewportStart + viewportSize;
+        return (
+          <div
+            key={beat.id}
+            className="absolute rounded-sm transition-opacity"
+            style={{
+              left: 2,
+              right: 4,
+              top: `${top}px`,
+              height: `${height}px`,
+              backgroundColor: beat.color,
+              opacity: inViewport ? 0.85 : 0.35,
+            }}
+            title={beat.label}
+          />
+        );
+      })}
 
-      {/* Current viewport indicator */}
+      {/* Viewport 指示条 — 显示当前可见区域 */}
       <div
-        className="absolute left-0 right-0 bg-white/10 pointer-events-none rounded-sm"
+        className="absolute left-0 right-0 pointer-events-none rounded-sm"
         style={{
           top: `${viewportStart}px`,
           height: `${viewportSize}px`,
+          background: "rgba(255,255,255,0.06)",
+          borderLeft: "2px solid rgba(255,255,255,0.15)",
         }}
       />
     </div>

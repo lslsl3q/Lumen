@@ -1,10 +1,10 @@
 /**
  * SceneBeatView — 场景节拍块的 React NodeView
  *
- * 布局：标题栏 + 指令输入区 + 设置区 + 模型选择器/Clear Beat
- * 生成时在 beat 块下方显示独立的 GenerationBar + ghost text。
+ * NC-aligned visual: uniform border, translucent bg, SVG drag handle,
+ * grouped context menu, dashed collapse, no divider lines.
  */
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react";
@@ -12,7 +12,7 @@ import { useWritingStore } from "../../stores/useWritingStore";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import type { StreamEvent } from "../../api/chat";
 import { GenerationBar } from "./GenerationBar";
-import { PencilLine } from "lucide-react";
+import { GenerateTextDialog, type GenerateOptions } from "./GenerateTextDialog";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
 const WORD_LIMITS = [200, 400, 600] as const;
@@ -21,6 +21,38 @@ const TYPE_LABELS: Record<string, string> = {
   beat: "SCENE BEAT",
   continue: "CONTINUE WRITING",
 };
+
+const CATEGORY_LABELS: Record<string, string> = {
+  character: "角色",
+  location: "地点",
+  item: "物品",
+  event: "事件",
+  custom: "自定义",
+};
+
+function GripDotsIcon() {
+  return (
+    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+      <circle cx="2" cy="3" r="1.5" />
+      <circle cx="7" cy="3" r="1.5" />
+      <circle cx="2" cy="8" r="1.5" />
+      <circle cx="7" cy="8" r="1.5" />
+      <circle cx="2" cy="13" r="1.5" />
+      <circle cx="7" cy="13" r="1.5" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5"
+      className={`transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+    >
+      <path d="M4.5 2.5L8 6L4.5 9.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getPos }: NodeViewProps) {
   const beatType = (node.attrs.beatType as string) ?? "beat";
@@ -45,15 +77,27 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const [genWordCount, setGenWordCount] = useState(0);
   const [customWords, setCustomWords] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const selectedContextIds = (node.attrs.contextIds as string[]) ?? [];
   const settings = useWritingStore((s) => s.settings);
   const selectedContexts = settings.filter((s) => selectedContextIds.includes(s.id));
 
+  // Group settings by category for the context dropdown
+  const settingsByCategory = useMemo(() => {
+    const groups: Record<string, typeof settings> = {};
+    for (const s of settings) {
+      const cat = s.category || "custom";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(s);
+    }
+    return groups;
+  }, [settings]);
+
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [genBarRect, setGenBarRect] = useState<{ left: number; top: number } | null>(null);
 
-  // ── 自定义拖拽：纯 mouse 事件，不依赖 ProseMirror/HTML5 drag ──
+  // ── Custom drag: pure mouse events ──
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -61,7 +105,6 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     const pos = getPos();
     if (pos == null) return;
 
-    // 半透明幽灵：克隆 SceneBeat 原始外观，从原位开始跟随鼠标
     const blockEl = wrapperRef.current?.querySelector<HTMLElement>(".scene-beat-block");
     const ghost = blockEl
       ? blockEl.cloneNode(true) as HTMLElement
@@ -77,7 +120,6 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     `;
     document.body.appendChild(ghost);
 
-    // 插入线：宽度对齐编辑器文字区域
     const editorEl = editor.view.dom as HTMLElement;
     const editorRect = editorEl.getBoundingClientRect();
     const dropLine = document.createElement("div");
@@ -99,11 +141,8 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       const dropResult = editor.view.posAtCoords({ left: me.clientX, top: me.clientY });
       if (!dropResult) { dropLine.style.display = "none"; targetPos = null; return; }
 
-      // 吸附到段落边界：找到光标所在 block 的开头位置
       const $pos = editor.state.doc.resolve(dropResult.pos);
-      // 如果在 block 中间，吸附到 block 开头
       const blockPos = $pos.before($pos.depth);
-      // 目标插入位置 = block 节点之前（在它前面插入）
       targetPos = blockPos;
 
       try {
@@ -138,9 +177,9 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
 
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
-  }, [editor, getPos, beatType]);
+  }, [editor, getPos]);
 
-  // 追踪 GenerationBar 浮动位置
+  // Track GenerationBar floating position
   useEffect(() => {
     if (genStatus === "idle" || !wrapperRef.current) {
       setGenBarRect(null);
@@ -225,22 +264,26 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     [selectedContextIds, updateAttributes]
   );
 
-  const handleGenerate = useCallback(() => {
+  const handleGenerate = useCallback((opts?: GenerateOptions) => {
     if (!activeProjectId || !activeChapterId || !activeProject || !activeChapter) return;
 
     const beatText = node.textContent.trim();
     if (!beatText) return;
+
+    const finalMaxWords = opts?.maxWords ?? maxWords;
+    const finalModelId = opts?.modelId ?? modelId;
+    const finalInstructions = opts?.instructions ?? "";
 
     const requestId = crypto.randomUUID();
     requestIdRef.current = requestId;
     generatedTextRef.current = "";
     useWritingStore.setState({ aiMode: "beat_generate" });
     clearGhostText();
-    updateAttributes({ status: "generating" });
+    updateAttributes({ status: "generating", maxWords: finalMaxWords });
     setGenStatus("generating");
     setGenWordCount(0);
+    setDialogOpen(false);
 
-    // 把光标移到 SceneBeat 节点之后，ghost text 才会插在 beat 下方（正文区域）
     const pos = getPos();
     if (pos != null) {
       const afterBeat = pos + node.nodeSize;
@@ -259,8 +302,9 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       selected_text: "",
       content: beatText,
       beat_text: beatText,
-      max_words: maxWords,
-      model_id: modelId,
+      max_words: finalMaxWords,
+      model_id: finalModelId,
+      instructions: finalInstructions,
       request_id: requestId,
     });
   }, [
@@ -288,7 +332,6 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   }, [clearGhostText, editor, updateAttributes]);
 
   const handleRetry = useCallback(() => {
-    // 重新生成
     handleGenerate();
   }, [handleGenerate]);
 
@@ -324,21 +367,23 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       className={`scene-beat-wrapper ${collapsed ? "scene-beat-collapsed" : ""}`}
     >
       <div className="scene-beat-block">
-        {/* 标题栏 */}
+        {/* Header bar */}
         <div className="scene-beat-header" contentEditable={false}>
           <span
             className="scene-beat-drag"
             title="拖拽排序"
             onMouseDown={handleDragStart}
-          >⠿</span>
-          <span className="scene-beat-type-label">{TYPE_LABELS[beatType] ?? "SCENE BEAT"}</span>
+          >
+            <GripDotsIcon />
+          </span>
           <button
             onClick={handleToggleCollapsed}
             className="scene-beat-collapse"
-            title={collapsed ? "Show" : "Hide"}
+            title={collapsed ? "展开" : "折叠"}
           >
-            {collapsed ? "Show" : "Hide"}
+            <ChevronIcon open={!collapsed} />
           </button>
+          <span className="scene-beat-type-label">{TYPE_LABELS[beatType] ?? "SCENE BEAT"}</span>
           <button
             onClick={deleteNode}
             className="scene-beat-delete"
@@ -351,8 +396,9 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         {!collapsed && (
           <>
             <NodeViewContent className="scene-beat-content" />
+
+            {/* Settings: word chips + context + tags */}
             <div className="scene-beat-settings" contentEditable={false}>
-              {/* 字数 + 自定义 + Context 按钮一行 */}
               <div className="scene-beat-toolbar">
                 <div className="scene-beat-word-chips">
                   {WORD_LIMITS.map((w) => (
@@ -374,7 +420,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                     className="scene-beat-ghost-btn"
                     title="自定义字数"
                   >
-                    <PencilLine size={13} />
+                    …
                   </button>
                   {showCustomInput && (
                     <input
@@ -394,32 +440,46 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                     />
                   )}
                 </div>
+
+                {/* Context button — grouped dropdown */}
                 <Popover>
-                  <PopoverTrigger
-                    className="scene-beat-ghost-btn"
-                    title="添加上下文"
-                  >
-                    +Context
+                  <PopoverTrigger className="scene-beat-ghost-btn" title="添加上下文">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M6 1.5v9M1.5 6h9" strokeLinecap="round" />
+                    </svg>
+                    Context
                   </PopoverTrigger>
                   <PopoverContent align="start" sideOffset={4} className="scene-beat-context-dropdown">
                     {settings.length === 0 ? (
                       <div className="scene-beat-context-empty">暂无设定条目</div>
                     ) : (
-                      settings.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => toggleContext(s.id)}
-                          className={`scene-beat-context-item ${selectedContextIds.includes(s.id) ? "selected" : ""}`}
-                        >
-                          <span className="scene-beat-context-name">{s.name}</span>
-                          <span className="scene-beat-context-cat">{s.category}</span>
-                        </button>
+                      Object.entries(settingsByCategory).map(([cat, items]) => (
+                        <div key={cat}>
+                          <div className="scene-beat-context-group-label">
+                            {CATEGORY_LABELS[cat] ?? cat}
+                          </div>
+                          {items.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => toggleContext(s.id)}
+                              className={`scene-beat-context-item ${selectedContextIds.includes(s.id) ? "selected" : ""}`}
+                            >
+                              <span className="scene-beat-context-name">{s.name}</span>
+                              {selectedContextIds.includes(s.id) && (
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                  <path d="M2.5 6.5L5 9L9.5 3.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </button>
+                          ))}
+                        </div>
                       ))
                     )}
                   </PopoverContent>
                 </Popover>
               </div>
-              {/* 已选上下文标签 */}
+
+              {/* Selected context tags */}
               {selectedContexts.length > 0 && (
                 <div className="scene-beat-context-tags">
                   {selectedContexts.map((ctx) => (
@@ -432,18 +492,28 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
               )}
             </div>
 
-            {/* 底部：模型选择器 + Clear Beat */}
+            {/* Footer: generate button group + clear beat */}
             <div className="scene-beat-footer" contentEditable={false}>
-              <button
-                onClick={handleGenerate}
-                className="scene-beat-generate-btn"
-              >
-                <span className="scene-beat-generate-icon">▶</span>
-                <span className="scene-beat-generate-model">
-                  {modelId || "默认模型"}
-                </span>
-                <span className="scene-beat-generate-dropdown">▼</span>
-              </button>
+              <div className="scene-beat-generate-group">
+                <button
+                  onClick={() => setDialogOpen(true)}
+                  className="scene-beat-generate-btn"
+                >
+                  <span className="scene-beat-generate-icon">▶</span>
+                  <span className="scene-beat-generate-model">
+                    {modelId || "默认模型"}
+                  </span>
+                </button>
+                <div className="scene-beat-generate-divider" />
+                <button
+                  className="scene-beat-generate-dropdown"
+                  title="切换模型"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M2.5 3.75L5 6.25L7.5 3.75" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </div>
               <button
                 onClick={handleClearBeat}
                 className="scene-beat-clear-btn"
@@ -456,7 +526,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         )}
       </div>
 
-      {/* GenerationBar — 浮动 overlay，不在编辑器文档流中 */}
+      {/* GenerationBar — floating overlay */}
       {genStatus !== "idle" && genBarRect && createPortal(
         <div
           style={{ position: "fixed", left: genBarRect.left, top: genBarRect.top, zIndex: 99999 }}
@@ -473,6 +543,19 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         </div>,
         document.body,
       )}
+
+      {/* Generate Text Dialog */}
+      <GenerateTextDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onGenerate={handleGenerate}
+        defaultMaxWords={maxWords}
+        defaultModelId={modelId}
+        contextIds={selectedContextIds}
+        chapterContent={activeChapter?.content ?? ""}
+        chapterTitle={activeChapter?.title ?? ""}
+        beatText={node.textContent.trim()}
+      />
     </NodeViewWrapper>
   );
 }

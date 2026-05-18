@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
+import { NodeSelection } from "@tiptap/pm/state";
 import { Undo2, Redo2, Bold, Italic, Underline, Strikethrough, Highlighter, Code, Ban, ChevronDown, Quote, List, ListOrdered, IndentIncrease, IndentDecrease, UnfoldVertical, RefreshCw, FoldVertical } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
@@ -35,10 +36,13 @@ function ToolBtn({ onClick, active, children }: {
   );
 }
 
-export function SelectionToolbar({ editor }: { editor: Editor }) {
+type AiActionMode = "expand" | "rewrite" | "condense";
+
+export function SelectionToolbar({ editor, onAiAction, hidden }: { editor: Editor; onAiAction?: (mode: AiActionMode) => void; hidden?: boolean }) {
   const [charCount, setCharCount] = useState(0);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
   const [tick, setTick] = useState(0);
+  const [aiPopoverOpen, setAiPopoverOpen] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   void tick;
@@ -48,7 +52,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
 
     const update = () => {
       const { from, to, empty } = editor.state.selection;
-      if (empty) {
+      if (empty || editor.state.selection instanceof NodeSelection) {
         setCharCount(0);
         setAnchor(null);
         return;
@@ -88,6 +92,8 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
     if (left < editorBounds.left) left = editorBounds.left;
     pos = { left, bottom: window.innerHeight - anchor.top + 8 };
   }
+
+  if (hidden || !pos) return null;
 
   return createPortal(
     <div
@@ -247,7 +253,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
       {/* 第三排：AI 操作 — 选中超 3 字才显示 */}
       {charCount > 3 && (
       <div className="selection-toolbar-row-separated">
-        <Popover>
+        <Popover open={aiPopoverOpen === "expand"} onOpenChange={(o) => setAiPopoverOpen(o ? "expand" : null)}>
           <PopoverTrigger className="selection-toolbar-btn-ai" title="扩写">
             <UnfoldVertical size={14} />
             <span className="selection-toolbar-btn-ai-label">扩写</span>
@@ -255,13 +261,13 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
           <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
             <span className="ai-action-title">扩写</span>
             <span className="highlight-color-divider" />
-            <button className="highlight-color-item" onClick={() => {/* TODO: trigger expand */}}>
+            <button className="highlight-color-item" onClick={() => { setAiPopoverOpen(null); onAiAction?.("expand"); }}>
               <span className="highlight-color-label">Generate</span>
             </button>
           </PopoverContent>
         </Popover>
 
-        <Popover>
+        <Popover open={aiPopoverOpen === "rewrite"} onOpenChange={(o) => setAiPopoverOpen(o ? "rewrite" : null)}>
           <PopoverTrigger className="selection-toolbar-btn-ai" title="改写">
             <RefreshCw size={14} />
             <span className="selection-toolbar-btn-ai-label">改写</span>
@@ -269,13 +275,13 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
           <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
             <span className="ai-action-title">改写</span>
             <span className="highlight-color-divider" />
-            <button className="highlight-color-item" onClick={() => {/* TODO: trigger rewrite */}}>
+            <button className="highlight-color-item" onClick={() => { setAiPopoverOpen(null); onAiAction?.("rewrite"); }}>
               <span className="highlight-color-label">Generate</span>
             </button>
           </PopoverContent>
         </Popover>
 
-        <Popover>
+        <Popover open={aiPopoverOpen === "condense"} onOpenChange={(o) => setAiPopoverOpen(o ? "condense" : null)}>
           <PopoverTrigger className="selection-toolbar-btn-ai" title="精简">
             <FoldVertical size={14} />
             <span className="selection-toolbar-btn-ai-label">精简</span>
@@ -283,7 +289,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
           <PopoverContent sideOffset={4} align="start" className="highlight-color-popover !border-0">
             <span className="ai-action-title">精简</span>
             <span className="highlight-color-divider" />
-            <button className="highlight-color-item" onClick={() => {/* TODO: trigger condense */}}>
+            <button className="highlight-color-item" onClick={() => { setAiPopoverOpen(null); onAiAction?.("condense"); }}>
               <span className="highlight-color-label">Generate</span>
             </button>
           </PopoverContent>
