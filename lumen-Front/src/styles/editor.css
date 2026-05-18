@@ -1641,28 +1641,69 @@
 
 .writing-manuscript-scroll {
   scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.writing-manuscript-scroll::-webkit-scrollbar { width: 0; }
+.writing-manuscript-scroll:hover::-webkit-scrollbar { width: 6px; }
+.writing-manuscript-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 108, 0.3);
+  border-radius: 3px;
 }
 
+/* Scene — independent editor container */
 .scene-section {
   position: relative;
   margin: 0;
-  padding: 16px 0;
+  padding: 0;
 }
-
 .scene-section .ProseMirror {
-  padding: 16px;
+  padding: 0;
 }
 
+/* Act header — thick border + large gap */
 .act-row-header {
   position: relative;
+  border-top: 3.57px solid #3f3f46;
   margin-top: 80px;
-  border-top: 3px solid var(--color-border-subtle);
-  padding-top: 64px;
-  padding-bottom: 64px;
+  padding-top: 80px;
+  padding-bottom: 24px;
+}
+.act-row-header.is-first {
+  margin-top: 20vh;
 }
 
+/* Chapter header — compact, no thick border */
 .chapter-row-header {
-  border-top: 1px solid var(--color-border-subtle);
-  margin: 2.5em 0 1em;
-  padding-top: 2.5em;
+  margin-top: 2.5em;
+  margin-bottom: 1em;
+}
+.chapter-row-header.after-act {
+  margin-top: 16px;
+}
+
+/* Insert buttons — aligned styling */
+.insert-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: rgba(214, 211, 209, 0.4);
+  font-size: 14px;
+  font-family: "Noto Serif SC", "Source Serif Pro", Georgia, serif;
+  cursor: pointer;
+  transition: color 0.15s, opacity 0.15s;
+}
+.insert-btn:hover {
+  color: rgba(214, 211, 209, 1);
+}
+.insert-btn-scene { margin-top: 32px; }
+.insert-btn-chapter {
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.insert-btn-act {
+  margin-top: 40px;
 }

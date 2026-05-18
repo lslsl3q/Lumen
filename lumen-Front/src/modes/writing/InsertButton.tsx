@@ -5,12 +5,16 @@ interface InsertButtonProps {
 
 export function InsertButton({ label, onClick }: InsertButtonProps) {
   return (
-    <div className="my-2">
+    <div>
       <button
-        className="w-full py-1.5 rounded text-[12px] text-text-muted hover:text-text-secondary hover:bg-white/5 border border-dashed border-border-default transition-colors cursor-pointer"
+        className="insert-btn"
         onClick={onClick}
         type="button"
       >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
         {label}
       </button>
     </div>
