@@ -151,7 +151,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank, theme, templates
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank, theme, templates, chrome_bridge
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -178,6 +178,7 @@ app.include_router(permissions.router, prefix="/permissions", tags=["权限管�
 app.include_router(rerank.router, tags=["Rerank"])
 app.include_router(theme.router, prefix="/api/theme", tags=["Theme Management"])
 app.include_router(templates.router, prefix="/templates", tags=["Prompt模板"])
+app.include_router(chrome_bridge.router, prefix="/bridge", tags=["Chrome Bridge"])
 
 # 挂载头像静态文件目录（使用 config.py AVATARS_DIR，与 save_avatar() 一致）
 from lumen.config import AVATARS_DIR

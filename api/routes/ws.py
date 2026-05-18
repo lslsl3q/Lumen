@@ -9,6 +9,7 @@ import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from lumen.services.ws_manager import get_ws_manager
+from lumen.services.chrome_bridge import get_chrome_bridge
 from api.routes.ws_handler import dispatch_message
 
 logger = logging.getLogger(__name__)
@@ -48,3 +49,4 @@ async def ws_endpoint(websocket: WebSocket):
         logger.error(f"[WS] 客户端 {client_id} 异常: {e}")
     finally:
         await manager.disconnect(client_id)
+        get_chrome_bridge().handle_disconnect(client_id)

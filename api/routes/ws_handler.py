@@ -15,6 +15,7 @@ from lumen.core.session import get_session_manager
 from lumen.core.agent_chat import agent_chat_stream
 from lumen.components.react_acting import request_cancel, _clear_cancel
 from lumen.services.ws_manager import get_ws_manager
+from lumen.services.chrome_bridge import get_chrome_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -112,22 +113,24 @@ async def handle_cancel(ws: WebSocket, client_id: str, msg: dict):
 async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
     """处理 writing 类型的 WS 消息
 
-    接入 WritingEnvironment / writing_chat_stream，
-    支持 chat/continue/rewrite/expand/condense 五种 AI 模式。
+    两种管道：
+    - chat → Agent 管道（有 persona、记忆、ReAct）
+    - 其余 → 直接管道（模板渲染 + LLM，无 Agent）
 
     msg 字段：
-        ai_mode: chat/continue/rewrite/expand/condense
+        ai_mode: chat/continue/rewrite/expand/condense/beat_generate
         book_id: 作品 ID
         chapter_id: 章节 ID
         chapter_title: 章节标题
-        chapter_content: 章节全文（Markdown）
+        chapter_content: 章节全文
         book_name: 作品名称
-        selected_text: 编辑器选中的文字（润色/扩写/精简用）
+        selected_text: 编辑器选中的文字
+        text_before_selection: 选区前文
+        text_after_selection: 选区后文
         content: 用户输入文本
-        request_id: 前端生成的请求 ID（回传用于关联响应）
+        request_id: 前端请求 ID
+        beat_text / beat_context / max_words / model_id: beat_generate 专属
     """
-    from lumen.core.environments.writing import writing_chat_stream
-
     ai_mode = msg.get("ai_mode", "chat")
     book_id = msg.get("book_id", "")
     chapter_id = msg.get("chapter_id", "")
@@ -138,35 +141,63 @@ async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
     user_input = msg.get("content", "")
     request_id = msg.get("request_id", "")
 
-    if ai_mode == "beat_generate":
-        user_input = msg.get("beat_text") or user_input
-
     if not book_id:
         await ws.send_json({"type": "error", "message": "未指定作品", "request_id": request_id})
         return
 
     try:
-        async for event in writing_chat_stream(
-            book_id=book_id,
-            chapter_id=chapter_id,
-            ai_mode=ai_mode,
-            chapter_title=chapter_title,
-            chapter_content=chapter_content,
-            book_name=book_name,
-            selected_text=selected_text,
-            user_input=user_input,
-            extra_context={
-                "beat_text": msg.get("beat_text", ""),
-                "beat_context": msg.get("beat_context", ""),
-                "max_words": msg.get("max_words"),
-                "model_id": msg.get("model_id", ""),
-            } if ai_mode == "beat_generate" else None,
-        ):
+        if ai_mode == "chat":
+            # Agent 管道：协同编辑、多轮对话
+            from lumen.core.environments.writing import writing_chat_stream
+            stream = writing_chat_stream(
+                book_id=book_id,
+                chapter_id=chapter_id,
+                ai_mode=ai_mode,
+                chapter_title=chapter_title,
+                chapter_content=chapter_content,
+                book_name=book_name,
+                selected_text=selected_text,
+                user_input=user_input,
+            )
+        else:
+            # 直接管道：模板渲染 + LLM
+            from lumen.core.environments.writing import direct_writing_stream
+            stream = direct_writing_stream(
+                ai_mode=ai_mode,
+                book_id=book_id,
+                chapter_id=chapter_id,
+                chapter_title=chapter_title,
+                chapter_content=chapter_content,
+                book_name=book_name,
+                selected_text=selected_text,
+                text_before_selection=msg.get("text_before_selection", ""),
+                text_after_selection=msg.get("text_after_selection", ""),
+                beat_text=msg.get("beat_text", ""),
+                beat_context=msg.get("beat_context", ""),
+                max_words=msg.get("max_words"),
+                model_id=msg.get("model_id", ""),
+            )
+
+        async for event in stream:
             event["request_id"] = request_id
             await ws.send_json(event)
     except Exception as e:
         logger.error(f"[WS] 写作处理失败: {e}")
         await ws.send_json({"type": "error", "message": str(e), "request_id": request_id})
+
+
+async def handle_chrome_bridge_connect(ws: WebSocket, client_id: str, msg: dict):
+    """Chrome 扩展连接注册"""
+    bridge = get_chrome_bridge()
+    await bridge.handle_connect(ws, client_id)
+    await ws.send_json({"type": "chrome_bridge_connected", "client_id": client_id})
+    logger.info(f"[WS] Chrome Bridge 客户端已注册: {client_id}")
+
+
+def handle_chrome_bridge_result(ws: WebSocket, client_id: str, msg: dict):
+    """Chrome 扩展命令执行结果"""
+    bridge = get_chrome_bridge()
+    bridge.handle_result(msg)
 
 
 # 消息类型 → 处理函数映射
@@ -176,6 +207,8 @@ HANDLERS = {
     "unsubscribe": handle_unsubscribe,
     "cancel": handle_cancel,
     "writing": handle_writing,
+    "chrome_bridge_connect": handle_chrome_bridge_connect,
+    "chrome_bridge_result": handle_chrome_bridge_result,
 }
 
 
