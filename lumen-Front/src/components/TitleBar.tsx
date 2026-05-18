@@ -70,9 +70,12 @@ function TitleBar() {
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
   const projects = useWritingStore((s) => s.projects);
   const activeProject = projects.find((p) => p.id === activeProjectId);
-  const activeChapterId = useWritingStore((s) => s.activeChapterId);
-  const chapters = useWritingStore((s) => s.chapters);
-  const activeChapter = chapters.find((c) => c.id === activeChapterId);
+  const activeSceneId = useWritingStore((s) => s.activeSceneId);
+  const acts = useWritingStore((s) => s.acts);
+  // Flatten to find active scene's chapter title
+  const activeSceneChapter = acts.flatMap((a: any) => (a.chapters || [])).find((ch: any) =>
+    (ch.scenes || []).some((sc: any) => sc.id === activeSceneId)
+  );
 
   useEffect(() => {
     if (!appWindow) return;
@@ -107,8 +110,8 @@ function TitleBar() {
 
     if (activeMode === 'writing' && activeProject) {
       items.push({ label: activeProject.name });
-      if (activeChapter) {
-        items.push({ label: activeChapter.title });
+      if (activeSceneChapter) {
+        items.push({ label: activeSceneChapter.title });
       }
     } else {
       const label = MODE_LABELS[activeMode];
@@ -116,7 +119,7 @@ function TitleBar() {
     }
 
     return items;
-  }, [activeMode, activeProject, activeChapter]);
+  }, [activeMode, activeProject, activeSceneChapter]);
 
   return (
     <div className="h-9 flex items-center bg-surface-rail/80 border-b border-border-default select-none relative">
