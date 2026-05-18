@@ -10,7 +10,6 @@ import { useState, useEffect, Component } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
-import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
 import * as writingApi from "../api/writing";
@@ -111,8 +110,6 @@ export default function WritingMode() {
           )}
         </div>
       </div>
-
-      <SnapshotPanel onClose={() => {}} />
     </ErrorBoundary>
   );
 }
