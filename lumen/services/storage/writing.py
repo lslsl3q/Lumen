@@ -264,31 +264,44 @@ def reorder_acts(project_id: str, ordered_ids: list[str]):
             raise
 
 
-# ── 章节管理 ──
+# ── 章节管理（新版：关联到 Act）──
 
-def create_chapter(project_id: str, title: str = "", volume: str = "") -> dict:
+def create_chapter(act_id: str, project_id: str, title: str = "") -> dict:
     with write_lock:
         conn = get_conn()
         cid = f"ch-{uuid.uuid4().hex[:12]}"
         now = time.time()
         max_order = conn.execute(
-            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_chapters WHERE project_id = ?",
-            (project_id,),
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_chapters WHERE act_id = ?",
+            (act_id,),
         ).fetchone()[0]
         conn.execute(
-            """INSERT INTO writing_chapters (id, project_id, title, sort_order, volume, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (cid, project_id, title, max_order, volume, now, now),
+            """INSERT INTO writing_chapters (id, act_id, project_id, title, numerate, show_number, sort_order, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?)""",
+            (cid, act_id, project_id, title, max_order, now, now),
         )
         conn.commit()
         return _row_to_dict(conn.execute("SELECT * FROM writing_chapters WHERE id = ?", (cid,)).fetchone())
 
 
 def list_chapters(project_id: str) -> list[dict]:
+    """List all chapters for a project, ordered by act.sort_order then chapter.sort_order."""
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM writing_chapters WHERE project_id = ? ORDER BY sort_order",
+        """SELECT c.* FROM writing_chapters c
+           JOIN writing_acts a ON c.act_id = a.id
+           WHERE c.project_id = ?
+           ORDER BY a.sort_order, c.sort_order""",
         (project_id,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def list_chapters_by_act(act_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM writing_chapters WHERE act_id = ? ORDER BY sort_order",
+        (act_id,),
     ).fetchall()
     return [_row_to_dict(r) for r in rows]
 
@@ -302,16 +315,14 @@ def get_chapter(chapter_id: str) -> dict | None:
 def update_chapter(chapter_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"title", "content", "word_count", "volume"}
+        allowed = {"title", "numerate", "show_number"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_chapter(chapter_id)
         updates["updated_at"] = time.time()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [chapter_id]
-        conn.execute(
-            f"UPDATE writing_chapters SET {set_clause} WHERE id = ?", values
-        )
+        conn.execute(f"UPDATE writing_chapters SET {set_clause} WHERE id = ?", values)
         conn.commit()
     return get_chapter(chapter_id)
 
@@ -319,20 +330,26 @@ def update_chapter(chapter_id: str, **kwargs) -> dict | None:
 def delete_chapter(chapter_id: str) -> bool:
     with write_lock:
         conn = get_conn()
-        conn.execute("DELETE FROM writing_chapters WHERE id = ?", (chapter_id,))
-        conn.commit()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("DELETE FROM writing_scenes WHERE chapter_id = ?", (chapter_id,))
+            conn.execute("DELETE FROM writing_chapters WHERE id = ?", (chapter_id,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
     return True
 
 
-def reorder_chapters(project_id: str, ordered_ids: list[str]):
+def reorder_chapters(act_id: str, ordered_ids: list[str]):
     with write_lock:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
             for i, cid in enumerate(ordered_ids):
                 conn.execute(
-                    "UPDATE writing_chapters SET sort_order = ?, updated_at = ? WHERE id = ? AND project_id = ?",
-                    (i, time.time(), cid, project_id),
+                    "UPDATE writing_chapters SET sort_order = ?, updated_at = ? WHERE id = ? AND act_id = ?",
+                    (i, time.time(), cid, act_id),
                 )
             conn.commit()
         except Exception:
