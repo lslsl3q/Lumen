@@ -14,6 +14,7 @@ import { AiWritingPanel } from "./writing/AiWritingPanel";
 import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import * as writingApi from "../api/writing";
+import { getMigrationStatus, runMigration } from "../api/writing";
 
 type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
 
@@ -48,6 +49,34 @@ export default function WritingMode() {
 
   const [activePanel, setActivePanel] = useState<WritingPanelType | null>(null);
 
+  // 数据迁移状态
+  const [migrationNeeded, setMigrationNeeded] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+
+  useEffect(() => {
+    if (!activeProjectId) return;
+    getMigrationStatus()
+      .then((s) => {
+        if (s.needs_migration) setMigrationNeeded(true);
+      })
+      .catch(() => {});
+  }, [activeProjectId]);
+
+  const handleRunMigration = async () => {
+    setMigrating(true);
+    try {
+      const result = await runMigration();
+      console.log("Migration complete:", result);
+      setMigrationNeeded(false);
+      // Reload manuscript to refresh UI
+      await useWritingStore.getState().loadManuscript(activeProjectId!);
+    } catch (e) {
+      console.error("Migration failed:", e);
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   const isModal = activePanel ? MODAL_PANELS.includes(activePanel) : false;
 
   // 自动快照：每 15 分钟检查 contentDirty 后触发
@@ -68,7 +97,27 @@ export default function WritingMode() {
   }, [activeProjectId]);
 
   return (
-    <ErrorBoundary>
+    <>
+      {migrationNeeded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="bg-surface-elevated rounded-xl p-8 max-w-md text-center shadow-2xl border border-border-default">
+            <h2 className="text-lg font-semibold text-text-primary mb-2">数据需要迁移</h2>
+            <p className="text-sm text-text-muted mb-6">
+              您的写作数据需要迁移到新的多编辑器格式。
+              系统会自动创建迁移前备份。
+            </p>
+            <button
+              className="px-6 py-2 rounded-lg bg-primary text-white hover:bg-primary/80 transition-colors disabled:opacity-50 cursor-pointer"
+              disabled={migrating}
+              onClick={handleRunMigration}
+              type="button"
+            >
+              {migrating ? "迁移中..." : "开始迁移"}
+            </button>
+          </div>
+        </div>
+      )}
+      <ErrorBoundary>
       <div className="flex h-full w-full overflow-hidden">
         <WritingSidebar />
         <WritingEditor>
@@ -96,5 +145,6 @@ export default function WritingMode() {
         <WritingModalPanel panel={activePanel} onClose={() => setActivePanel(null)} />
       )}
     </ErrorBoundary>
+    </>
   );
 }
