@@ -27,6 +27,51 @@ export interface WritingChapter {
   updated_at: number;
 }
 
+export interface WritingAct {
+  id: string;
+  project_id: string;
+  title: string;
+  numerate: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WritingChapterV2 {
+  id: string;
+  act_id: string;
+  project_id: string;
+  title: string;
+  numerate: number;
+  show_number: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WritingScene {
+  id: string;
+  chapter_id: string;
+  content: string;
+  summary: string;
+  subtitle: string;
+  scene_number: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ManuscriptTree {
+  acts: Array<WritingAct & {
+    chapters: Array<WritingChapterV2 & { scenes: WritingScene[] }>;
+  }>;
+}
+
+export interface ManuscriptFlatItem {
+  type: "act" | "chapter" | "scene" | "separator" | "add-scene" | "add-chapter" | "add-act";
+  [key: string]: any;
+}
+
 export interface WritingSetting {
   id: string;
   project_id: string;
@@ -92,6 +137,16 @@ export async function createChapter(projectId: string, title = "新章节", volu
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ project_id: projectId, title, volume }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createChapterV2(actId: string, projectId: string, title = ""): Promise<WritingChapterV2> {
+  const res = await fetch(`${BASE}/chapters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ act_id: actId, project_id: projectId, title }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -168,6 +223,100 @@ export async function deleteSetting(id: string): Promise<void> {
 /** 导出整本作品 */
 export function getExportUrl(projectId: string, format: "txt" | "md" | "docx" = "txt"): string {
   return `${BASE}/projects/${encodeURIComponent(projectId)}/export?format=${format}`;
+}
+
+// ── Acts ──
+
+export async function listActs(projectId: string): Promise<WritingAct[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/acts`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createAct(projectId: string, title = "", numerate = true): Promise<WritingAct> {
+  const res = await fetch(`${BASE}/acts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, title, numerate }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateAct(id: string, data: Partial<WritingAct>): Promise<WritingAct> {
+  const res = await fetch(`${BASE}/acts/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteAct(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/acts/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── Scenes ──
+
+export async function listScenes(chapterId: string): Promise<WritingScene[]> {
+  const res = await fetch(`${BASE}/chapters/${encodeURIComponent(chapterId)}/scenes`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createScene(chapterId: string): Promise<WritingScene> {
+  const res = await fetch(`${BASE}/scenes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chapter_id: chapterId }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateScene(id: string, data: Partial<WritingScene>): Promise<WritingScene> {
+  const res = await fetch(`${BASE}/scenes/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteScene(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/scenes/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── Manuscript ──
+
+export async function getManuscript(projectId: string): Promise<ManuscriptTree> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/manuscript`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getManuscriptFlat(projectId: string): Promise<ManuscriptFlatItem[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/manuscript-flat`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// ── Migration ──
+
+export async function getMigrationStatus(): Promise<{ needs_migration: boolean }> {
+  const res = await fetch(`${BASE}/system/migration-status`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function runMigration(): Promise<{ status: string; migrated: number }> {
+  const res = await fetch(`${BASE}/system/run-migration`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 // ── 快照 ──
