@@ -1,9 +1,10 @@
 /**
  * WritingMode — 写作模式主组件
  *
- * 写作模式使用独立布局，不通过 ActivityBar + SidePanel。
- * 布局结构：WritingSidebar（折叠/展开） + WritingEditor（主编辑区）。
- * 设定面板（人物/地点/世界/物品/大纲/导出/作品管理）为居中模态弹窗。
+ * 布局结构（写作模式）：
+ *   WritingSidebar（左） | 主内容区（右）
+ *   主内容区顶部：Plan | Write | Chat | Review（四个 tabs）
+ *   主内容区下方：Write→WritingEditor / Plan→PlanView
  */
 import { useState, useEffect, Component } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
@@ -11,9 +12,17 @@ import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
 import { SnapshotPanel } from "./writing/SnapshotPanel";
 import { useWritingStore } from "../stores/useWritingStore";
+import { cn } from "../lib/utils";
 import * as writingApi from "../api/writing";
 
-type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
+type WritingView = "plan" | "write" | "chat" | "review";
+
+const VIEW_TABS: { id: WritingView; label: string; disabled: boolean }[] = [
+  { id: "plan", label: "Plan", disabled: true },
+  { id: "write", label: "Write", disabled: false },
+  { id: "chat", label: "Chat", disabled: true },
+  { id: "review", label: "Review", disabled: true },
+];
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -39,14 +48,11 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
   }
 }
 
-
 export default function WritingMode() {
   const { isChatPanelOpen, activeProjectId } = useWritingStore();
+  const [viewMode, setViewMode] = useState<WritingView>("write");
 
-  const [activePanel, setActivePanel] = useState<WritingPanelType | null>(null);
-  const [viewMode, setViewMode] = useState<"write" | "plan">("write");
-
-  // 自动快照：每 15 分钟检查 contentDirty 后触发
+  // 自动快照
   useEffect(() => {
     if (!activeProjectId) return;
     const timer = setInterval(async () => {
@@ -66,9 +72,32 @@ export default function WritingMode() {
   return (
     <ErrorBoundary>
       <div className="flex h-full w-full overflow-hidden">
-        <WritingSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
+        <WritingSidebar />
 
-        <div className="flex flex-1 min-w-0 h-full">
+        {/* 主内容区 */}
+        <div className="flex flex-col flex-1 min-w-0 h-full">
+          {/* 顶部 tabs — 写作模式：Plan | Write | Chat | Review */}
+          <div className="flex-none h-11 flex items-center px-3 border-b border-border-default bg-surface-deep gap-0.5">
+            {VIEW_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => !tab.disabled && setViewMode(tab.id)}
+                disabled={tab.disabled}
+                className={cn(
+                  "text-xs font-semibold rounded px-3 py-1.5 transition-colors",
+                  viewMode === tab.id
+                    ? "bg-gray-800 text-stone-200"
+                    : "bg-transparent text-stone-400 hover:text-stone-300",
+                  tab.disabled && "opacity-40 pointer-events-none"
+                )}
+                type="button"
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 内容 */}
           {viewMode === "write" ? (
             <WritingEditor>
               {isChatPanelOpen && (
@@ -83,10 +112,7 @@ export default function WritingMode() {
         </div>
       </div>
 
-      {/* 快照面板 */}
-      {activePanel === "snapshots" && (
-        <SnapshotPanel onClose={() => setActivePanel(null)} />
-      )}
+      <SnapshotPanel onClose={() => {}} />
     </ErrorBoundary>
   );
 }

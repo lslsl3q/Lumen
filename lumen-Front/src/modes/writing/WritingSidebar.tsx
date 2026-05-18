@@ -57,12 +57,7 @@ const NEW_ENTRY_TYPES = [
 
 /* ── Sidebar ── */
 
-interface WritingSidebarProps {
-  viewMode: "write" | "plan";
-  onViewModeChange: (mode: "write" | "plan") => void;
-}
-
-export const WritingSidebar = forwardRef<HTMLElement, WritingSidebarProps>(({ viewMode, onViewModeChange }, ref) => {
+export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
   const {
     writingSidebarExpanded: expanded,
     writingSidebarTab: activeTab,
@@ -83,30 +78,6 @@ export const WritingSidebar = forwardRef<HTMLElement, WritingSidebarProps>(({ vi
       {/* Header h-14 */}
       <div className="flex-none h-14 flex items-center gap-1 px-2 border-b border-gray-800">
         <SidebarIconButton icon={ArrowLeft} label="返回" />
-        {expanded && (
-          <>
-            <button
-              className={cn(
-                "px-2 py-1 text-[12px] rounded transition-colors",
-                viewMode === "write" ? "bg-stone-300/20 text-stone-200" : "text-stone-500 hover:text-stone-300"
-              )}
-              onClick={() => onViewModeChange("write")}
-              type="button"
-            >
-              Write
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 text-[12px] rounded transition-colors",
-                viewMode === "plan" ? "bg-stone-300/20 text-stone-200" : "text-stone-500 hover:text-stone-300"
-              )}
-              onClick={() => onViewModeChange("plan")}
-              type="button"
-            >
-              Plan
-            </button>
-          </>
-        )}
         <SidebarIconButton icon={Settings} label="设置" />
         {expanded && (
           <button
@@ -161,7 +132,7 @@ export const WritingSidebar = forwardRef<HTMLElement, WritingSidebarProps>(({ vi
         </div>
       )}
 
-      {/* 底栏 (展开态) — 匹配 NC */}
+      {/* 底栏 (展开态) — 写作模式 */}
       {expanded && <SidebarFooter />}
 
       {/* 折叠态：展开按钮 */}

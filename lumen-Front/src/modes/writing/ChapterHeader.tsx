@@ -9,16 +9,14 @@ export function ChapterHeader({
 }) {
   return (
     <div
-      className="chapter-row-header flex items-center gap-4"
+      className="flex items-center gap-4"
       style={{
-        borderTop: isAfterAct ? "none" : "1px solid var(--color-border-subtle)",
-        marginTop: isAfterAct ? "0" : "2.5em",
+        marginTop: isAfterAct ? "16px" : "2.5em",
         marginBottom: "1em",
-        paddingTop: isAfterAct ? "0" : "2.5em",
       }}
     >
       <div className="flex-1">
-        <span className="text-base font-medium text-text-secondary">
+        <span className="text-lg font-medium text-stone-300">
           {chapter.show_number ? `Chapter ${chapter.sort_order + 1}` : ""}
           {chapter.title ? `: ${chapter.title}` : ""}
         </span>
