@@ -18,8 +18,8 @@ import {
   ScrollText,
   Lightbulb,
   Package,
-  HelpCircle,
   BookMarked,
+  Search,
 } from "lucide-react";
 import {
   Popover,
@@ -34,8 +34,6 @@ const tabs: { id: SidebarTab; label: string; icon: React.ElementType }[] = [
   { id: "snippets", label: "Snippets", icon: StickyNote },
   { id: "chat", label: "Chats", icon: MessagesSquare },
 ];
-
-/* ── Codex 条目分类 ── */
 
 const CODEX_CATEGORIES = [
   { id: "character", label: "Characters", icon: User },
@@ -55,8 +53,6 @@ const NEW_ENTRY_TYPES = [
   { id: "other", label: "Other", icon: BookMarked },
 ];
 
-/* ── Sidebar ── */
-
 export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
   const {
     writingSidebarExpanded: expanded,
@@ -69,40 +65,35 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
     <aside
       ref={ref}
       className={cn(
-        "flex-none flex flex-col border-r border-gray-800 overflow-hidden",
-        "bg-gray-950"
+        "flex-none flex flex-col border-r border-[var(--color-border)] overflow-hidden",
+        "bg-[var(--color-surface-deep)]"
       )}
-      style={{ width: expanded ? 400 : 48 }}
+      style={{ width: expanded ? 450 : 48, transition: "width 0.2s ease" }}
       aria-label="Sidebar"
     >
-      {/* Header h-14 */}
-      <div className="flex-none h-14 flex items-center gap-1 px-2 border-b border-gray-800">
-        <SidebarIconButton icon={ArrowLeft} label="返回" />
-        <SidebarIconButton icon={Settings} label="设置" />
-        {expanded && (
-          <button
-            onClick={toggleWritingSidebar}
-            className="ml-auto"
-            aria-label="Collapse Sidebar"
-          >
-            <PanelLeftClose className="w-4 h-4 text-stone-400" />
-          </button>
-        )}
-      </div>
+      {/* Novel title bar */}
+      {expanded ? <SidebarHeader onCollapse={toggleWritingSidebar} /> : (
+        <div className="flex-none h-14 flex items-center justify-center border-b border-[var(--color-border)]">
+          <BookOpen className="w-4 h-4 text-[var(--color-text-dim)]" />
+        </div>
+      )}
 
-      {/* Tab bar (展开态) */}
+      {/* Tabs */}
       {expanded && (
-        <div className="flex-none h-12 flex items-center gap-2 px-2 border-b border-gray-800 overflow-x-auto">
+        <div className="flex-none h-11 flex items-center gap-0 px-2 border-b border-[var(--color-border)]">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setWritingSidebarTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
               className={cn(
-                "px-3 py-1.5 rounded text-sm font-medium transition-colors whitespace-nowrap",
+                "flex-1 py-1.5 text-[13px] font-medium text-center transition-colors rounded",
                 activeTab === tab.id
-                  ? "bg-stone-300/20 text-stone-300"
-                  : "text-stone-400 hover:text-stone-300"
+                  ? "text-[var(--color-text-primary)]"
+                  : "text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)]"
               )}
+              type="button"
             >
               {tab.label}
             </button>
@@ -110,14 +101,14 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
         </div>
       )}
 
-      {/* Content (展开态) */}
+      {/* Content */}
       {expanded && (
         <div className="grow overflow-hidden flex flex-col">
           <SidebarContent tab={activeTab} />
         </div>
       )}
 
-      {/* 折叠态：图标列表 */}
+      {/* Collapsed: icon list */}
       {!expanded && (
         <div className="grow flex flex-col items-center gap-1 py-2">
           {tabs.map((tab) => (
@@ -132,13 +123,10 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
         </div>
       )}
 
-      {/* 底栏 (展开态) — 写作模式 */}
+      {/* Footer */}
       {expanded && <SidebarFooter />}
-
-      {/* 折叠态：展开按钮 */}
       {!expanded && (
-        <div className="flex-none p-2 flex flex-col items-center gap-1 border-t border-gray-800">
-          <SidebarIconButton icon={HelpCircle} label="帮助" />
+        <div className="flex-none p-2 flex flex-col items-center gap-1 border-t border-[var(--color-border)]">
           <SidebarIconButton
             icon={ArrowLeftToLine}
             label="展开侧边栏"
@@ -149,6 +137,32 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
     </aside>
   );
 });
+
+/* ── SidebarHeader — novel title + actions ── */
+
+function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
+  const project = useWritingStore((s) => s.getActiveProject());
+
+  return (
+    <div className="flex-none h-14 flex items-center gap-2 px-3 border-b border-[var(--color-border)]">
+      <SidebarIconButton icon={ArrowLeft} label="返回" />
+      <SidebarIconButton icon={Settings} label="设置" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-[var(--color-text-secondary)] truncate">
+          {project?.name || "未选择作品"}
+        </p>
+      </div>
+      <button
+        onClick={onCollapse}
+        className="flex items-center justify-center w-7 h-7 rounded hover:bg-white/5 transition-colors"
+        aria-label="Collapse Sidebar"
+        type="button"
+      >
+        <PanelLeftClose className="w-4 h-4 text-[var(--color-text-dim)]" />
+      </button>
+    </div>
+  );
+}
 
 /* ── SidebarIconButton ── */
 
@@ -167,10 +181,10 @@ function SidebarIconButton({
     <button
       onClick={onClick}
       className={cn(
-        "w-10 h-10 flex items-center justify-center rounded transition-colors",
-        "hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-gray-600",
-        active && "bg-gray-800 text-stone-300",
-        !active && "text-stone-400"
+        "w-8 h-8 flex items-center justify-center rounded transition-colors",
+        "hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--color-border)]",
+        active && "bg-white/5 text-[var(--color-text-muted)]",
+        !active && "text-[var(--color-text-dim)]"
       )}
       aria-label={label}
       title={label}
@@ -189,49 +203,58 @@ function SidebarContent({ tab }: { tab: SidebarTab }) {
       return <CodexPanel />;
     case "snippets":
       return (
-        <div className="p-3 text-sm text-stone-400">便签/片段面板（待实现）</div>
+        <div className="p-3 text-sm text-[var(--color-text-dim)]">便签/片段面板（待实现）</div>
       );
     case "chat":
       return (
-        <div className="p-3 text-sm text-stone-400">Chat 面板（待实现）</div>
+        <div className="p-3 text-sm text-[var(--color-text-dim)]">Chat 面板（待实现）</div>
       );
   }
 }
 
-/* ── CodexPanel — 分类折叠列表 ── */
+/* ── CodexPanel ── */
 
 function CodexPanel() {
   const settings = useWritingStore((s) => s.settings);
   const createSetting = useWritingStore((s) => s.createSetting);
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
+  const [search, setSearch] = useState("");
 
-  // 按分类分组
+  const filtered = search
+    ? settings.filter((s) =>
+        s.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : settings;
+
   const grouped = CODEX_CATEGORIES.map((cat) => ({
     ...cat,
-    items: settings.filter((s) => s.category === cat.id),
+    items: filtered.filter((s) => s.category === cat.id),
   }));
-
-  // 统计总数
-  const totalSettings = settings.length;
 
   return (
     <div className="flex flex-col h-full">
-      {/* 工具行：排序 + 新建 */}
-      <div className="flex-none flex items-center justify-between px-3 py-2 border-b border-gray-800">
-        <span className="text-[11px] text-stone-500">{totalSettings} 条目</span>
-
-        {/* New Entry 按钮 + 下拉 */}
+      {/* Search + New */}
+      <div className="flex-none flex items-center gap-2 px-3 py-2 border-b border-[var(--color-border)]">
+        <div className="flex-1 flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 border border-[var(--color-border)]">
+          <Search className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
+          <input
+            className="flex-1 bg-transparent text-[12px] text-[var(--color-text-secondary)] outline-none placeholder:text-[var(--color-text-dim)]"
+            placeholder="Search all entries..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <Popover>
           <PopoverTrigger
-            className="flex items-center gap-1 px-2.5 py-1 rounded text-[12px] font-medium text-stone-300 hover:bg-gray-800 transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] font-medium text-[var(--color-text-muted)] hover:bg-white/5 transition-colors cursor-pointer"
             type="button"
           >
             <Plus className="w-3.5 h-3.5" />
-            新建
+            New Entry
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-48 p-1 bg-gray-900 border-gray-800 rounded-lg shadow-xl"
+            className="w-48 p-1 bg-[var(--color-surface-deep)] border-[var(--color-border)] rounded-lg shadow-xl"
           >
             {NEW_ENTRY_TYPES.map((t) => (
               <button
@@ -240,10 +263,10 @@ function CodexPanel() {
                   if (!activeProjectId) return;
                   await createSetting(`新${t.label}`, t.id, null);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-stone-300 hover:bg-gray-800 rounded transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--color-text-secondary)] hover:bg-white/5 rounded transition-colors"
                 type="button"
               >
-                <t.icon className="w-4 h-4 text-stone-500" />
+                <t.icon className="w-3.5 h-3.5 text-[var(--color-text-dim)]" />
                 {t.label}
               </button>
             ))}
@@ -251,7 +274,7 @@ function CodexPanel() {
         </Popover>
       </div>
 
-      {/* 分类折叠列表 */}
+      {/* Category list */}
       <div className="flex-1 overflow-y-auto">
         {grouped.map((cat) => (
           <CodexCategory
@@ -259,6 +282,10 @@ function CodexPanel() {
             label={cat.label}
             icon={cat.icon}
             items={cat.items}
+            onAdd={async () => {
+              if (!activeProjectId) return;
+              await createSetting(`新${cat.label}`, cat.id, null);
+            }}
           />
         ))}
       </div>
@@ -266,95 +293,94 @@ function CodexPanel() {
   );
 }
 
-/* ── CodexCategory — 可折叠分类 ── */
+/* ── CodexCategory ── */
 
 function CodexCategory({
   label,
   icon: Icon,
   items,
+  onAdd,
 }: {
   label: string;
   icon: React.ElementType;
-  items: { id: string; name: string; content: Record<string, unknown> }[];
+  items: { id: string; name: string }[];
+  onAdd: () => void;
 }) {
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="border-b border-gray-800/60">
-      {/* 分类头 */}
+    <div className="border-b border-[var(--color-border)]/50">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors"
         type="button"
       >
-        <Icon className="w-3.5 h-3.5 text-stone-500 flex-none" />
-        <span className="text-[13px] font-semibold text-stone-200 truncate">
+        <Icon className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
+        <span className="text-[12px] font-semibold text-[var(--color-text-secondary)] truncate">
           {label}
         </span>
-        <span className="ml-auto text-[10px] text-stone-500 flex-none">
-          {items.length} 条
+        <span className="ml-auto text-[10px] text-[var(--color-text-dim)] flex-none">
+          {items.length} {items.length === 1 ? "entry" : "entries"}
         </span>
         {open ? (
-          <ChevronDown className="w-3 h-3 text-stone-500 flex-none" />
+          <ChevronDown className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
         ) : (
-          <ChevronRight className="w-3 h-3 text-stone-500 flex-none" />
+          <ChevronRight className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
         )}
       </button>
 
-      {/* 条目列表 */}
-      {open && items.length > 0 && (
-        <ul>
+      {open && (
+        <div className="pb-1">
           {items.map((item) => (
-            <li
+            <button
               key={item.id}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-gray-900 cursor-pointer transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer transition-colors text-left"
+              type="button"
             >
-              <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center flex-none">
-                <Icon className="w-3.5 h-3.5 text-stone-500" />
+              <div className="w-7 h-7 rounded bg-white/5 flex items-center justify-center flex-none">
+                <Icon className="w-3 h-3 text-[var(--color-text-dim)]" />
               </div>
-              <span className="text-[13px] text-stone-300 truncate">
+              <span className="text-[12px] text-[var(--color-text-muted)] truncate">
                 {item.name}
               </span>
-            </li>
+            </button>
           ))}
-        </ul>
-      )}
-
-      {open && items.length === 0 && (
-        <div className="px-3 py-3 text-[11px] text-stone-600 text-center">
-          暂无条目
+          {items.length === 0 && (
+            <div className="px-3 py-2 text-[11px] text-[var(--color-text-dim)] text-center">
+              暂无条目
+            </div>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onAdd(); }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-[var(--color-text-dim)] hover:bg-white/5 cursor-pointer transition-colors text-left"
+            type="button"
+          >
+            <Plus className="w-3 h-3" />
+            Add entry
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-/* ── SidebarFooter — 底栏 ── */
+/* ── SidebarFooter ── */
 
 function SidebarFooter() {
   const saveStatus = useWritingStore((s) => s.saveStatus);
-
-  const savedLabel = saveStatus === "saved" ? "已保存" : saveStatus === "saving" ? "保存中…" : "未保存";
+  const savedLabel = saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved";
 
   return (
-    <div className="flex-none h-14 flex items-center gap-2 px-3 border-t border-gray-800 bg-gray-950">
+    <div className="flex-none h-14 flex items-center gap-2 px-3 border-t border-[var(--color-border)] bg-[var(--color-surface-deep)]">
       <button
-        className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-stone-400 hover:text-stone-300 hover:bg-gray-800 rounded transition-colors"
-        type="button"
-        aria-label="帮助"
-      >
-        <HelpCircle className="w-3.5 h-3.5" />
-        <span>帮助</span>
-      </button>
-      <button
-        className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-stone-400 hover:text-stone-300 hover:bg-gray-800 rounded transition-colors"
+        className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 rounded transition-colors"
         type="button"
         aria-label="导出"
       >
         <BookMarked className="w-3.5 h-3.5" />
-        <span>导出</span>
+        <span>Export</span>
       </button>
-      <div className="ml-auto flex items-center gap-1.5 text-[11px] text-stone-500">
+      <div className="ml-auto flex items-center gap-1.5 text-[11px] text-[var(--color-text-dim)]">
         <span
           className={cn(
             "w-1.5 h-1.5 rounded-full flex-none",
