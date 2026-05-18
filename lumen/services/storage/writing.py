@@ -179,6 +179,91 @@ def delete_project(project_id: str) -> bool:
     return True
 
 
+# ── Act 管理 ──
+
+def create_act(project_id: str, title: str = "", numerate: bool = True) -> dict:
+    with write_lock:
+        conn = get_conn()
+        aid = f"act-{uuid.uuid4().hex[:12]}"
+        now = time.time()
+        max_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_acts WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()[0]
+        conn.execute(
+            """INSERT INTO writing_acts (id, project_id, title, numerate, sort_order, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (aid, project_id, title, 1 if numerate else 0, max_order, now, now),
+        )
+        conn.commit()
+        return _row_to_dict(conn.execute("SELECT * FROM writing_acts WHERE id = ?", (aid,)).fetchone())
+
+
+def list_acts(project_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM writing_acts WHERE project_id = ? ORDER BY sort_order",
+        (project_id,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_act(act_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM writing_acts WHERE id = ?", (act_id,)).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def update_act(act_id: str, **kwargs) -> dict | None:
+    with write_lock:
+        conn = get_conn()
+        allowed = {"title", "numerate"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return get_act(act_id)
+        updates["updated_at"] = time.time()
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [act_id]
+        conn.execute(f"UPDATE writing_acts SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+    return get_act(act_id)
+
+
+def delete_act(act_id: str) -> bool:
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("""
+                DELETE FROM writing_scenes WHERE chapter_id IN (
+                    SELECT id FROM writing_chapters WHERE act_id = ?
+                )
+            """, (act_id,))
+            conn.execute("DELETE FROM writing_chapters WHERE act_id = ?", (act_id,))
+            conn.execute("DELETE FROM writing_acts WHERE id = ?", (act_id,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return True
+
+
+def reorder_acts(project_id: str, ordered_ids: list[str]):
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for i, aid in enumerate(ordered_ids):
+                conn.execute(
+                    "UPDATE writing_acts SET sort_order = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+                    (i, time.time(), aid, project_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
 # ── 章节管理 ──
 
 def create_chapter(project_id: str, title: str = "", volume: str = "") -> dict:
