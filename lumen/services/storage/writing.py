@@ -357,6 +357,84 @@ def reorder_chapters(act_id: str, ordered_ids: list[str]):
             raise
 
 
+# ── 场景管理 ──
+
+def create_scene(chapter_id: str, content: dict | None = None, summary: str = "", subtitle: str = "") -> dict:
+    with write_lock:
+        conn = get_conn()
+        sid = f"sc-{uuid.uuid4().hex[:12]}"
+        now = time.time()
+        max_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_scenes WHERE chapter_id = ?",
+            (chapter_id,),
+        ).fetchone()[0]
+        default_content = json.dumps({"type": "doc", "content": [{"type": "paragraph"}]})
+        content_str = json.dumps(content) if content else default_content
+        conn.execute(
+            """INSERT INTO writing_scenes (id, chapter_id, content, summary, subtitle, sort_order, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (sid, chapter_id, content_str, summary, subtitle, max_order, now, now),
+        )
+        conn.commit()
+        return _row_to_dict(conn.execute("SELECT * FROM writing_scenes WHERE id = ?", (sid,)).fetchone())
+
+
+def list_scenes(chapter_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM writing_scenes WHERE chapter_id = ? ORDER BY sort_order",
+        (chapter_id,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_scene(scene_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM writing_scenes WHERE id = ?", (scene_id,)).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def update_scene(scene_id: str, **kwargs) -> dict | None:
+    with write_lock:
+        conn = get_conn()
+        allowed = {"content", "summary", "subtitle"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return get_scene(scene_id)
+        if "content" in updates and isinstance(updates["content"], dict):
+            updates["content"] = json.dumps(updates["content"], ensure_ascii=False)
+        updates["updated_at"] = time.time()
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [scene_id]
+        conn.execute(f"UPDATE writing_scenes SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+    return get_scene(scene_id)
+
+
+def delete_scene(scene_id: str) -> bool:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM writing_scenes WHERE id = ?", (scene_id,))
+        conn.commit()
+    return True
+
+
+def reorder_scenes(chapter_id: str, ordered_ids: list[str]):
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for i, sid in enumerate(ordered_ids):
+                conn.execute(
+                    "UPDATE writing_scenes SET sort_order = ?, updated_at = ? WHERE id = ? AND chapter_id = ?",
+                    (i, time.time(), sid, chapter_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
 # ── 世界观设定管理 ──
 
 def create_setting(project_id: str, name: str, category: str = "custom",
