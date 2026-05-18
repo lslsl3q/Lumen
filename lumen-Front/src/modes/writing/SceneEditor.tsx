@@ -116,7 +116,8 @@ export function SceneEditor({ scene }: { scene: WritingScene }) {
   };
 
   return (
-    <section className="scene-section flex flex-col lg:flex-row lg:gap-6 2xl:gap-8">
+    <section className="scene-section">
+      <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-6 2xl:gap-8">
       <div className="flex-1 min-w-0">
         <EditorContent editor={editor} />
       </div>
@@ -222,6 +223,7 @@ export function SceneEditor({ scene }: { scene: WritingScene }) {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </section>
   );

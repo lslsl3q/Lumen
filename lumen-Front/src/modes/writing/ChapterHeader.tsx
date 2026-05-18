@@ -41,7 +41,7 @@ export function ChapterHeader({
 
   return (
     <div className={`chapter-row-header${isAfterAct ? " after-act" : ""}`}>
-      <div className="flex flex-col lg:flex-row lg:gap-6 2xl:gap-8 items-center lg:items-start">
+      <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-6 2xl:gap-8 items-center lg:items-start">
         <div className="flex-1 min-w-0">
           {showNumber && (
             <span className="font-medium text-sm opacity-60 mb-1 text-[var(--color-text-muted)] select-none block">

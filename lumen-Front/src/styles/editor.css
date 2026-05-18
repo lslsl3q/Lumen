@@ -1653,6 +1653,15 @@
   background-color: rgba(120, 113, 108, 0.5);
 }
 
+/* Shared content max-width — text/buttons constrained, borders full-width */
+.manuscript-inner {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
 /* Scene — independent editor container */
 .scene-section {
   position: relative;
@@ -1663,7 +1672,7 @@
   padding: 0;
 }
 
-/* Act header — thick border + large gap */
+/* Act header — thick border SPANS FULL WIDTH */
 .act-row-header {
   position: relative;
   border-top: 3px solid var(--color-border-subtle);
@@ -1677,7 +1686,7 @@
   padding-top: 0;
 }
 
-/* Chapter header — dashed border separator */
+/* Chapter header — dashed border SPANS FULL WIDTH */
 .chapter-row-header {
   border-top: 1px dashed var(--color-border-subtle);
   margin-top: 2.5em;
@@ -1715,4 +1724,18 @@
 }
 .insert-btn-act {
   margin-top: 40px;
+}
+
+/* Scene separator — full width */
+.scene-separator {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5rem;
+  margin: 1rem 0;
+}
+.scene-separator hr {
+  width: 33%;
+  border-top: 1px solid var(--color-border-subtle);
 }

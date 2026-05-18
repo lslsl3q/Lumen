@@ -5,7 +5,7 @@ interface InsertButtonProps {
 
 export function InsertButton({ label, onClick }: InsertButtonProps) {
   return (
-    <div>
+    <div className="manuscript-inner">
       <button
         className="insert-btn"
         onClick={onClick}

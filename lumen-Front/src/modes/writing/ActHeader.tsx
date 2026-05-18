@@ -35,7 +35,7 @@ export function ActHeader({ act, isFirst }: { act: WritingAct; isFirst: boolean 
 
   return (
     <div className={`act-row-header${isFirst ? " is-first" : ""}`}>
-      <div className="flex flex-col lg:flex-row lg:gap-6 2xl:gap-8 items-center">
+      <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-6 2xl:gap-8 items-center">
         <div className="flex-1 min-w-0">
           {numerate && (
             <span className="font-medium text-sm opacity-60 text-[var(--color-text-muted)] select-none block text-center">

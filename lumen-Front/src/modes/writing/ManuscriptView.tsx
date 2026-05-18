@@ -12,7 +12,6 @@ export function ManuscriptView() {
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Flatten tree into render items
   const items: ManuscriptFlatItem[] = [];
   for (const act of acts) {
     items.push({ type: "act", ...act });
@@ -37,8 +36,7 @@ export function ManuscriptView() {
         if (parentId) await store.createScene(parentId);
         break;
       case "chapter": {
-        const act = acts.find((a) => a.id === parentId);
-        if (act && parentId) await store.createChapter(parentId, "新章节");
+        if (parentId) await store.createChapter(parentId, "新章节");
         break;
       }
       case "act":
@@ -49,57 +47,54 @@ export function ManuscriptView() {
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto writing-manuscript-scroll">
-      <div className="max-w-[720px] mx-auto px-8">
-        <div style={{ height: "20vh" }} />
-        {items.map((item, i) => {
-          switch (item.type) {
-            case "act": {
-              return <ActHeader key={item.id} act={item as any} isFirst={i === 0} />;
-            }
-            case "chapter": {
-              const prevItem = i > 0 ? items[i - 1] : null;
-              return (
-                <ChapterHeader
-                  key={item.id}
-                  chapter={item as any}
-                  isAfterAct={prevItem?.type === "act"}
-                />
-              );
-            }
-            case "scene":
-              return <SceneEditor key={item.id} scene={item as any} />;
-            case "separator":
-              return <SceneSeparator key={`sep-${i}`} />;
-            case "add-scene":
-              return (
-                <InsertButton
-                  key={`add-sc-${item.chapter_id}`}
-                  label="新场景"
-                  onClick={() => handleInsert("scene", item.chapter_id as string)}
-                />
-              );
-            case "add-chapter":
-              return (
-                <InsertButton
-                  key={`add-ch-${item.act_id}`}
-                  label="新章节"
-                  onClick={() => handleInsert("chapter", item.act_id as string)}
-                />
-              );
-            case "add-act":
-              return (
-                <InsertButton
-                  key="add-act"
-                  label="新卷"
-                  onClick={() => handleInsert("act")}
-                />
-              );
-            default:
-              return null;
+      <div style={{ height: "20vh" }} />
+      {items.map((item, i) => {
+        switch (item.type) {
+          case "act":
+            return <ActHeader key={item.id} act={item as any} isFirst={i === 0} />;
+          case "chapter": {
+            const prevItem = i > 0 ? items[i - 1] : null;
+            return (
+              <ChapterHeader
+                key={item.id}
+                chapter={item as any}
+                isAfterAct={prevItem?.type === "act"}
+              />
+            );
           }
-        })}
-        <div style={{ height: "50vh" }} />
-      </div>
+          case "scene":
+            return <SceneEditor key={item.id} scene={item as any} />;
+          case "separator":
+            return <SceneSeparator key={`sep-${i}`} />;
+          case "add-scene":
+            return (
+              <InsertButton
+                key={`add-sc-${item.chapter_id}`}
+                label="新场景"
+                onClick={() => handleInsert("scene", item.chapter_id as string)}
+              />
+            );
+          case "add-chapter":
+            return (
+              <InsertButton
+                key={`add-ch-${item.act_id}`}
+                label="新章节"
+                onClick={() => handleInsert("chapter", item.act_id as string)}
+              />
+            );
+          case "add-act":
+            return (
+              <InsertButton
+                key="add-act"
+                label="新卷"
+                onClick={() => handleInsert("act")}
+              />
+            );
+          default:
+            return null;
+        }
+      })}
+      <div style={{ height: "50vh" }} />
     </div>
   );
 }
