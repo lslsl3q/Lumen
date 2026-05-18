@@ -49,41 +49,69 @@ def _init_tables(conn: sqlite3.Connection):
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL DEFAULT '',
             description TEXT DEFAULT '',
-            channel_id  TEXT DEFAULT '',   -- 关联的 channel
-            metadata    TEXT DEFAULT '{}',  -- JSON：封面、标签、模板等
+            channel_id  TEXT DEFAULT '',
+            metadata    TEXT DEFAULT '{}',
             created_at  REAL NOT NULL,
             updated_at  REAL NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS writing_chapters (
+        -- NEW: Acts table
+        CREATE TABLE IF NOT EXISTS writing_acts (
             id          TEXT PRIMARY KEY,
             project_id  TEXT NOT NULL,
             title       TEXT NOT NULL DEFAULT '',
-            content     TEXT NOT NULL DEFAULT '',  -- Markdown 格式
-            word_count  INTEGER NOT NULL DEFAULT 0,
+            numerate    INTEGER NOT NULL DEFAULT 1,
             sort_order  INTEGER NOT NULL DEFAULT 0,
-            volume      TEXT DEFAULT '',   -- 分卷名
             created_at  REAL NOT NULL,
             updated_at  REAL NOT NULL,
             FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
         );
+        CREATE INDEX IF NOT EXISTS idx_wa_project ON writing_acts(project_id);
 
+        -- MODIFIED: Chapters table (removed content/word_count/volume, added act_id/numerate/show_number)
+        CREATE TABLE IF NOT EXISTS writing_chapters (
+            id          TEXT PRIMARY KEY,
+            act_id      TEXT NOT NULL,
+            project_id  TEXT NOT NULL DEFAULT '',
+            title       TEXT NOT NULL DEFAULT '',
+            numerate    INTEGER NOT NULL DEFAULT 1,
+            show_number INTEGER NOT NULL DEFAULT 1,
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (act_id) REFERENCES writing_acts(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wc_act ON writing_chapters(act_id);
         CREATE INDEX IF NOT EXISTS idx_wc_project ON writing_chapters(project_id);
+
+        -- NEW: Scenes table
+        CREATE TABLE IF NOT EXISTS writing_scenes (
+            id           TEXT PRIMARY KEY,
+            chapter_id   TEXT NOT NULL,
+            content      TEXT NOT NULL DEFAULT '{"type":"doc","content":[{"type":"paragraph"}]}',
+            summary      TEXT NOT NULL DEFAULT '',
+            subtitle     TEXT NOT NULL DEFAULT '',
+            scene_number INTEGER NOT NULL DEFAULT 0,
+            sort_order   INTEGER NOT NULL DEFAULT 0,
+            created_at   REAL NOT NULL,
+            updated_at   REAL NOT NULL,
+            FOREIGN KEY (chapter_id) REFERENCES writing_chapters(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_ws_chapter ON writing_scenes(chapter_id);
 
         CREATE TABLE IF NOT EXISTS writing_settings (
             id          TEXT PRIMARY KEY,
             project_id  TEXT NOT NULL,
-            parent_id   TEXT DEFAULT NULL,  -- 树形层级
+            parent_id   TEXT DEFAULT NULL,
             name        TEXT NOT NULL DEFAULT '',
-            category    TEXT NOT NULL DEFAULT 'custom',  -- character|world|location|object|plot|rules|custom
-            content     TEXT NOT NULL DEFAULT '{}',      -- JSON
+            category    TEXT NOT NULL DEFAULT 'custom',
+            content     TEXT NOT NULL DEFAULT '{}',
             sort_order  INTEGER NOT NULL DEFAULT 0,
-            enabled     INTEGER NOT NULL DEFAULT 1,      -- 是否注入 AI 上下文
+            enabled     INTEGER NOT NULL DEFAULT 1,
             created_at  REAL NOT NULL,
             updated_at  REAL NOT NULL,
             FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
         );
-
         CREATE INDEX IF NOT EXISTS idx_ws_project ON writing_settings(project_id);
         CREATE INDEX IF NOT EXISTS idx_ws_parent ON writing_settings(parent_id);
     """)
