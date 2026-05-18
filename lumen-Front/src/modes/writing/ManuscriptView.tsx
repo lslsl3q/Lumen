@@ -76,7 +76,7 @@ export function ManuscriptView() {
               return (
                 <InsertButton
                   key={`add-sc-${item.chapter_id}`}
-                  label="+ 新场景"
+                  label="新场景"
                   onClick={() => handleInsert("scene", item.chapter_id as string)}
                 />
               );
@@ -84,7 +84,7 @@ export function ManuscriptView() {
               return (
                 <InsertButton
                   key={`add-ch-${item.act_id}`}
-                  label="+ 新章节"
+                  label="新章节"
                   onClick={() => handleInsert("chapter", item.act_id as string)}
                 />
               );
@@ -92,7 +92,7 @@ export function ManuscriptView() {
               return (
                 <InsertButton
                   key="add-act"
-                  label="+ 新卷"
+                  label="新卷"
                   onClick={() => handleInsert("act")}
                 />
               );
