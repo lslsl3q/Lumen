@@ -13,16 +13,72 @@ from lumen.services.storage.writing import (
     create_project, list_projects, get_project, update_project, delete_project,
     create_chapter, list_chapters, get_chapter, update_chapter, delete_chapter, reorder_chapters,
     create_setting, list_settings, get_setting, update_setting, delete_setting, reorder_settings,
+    # NEW:
+    create_act, list_acts, get_act, update_act, delete_act, reorder_acts,
+    create_scene, list_scenes, get_scene, update_scene, delete_scene, reorder_scenes,
+    get_manuscript, get_manuscript_flat,
 )
 from lumen.services.storage.writing_snapshot import (
     create_snapshot, list_snapshots, get_snapshot_detail, restore_snapshot, delete_snapshot,
 )
+from lumen.services.storage.writing_migration import needs_migration, run_migration
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 # ── 请求模型 ──
+
+class CreateActRequest(BaseModel):
+    project_id: str
+    title: str = ""
+    numerate: bool = True
+
+
+class UpdateActRequest(BaseModel):
+    title: str | None = None
+    numerate: bool | None = None
+
+
+class ReorderActsRequest(BaseModel):
+    project_id: str
+    ordered_ids: list[str]
+
+
+class CreateChapterV2Request(BaseModel):
+    act_id: str
+    project_id: str
+    title: str = ""
+
+
+class UpdateChapterV2Request(BaseModel):
+    title: str | None = None
+    numerate: bool | None = None
+    show_number: bool | None = None
+
+
+class ReorderChaptersV2Request(BaseModel):
+    act_id: str
+    ordered_ids: list[str]
+
+
+class CreateSceneRequest(BaseModel):
+    chapter_id: str
+    content: dict | None = None
+    summary: str = ""
+    subtitle: str = ""
+
+
+class UpdateSceneRequest(BaseModel):
+    content: dict | None = None
+    summary: str | None = None
+    subtitle: str | None = None
+
+
+class ReorderScenesRequest(BaseModel):
+    chapter_id: str
+    ordered_ids: list[str]
+
 
 class CreateProjectRequest(BaseModel):
     name: str
@@ -165,6 +221,47 @@ async def api_reorder_chapters(req: ReorderChaptersRequest):
     return {"status": "reordered"}
 
 
+# ── Act ──
+
+@router.get("/projects/{project_id}/acts")
+async def api_list_acts(project_id: str):
+    return await asyncio.to_thread(list_acts, project_id)
+
+
+@router.post("/acts")
+async def api_create_act(req: CreateActRequest):
+    return await asyncio.to_thread(create_act, req.project_id, req.title, req.numerate)
+
+
+@router.get("/acts/{act_id}")
+async def api_get_act(act_id: str):
+    a = await asyncio.to_thread(get_act, act_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="Act not found")
+    return a
+
+
+@router.patch("/acts/{act_id}")
+async def api_update_act(act_id: str, req: UpdateActRequest):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    a = await asyncio.to_thread(update_act, act_id, **updates)
+    if not a:
+        raise HTTPException(status_code=404, detail="Act not found")
+    return a
+
+
+@router.delete("/acts/{act_id}")
+async def api_delete_act(act_id: str):
+    await asyncio.to_thread(delete_act, act_id)
+    return {"status": "deleted"}
+
+
+@router.post("/acts/reorder")
+async def api_reorder_acts(req: ReorderActsRequest):
+    await asyncio.to_thread(reorder_acts, req.project_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
 # ── 世界观设定 ──
 
 @router.get("/projects/{project_id}/settings")
@@ -205,6 +302,47 @@ async def api_delete_setting(setting_id: str):
 @router.post("/settings/reorder")
 async def api_reorder_settings(req: ReorderSettingsRequest):
     await asyncio.to_thread(reorder_settings, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# ── Scene ──
+
+@router.get("/chapters/{chapter_id}/scenes")
+async def api_list_scenes(chapter_id: str):
+    return await asyncio.to_thread(list_scenes, chapter_id)
+
+
+@router.post("/scenes")
+async def api_create_scene(req: CreateSceneRequest):
+    return await asyncio.to_thread(create_scene, req.chapter_id, req.content, req.summary, req.subtitle)
+
+
+@router.get("/scenes/{scene_id}")
+async def api_get_scene(scene_id: str):
+    s = await asyncio.to_thread(get_scene, scene_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return s
+
+
+@router.patch("/scenes/{scene_id}")
+async def api_update_scene(scene_id: str, req: UpdateSceneRequest):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    s = await asyncio.to_thread(update_scene, scene_id, **updates)
+    if not s:
+        raise HTTPException(status_code=404, detail="Scene not found")
+    return s
+
+
+@router.delete("/scenes/{scene_id}")
+async def api_delete_scene(scene_id: str):
+    await asyncio.to_thread(delete_scene, scene_id)
+    return {"status": "deleted"}
+
+
+@router.post("/scenes/reorder")
+async def api_reorder_scenes(req: ReorderScenesRequest):
+    await asyncio.to_thread(reorder_scenes, req.chapter_id, req.ordered_ids)
     return {"status": "reordered"}
 
 
@@ -372,3 +510,31 @@ async def api_export_project(project_id: str, format: str = "txt"):
             parts.append(f"{content}\n\n")
         return PlainTextResponse("".join(parts), media_type="text/plain",
                                  headers={"Content-Disposition": f"attachment; filename={safe_title}.txt"})
+
+
+# ── Manuscript (bulk) ──
+
+@router.get("/projects/{project_id}/manuscript")
+async def api_get_manuscript(project_id: str):
+    return await asyncio.to_thread(get_manuscript, project_id)
+
+
+@router.get("/projects/{project_id}/manuscript-flat")
+async def api_get_manuscript_flat(project_id: str):
+    return await asyncio.to_thread(get_manuscript_flat, project_id)
+
+
+# ── Migration ──
+
+@router.get("/system/migration-status")
+async def api_migration_status():
+    return {"needs_migration": await asyncio.to_thread(needs_migration)}
+
+
+@router.post("/system/run-migration")
+async def api_run_migration():
+    try:
+        result = await asyncio.to_thread(run_migration)
+        return {"status": "ok", **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
