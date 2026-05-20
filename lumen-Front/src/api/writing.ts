@@ -71,13 +71,18 @@ export interface ManuscriptFlatItem {
   [key: string]: any;
 }
 
-export interface WritingSetting {
+export interface CodexEntry {
   id: string;
   project_id: string;
   parent_id: string | null;
   name: string;
-  category: string;
-  content: Record<string, unknown>;
+  type: string;
+  description: Record<string, unknown>;
+  aliases: string[];
+  tags: string[];
+  custom_fields: Record<string, unknown>;
+  relations: { target_id: string; type: string }[];
+  graph_entity_id: string | null;
   sort_order: number;
   enabled: number;
   created_at: number;
@@ -162,31 +167,32 @@ export async function deleteChapter(id: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
-// ── 世界观设定 ──
+// ── Codex (世界观设定) ──
 
-export async function listSettings(projectId: string, category?: string): Promise<WritingSetting[]> {
-  const params = category ? new URLSearchParams({ category }).toString() : "";
-  const url = `${BASE}/projects/${encodeURIComponent(projectId)}/settings${params ? "?" + params : ""}`;
+export async function listCodex(projectId: string, type?: string): Promise<CodexEntry[]> {
+  const params = type ? new URLSearchParams({ type }).toString() : "";
+  const url = `${BASE}/projects/${encodeURIComponent(projectId)}/codex${params ? "?" + params : ""}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function createSetting(
-  projectId: string, name: string, category = "custom",
-  parentId: string | null = null, content: Record<string, unknown> = {},
-): Promise<WritingSetting> {
-  const res = await fetch(`${BASE}/settings`, {
+export async function createCodex(
+  projectId: string, name: string, type = "custom",
+  parentId: string | null = null, description: Record<string, unknown> = {},
+  aliases: string[] = [], tags: string[] = [],
+): Promise<CodexEntry> {
+  const res = await fetch(`${BASE}/codex`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, name, category, parent_id: parentId, content }),
+    body: JSON.stringify({ project_id: projectId, name, type, parent_id: parentId, description, aliases, tags }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function updateSetting(id: string, data: Partial<WritingSetting>): Promise<WritingSetting> {
-  const res = await fetch(`${BASE}/settings/${encodeURIComponent(id)}`, {
+export async function updateCodex(id: string, data: Partial<CodexEntry>): Promise<CodexEntry> {
+  const res = await fetch(`${BASE}/codex/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -195,8 +201,8 @@ export async function updateSetting(id: string, data: Partial<WritingSetting>): 
   return res.json();
 }
 
-export async function deleteSetting(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/settings/${encodeURIComponent(id)}`, { method: "DELETE" });
+export async function deleteCodex(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/codex/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }
 
@@ -340,7 +346,7 @@ export interface WritingSnapshotDetail extends WritingSnapshot {
         scenes: Array<{ id: string; content: string; summary: string; subtitle: string; sort_order: number }>;
       }>;
     }>;
-    settings: Array<{ id: string; name: string; category: string; content: Record<string, unknown>; parent_id: string | null; sort_order: number; enabled: number }>;
+    codex: Array<{ id: string; name: string; type: string; description: Record<string, unknown>; parent_id: string | null; aliases: string[]; tags: string[]; sort_order: number; enabled: number }>;
     snapshot_version: number;
   };
 }

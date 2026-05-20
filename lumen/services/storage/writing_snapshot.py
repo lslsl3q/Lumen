@@ -22,7 +22,7 @@ from lumen.services.storage.writing import (
     list_acts,
     list_chapters_by_act,
     list_scenes,
-    list_settings,
+    list_codex,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def create_snapshot(project_id: str, snap_type: str = "auto", label: str = "") -
         raise ValueError(f"项目 {project_id} 不存在")
 
     acts = list_acts(project_id)
-    settings = list_settings(project_id)
+    settings = list_codex(project_id)
 
     acts_data = []
     for act in acts:
@@ -95,8 +95,8 @@ def create_snapshot(project_id: str, snap_type: str = "auto", label: str = "") -
             "metadata": project.get("metadata", {}),
         },
         "acts": acts_data,
-        "settings": [
-            {k: s[k] for k in ("id", "name", "category", "content", "parent_id", "sort_order", "enabled")}
+        "codex": [
+            {k: s[k] for k in ("id", "name", "type", "description", "parent_id", "aliases", "tags", "sort_order", "enabled")}
             for s in settings
         ],
         "snapshot_version": SNAPSHOT_VERSION,
@@ -183,11 +183,11 @@ def restore_snapshot(snapshot_id: str) -> dict:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
-            # 删除当前 acts, chapters, scenes, settings
+            # 删除当前 acts, chapters, scenes, codex
             conn.execute("DELETE FROM writing_scenes WHERE project_id = ?", (project_id,))
             conn.execute("DELETE FROM writing_chapters WHERE project_id = ?", (project_id,))
             conn.execute("DELETE FROM writing_acts WHERE project_id = ?", (project_id,))
-            conn.execute("DELETE FROM writing_settings WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM codex WHERE project_id = ?", (project_id,))
 
             version = data.get("snapshot_version", 1)
 
@@ -229,15 +229,30 @@ def restore_snapshot(snapshot_id: str) -> dict:
                                 (sc["id"], ch["id"], content, sc.get("summary", ""), sc.get("subtitle", ""), sc.get("sort_order", 0), now, now),
                             )
 
-            # 从快照恢复 settings
-            for s in data.get("settings", []):
+            # 从快照恢复 codex
+            for s in data.get("codex", []):
                 now = time.time()
-                content_json = json.dumps(s["content"], ensure_ascii=False) if isinstance(s["content"], dict) else s["content"]
+                desc_json = json.dumps(s.get("description", {}), ensure_ascii=False) if isinstance(s.get("description"), dict) else (s.get("description") or "{}")
+                aliases_json = json.dumps(s.get("aliases", []), ensure_ascii=False) if isinstance(s.get("aliases"), list) else "[]"
+                tags_json = json.dumps(s.get("tags", []), ensure_ascii=False) if isinstance(s.get("tags"), list) else "[]"
                 conn.execute(
-                    """INSERT INTO writing_settings (id, project_id, parent_id, name, category, content, sort_order, enabled, created_at, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (s["id"], project_id, s.get("parent_id"), s["name"], s["category"],
-                     content_json, s.get("sort_order", 0), s.get("enabled", 1), now, now),
+                    """INSERT INTO codex (id, project_id, parent_id, name, type, description, aliases, tags, sort_order, enabled, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (s["id"], project_id, s.get("parent_id"), s["name"], s.get("type", "custom"),
+                     desc_json, aliases_json, tags_json, s.get("sort_order", 0), s.get("enabled", 1), now, now),
+                )
+
+            # 兼容旧快照（V2 含 settings 字段而非 codex）
+            for s in data.get("settings", []):
+                if data.get("codex"):
+                    break  # 已从 codex 字段恢复，跳过旧 settings
+                now = time.time()
+                desc_json = json.dumps(s.get("content", {}), ensure_ascii=False) if isinstance(s.get("content"), dict) else (s.get("content") or "{}")
+                conn.execute(
+                    """INSERT INTO codex (id, project_id, parent_id, name, type, description, aliases, tags, sort_order, enabled, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (s["id"], project_id, s.get("parent_id"), s["name"], s.get("category", "custom"),
+                     desc_json, "[]", "[]", s.get("sort_order", 0), s.get("enabled", 1), now, now),
                 )
 
             conn.commit()

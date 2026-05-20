@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, WritingChapter, WritingScene, WritingSetting, WritingSnapshot, WritingSnippet } from "../api/writing";
+import type { WritingProject, WritingAct, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -10,7 +10,7 @@ interface WritingState {
   activeProjectId: string | null;
   acts: WritingAct[];
   activeSceneId: string | null;
-  settings: WritingSetting[];
+  codexEntries: CodexEntry[];
   snippets: WritingSnippet[];
   activeSnippetId: string | null;
   manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
@@ -73,11 +73,11 @@ interface WritingState {
   reorderChaptersAction: (actId: string, orderedIds: string[]) => Promise<void>;
   reorderScenesAction: (chapterId: string, orderedIds: string[]) => Promise<void>;
 
-  // Settings
-  loadSettings: (projectId: string) => Promise<void>;
-  createSetting: (name: string, category?: string, parentId?: string | null) => Promise<WritingSetting>;
-  updateSetting: (id: string, data: Partial<WritingSetting>) => Promise<void>;
-  deleteSetting: (id: string) => Promise<void>;
+  // Codex
+  loadCodex: (projectId: string) => Promise<void>;
+  createCodexEntry: (name: string, type?: string, parentId?: string | null) => Promise<CodexEntry>;
+  updateCodexEntry: (id: string, data: Partial<CodexEntry>) => Promise<void>;
+  deleteCodexEntry: (id: string) => Promise<void>;
 
   // Snapshots
   snapshots: WritingSnapshot[];
@@ -105,7 +105,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   activeProjectId: null,
   acts: [],
   activeSceneId: null,
-  settings: [],
+  codexEntries: [],
   aiMode: "chat",
   sidebarWidth: 280,
   isChatPanelOpen: false,
@@ -139,8 +139,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   createProject: async (name) => {
     const project = await writingApi.createProject(name);
-    set((s) => ({ projects: [project, ...s.projects], activeProjectId: project.id, acts: [], activeSceneId: null, settings: [] }));
-    await get().loadSettings(project.id);
+    set((s) => ({ projects: [project, ...s.projects], activeProjectId: project.id, acts: [], activeSceneId: null, codexEntries: [] }));
+    await get().loadCodex(project.id);
     return project;
   },
 
@@ -160,10 +160,10 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveProject: async (id) => {
-    set({ activeProjectId: id, acts: [], activeSceneId: null, settings: [] });
+    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [] });
     if (id) {
       await get().loadManuscript(id);
-      await get().loadSettings(id);
+      await get().loadCodex(id);
     }
   },
 
@@ -250,48 +250,79 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   setActiveScene: (sceneId) => set({ activeSceneId: sceneId }),
 
   reorderActsAction: async (projectId, orderedIds) => {
-    await writingApi.reorderActs(projectId, orderedIds);
-    await get().loadManuscript(projectId);
+    // Optimistic: reorder acts locally
+    const acts = get().acts;
+    const idToAct = new Map(acts.map((a) => [a.id, a]));
+    const reordered = orderedIds.map((id) => idToAct.get(id)).filter(Boolean) as WritingAct[];
+    set({ acts: reordered });
+    // Persist in background
+    writingApi.reorderActs(projectId, orderedIds).catch(() => {
+      // Revert on failure
+      if (get().activeProjectId) get().loadManuscript(get().activeProjectId!);
+    });
   },
 
   reorderChaptersAction: async (actId, orderedIds) => {
-    await writingApi.reorderChapters(actId, orderedIds);
-    const { activeProjectId } = get();
-    if (activeProjectId) await get().loadManuscript(activeProjectId);
+    // Optimistic: reorder chapters within act locally
+    set((s) => ({
+      acts: s.acts.map((act) => {
+        if (act.id !== actId) return act;
+        const chMap = new Map((act as any).chapters?.map((ch: any) => [ch.id, ch]) ?? []);
+        return { ...act, chapters: orderedIds.map((id) => chMap.get(id)).filter(Boolean) };
+      }),
+    }));
+    // Persist in background
+    writingApi.reorderChapters(actId, orderedIds).catch(() => {
+      const { activeProjectId } = get();
+      if (activeProjectId) get().loadManuscript(activeProjectId);
+    });
   },
 
   reorderScenesAction: async (chapterId, orderedIds) => {
-    await writingApi.reorderScenes(chapterId, orderedIds);
-    const { activeProjectId } = get();
-    if (activeProjectId) await get().loadManuscript(activeProjectId);
+    // Optimistic: reorder scenes within chapter locally
+    set((s) => ({
+      acts: s.acts.map((act) => ({
+        ...act,
+        chapters: ((act as any).chapters || []).map((ch: any) => {
+          if (ch.id !== chapterId) return ch;
+          const scMap = new Map((ch.scenes || []).map((sc: any) => [sc.id, sc]));
+          return { ...ch, scenes: orderedIds.map((id) => scMap.get(id)).filter(Boolean) };
+        }),
+      })),
+    }));
+    // Persist in background
+    writingApi.reorderScenes(chapterId, orderedIds).catch(() => {
+      const { activeProjectId } = get();
+      if (activeProjectId) get().loadManuscript(activeProjectId);
+    });
   },
 
-  loadSettings: async (projectId) => {
-    const settings = await writingApi.listSettings(projectId);
-    set({ settings });
+  loadCodex: async (projectId) => {
+    const entries = await writingApi.listCodex(projectId);
+    set({ codexEntries: entries });
   },
 
-  createSetting: async (name, category = "custom", parentId = null) => {
+  createCodexEntry: async (name, type = "custom", parentId = null) => {
     const { activeProjectId } = get();
     if (!activeProjectId) throw new Error("No project selected");
-    const setting = await writingApi.createSetting(activeProjectId, name, category, parentId);
-    set((s) => ({ settings: [...s.settings, setting] }));
-    return setting;
+    const entry = await writingApi.createCodex(activeProjectId, name, type, parentId);
+    set((s) => ({ codexEntries: [...s.codexEntries, entry] }));
+    return entry;
   },
 
-  updateSetting: async (id, data) => {
+  updateCodexEntry: async (id, data) => {
     set({ saveStatus: "saving" });
     try {
-      const setting = await writingApi.updateSetting(id, data);
-      set((s) => ({ settings: s.settings.map((st) => (st.id === id ? setting : st)), saveStatus: "saved", lastSavedAt: Date.now() }));
+      const entry = await writingApi.updateCodex(id, data);
+      set((s) => ({ codexEntries: s.codexEntries.map((e) => (e.id === id ? entry : e)), saveStatus: "saved", lastSavedAt: Date.now() }));
     } catch {
       set({ saveStatus: "error" });
     }
   },
 
-  deleteSetting: async (id) => {
-    await writingApi.deleteSetting(id);
-    set((s) => ({ settings: s.settings.filter((st) => st.id !== id && st.parent_id !== id) }));
+  deleteCodexEntry: async (id) => {
+    await writingApi.deleteCodex(id);
+    set((s) => ({ codexEntries: s.codexEntries.filter((e) => e.id !== id && e.parent_id !== id) }));
   },
 
   loadSnapshots: async (projectId) => {
@@ -312,7 +343,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     if (activeProjectId) {
       set({ activeSceneId: null });
       await get().loadManuscript(activeProjectId);
-      await get().loadSettings(activeProjectId);
+      await get().loadCodex(activeProjectId);
       await get().loadSnapshots(activeProjectId);
     }
   },

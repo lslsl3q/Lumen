@@ -99,21 +99,26 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_ws_chapter ON writing_scenes(chapter_id);
 
-        CREATE TABLE IF NOT EXISTS writing_settings (
+        CREATE TABLE IF NOT EXISTS codex (
             id          TEXT PRIMARY KEY,
             project_id  TEXT NOT NULL,
             parent_id   TEXT DEFAULT NULL,
             name        TEXT NOT NULL DEFAULT '',
-            category    TEXT NOT NULL DEFAULT 'custom',
-            content     TEXT NOT NULL DEFAULT '{}',
+            type        TEXT NOT NULL DEFAULT 'custom',
+            description TEXT NOT NULL DEFAULT '{}',
+            aliases     TEXT NOT NULL DEFAULT '[]',
+            tags        TEXT NOT NULL DEFAULT '[]',
+            custom_fields TEXT NOT NULL DEFAULT '{}',
+            relations   TEXT NOT NULL DEFAULT '[]',
+            graph_entity_id TEXT DEFAULT NULL,
             sort_order  INTEGER NOT NULL DEFAULT 0,
             enabled     INTEGER NOT NULL DEFAULT 1,
             created_at  REAL NOT NULL,
             updated_at  REAL NOT NULL,
             FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
         );
-        CREATE INDEX IF NOT EXISTS idx_ws_project ON writing_settings(project_id);
-        CREATE INDEX IF NOT EXISTS idx_ws_parent ON writing_settings(parent_id);
+        CREATE INDEX IF NOT EXISTS idx_codex_project ON codex(project_id);
+        CREATE INDEX IF NOT EXISTS idx_codex_parent ON codex(parent_id);
 
         -- Snippets: 独立文本片段（草稿/灵感/笔记）
         CREATE TABLE IF NOT EXISTS writing_snippets (
@@ -129,6 +134,9 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_wsnip_project ON writing_snippets(project_id);
     """)
+
+    # 删旧表（测试数据，无需迁移）
+    conn.execute("DROP TABLE IF EXISTS writing_settings")
 
 
 # ── 作品管理 ──
@@ -475,73 +483,79 @@ def reorder_scenes(chapter_id: str, ordered_ids: list[str]):
             raise
 
 
-# ── 世界观设定管理 ──
+# ── Codex (世界观设定) ──
 
-def create_setting(project_id: str, name: str, category: str = "custom",
-                   parent_id: str | None = None, content: dict | None = None) -> dict:
+def create_codex(project_id: str, name: str, type: str = "custom",
+                 parent_id: str | None = None, description: dict | None = None,
+                 aliases: list | None = None, tags: list | None = None) -> dict:
     with write_lock:
         conn = get_conn()
-        sid = f"set-{uuid.uuid4().hex[:12]}"
+        sid = f"cdx-{uuid.uuid4().hex[:12]}"
         now = time.time()
         max_order = conn.execute(
-            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_settings WHERE project_id = ? AND parent_id IS ?",
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM codex WHERE project_id = ? AND parent_id IS ?",
             (project_id, parent_id),
         ).fetchone()[0]
         conn.execute(
-            """INSERT INTO writing_settings (id, project_id, parent_id, name, category, content, sort_order, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (sid, project_id, parent_id, name, category, json.dumps(content or {}, ensure_ascii=False),
+            """INSERT INTO codex (id, project_id, parent_id, name, type, description, aliases, tags, sort_order, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (sid, project_id, parent_id, name, type,
+             json.dumps(description or {}, ensure_ascii=False),
+             json.dumps(aliases or [], ensure_ascii=False),
+             json.dumps(tags or [], ensure_ascii=False),
              max_order, now, now),
         )
         conn.commit()
-        return _row_to_dict(conn.execute("SELECT * FROM writing_settings WHERE id = ?", (sid,)).fetchone())
+        return _row_to_dict(conn.execute("SELECT * FROM codex WHERE id = ?", (sid,)).fetchone())
 
 
-def list_settings(project_id: str, category: str | None = None) -> list[dict]:
+def list_codex(project_id: str, type: str | None = None) -> list[dict]:
     conn = get_conn()
-    if category:
+    if type:
         rows = conn.execute(
-            "SELECT * FROM writing_settings WHERE project_id = ? AND category = ? ORDER BY sort_order",
-            (project_id, category),
+            "SELECT * FROM codex WHERE project_id = ? AND type = ? ORDER BY sort_order",
+            (project_id, type),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM writing_settings WHERE project_id = ? ORDER BY category, sort_order",
+            "SELECT * FROM codex WHERE project_id = ? ORDER BY type, sort_order",
             (project_id,),
         ).fetchall()
     return [_row_to_dict(r) for r in rows]
 
 
-def get_setting(setting_id: str) -> dict | None:
+def get_codex(codex_id: str) -> dict | None:
     conn = get_conn()
-    row = conn.execute("SELECT * FROM writing_settings WHERE id = ?", (setting_id,)).fetchone()
+    row = conn.execute("SELECT * FROM codex WHERE id = ?", (codex_id,)).fetchone()
     return _row_to_dict(row) if row else None
 
 
-def update_setting(setting_id: str, **kwargs) -> dict | None:
+def update_codex(codex_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"name", "category", "content", "enabled", "parent_id"}
+        allowed = {"name", "type", "description", "aliases", "tags", "custom_fields",
+                   "relations", "graph_entity_id", "enabled", "parent_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
-            return get_setting(setting_id)
-        if "content" in updates and isinstance(updates["content"], dict):
-            updates["content"] = json.dumps(updates["content"], ensure_ascii=False)
+            return get_codex(codex_id)
+        for json_field in ("description", "custom_fields", "relations", "aliases", "tags"):
+            if json_field in updates and not isinstance(updates[json_field], str):
+                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
         updates["updated_at"] = time.time()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [setting_id]
-        conn.execute(f"UPDATE writing_settings SET {set_clause} WHERE id = ?", values)
+        values = list(updates.values()) + [codex_id]
+        conn.execute(f"UPDATE codex SET {set_clause} WHERE id = ?", values)
         conn.commit()
-    return get_setting(setting_id)
+    return get_codex(codex_id)
 
 
-def delete_setting(setting_id: str) -> bool:
+def delete_codex(codex_id: str) -> bool:
     with write_lock:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
-            conn.execute("DELETE FROM writing_settings WHERE parent_id = ?", (setting_id,))
-            conn.execute("DELETE FROM writing_settings WHERE id = ?", (setting_id,))
+            conn.execute("DELETE FROM codex WHERE parent_id = ?", (codex_id,))
+            conn.execute("DELETE FROM codex WHERE id = ?", (codex_id,))
             conn.commit()
         except Exception:
             conn.rollback()
@@ -549,14 +563,14 @@ def delete_setting(setting_id: str) -> bool:
     return True
 
 
-def reorder_settings(ordered_ids: list[str]):
+def reorder_codex(ordered_ids: list[str]):
     with write_lock:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
             for i, sid in enumerate(ordered_ids):
                 conn.execute(
-                    "UPDATE writing_settings SET sort_order = ?, updated_at = ? WHERE id = ?",
+                    "UPDATE codex SET sort_order = ?, updated_at = ? WHERE id = ?",
                     (i, time.time(), sid),
                 )
             conn.commit()
@@ -572,7 +586,7 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
         return None
     d = dict(row)
     # 解析 JSON 字段
-    for key in ("content", "metadata"):
+    for key in ("description", "aliases", "tags", "custom_fields", "relations", "metadata"):
         if key in d and isinstance(d[key], str):
             try:
                 d[key] = json.loads(d[key])

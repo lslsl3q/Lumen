@@ -206,20 +206,20 @@ function SidebarContent({ tab }: { tab: SidebarTab }) {
 /* ── CodexPanel ── */
 
 function CodexPanel() {
-  const settings = useWritingStore((s) => s.settings);
-  const createSetting = useWritingStore((s) => s.createSetting);
+  const codexEntries = useWritingStore((s) => s.codexEntries);
+  const createCodexEntry = useWritingStore((s) => s.createCodexEntry);
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
   const [search, setSearch] = useState("");
 
   const filtered = search
-    ? settings.filter((s) =>
+    ? codexEntries.filter((s) =>
         s.name.toLowerCase().includes(search.toLowerCase())
       )
-    : settings;
+    : codexEntries;
 
   const grouped = CODEX_CATEGORIES.map((cat) => ({
     ...cat,
-    items: filtered.filter((s) => s.category === cat.id),
+    items: filtered.filter((s) => s.type === cat.id),
   }));
 
   return (
@@ -248,7 +248,7 @@ function CodexPanel() {
                 key={t.id}
                 onClick={async () => {
                   if (!activeProjectId) return;
-                  await createSetting(`新${t.label}`, t.id, null);
+                  await createCodexEntry(`新${t.label}`, t.id, null);
                 }}
               >
                 <t.icon className="w-3.5 h-3.5" />
@@ -276,7 +276,7 @@ function CodexPanel() {
             items={cat.items}
             onAdd={async () => {
               if (!activeProjectId) return;
-              await createSetting(`新${cat.label}`, cat.id, null);
+              await createCodexEntry(`新${cat.label}`, cat.id, null);
             }}
           />
         ))}

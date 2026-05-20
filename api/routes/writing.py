@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from lumen.services.storage.writing import (
     create_project, list_projects, get_project, update_project, delete_project,
     create_chapter, list_chapters, get_chapter, update_chapter, delete_chapter, reorder_chapters,
-    create_setting, list_settings, get_setting, update_setting, delete_setting, reorder_settings,
+    create_codex, list_codex, get_codex, update_codex, delete_codex, reorder_codex,
     # NEW:
     create_act, list_acts, get_act, update_act, delete_act, reorder_acts,
     create_scene, list_scenes, get_scene, update_scene, delete_scene, reorder_scenes,
@@ -95,23 +95,30 @@ class UpdateProjectRequest(BaseModel):
     metadata: dict | None = None
 
 
-class CreateSettingRequest(BaseModel):
+class CreateCodexRequest(BaseModel):
     project_id: str
     name: str
-    category: str = "custom"
+    type: str = "custom"
     parent_id: str | None = None
-    content: dict = Field(default_factory=dict)
+    description: dict = Field(default_factory=dict)
+    aliases: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
-class UpdateSettingRequest(BaseModel):
+class UpdateCodexRequest(BaseModel):
     name: str | None = None
-    category: str | None = None
-    content: dict | None = None
+    type: str | None = None
+    description: dict | None = None
+    aliases: list[str] | None = None
+    tags: list[str] | None = None
+    custom_fields: dict | None = None
+    relations: list | None = None
+    graph_entity_id: str | None = None
     enabled: int | None = None
     parent_id: str | None = None
 
 
-class ReorderSettingsRequest(BaseModel):
+class ReorderCodexRequest(BaseModel):
     ordered_ids: list[str]
 
 
@@ -247,46 +254,46 @@ async def api_reorder_acts(req: ReorderActsRequest):
     return {"status": "reordered"}
 
 
-# ── 世界观设定 ──
+# ── Codex (世界观设定) ──
 
-@router.get("/projects/{project_id}/settings")
-async def api_list_settings(project_id: str, category: str | None = None):
-    return await asyncio.to_thread(list_settings, project_id, category)
+@router.get("/projects/{project_id}/codex")
+async def api_list_codex(project_id: str, type: str | None = None):
+    return await asyncio.to_thread(list_codex, project_id, type)
 
 
-@router.post("/settings")
-async def api_create_setting(req: CreateSettingRequest):
+@router.post("/codex")
+async def api_create_codex(req: CreateCodexRequest):
     return await asyncio.to_thread(
-        create_setting, req.project_id, req.name, req.category, req.parent_id, req.content
+        create_codex, req.project_id, req.name, req.type, req.parent_id, req.description, req.aliases, req.tags
     )
 
 
-@router.get("/settings/{setting_id}")
-async def api_get_setting(setting_id: str):
-    s = await asyncio.to_thread(get_setting, setting_id)
+@router.get("/codex/{codex_id}")
+async def api_get_codex(codex_id: str):
+    s = await asyncio.to_thread(get_codex, codex_id)
     if not s:
-        raise HTTPException(status_code=404, detail="设定不存在")
+        raise HTTPException(status_code=404, detail="Codex 条目不存在")
     return s
 
 
-@router.patch("/settings/{setting_id}")
-async def api_update_setting(setting_id: str, req: UpdateSettingRequest):
+@router.patch("/codex/{codex_id}")
+async def api_update_codex(codex_id: str, req: UpdateCodexRequest):
     updates = {k: v for k, v in req.model_dump().items() if v is not None}
-    s = await asyncio.to_thread(update_setting, setting_id, **updates)
+    s = await asyncio.to_thread(update_codex, codex_id, **updates)
     if not s:
-        raise HTTPException(status_code=404, detail="设定不存在")
+        raise HTTPException(status_code=404, detail="Codex 条目不存在")
     return s
 
 
-@router.delete("/settings/{setting_id}")
-async def api_delete_setting(setting_id: str):
-    await asyncio.to_thread(delete_setting, setting_id)
+@router.delete("/codex/{codex_id}")
+async def api_delete_codex(codex_id: str):
+    await asyncio.to_thread(delete_codex, codex_id)
     return {"status": "deleted"}
 
 
-@router.post("/settings/reorder")
-async def api_reorder_settings(req: ReorderSettingsRequest):
-    await asyncio.to_thread(reorder_settings, req.ordered_ids)
+@router.post("/codex/reorder")
+async def api_reorder_codex(req: ReorderCodexRequest):
+    await asyncio.to_thread(reorder_codex, req.ordered_ids)
     return {"status": "reordered"}
 
 

@@ -12,7 +12,7 @@ import re
 import logging
 from typing import Any
 
-from lumen.services.storage.writing import list_chapters, list_settings
+from lumen.services.storage.writing import list_chapters, list_codex
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +183,7 @@ class ContextQueryService:
 
         self._all_chapters = list_chapters(self._book_id) or []
         self._all_settings = [
-            s for s in (list_settings(self._book_id) or [])
+            s for s in (list_codex(self._book_id) or [])
             if s.get("enabled", 1)
         ]
 

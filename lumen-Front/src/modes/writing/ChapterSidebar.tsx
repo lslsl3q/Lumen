@@ -294,29 +294,29 @@ const CATEGORY_OPTIONS = [
 ];
 
 function SettingsList() {
-  const { settings, activeProjectId, loadSettings, createSetting, updateSetting, deleteSetting } = useWritingStore();
+  const { codexEntries: entries, activeProjectId, loadCodex, createCodexEntry, updateCodexEntry, deleteCodexEntry } = useWritingStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pendingSettingId, setPendingSettingId] = useState<string | null>(null);
   const [pendingSettingName, setPendingSettingName] = useState("");
 
   useEffect(() => {
-    if (activeProjectId) loadSettings(activeProjectId);
+    if (activeProjectId) loadCodex(activeProjectId);
   }, [activeProjectId]);
 
   const handleUpdateContent = async (id: string, content: string) => {
     try {
-      await updateSetting(id, { content: { text: content } } as any);
+      await updateCodexEntry(id, { description: { text: content } } as any);
     } catch { /* ignore */ }
   };
 
   return (
     <div className="mt-1 px-1 space-y-0.5 max-h-[300px] overflow-y-auto scrollbar-lumen">
-      {settings.length === 0 && (
+      {entries.length === 0 && (
         <p className="text-[10px] text-text-muted italic px-3 py-1">暂无设定</p>
       )}
-      {settings.map((s) => {
+      {entries.map((s) => {
         const isExpanded = expandedId === s.id;
-        const contentText = (s.content as any)?.text ?? "";
+        const contentText = (s.description as any)?.text ?? "";
         return (
           <div key={s.id} className="rounded-md overflow-hidden">
             <div
@@ -324,7 +324,7 @@ function SettingsList() {
               className="flex items-center justify-between px-3 py-1.5 text-[12px] text-text-secondary hover:bg-surface-elevated group transition-colors cursor-pointer"
             >
               <span className="flex items-center gap-1.5 truncate flex-1">
-                <span className="text-[10px] text-text-muted">{CATEGORY_LABELS[s.category] ?? s.category}</span>
+                <span className="text-[10px] text-text-muted">{CATEGORY_LABELS[s.type] ?? s.type}</span>
                 {pendingSettingId === s.id ? (
                   <input
                     autoFocus
@@ -335,7 +335,7 @@ function SettingsList() {
                       if (e.key === "Enter") {
                         e.preventDefault();
                         const name = pendingSettingName.trim();
-                        if (name) { try { await updateSetting(s.id, { name }); } catch {} }
+                        if (name) { try { await updateCodexEntry(s.id, { name }); } catch {} }
                         setPendingSettingId(null);
                       } else if (e.key === "Escape") {
                         e.preventDefault();
@@ -353,7 +353,7 @@ function SettingsList() {
               <button
                 onClick={async (e) => {
                   e.stopPropagation();
-                  try { await deleteSetting(s.id); }
+                  try { await deleteCodexEntry(s.id); }
                   catch { /* ignore */ }
                 }}
                 className="p-0.5 rounded opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 cursor-pointer transition-opacity"
@@ -366,16 +366,16 @@ function SettingsList() {
                 <input
                   value={s.name}
                   onChange={async (e) => {
-                    try { await updateSetting(s.id, { name: e.target.value }); }
+                    try { await updateCodexEntry(s.id, { name: e.target.value }); }
                     catch { /* ignore */ }
                   }}
                   className="w-full bg-surface-elevated border border-border-default rounded px-2 py-1 text-[12px] text-text-primary outline-none focus:border-primary/30"
                   placeholder="设定名称"
                 />
                 <select
-                  value={s.category}
+                  value={s.type}
                   onChange={async (e) => {
-                    try { await updateSetting(s.id, { category: e.target.value }); await loadSettings(activeProjectId!); }
+                    try { await updateCodexEntry(s.id, { type: e.target.value }); await loadCodex(activeProjectId!); }
                     catch { /* ignore */ }
                   }}
                   className="w-full bg-surface-elevated border border-border-default rounded px-2 py-1 text-[11px] text-text-secondary outline-none focus:border-primary/30"
@@ -400,7 +400,7 @@ function SettingsList() {
         onClick={async () => {
           if (!activeProjectId) return;
           try {
-            const ns = await createSetting("新设定");
+            const ns = await createCodexEntry("新设定");
             setPendingSettingId(ns.id);
             setPendingSettingName("新设定");
           } catch {}

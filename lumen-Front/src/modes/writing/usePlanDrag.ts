@@ -83,15 +83,50 @@ export async function handleSceneDrag(
   if (srcInfo.chapterId === tgtChapterId && sceneId === overId) return;
 
   if (srcInfo.chapterId !== tgtChapterId) {
-    // Cross-chapter move
-    await writingApi.updateScene(sceneId, { chapter_id: tgtChapterId });
-    const overIdx = overType === "scene" ? tgtSceneIds.indexOf(overId) : -1;
-    if (overIdx === -1) tgtSceneIds.push(sceneId);
-    else tgtSceneIds.splice(overIdx, 0, sceneId);
-    await writingApi.reorderScenes(tgtChapterId, tgtSceneIds);
+    // Cross-chapter move — optimistic local update
+    const acts = store.acts as any[];
+    const updatedActs = acts.map((act) => ({
+      ...act,
+      chapters: (act.chapters || []).map((ch: any) => {
+        if (ch.id === srcInfo.chapterId) {
+          // Remove scene from source
+          return { ...ch, scenes: ch.scenes.filter((sc: any) => sc.id !== sceneId) };
+        }
+        if (ch.id === tgtChapterId) {
+          // Insert scene into target at position
+          const overIdx = overType === "scene" ? tgtSceneIds.indexOf(overId) : -1;
+          const scene = acts.flatMap((a) => (a.chapters || [])).flatMap((c: any) => c.scenes || []).find((sc: any) => sc.id === sceneId);
+          const newScenes = [...ch.scenes.filter((sc: any) => sc.id !== sceneId)];
+          if (overIdx === -1) newScenes.push(scene);
+          else newScenes.splice(overIdx, 0, scene);
+          return { ...ch, scenes: newScenes, scene_count: newScenes.length };
+        }
+        return ch;
+      }),
+    }));
+    // Patch scene's chapter_id locally
+    for (const act of updatedActs) {
+      for (const ch of act.chapters || []) {
+        for (const sc of ch.scenes || []) {
+          if (sc.id === sceneId) sc.chapter_id = tgtChapterId;
+        }
+      }
+    }
+    useWritingStore.setState({ acts: updatedActs });
+    // Persist in background
+    const updatedTgtIds = [...tgtSceneIds];
+    const oi = overType === "scene" ? updatedTgtIds.indexOf(overId) : -1;
+    if (oi === -1) updatedTgtIds.push(sceneId);
+    else updatedTgtIds.splice(oi, 0, sceneId);
     const srcRemaining = srcInfo.sceneIds.filter((id) => id !== sceneId);
-    if (srcRemaining.length > 0) await writingApi.reorderScenes(srcInfo.chapterId, srcRemaining);
-    if (store.activeProjectId) await store.loadManuscript(store.activeProjectId);
+    Promise.all([
+      writingApi.updateScene(sceneId, { chapter_id: tgtChapterId }),
+      writingApi.reorderScenes(tgtChapterId, updatedTgtIds),
+      srcRemaining.length > 0 ? writingApi.reorderScenes(srcInfo.chapterId, srcRemaining) : Promise.resolve(),
+    ]).catch(() => {
+      // Revert on failure
+      if (store.activeProjectId) store.loadManuscript(store.activeProjectId);
+    });
   } else {
     // Same chapter reorder
     if (sceneId === overId) return;
@@ -137,15 +172,37 @@ export async function handleChapterDrag(
   if (srcInfo.actId === tgtActId && chapterId === overId) return;
 
   if (srcInfo.actId !== tgtActId) {
-    // Cross-act move
-    await writingApi.updateChapter(chapterId, { act_id: tgtActId });
-    const overIdx = overType === "chapter" ? tgtChapterIds.indexOf(overId) : -1;
-    if (overIdx === -1) tgtChapterIds.push(chapterId);
-    else tgtChapterIds.splice(overIdx, 0, chapterId);
-    await writingApi.reorderChapters(tgtActId, tgtChapterIds);
+    // Cross-act move — optimistic local update
+    const acts = store.acts as any[];
+    const chapter = acts.flatMap((a) => (a.chapters || [])).find((ch: any) => ch.id === chapterId);
+    if (!chapter) return;
+    const updatedActs = acts.map((act) => {
+      if (act.id === srcInfo.actId) {
+        return { ...act, chapters: act.chapters.filter((ch: any) => ch.id !== chapterId) };
+      }
+      if (act.id === tgtActId) {
+        const newChapters = [...act.chapters.filter((ch: any) => ch.id !== chapterId)];
+        const overIdx = overType === "chapter" ? tgtChapterIds.indexOf(overId) : -1;
+        if (overIdx === -1) newChapters.push({ ...chapter, act_id: tgtActId });
+        else newChapters.splice(overIdx, 0, { ...chapter, act_id: tgtActId });
+        return { ...act, chapters: newChapters };
+      }
+      return act;
+    });
+    useWritingStore.setState({ acts: updatedActs });
+    // Persist in background
+    const updatedTgtIds = [...tgtChapterIds];
+    const oi = overType === "chapter" ? updatedTgtIds.indexOf(overId) : -1;
+    if (oi === -1) updatedTgtIds.push(chapterId);
+    else updatedTgtIds.splice(oi, 0, chapterId);
     const srcRemaining = srcInfo.chapterIds.filter((id) => id !== chapterId);
-    if (srcRemaining.length > 0) await writingApi.reorderChapters(srcInfo.actId, srcRemaining);
-    if (store.activeProjectId) await store.loadManuscript(store.activeProjectId);
+    Promise.all([
+      writingApi.updateChapter(chapterId, { act_id: tgtActId }),
+      writingApi.reorderChapters(tgtActId, updatedTgtIds),
+      srcRemaining.length > 0 ? writingApi.reorderChapters(srcInfo.actId, srcRemaining) : Promise.resolve(),
+    ]).catch(() => {
+      if (store.activeProjectId) store.loadManuscript(store.activeProjectId);
+    });
   } else {
     // Same act reorder
     if (chapterId === overId) return;

@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { getExportUrl } from "../../api/writing";
-import type { WritingSetting } from "../../api/writing";
+import type { CodexEntry } from "../../api/writing";
 
 type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
 import {
@@ -202,7 +202,7 @@ function CategoryContent({ category, fields, label, icon }: {
   label: string;
   icon: string;
 }) {
-  const { settings, activeProjectId, loadSettings, createSetting, deleteSetting, updateSetting } = useWritingStore();
+  const { settings, activeProjectId, loadCodex, createCodexEntry, deleteCodexEntry, updateCodexEntry } = useWritingStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -210,17 +210,17 @@ function CategoryContent({ category, fields, label, icon }: {
   const [pendingEditName, setPendingEditName] = useState("");
 
   useEffect(() => {
-    if (activeProjectId) loadSettings(activeProjectId);
+    if (activeProjectId) loadCodex(activeProjectId);
   }, [activeProjectId]);
 
-  const filtered = settings.filter((s) => s.category === category);
+  const filtered = settings.filter((s) => s.type === category);
   const searched = searchQuery
     ? filtered.filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : filtered;
 
   // 构建树结构（孤儿节点提升为根节点）
   const allIds = new Set(searched.map((s) => s.id));
-  const byParent = new Map<string | null, WritingSetting[]>();
+  const byParent = new Map<string | null, CodexEntry[]>();
   for (const s of searched) {
     const pid = s.parent_id ?? null;
     const effectivePid = pid !== null && !allIds.has(pid) ? null : pid;
@@ -236,11 +236,11 @@ function CategoryContent({ category, fields, label, icon }: {
     });
   };
 
-  const renderNode = (s: WritingSetting, depth: number, visited: Set<string>): React.ReactNode => {
+  const renderNode = (s: CodexEntry, depth: number, visited: Set<string>): React.ReactNode => {
     if (visited.has(s.id)) return null;
     const nextVisited = new Set(visited).add(s.id);
 
-    const content = (s.content as Record<string, string>) ?? {};
+    const content = (s.description as Record<string, string>) ?? {};
     const badgeField = fields.find((f) => f.type === "select");
     const badge = badgeField?.options?.find((o) => o.value === content[badgeField.key])?.label;
     const isActive = selectedId === s.id;
@@ -278,7 +278,7 @@ function CategoryContent({ category, fields, label, icon }: {
                   e.preventDefault();
                   const name = pendingEditName.trim();
                   if (name) {
-                    try { await updateSetting(s.id, { name }); } catch {}
+                    try { await updateCodexEntry(s.id, { name }); } catch {}
                   }
                   setPendingEditId(null);
                 } else if (e.key === "Escape") {
@@ -303,7 +303,7 @@ function CategoryContent({ category, fields, label, icon }: {
               e.stopPropagation();
               if (!activeProjectId) return;
               try {
-                const ns = await createSetting("新子项", category, s.id);
+                const ns = await createCodexEntry("新子项", category, s.id);
                 toggleExpand(s.id);
                 setPendingEditId(ns.id);
                 setPendingEditName("新子项");
@@ -318,7 +318,7 @@ function CategoryContent({ category, fields, label, icon }: {
             onClick={async (e) => {
               e.stopPropagation();
               if (!confirm(`删除「${s.name}」？`)) return;
-              await deleteSetting(s.id);
+              await deleteCodexEntry(s.id);
               if (selectedId === s.id) setSelectedId(null);
             }}
             className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 cursor-pointer"
@@ -352,7 +352,7 @@ function CategoryContent({ category, fields, label, icon }: {
             onClick={async () => {
               if (!activeProjectId) return;
               try {
-                const ns = await createSetting("新" + label, category);
+                const ns = await createCodexEntry("新" + label, category);
                 setPendingEditId(ns.id);
                 setPendingEditName("新" + label);
               } catch {}
@@ -398,9 +398,9 @@ function CategoryContent({ category, fields, label, icon }: {
 
 /* ── 详情编辑器 ── */
 
-function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: FieldDef[] }) {
-  const { updateSetting } = useWritingStore();
-  const content = (setting.content as Record<string, string>) ?? {};
+function DetailEditor({ setting, fields }: { setting: CodexEntry; fields: FieldDef[] }) {
+  const { updateCodexEntry } = useWritingStore();
+  const content = (setting.description as Record<string, string>) ?? {};
 
   const getFieldValue = (key: string): string => {
     const val = content[key];
@@ -408,8 +408,8 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
   };
 
   const updateField = async (key: string, value: string) => {
-    await updateSetting(setting.id, {
-      content: { ...content, [key]: value },
+    await updateCodexEntry(setting.id, {
+      description: { ...content, [key]: value },
     } as any);
   };
 
@@ -423,7 +423,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
           defaultValue={setting.name}
           onBlur={async (e) => {
             if (e.target.value.trim() && e.target.value !== setting.name) {
-              await updateSetting(setting.id, { name: e.target.value });
+              await updateCodexEntry(setting.id, { name: e.target.value });
             }
           }}
           className="w-full mt-1 bg-surface-elevated border border-border-default rounded-lg px-3 py-2 text-[15px] text-text-primary outline-none focus:border-primary/30"
@@ -451,7 +451,7 @@ function DetailEditor({ setting, fields }: { setting: WritingSetting; fields: Fi
           </div>
           <button
             onClick={async () => {
-              await updateSetting(setting.id, { enabled: setting.enabled ? 0 : 1 });
+              await updateCodexEntry(setting.id, { enabled: setting.enabled ? 0 : 1 });
             }}
             className={`ml-auto text-[11px] px-3 py-1.5 rounded-lg border transition-colors cursor-pointer
               ${setting.enabled
@@ -642,7 +642,7 @@ function ProjectManagementContent() {
                 </div>
                 <div className="px-4 py-3 rounded-xl bg-surface-panel border border-border-default">
                   <p className="text-[11px] text-text-muted">设定数</p>
-                  <p className="text-[20px] font-medium text-text-primary mt-0.5">{useWritingStore.getState().settings.length}</p>
+                  <p className="text-[20px] font-medium text-text-primary mt-0.5">{useWritingStore.getState().codexEntries.length}</p>
                 </div>
               </div>
 
@@ -680,14 +680,14 @@ function ProjectManagementContent() {
    ══════════════════════════════════════ */
 
 function OutlineContent() {
-  const { chapters, setActiveChapter, settings, activeProjectId, loadSettings, createSetting, updateSetting } = useWritingStore();
+  const { chapters, setActiveChapter, settings, activeProjectId, loadCodex, createCodexEntry, updateCodexEntry } = useWritingStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeProjectId) loadSettings(activeProjectId);
+    if (activeProjectId) loadCodex(activeProjectId);
   }, [activeProjectId]);
 
-  const outlineSettings = settings.filter((s) => s.category === "outline");
+  const outlineSettings = settings.filter((s) => s.type === "outline");
   const totalWords = chapters.reduce((sum, c) => sum + (c.word_count ?? 0), 0);
 
   const getOutlineContent = (chapterId: string) => {
@@ -698,9 +698,9 @@ function OutlineContent() {
   const getOrCreateOutlineSetting = async (chapterId: string) => {
     let s = outlineSettings.find((o) => o.name === chapterId);
     if (!s && activeProjectId) {
-      await createSetting(chapterId, "outline");
-      await loadSettings(activeProjectId);
-      s = useWritingStore.getState().settings.find((o) => o.name === chapterId && o.category === "outline");
+      await createCodexEntry(chapterId, "outline");
+      await loadCodex(activeProjectId);
+      s = useWritingStore.getState().codexEntries.find((o) => o.name === chapterId && o.category === "outline");
     }
     return s;
   };
@@ -768,7 +768,7 @@ function OutlineContent() {
                 defaultValue={getOutlineContent(selectedChapter.id)}
                 onBlur={async (e) => {
                   const s = await getOrCreateOutlineSetting(selectedChapter.id);
-                  if (s) await updateSetting(s.id, { content: { text: e.target.value } } as any);
+                  if (s) await updateCodexEntry(s.id, { content: { text: e.target.value } } as any);
                 }}
                 placeholder={`${selectedChapter.title} 的大纲备注、剧情要点、伏笔…`}
                 rows={15}

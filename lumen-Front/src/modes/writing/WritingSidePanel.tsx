@@ -9,7 +9,7 @@
 import { useEffect, useState } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { getExportUrl } from "../../api/writing";
-import type { WritingSetting } from "../../api/writing";
+import type { CodexEntry } from "../../api/writing";
 import { Plus, Trash2, X, Download, Edit3, FileText, ChevronDown, ChevronRight } from "lucide-react";
 
 type WritingPanelType = "chapters" | "snapshots" | "chat" | "project" | "characters" | "locations" | "world" | "items" | "outline" | "export";
@@ -248,16 +248,16 @@ function CategoryPanel({ category, label, icon, fieldConfig }: {
   icon: string;
   fieldConfig: FieldDef[];
 }) {
-  const { settings, activeProjectId, loadSettings, createSetting, updateSetting, deleteSetting } = useWritingStore();
+  const { settings, activeProjectId, loadCodex, createCodexEntry, updateCodexEntry, deleteCodexEntry } = useWritingStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pendingEditId, setPendingEditId] = useState<string | null>(null);
   const [pendingEditName, setPendingEditName] = useState("");
 
   useEffect(() => {
-    if (activeProjectId) loadSettings(activeProjectId);
+    if (activeProjectId) loadCodex(activeProjectId);
   }, [activeProjectId]);
 
-  const filtered = settings.filter((s) => s.category === category);
+  const filtered = settings.filter((s) => s.type === category);
 
   return (
     <div className="p-3">
@@ -267,7 +267,7 @@ function CategoryPanel({ category, label, icon, fieldConfig }: {
           onClick={async () => {
             if (!activeProjectId) return;
             try {
-              const ns = await createSetting("新" + label, category);
+              const ns = await createCodexEntry("新" + label, category);
               setPendingEditId(ns.id);
               setPendingEditName("新" + label);
             } catch {}
@@ -297,15 +297,15 @@ function CategoryPanel({ category, label, icon, fieldConfig }: {
               fieldConfig={fieldConfig}
               isExpanded={isExpanded}
               onToggle={() => setExpandedId(isExpanded ? null : s.id)}
-              onUpdate={updateSetting}
+              onUpdate={updateCodexEntry}
               onDelete={async () => {
-                await deleteSetting(s.id);
+                await deleteCodexEntry(s.id);
               }}
               pendingEdit={pendingEditId === s.id}
               pendingEditName={pendingEditName}
               onPendingEditNameChange={setPendingEditName}
               onPendingEditConfirm={async (name) => {
-                if (name) { try { await updateSetting(s.id, { name }); } catch {} }
+                if (name) { try { await updateCodexEntry(s.id, { name }); } catch {} }
                 setPendingEditId(null);
               }}
               onPendingEditCancel={() => setPendingEditId(null)}
@@ -320,12 +320,12 @@ function CategoryPanel({ category, label, icon, fieldConfig }: {
 /** 单个设定项（列表行 + 展开编辑器） */
 function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdate, onDelete,
   pendingEdit, pendingEditName, onPendingEditNameChange, onPendingEditConfirm, onPendingEditCancel }: {
-  setting: WritingSetting;
+  setting: CodexEntry;
   icon: string;
   fieldConfig: FieldDef[];
   isExpanded: boolean;
   onToggle: () => void;
-  onUpdate: (id: string, data: Partial<WritingSetting>) => Promise<void>;
+  onUpdate: (id: string, data: Partial<CodexEntry>) => Promise<void>;
   onDelete: () => Promise<void>;
   pendingEdit?: boolean;
   pendingEditName?: string;
@@ -333,7 +333,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
   onPendingEditConfirm?: (name: string) => void;
   onPendingEditCancel?: () => void;
 }) {
-  const content = (setting.content as Record<string, string>) ?? {};
+  const content = (setting.description as Record<string, string>) ?? {};
 
   // 从字段配置推导显示标签（如角色类型、稀有度等）
   const badgeFields = fieldConfig.filter((f) => f.type === "select");
@@ -399,7 +399,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
                 value={content._tracking ?? "detected"}
                 onChange={async (v) => {
                   await onUpdate(setting.id, {
-                    content: { ...content, _tracking: v },
+                    description: { ...content, _tracking: v },
                   } as any);
                 }}
               />
@@ -430,7 +430,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
                       value={content[field.key] ?? ""}
                       onChange={async (v) => {
                         await onUpdate(setting.id, {
-                          content: { ...content, [field.key]: v },
+                          description: { ...content, [field.key]: v },
                         } as any);
                       }}
                     />
@@ -448,7 +448,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
                   rows={field.rows ?? 3}
                   onUpdate={async (v) => {
                     await onUpdate(setting.id, {
-                      content: { ...content, [field.key]: v },
+                      description: { ...content, [field.key]: v },
                     } as any);
                   }}
                 />
@@ -462,7 +462,7 @@ function SettingItem({ setting, icon, fieldConfig, isExpanded, onToggle, onUpdat
                 placeholder={field.placeholder}
                 onUpdate={async (v) => {
                   await onUpdate(setting.id, {
-                    content: { ...content, [field.key]: v },
+                    description: { ...content, [field.key]: v },
                   } as any);
                 }}
               />
@@ -741,14 +741,14 @@ function ProjectManagementPanel() {
    ══════════════════════════════════════ */
 
 function OutlinePanel() {
-  const { chapters, activeChapterId, setActiveChapter, settings, activeProjectId, loadSettings, createSetting, updateSetting } = useWritingStore();
+  const { chapters, activeChapterId, setActiveChapter, settings, activeProjectId, loadCodex, createCodexEntry, updateCodexEntry } = useWritingStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeProjectId) loadSettings(activeProjectId);
+    if (activeProjectId) loadCodex(activeProjectId);
   }, [activeProjectId]);
 
-  const outlineSettings = settings.filter((s) => s.category === "outline");
+  const outlineSettings = settings.filter((s) => s.type === "outline");
 
   const getOutlineContent = (chapterId: string) => {
     const s = outlineSettings.find((o) => o.name === chapterId);
@@ -758,9 +758,9 @@ function OutlinePanel() {
   const getOrCreateOutlineSetting = async (chapterId: string) => {
     let s = outlineSettings.find((o) => o.name === chapterId);
     if (!s && activeProjectId) {
-      await createSetting(chapterId, "outline");
-      await loadSettings(activeProjectId);
-      s = useWritingStore.getState().settings.find((o) => o.name === chapterId && o.category === "outline");
+      await createCodexEntry(chapterId, "outline");
+      await loadCodex(activeProjectId);
+      s = useWritingStore.getState().codexEntries.find((o) => o.name === chapterId && o.category === "outline");
     }
     return s;
   };
@@ -811,7 +811,7 @@ function OutlinePanel() {
                     onBlur={async (e) => {
                       const s = await getOrCreateOutlineSetting(ch.id);
                       if (s) {
-                        await updateSetting(s.id, { content: { text: e.target.value } } as any);
+                        await updateCodexEntry(s.id, { content: { text: e.target.value } } as any);
                       }
                     }}
                     placeholder={`${ch.title} 的大纲备注…`}
