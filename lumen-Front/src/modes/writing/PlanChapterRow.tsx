@@ -1,8 +1,6 @@
-import { useState, useCallback, useContext } from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useState, useCallback } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronRight, ChevronDown, GripVertical, SquarePen, Trash2, MoreVertical } from "lucide-react";
-import { DragTypeContext } from "./PlanGridView";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -16,6 +14,7 @@ import {
 } from "../../components/ui/collapsible";
 import { useWritingStore } from "../../stores/useWritingStore";
 import type { WritingChapter } from "../../api/writing";
+import type { ChapterDragData } from "./usePlanDrag";
 
 interface PlanChapterRowProps {
   chapter: WritingChapter;
@@ -26,23 +25,24 @@ export function PlanChapterRow({ chapter, children }: PlanChapterRowProps) {
   const [title, setTitle] = useState(chapter.title);
   const [open, setOpen] = useState(true);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: chapter.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: chapter.id,
+    data: { type: "chapter" },
+  });
 
-  const activeDragType = useContext(DragTypeContext);
-  const shouldAnimate = !activeDragType || activeDragType === "chapter";
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: chapter.id,
+    data: {
+      type: "chapter",
+      chapterId: chapter.id,
+      actId: chapter.act_id,
+    } satisfies ChapterDragData,
+  });
 
-  const style: React.CSSProperties = {
-    transform: shouldAnimate ? CSS.Transform.toString(transform) : undefined,
-    transition: shouldAnimate ? transition : undefined,
-    opacity: isDragging ? 0 : 1,
-  };
+  const setRefs = useCallback((node: HTMLDivElement | null) => {
+    setDropRef(node);
+    setDragRef(node);
+  }, [setDropRef, setDragRef]);
 
   const chapterNumber = (chapter.sort_order ?? 0) + 1;
 
@@ -74,10 +74,14 @@ export function PlanChapterRow({ chapter, children }: PlanChapterRowProps) {
   }, [chapter.id]);
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setRefs}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      className={`rounded transition-colors ${isOver ? "bg-zinc-700/20" : ""}`}
+    >
       <Collapsible open={open} onOpenChange={setOpen}>
         <div className="flex items-center">
-          {/* Grip handle — same size as scene */}
+          {/* Grip handle */}
           <button
             {...attributes}
             {...listeners}
@@ -107,7 +111,7 @@ export function PlanChapterRow({ chapter, children }: PlanChapterRowProps) {
             />
           </div>
 
-          {/* Action buttons — in main row, vertically centered with grip & triangle */}
+          {/* Action buttons */}
           <div className="flex items-center gap-0.5 shrink-0 opacity-50 hover:opacity-100 transition-opacity">
             <button
               onClick={handleEditInManuscript}

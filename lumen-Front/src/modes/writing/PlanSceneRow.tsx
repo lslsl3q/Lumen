@@ -1,8 +1,6 @@
-import { useRef, useCallback, useContext } from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useRef, useCallback } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { GripVertical, SquarePen, Trash2, MoreVertical } from "lucide-react";
-import { DragTypeContext } from "./PlanGridView";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -11,6 +9,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { useWritingStore } from "../../stores/useWritingStore";
 import type { WritingScene } from "../../api/writing";
+import type { SceneDragData } from "./usePlanDrag";
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -24,23 +23,24 @@ interface PlanSceneRowProps {
 export function PlanSceneRow({ scene }: PlanSceneRowProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: scene.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: scene.id,
+    data: { type: "scene" },
+  });
 
-  const activeDragType = useContext(DragTypeContext);
-  const shouldAnimate = !activeDragType || activeDragType === "scene";
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: scene.id,
+    data: {
+      type: "scene",
+      sceneId: scene.id,
+      chapterId: scene.chapter_id,
+    } satisfies SceneDragData,
+  });
 
-  const style = {
-    transform: shouldAnimate ? CSS.Transform.toString(transform) : undefined,
-    transition: shouldAnimate ? transition : undefined,
-    opacity: isDragging ? 0 : 1,
-  };
+  const setRefs = useCallback((node: HTMLDivElement | null) => {
+    setDropRef(node);
+    setDragRef(node);
+  }, [setDropRef, setDragRef]);
 
   const handleSummaryBlur = useCallback(
     (e: React.FocusEvent<HTMLTextAreaElement>) => {
@@ -63,9 +63,9 @@ export function PlanSceneRow({ scene }: PlanSceneRowProps) {
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      className="flex gap-1 items-center py-0.5"
+      ref={setRefs}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      className={`flex gap-1 items-center py-0.5 rounded transition-colors ${isOver ? "bg-zinc-700/30" : ""}`}
     >
       {/* Drag handle */}
       <button
@@ -77,7 +77,7 @@ export function PlanSceneRow({ scene }: PlanSceneRowProps) {
         <GripVertical size={14} />
       </button>
 
-      {/* Scene editor with border — NC: border border-gray-400/40 shadow-sm rounded focus-within:ring-1 */}
+      {/* Scene editor with border */}
       <div className="grow flex flex-col border border-zinc-400/40 shadow-sm rounded focus-within:ring-1 focus-within:ring-zinc-600 focus-within:border-zinc-600">
         <textarea
           ref={textareaRef}
@@ -94,7 +94,7 @@ export function PlanSceneRow({ scene }: PlanSceneRowProps) {
         />
       </div>
 
-      {/* Action buttons — NC: flex-col-reverse (Actions on top, Edit on bottom) */}
+      {/* Action buttons */}
       <div className="flex-shrink-0 flex flex-col-reverse items-center gap-0.5 opacity-70 hover:opacity-100 transition-opacity">
         <button
           type="button"

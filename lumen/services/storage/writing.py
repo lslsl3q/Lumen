@@ -336,7 +336,7 @@ def get_chapter(chapter_id: str) -> dict | None:
 def update_chapter(chapter_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"title", "numerate", "show_number"}
+        allowed = {"title", "numerate", "show_number", "act_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_chapter(chapter_id)
@@ -425,7 +425,7 @@ def get_scene(scene_id: str) -> dict | None:
 def update_scene(scene_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"content", "summary", "subtitle"}
+        allowed = {"content", "summary", "subtitle", "chapter_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_scene(scene_id)

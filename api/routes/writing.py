@@ -56,6 +56,7 @@ class UpdateChapterV2Request(BaseModel):
     title: str | None = None
     numerate: bool | None = None
     show_number: bool | None = None
+    act_id: str | None = None
 
 
 class ReorderChaptersV2Request(BaseModel):
@@ -74,6 +75,7 @@ class UpdateSceneRequest(BaseModel):
     content: dict | None = None
     summary: str | None = None
     subtitle: str | None = None
+    chapter_id: str | None = None
 
 
 class ReorderScenesRequest(BaseModel):

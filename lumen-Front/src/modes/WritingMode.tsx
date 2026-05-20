@@ -4,7 +4,7 @@ import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
-import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, List, Search, LayoutGrid } from "lucide-react";
+import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, Search, LayoutGrid } from "lucide-react";
 import { Toggle } from "../components/ui/toggle";
 import { Separator } from "../components/ui/separator";
 import {
@@ -25,9 +25,9 @@ const writingViewTabs = [
 ];
 
 const PLAN_VIEWS = [
-  { key: "outline" as const, label: "Grid", icon: LayoutGrid },
+  { key: "grid" as const, label: "Grid", icon: LayoutGrid },
   { key: "matrix" as const, label: "Matrix", icon: Table2 },
-  { key: "grid" as const, label: "Outline", icon: ListTree },
+  { key: "outline" as const, label: "Outline", icon: ListTree },
 ];
 
 function filterLabel(
@@ -171,7 +171,7 @@ export default function WritingMode() {
                     </button>
                   ))}
                 </div>
-                {planViewMode === "grid" && (
+                {(planViewMode === "outline" || planViewMode === "grid") && (
                   <div className="ml-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-zinc-800 border border-zinc-700">
                     <Search className="w-3.5 h-3.5 text-zinc-500 flex-none" />
                     <input

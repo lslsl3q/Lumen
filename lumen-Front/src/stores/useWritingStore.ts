@@ -119,7 +119,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   snippets: [],
   activeSnippetId: null,
   manuscriptFilter: { type: "all" },
-  planViewMode: "grid",
+  planViewMode: "outline",
   writingViewTab: "write",
   ghostTextContent: "",
   ghostRequestId: null,

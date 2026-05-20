@@ -1,6 +1,5 @@
-import { useState, useCallback, useContext } from "react"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
+import { useState, useCallback } from "react"
+import { useDraggable, useDroppable } from "@dnd-kit/core"
 import {
   ChevronRight,
   ChevronDown,
@@ -10,7 +9,6 @@ import {
   MoreVertical,
   Plus,
 } from "lucide-react"
-import { DragTypeContext } from "./PlanGridView"
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -26,6 +24,7 @@ import {
 import { ToggleSwitch } from "../../components/ui/toggle-switch"
 import { useWritingStore } from "../../stores/useWritingStore"
 import type { WritingAct } from "../../api/writing"
+import type { ActDragData } from "./usePlanDrag"
 
 interface PlanActRowProps {
   act: WritingAct
@@ -36,23 +35,20 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
   const [open, setOpen] = useState(true)
   const [title, setTitle] = useState(act.title)
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: act.id })
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: act.id,
+    data: { type: "act" },
+  })
 
-  const activeDragType = useContext(DragTypeContext)
-  const shouldAnimate = !activeDragType || activeDragType === "act"
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+    id: act.id,
+    data: { type: "act", actId: act.id } satisfies ActDragData,
+  })
 
-  const style = {
-    transform: shouldAnimate ? CSS.Transform.toString(transform) : undefined,
-    transition: shouldAnimate ? transition : undefined,
-    opacity: isDragging ? 0 : 1,
-  }
+  const setRefs = useCallback((node: HTMLDivElement | null) => {
+    setDropRef(node)
+    setDragRef(node)
+  }, [setDropRef, setDragRef])
 
   const handleTitleBlur = useCallback(() => {
     const trimmed = title.trim()
@@ -98,7 +94,6 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
     useWritingStore.getState().createChapter(act.id, "新章节")
   }, [act.id])
 
-  // Stats
   const chapters = (act as any).chapters || []
   const totalScenes = chapters.reduce((sum: number, ch: any) => sum + (ch.scenes || []).length, 0)
 
@@ -109,11 +104,11 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      className="flex py-2 items-start"
+      ref={setRefs}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
+      className={`flex py-2 items-start rounded transition-colors ${isOver ? "bg-zinc-700/15" : ""}`}
     >
-      {/* Grip handle — mt-2 aligns with header py-2 */}
+      {/* Grip handle */}
       <button
         className="flex-none mr-2 flex items-center justify-center h-8 w-6 mt-2 cursor-grab text-zinc-500 hover:text-zinc-300 active:cursor-grabbing transition-colors"
         {...attributes}
@@ -125,7 +120,7 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
       {/* Content area */}
       <div className="grow flex flex-col">
         <Collapsible open={open} onOpenChange={setOpen}>
-          {/* Header row — NC: sticky, bg-zinc-900, py-2 */}
+          {/* Header row */}
           <div className="flex py-2 items-center sticky top-0 z-20 bg-[var(--color-surface-deep)]">
             {/* Collapse toggle */}
             <CollapsibleTrigger className="flex items-center justify-center p-0.5 rounded hover:bg-white/5 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer">
@@ -136,8 +131,7 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
               )}
             </CollapsibleTrigger>
 
-            {/* Title input — NC: 20px/800 */}
-            {/* Auto-numbered prefix — NC: "Act N:" opacity-60 */}
+            {/* Title input */}
             <span className="font-extrabold text-[20px] leading-7 text-zinc-300 opacity-60 mr-0.5 whitespace-nowrap select-none">
               Act {(act.sort_order ?? 0) + 1}:
             </span>
@@ -156,7 +150,7 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
               {chapters.length} 章节 · {totalScenes} 场景
             </span>
 
-            {/* Action buttons — connected button group */}
+            {/* Action buttons */}
             <div className="flex -space-x-px shrink-0">
               <button
                 onClick={handleAddChapter}
@@ -199,7 +193,7 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
           <CollapsibleContent>
             <div className="mt-1 mb-2">
               {children}
-              {/* Bottom Add Chapter — NC: + icon + text, hover effect */}
+              {/* Bottom Add Chapter */}
               <button
                 onClick={handleAddChapter}
                 className="mt-1 inline-flex items-center gap-1 px-1 py-0.5 rounded text-[12px] font-medium text-zinc-400 hover:bg-white/5 hover:text-zinc-200 transition-colors cursor-pointer"

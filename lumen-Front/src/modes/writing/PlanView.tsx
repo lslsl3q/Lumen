@@ -4,6 +4,7 @@ import { useWritingStore } from "../../stores/useWritingStore";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { PlanGridView } from "./PlanGridView";
 import { PlanMatrixView } from "./PlanMatrixView";
+import { PlanKanbanView } from "./PlanKanbanView";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -33,16 +34,11 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface-deep)]">
       <ScrollArea className="flex-1 plan-scroll-area">
-        <div className="p-4 max-w-4xl mx-auto">
-          {/* grid key = NC Outline (tree view) */}
-          {planViewMode === "grid" && <PlanGridView searchQuery={searchQuery} />}
-          {/* outline key = NC Grid (kanban — not yet implemented) */}
-          {planViewMode === "outline" && (
-            <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
-              <p className="text-[14px] font-medium mb-2">Grid 视图</p>
-              <p className="text-[12px] text-zinc-600">看板式卡片布局，即将推出</p>
-            </div>
-          )}
+        <div className={planViewMode === "grid" ? "p-4 pl-6" : "p-4 max-w-4xl mx-auto"}>
+          {/* outline key = NC Outline (tree view) */}
+          {planViewMode === "outline" && <PlanGridView searchQuery={searchQuery} />}
+          {/* grid key = NC Grid (kanban cards) */}
+          {planViewMode === "grid" && <PlanKanbanView searchQuery={searchQuery} />}
           {planViewMode === "matrix" && <PlanMatrixView />}
 
           {/* Bottom action row */}
