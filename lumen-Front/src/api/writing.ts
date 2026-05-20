@@ -49,6 +49,17 @@ export interface WritingScene {
   updated_at: number;
 }
 
+export interface WritingSnippet {
+  id: string;
+  project_id: string;
+  name: string;
+  content: string;
+  pinned: number;
+  sort_order: number;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface ManuscriptTree {
   acts: Array<WritingAct & {
     chapters: Array<WritingChapter & { scenes: WritingScene[] }>;
@@ -260,6 +271,35 @@ export async function deleteScene(id: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+// ── Reorder ──
+
+export async function reorderActs(projectId: string, orderedIds: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/acts/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function reorderChapters(actId: string, orderedIds: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/chapters/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ act_id: actId, ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function reorderScenes(chapterId: string, orderedIds: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/scenes/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chapter_id: chapterId, ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 // ── Manuscript ──
 
 export async function getManuscript(projectId: string): Promise<ManuscriptTree> {
@@ -337,5 +377,44 @@ export async function restoreSnapshot(snapshotId: string): Promise<{ restored_at
 
 export async function deleteSnapshot(snapshotId: string): Promise<void> {
   const res = await fetch(`${BASE}/snapshots/${encodeURIComponent(snapshotId)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── Snippets ──
+
+export async function listSnippets(projectId: string): Promise<WritingSnippet[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/snippets`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createSnippet(projectId: string, name = ""): Promise<WritingSnippet> {
+  const res = await fetch(`${BASE}/snippets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, name }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getSnippet(id: string): Promise<WritingSnippet> {
+  const res = await fetch(`${BASE}/snippets/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateSnippet(id: string, data: Partial<Pick<WritingSnippet, "name" | "content" | "pinned">>): Promise<WritingSnippet> {
+  const res = await fetch(`${BASE}/snippets/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteSnippet(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/snippets/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }

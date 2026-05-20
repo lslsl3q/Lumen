@@ -14,18 +14,23 @@ import { GhostTextExtension } from "../../components/editors/GhostTextExtension"
 import { SlashCommandExtension } from "../../components/editors/SlashCommandExtension";
 import { SceneBeatNode } from "../../components/editors/SceneBeatNode";
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "../../components/ui/popover";
-import { MoreHorizontal, Tag, Plus, Trash2 } from "lucide-react";
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "../../components/ui/dropdown-menu";
+import { Tag, Plus, Trash2 } from "lucide-react";
+import { ActionsMenu } from "./ActionsMenu";
 import type { WritingScene } from "../../api/writing";
 import { useWritingStore } from "../../stores/useWritingStore";
 import * as writingApi from "../../api/writing";
 
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
 const sceneExtensions = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false, underline: false }),
-  Placeholder.configure({ placeholder: "开始写作…" }),
+  Placeholder.configure({ placeholder: "开始写作，或按 / 使用命令…" }),
   CharacterCount,
   Highlight.configure({ multicolor: true }),
   Underline,
@@ -117,13 +122,13 @@ export function SceneEditor({ scene }: { scene: WritingScene }) {
 
   return (
     <section className="scene-section">
-      <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-6 2xl:gap-8">
-      <div className="flex-1 min-w-0">
+      <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-[var(--gap)]">
+      <div className="manuscript-content">
         <EditorContent editor={editor} />
       </div>
 
-      <div className="w-full sm:w-3/4 md:w-3/5 lg:w-64 2xl:w-80 shrink-0 opacity-50 hover:opacity-100 transition-opacity">
-        <div className="scene-sidebar py-2">
+      <div className="manuscript-side opacity-70 hover:opacity-100 transition-opacity">
+        <div className="scene-sidebar py-2 px-1.5">
           <div className="text-xs mb-1">
             <span className="uppercase font-bold text-[var(--color-text-muted)]">
               Sc{sceneNumber || ""}
@@ -141,73 +146,47 @@ export function SceneEditor({ scene }: { scene: WritingScene }) {
           )}
 
           <div className="mt-1">
-            {summaryEditing ? (
-              <textarea
-                autoFocus
-                className="w-full min-h-[50px] bg-white/5 border border-[var(--color-border)] rounded px-2 py-1 text-[var(--color-text-secondary)] text-sm leading-relaxed resize-y outline-none focus:border-[var(--color-text-dim)] transition-colors"
-                placeholder="场景摘要…"
-                defaultValue={summaryText}
-                onChange={(e) => setSummaryText(e.target.value)}
-                onBlur={handleSummaryBlur}
-                onKeyDown={(e) => { if (e.key === "Escape") setSummaryEditing(false); }}
-              />
-            ) : (
-              <div
-                className="text-[var(--color-text-dim)] text-sm leading-relaxed cursor-text hover:text-[var(--color-text-muted)] transition-colors"
-                onClick={() => setSummaryEditing(true)}
-              >
-                {scene.summary || "场景摘要…"}
-              </div>
-            )}
+            <textarea
+              readOnly={!summaryEditing}
+              className="w-full min-h-[24px] text-[var(--color-text-dim)] text-sm leading-relaxed resize-none outline-none cursor-text transition-colors"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                color: summaryEditing ? 'var(--color-text-secondary)' : undefined,
+              }}
+              placeholder="场景摘要…"
+              value={summaryText}
+              onFocus={(e) => {
+                setSummaryEditing(true);
+                autoResize(e.currentTarget);
+              }}
+              onChange={(e) => {
+                setSummaryText(e.target.value);
+                autoResize(e.currentTarget);
+              }}
+              onBlur={handleSummaryBlur}
+              onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
+              rows={1}
+            />
           </div>
 
-          <div className="flex gap-0.5 pt-1">
-            <Popover>
-              <PopoverTrigger
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors"
-                type="button"
-              >
-                <MoreHorizontal className="w-3 h-3" />
-                Actions
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                className="w-44 p-1 bg-[var(--color-surface-deep)] border-[var(--color-border)] rounded-lg shadow-xl"
-              >
-                {[
-                  { label: "与场景对话" },
-                  { label: "AI 摘要" },
-                  { label: "检测角色" },
-                  { label: "复制正文" },
-                  { label: "导出场景" },
-                  { label: "归档", muted: true },
-                ].map((item) => (
-                  <button
-                    key={item.label}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] rounded transition-colors ${
-                      item.muted
-                        ? "text-[var(--color-text-dim)] hover:bg-[var(--color-surface-deep)]"
-                        : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-deep)]"
-                    }`}
-                    type="button"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-                <div className="h-px bg-[var(--color-border)] my-1" />
-                <button
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] rounded text-[var(--color-error-light)] hover:bg-red-400/10 transition-colors"
-                  type="button"
-                  onClick={handleDelete}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  删除场景
-                </button>
-              </PopoverContent>
-            </Popover>
+          <div className="flex gap-2.5 pt-1">
+            <ActionsMenu iconSize="w-3 h-3" className="flex items-center gap-1 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors cursor-pointer">
+              <DropdownMenuItem>与场景对话</DropdownMenuItem>
+              <DropdownMenuItem>AI 摘要</DropdownMenuItem>
+              <DropdownMenuItem>检测角色</DropdownMenuItem>
+              <DropdownMenuItem>复制正文</DropdownMenuItem>
+              <DropdownMenuItem>导出场景</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+                <Trash2 className="w-3.5 h-3.5" />
+                删除场景
+              </DropdownMenuItem>
+            </ActionsMenu>
 
             <button
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors"
+              className="flex items-center gap-1 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors"
               type="button"
             >
               <Tag className="w-3 h-3" />
@@ -215,7 +194,7 @@ export function SceneEditor({ scene }: { scene: WritingScene }) {
             </button>
 
             <button
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors"
+              className="flex items-center gap-1 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors"
               type="button"
             >
               <Plus className="w-3 h-3" />

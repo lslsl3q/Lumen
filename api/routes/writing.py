@@ -18,6 +18,7 @@ from lumen.services.storage.writing import (
     create_act, list_acts, get_act, update_act, delete_act, reorder_acts,
     create_scene, list_scenes, get_scene, update_scene, delete_scene, reorder_scenes,
     get_manuscript, get_manuscript_flat,
+    create_snippet, list_snippets, get_snippet, update_snippet, delete_snippet,
 )
 from lumen.services.storage.writing_snapshot import (
     create_snapshot, list_snapshots, get_snapshot_detail, restore_snapshot, delete_snapshot,
@@ -90,24 +91,6 @@ class UpdateProjectRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     metadata: dict | None = None
-
-
-class CreateChapterRequest(BaseModel):
-    project_id: str
-    title: str = "新章节"
-    volume: str = ""
-
-
-class UpdateChapterRequest(BaseModel):
-    title: str | None = None
-    content: str | None = None
-    word_count: int | None = None
-    volume: str | None = None
-
-
-class ReorderChaptersRequest(BaseModel):
-    project_id: str
-    ordered_ids: list[str]
 
 
 class CreateSettingRequest(BaseModel):
@@ -201,7 +184,7 @@ async def api_get_chapter(chapter_id: str):
 
 
 @router.patch("/chapters/{chapter_id}")
-async def api_update_chapter(chapter_id: str, req: UpdateChapterRequest):
+async def api_update_chapter(chapter_id: str, req: UpdateChapterV2Request):
     updates = {k: v for k, v in req.model_dump().items() if v is not None}
     ch = await asyncio.to_thread(update_chapter, chapter_id, **updates)
     if not ch:
@@ -216,8 +199,8 @@ async def api_delete_chapter(chapter_id: str):
 
 
 @router.post("/chapters/reorder")
-async def api_reorder_chapters(req: ReorderChaptersRequest):
-    await asyncio.to_thread(reorder_chapters, req.project_id, req.ordered_ids)
+async def api_reorder_chapters(req: ReorderChaptersV2Request):
+    await asyncio.to_thread(reorder_chapters, req.act_id, req.ordered_ids)
     return {"status": "reordered"}
 
 
@@ -528,3 +511,54 @@ async def api_get_manuscript(project_id: str):
 @router.get("/projects/{project_id}/manuscript-flat")
 async def api_get_manuscript_flat(project_id: str):
     return await asyncio.to_thread(get_manuscript_flat, project_id)
+
+
+# ── Snippets ──
+
+class CreateSnippetRequest(BaseModel):
+    project_id: str
+    name: str = ""
+
+
+class UpdateSnippetRequest(BaseModel):
+    name: str | None = None
+    content: str | None = None
+    pinned: bool | None = None
+
+
+@router.get("/projects/{project_id}/snippets")
+async def api_list_snippets(project_id: str):
+    return await asyncio.to_thread(list_snippets, project_id)
+
+
+@router.post("/snippets")
+async def api_create_snippet(req: CreateSnippetRequest):
+    result = await asyncio.to_thread(create_snippet, req.project_id, req.name)
+    if not result:
+        raise HTTPException(500, "创建 Snippet 失败")
+    return result
+
+
+@router.get("/snippets/{snippet_id}")
+async def api_get_snippet(snippet_id: str):
+    result = await asyncio.to_thread(get_snippet, snippet_id)
+    if not result:
+        raise HTTPException(404, "Snippet 不存在")
+    return result
+
+
+@router.patch("/snippets/{snippet_id}")
+async def api_update_snippet(snippet_id: str, req: UpdateSnippetRequest):
+    fields = {k: v for k, v in req.model_dump().items() if v is not None}
+    if not fields:
+        return await asyncio.to_thread(get_snippet, snippet_id)
+    result = await asyncio.to_thread(update_snippet, snippet_id, **fields)
+    if not result:
+        raise HTTPException(404, "Snippet 不存在")
+    return result
+
+
+@router.delete("/snippets/{snippet_id}")
+async def api_delete_snippet(snippet_id: str):
+    await asyncio.to_thread(delete_snippet, snippet_id)
+    return {"ok": True}

@@ -1,10 +1,4 @@
-/**
- * BeatNavigator — 24px sticky 导航面板
- *
- * 深色背景 + 彩色 beat 标记 + viewport 指示器 + 点击跳转。
- * sticky top-0 粘在滚动容器右边缘，不随内容滚动。
- */
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 
 export interface BeatInfo {
   id: string;
@@ -25,83 +19,146 @@ export function BeatNavigator({
   beats,
   totalHeight,
 }: BeatNavigatorProps) {
-  const navRef = useRef<HTMLDivElement>(null);
-  const [viewportTop, setViewportTop] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(0);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const indicatorRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+  const clickOffsetY = useRef(0);
+  const dragState = useRef({ containerTop: 0, trackH: 0, maxScroll: 0 });
 
-  const updateViewport = useCallback(() => {
+  const updateIndicator = useCallback(() => {
+    if (dragging.current) return;
     const el = scrollContainerRef.current;
-    if (!el) return;
-    setViewportTop(el.scrollTop);
-    setViewportHeight(el.clientHeight);
+    const ind = indicatorRef.current;
+    if (!el || !ind) return;
+    const cl = el.clientHeight;
+    const sh = el.scrollHeight;
+    const maxScroll = sh - cl;
+    if (maxScroll <= 0) return;
+    const indH = (cl / sh) * cl;
+    const indTop = (el.scrollTop / maxScroll) * (cl - indH);
+    ind.style.top = `${indTop}px`;
+    ind.style.height = `${indH}px`;
   }, [scrollContainerRef]);
 
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.addEventListener("scroll", updateViewport);
-    updateViewport();
-    return () => el.removeEventListener("scroll", updateViewport);
-  }, [scrollContainerRef, updateViewport]);
+    el.addEventListener("scroll", updateIndicator, { passive: true });
+    requestAnimationFrame(updateIndicator);
+    return () => el.removeEventListener("scroll", updateIndicator);
+  }, [scrollContainerRef, updateIndicator]);
 
   useEffect(() => {
-    window.addEventListener("resize", updateViewport);
-    return () => window.removeEventListener("resize", updateViewport);
-  }, [updateViewport]);
+    window.addEventListener("resize", updateIndicator);
+    return () => window.removeEventListener("resize", updateIndicator);
+  }, [updateIndicator]);
 
-  const navHeight = navRef.current?.clientHeight || 600;
-  const scale = totalHeight > 0 ? navHeight / totalHeight : 1;
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const el = scrollContainerRef.current;
+    const ind = indicatorRef.current;
+    if (!el || !ind) return;
+    const cl = el.clientHeight;
+    const sh = el.scrollHeight;
+    const maxScroll = sh - cl;
+    if (maxScroll <= 0) return;
 
-  const viewportStart = viewportTop * scale;
-  const viewportSize = viewportHeight * scale;
+    const indH = (cl / sh) * cl;
+    const effectiveTrackH = cl - indH;
+    const containerTop = el.getBoundingClientRect().top;
+
+    dragState.current = { containerTop, trackH: effectiveTrackH, maxScroll };
+
+    const currentIndTop = (el.scrollTop / maxScroll) * effectiveTrackH;
+    const relY = e.clientY - containerTop - currentIndTop;
+    clickOffsetY.current = (relY >= 0 && relY <= indH) ? relY : indH / 2;
+
+    dragging.current = true;
+    e.preventDefault();
+
+    const newIndTop = e.clientY - containerTop - clickOffsetY.current;
+    const clamped = Math.max(0, Math.min(newIndTop, effectiveTrackH));
+    el.scrollTo({ top: (clamped / effectiveTrackH) * maxScroll, behavior: "instant" });
+    ind.style.top = `${clamped}px`;
+    ind.style.height = `${indH}px`;
+  }, [scrollContainerRef]);
+
+  useEffect(() => {
+    let rafId = 0;
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const el = scrollContainerRef.current;
+        const ind = indicatorRef.current;
+        if (!el || !ind) return;
+        const { containerTop, trackH, maxScroll } = dragState.current;
+        if (trackH <= 0) return;
+
+        const newIndTop = e.clientY - containerTop - clickOffsetY.current;
+        const clamped = Math.max(0, Math.min(newIndTop, trackH));
+        el.scrollTo({ top: (clamped / trackH) * maxScroll, behavior: "instant" });
+        ind.style.top = `${clamped}px`;
+      });
+    };
+    const onUp = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      requestAnimationFrame(updateIndicator);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [scrollContainerRef, updateIndicator]);
+
+  const cl = scrollContainerRef.current?.clientHeight || 600;
+  const scale = totalHeight > 0 && cl > 0 ? cl / totalHeight : 1;
 
   return (
     <div
-      ref={navRef}
-      className="w-6 flex-none shrink-0 sticky top-0 h-full cursor-pointer select-none overflow-visible"
-      style={{ background: "rgb(24, 24, 27)" }}
-      onClick={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const ratio = y / rect.height;
-        const el = scrollContainerRef.current;
-        if (el) {
-          el.scrollTop = ratio * totalHeight - el.clientHeight / 2;
-        }
-      }}
+      className="sticky top-0 float-right w-6 cursor-ns-resize select-none overflow-visible"
+      style={{ height: 0, zIndex: 20 }}
+      onMouseDown={handleMouseDown}
     >
-      {/* Beat markers — 彩色色块贴左 */}
-      {beats.map((beat) => {
-        const top = beat.offsetTop * scale;
-        const height = Math.max(2, beat.height * scale);
-        const inViewport = top + height >= viewportStart && top <= viewportStart + viewportSize;
-        return (
-          <div
-            key={beat.id}
-            className="absolute rounded-sm transition-opacity"
-            style={{
-              left: 2,
-              right: 4,
-              top: `${top}px`,
-              height: `${height}px`,
-              backgroundColor: beat.color,
-              opacity: inViewport ? 0.85 : 0.35,
-            }}
-            title={beat.label}
-          />
-        );
-      })}
-
-      {/* Viewport 指示条 — 显示当前可见区域 */}
       <div
-        className="absolute left-0 right-0 pointer-events-none rounded-sm"
-        style={{
-          top: `${viewportStart}px`,
-          height: `${viewportSize}px`,
-          background: "rgba(255,255,255,0.06)",
-          borderLeft: "2px solid rgba(255,255,255,0.15)",
-        }}
-      />
+        ref={innerRef}
+        className="w-6 h-screen"
+        style={{ background: "rgb(24, 24, 27)" }}
+      >
+        {beats.map((beat) => {
+          const top = beat.offsetTop * scale;
+          const h = Math.max(2, beat.height * scale);
+          return (
+            <div
+              key={beat.id}
+              className="absolute rounded-sm"
+              style={{
+                left: 2,
+                right: 4,
+                top: `${top}px`,
+                height: `${h}px`,
+                backgroundColor: beat.color,
+                opacity: 0.85,
+              }}
+              title={beat.label}
+            />
+          );
+        })}
+
+        <div
+          ref={indicatorRef}
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{
+            top: 0,
+            height: 0,
+            background: "rgba(255,255,255,0.18)",
+            borderRadius: "4px",
+          }}
+        />
+      </div>
     </div>
   );
 }

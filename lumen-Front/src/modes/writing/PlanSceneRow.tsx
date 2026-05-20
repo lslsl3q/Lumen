@@ -1,0 +1,123 @@
+import { useRef, useCallback, useContext } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, SquarePen, Trash2, MoreVertical } from "lucide-react";
+import { DragTypeContext } from "./PlanGridView";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../../components/ui/dropdown-menu";
+import { useWritingStore } from "../../stores/useWritingStore";
+import type { WritingScene } from "../../api/writing";
+
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
+interface PlanSceneRowProps {
+  scene: WritingScene;
+}
+
+export function PlanSceneRow({ scene }: PlanSceneRowProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: scene.id });
+
+  const activeDragType = useContext(DragTypeContext);
+  const shouldAnimate = !activeDragType || activeDragType === "scene";
+
+  const style = {
+    transform: shouldAnimate ? CSS.Transform.toString(transform) : undefined,
+    transition: shouldAnimate ? transition : undefined,
+    opacity: isDragging ? 0 : 1,
+  };
+
+  const handleSummaryBlur = useCallback(
+    (e: React.FocusEvent<HTMLTextAreaElement>) => {
+      const summary = e.currentTarget.value;
+      if (summary !== (scene.summary || "")) {
+        useWritingStore.getState().updateSceneAction(scene.id, { summary });
+      }
+    },
+    [scene.id, scene.summary],
+  );
+
+  const handleOpenInManuscript = useCallback(() => {
+    useWritingStore.getState().setActiveScene(scene.id);
+    useWritingStore.getState().setWritingViewTab("write");
+  }, [scene.id]);
+
+  const handleDelete = useCallback(async () => {
+    await useWritingStore.getState().deleteSceneAction(scene.id);
+  }, [scene.id]);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex gap-1 items-center py-0.5"
+    >
+      {/* Drag handle */}
+      <button
+        type="button"
+        className="flex-none cursor-grab text-zinc-500 hover:text-zinc-300 transition-colors"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical size={14} />
+      </button>
+
+      {/* Scene editor with border — NC: border border-gray-400/40 shadow-sm rounded focus-within:ring-1 */}
+      <div className="grow flex flex-col border border-zinc-400/40 shadow-sm rounded focus-within:ring-1 focus-within:ring-zinc-600 focus-within:border-zinc-600">
+        <textarea
+          ref={textareaRef}
+          className="flex-1 min-h-[56px] text-[14px] leading-[22.75px] font-normal text-zinc-300 resize-none outline-none bg-transparent border-none p-2 placeholder:text-zinc-600"
+          placeholder="场景摘要…"
+          defaultValue={scene.summary || ""}
+          rows={2}
+          onFocus={(e) => autoResize(e.currentTarget)}
+          onInput={(e) => autoResize(e.currentTarget as HTMLTextAreaElement)}
+          onBlur={handleSummaryBlur}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") e.currentTarget.blur();
+          }}
+        />
+      </div>
+
+      {/* Action buttons — NC: flex-col-reverse (Actions on top, Edit on bottom) */}
+      <div className="flex-shrink-0 flex flex-col-reverse items-center gap-0.5 opacity-70 hover:opacity-100 transition-opacity">
+        <button
+          type="button"
+          className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors"
+          title="在编辑器中打开"
+          onClick={handleOpenInManuscript}
+        >
+          <SquarePen className="w-3.5 h-3.5" />
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="p-1 rounded text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors cursor-pointer"
+          >
+            <MoreVertical className="w-3.5 h-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+              <Trash2 className="w-3.5 h-3.5" />
+              删除场景
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}

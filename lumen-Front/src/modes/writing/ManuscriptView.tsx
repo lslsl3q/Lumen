@@ -1,33 +1,80 @@
-import { useRef } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { ActHeader } from "./ActHeader";
 import { ChapterHeader } from "./ChapterHeader";
 import { SceneEditor } from "./SceneEditor";
 import { SceneSeparator } from "./SceneSeparator";
 import { InsertButton } from "./InsertButton";
+import { BeatNavigator, type BeatInfo } from "./BeatNavigator";
+import { ScrollArea } from "../../components/ui/scroll-area";
 import type { ManuscriptFlatItem } from "../../api/writing";
 
-export function ManuscriptView() {
+export function ManuscriptView({ filter }: { filter?: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string } }) {
   const acts = useWritingStore((s) => s.acts);
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [beats, setBeats] = useState<BeatInfo[]>([]);
 
-  const items: ManuscriptFlatItem[] = [];
-  for (const act of acts) {
-    items.push({ type: "act", ...act });
-    const chs = (act as any).chapters || [];
+  const effectiveFilter = filter || { type: "all" as const };
+
+  const { filteredActs, chapterOnly } = useMemo(() => {
+    if (effectiveFilter.type === "all") return { filteredActs: acts, chapterOnly: null as string | null };
+    if (effectiveFilter.type === "act") return { filteredActs: acts.filter((a) => a.id === effectiveFilter.id), chapterOnly: null };
+    const chId = effectiveFilter.id;
+    const filtered = acts.filter((a) => (a as any).chapters?.some((ch: any) => ch.id === chId));
+    return { filteredActs: filtered, chapterOnly: chId };
+  }, [acts, effectiveFilter]);
+
+  const filteredItems: ManuscriptFlatItem[] = [];
+  for (const act of filteredActs) {
+    filteredItems.push({ type: "act", ...act });
+    const chs = ((act as any).chapters || []).filter((ch: any) =>
+      chapterOnly ? ch.id === chapterOnly : true
+    );
     for (const ch of chs) {
-      items.push({ type: "chapter", ...ch });
+      filteredItems.push({ type: "chapter", ...ch });
       const scenes = ch.scenes || [];
       for (let i = 0; i < scenes.length; i++) {
-        if (i > 0) items.push({ type: "separator" });
-        items.push({ type: "scene", ...scenes[i] });
+        if (i > 0) filteredItems.push({ type: "separator" });
+        filteredItems.push({ type: "scene", ...scenes[i] });
       }
-      items.push({ type: "add-scene", chapter_id: ch.id });
+      filteredItems.push({ type: "add-scene", chapter_id: ch.id });
     }
-    items.push({ type: "add-chapter", act_id: act.id });
+    if (!chapterOnly) {
+      filteredItems.push({ type: "add-chapter", act_id: act.id });
+    }
   }
-  items.push({ type: "add-act", project_id: activeProjectId || "" });
+  if (effectiveFilter.type === "all") {
+    filteredItems.push({ type: "add-act", project_id: activeProjectId || "" });
+  }
+
+  const collectBeats = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const beatEls = scrollRef.current.querySelectorAll("[data-beat-id]");
+      const newBeats: BeatInfo[] = [];
+      beatEls.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        newBeats.push({
+          id: htmlEl.dataset.beatId!,
+          color: htmlEl.dataset.beatColor || "rgb(248, 113, 113)",
+          label: htmlEl.dataset.beatLabel || "Beat",
+          offsetTop: htmlEl.offsetTop,
+          height: htmlEl.offsetHeight,
+        });
+      });
+      setBeats(newBeats);
+    });
+  }, []);
+
+  useEffect(() => {
+    collectBeats();
+    window.addEventListener("resize", collectBeats);
+    return () => window.removeEventListener("resize", collectBeats);
+  }, [acts, collectBeats]);
+
+  const totalHeight = scrollRef.current?.scrollHeight || 1;
 
   const handleInsert = async (type: string, parentId?: string) => {
     const store = useWritingStore.getState();
@@ -46,55 +93,65 @@ export function ManuscriptView() {
   };
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto writing-manuscript-scroll">
-      <div style={{ height: "20vh" }} />
-      {items.map((item, i) => {
-        switch (item.type) {
-          case "act":
-            return <ActHeader key={item.id} act={item as any} isFirst={i === 0} />;
-          case "chapter": {
-            const prevItem = i > 0 ? items[i - 1] : null;
-            return (
-              <ChapterHeader
-                key={item.id}
-                chapter={item as any}
-                isAfterAct={prevItem?.type === "act"}
-              />
-            );
+    <ScrollArea className="flex-1 writing-manuscript-scroll" viewportRef={scrollRef}>
+      <BeatNavigator
+        scrollContainerRef={scrollRef}
+        beats={beats}
+        totalHeight={totalHeight}
+      />
+      <div ref={contentRef} className="pr-6">
+        <div style={{ height: "20vh" }} />
+        {filteredItems.map((item, i) => {
+          switch (item.type) {
+            case "act":
+              return <ActHeader key={item.id} act={item as any} />;
+            case "chapter": {
+              const prevItem = i > 0 ? filteredItems[i - 1] : null;
+              return (
+                <ChapterHeader
+                  key={item.id}
+                  chapter={item as any}
+                  isAfterAct={prevItem?.type === "act"}
+                />
+              );
+            }
+            case "scene":
+              return <SceneEditor key={item.id} scene={item as any} />;
+            case "separator":
+              return <SceneSeparator key={`sep-${i}`} />;
+            case "add-scene":
+              return (
+                <InsertButton
+                  key={`add-sc-${item.chapter_id}`}
+                  variant="scene"
+                  label="新场景"
+                  onClick={() => handleInsert("scene", item.chapter_id as string)}
+                />
+              );
+            case "add-chapter":
+              return (
+                <InsertButton
+                  key={`add-ch-${item.act_id}`}
+                  variant="chapter"
+                  label="新章节"
+                  onClick={() => handleInsert("chapter", item.act_id as string)}
+                />
+              );
+            case "add-act":
+              return (
+                <InsertButton
+                  key="add-act"
+                  variant="act"
+                  label="新卷"
+                  onClick={() => handleInsert("act")}
+                />
+              );
+            default:
+              return null;
           }
-          case "scene":
-            return <SceneEditor key={item.id} scene={item as any} />;
-          case "separator":
-            return <SceneSeparator key={`sep-${i}`} />;
-          case "add-scene":
-            return (
-              <InsertButton
-                key={`add-sc-${item.chapter_id}`}
-                label="新场景"
-                onClick={() => handleInsert("scene", item.chapter_id as string)}
-              />
-            );
-          case "add-chapter":
-            return (
-              <InsertButton
-                key={`add-ch-${item.act_id}`}
-                label="新章节"
-                onClick={() => handleInsert("chapter", item.act_id as string)}
-              />
-            );
-          case "add-act":
-            return (
-              <InsertButton
-                key="add-act"
-                label="新卷"
-                onClick={() => handleInsert("act")}
-              />
-            );
-          default:
-            return null;
-        }
-      })}
-      <div style={{ height: "50vh" }} />
-    </div>
+        })}
+        <div style={{ height: "50vh" }} />
+      </div>
+    </ScrollArea>
   );
 }

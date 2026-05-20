@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, WritingChapter, WritingScene, WritingSetting, WritingSnapshot } from "../api/writing";
+import type { WritingProject, WritingAct, WritingChapter, WritingScene, WritingSetting, WritingSnapshot, WritingSnippet } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -11,6 +11,16 @@ interface WritingState {
   acts: WritingAct[];
   activeSceneId: string | null;
   settings: WritingSetting[];
+  snippets: WritingSnippet[];
+  activeSnippetId: string | null;
+  manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
+  setManuscriptFilter: (filter: WritingState["manuscriptFilter"]) => void;
+
+  // Plan view state
+  planViewMode: "grid" | "outline" | "matrix";
+  setPlanViewMode: (mode: WritingState["planViewMode"]) => void;
+  writingViewTab: "plan" | "write" | "chat" | "review";
+  setWritingViewTab: (tab: WritingState["writingViewTab"]) => void;
 
   // UI
   aiMode: AiMode;
@@ -56,8 +66,12 @@ interface WritingState {
   // Scenes
   createScene: (chapterId: string) => Promise<WritingScene>;
   updateSceneContent: (sceneId: string, content: object) => Promise<void>;
+  updateSceneAction: (sceneId: string, data: Partial<WritingScene>) => Promise<void>;
   deleteSceneAction: (sceneId: string) => Promise<void>;
   setActiveScene: (sceneId: string | null) => void;
+  reorderActsAction: (projectId: string, orderedIds: string[]) => Promise<void>;
+  reorderChaptersAction: (actId: string, orderedIds: string[]) => Promise<void>;
+  reorderScenesAction: (chapterId: string, orderedIds: string[]) => Promise<void>;
 
   // Settings
   loadSettings: (projectId: string) => Promise<void>;
@@ -71,6 +85,13 @@ interface WritingState {
   createManualSnapshot: (label?: string) => Promise<void>;
   restoreFromSnapshot: (snapshotId: string) => Promise<void>;
   deleteSnapshotAction: (snapshotId: string) => Promise<void>;
+
+  // Snippets
+  loadSnippets: (projectId: string) => Promise<void>;
+  createSnippetAction: (name?: string) => Promise<WritingSnippet>;
+  updateSnippetAction: (id: string, data: Partial<Pick<WritingSnippet, "name" | "content" | "pinned">>) => Promise<void>;
+  deleteSnippetAction: (id: string) => Promise<void>;
+  setActiveSnippet: (id: string | null) => void;
 
   // UI
   setAiMode: (mode: AiMode) => void;
@@ -95,6 +116,11 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   lastSavedAt: null,
   contentDirty: false,
   snapshots: [],
+  snippets: [],
+  activeSnippetId: null,
+  manuscriptFilter: { type: "all" },
+  planViewMode: "grid",
+  writingViewTab: "write",
   ghostTextContent: "",
   ghostRequestId: null,
 
@@ -145,8 +171,9 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     try {
       const data = await writingApi.getManuscript(projectId);
       set({ acts: data.acts as WritingAct[] });
+      await get().loadSnippets(projectId);
     } catch {
-      set({ acts: [] });
+      set({ acts: [], snippets: [] });
     }
   },
 
@@ -174,6 +201,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     const { activeProjectId } = get();
     if (!activeProjectId) throw new Error("No project selected");
     const chapter = await writingApi.createChapter(actId, activeProjectId, title);
+    // Auto-create first scene in the new chapter
+    await writingApi.createScene(chapter.id);
     await get().loadManuscript(activeProjectId);
     return chapter;
   },
@@ -207,12 +236,35 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     }
   },
 
+  updateSceneAction: async (sceneId, data) => {
+    await writingApi.updateScene(sceneId, data);
+    const { activeProjectId } = get();
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
+
   deleteSceneAction: async (sceneId) => {
     await writingApi.deleteScene(sceneId);
     if (get().activeProjectId) await get().loadManuscript(get().activeProjectId!);
   },
 
   setActiveScene: (sceneId) => set({ activeSceneId: sceneId }),
+
+  reorderActsAction: async (projectId, orderedIds) => {
+    await writingApi.reorderActs(projectId, orderedIds);
+    await get().loadManuscript(projectId);
+  },
+
+  reorderChaptersAction: async (actId, orderedIds) => {
+    await writingApi.reorderChapters(actId, orderedIds);
+    const { activeProjectId } = get();
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
+
+  reorderScenesAction: async (chapterId, orderedIds) => {
+    await writingApi.reorderScenes(chapterId, orderedIds);
+    const { activeProjectId } = get();
+    if (activeProjectId) await get().loadManuscript(activeProjectId);
+  },
 
   loadSettings: async (projectId) => {
     const settings = await writingApi.listSettings(projectId);
@@ -269,6 +321,38 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     await writingApi.deleteSnapshot(snapshotId);
     set((s) => ({ snapshots: s.snapshots.filter((snap) => snap.id !== snapshotId) }));
   },
+
+  setManuscriptFilter: (filter) => set({ manuscriptFilter: filter }),
+  setPlanViewMode: (mode) => set({ planViewMode: mode }),
+  setWritingViewTab: (tab) => set({ writingViewTab: tab }),
+
+  loadSnippets: async (projectId) => {
+    const snippets = await writingApi.listSnippets(projectId);
+    set({ snippets });
+  },
+
+  createSnippetAction: async (name = "") => {
+    const { activeProjectId } = get();
+    if (!activeProjectId) throw new Error("No active project");
+    const snippet = await writingApi.createSnippet(activeProjectId, name);
+    set((s) => ({ snippets: [...s.snippets, snippet], activeSnippetId: snippet.id }));
+    return snippet;
+  },
+
+  updateSnippetAction: async (id, data) => {
+    const updated = await writingApi.updateSnippet(id, data);
+    set((s) => ({ snippets: s.snippets.map((sn) => sn.id === id ? updated : sn) }));
+  },
+
+  deleteSnippetAction: async (id) => {
+    await writingApi.deleteSnippet(id);
+    set((s) => ({
+      snippets: s.snippets.filter((sn) => sn.id !== id),
+      activeSnippetId: s.activeSnippetId === id ? null : s.activeSnippetId,
+    }));
+  },
+
+  setActiveSnippet: (id) => set({ activeSnippetId: id }),
 
   getActiveProject: () => {
     const { projects, activeProjectId } = get();

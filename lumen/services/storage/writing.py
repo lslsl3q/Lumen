@@ -114,6 +114,20 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_ws_project ON writing_settings(project_id);
         CREATE INDEX IF NOT EXISTS idx_ws_parent ON writing_settings(parent_id);
+
+        -- Snippets: 独立文本片段（草稿/灵感/笔记）
+        CREATE TABLE IF NOT EXISTS writing_snippets (
+            id          TEXT PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            name        TEXT NOT NULL DEFAULT '',
+            content     TEXT NOT NULL DEFAULT '{"type":"doc","content":[{"type":"paragraph"}]}',
+            pinned      INTEGER NOT NULL DEFAULT 0,
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wsnip_project ON writing_snippets(project_id);
     """)
 
 
@@ -234,6 +248,8 @@ def delete_act(act_id: str) -> bool:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT project_id FROM writing_acts WHERE id = ?", (act_id,)).fetchone()
+            project_id = row["project_id"] if row else None
             conn.execute("""
                 DELETE FROM writing_scenes WHERE chapter_id IN (
                     SELECT id FROM writing_chapters WHERE act_id = ?
@@ -242,6 +258,11 @@ def delete_act(act_id: str) -> bool:
             conn.execute("DELETE FROM writing_chapters WHERE act_id = ?", (act_id,))
             conn.execute("DELETE FROM writing_acts WHERE id = ?", (act_id,))
             conn.commit()
+            if project_id:
+                remaining = conn.execute("SELECT id FROM writing_acts WHERE project_id = ? ORDER BY sort_order", (project_id,)).fetchall()
+                for i, r in enumerate(remaining):
+                    conn.execute("UPDATE writing_acts SET sort_order = ? WHERE id = ?", (i, r["id"]))
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -332,9 +353,16 @@ def delete_chapter(chapter_id: str) -> bool:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT act_id FROM writing_chapters WHERE id = ?", (chapter_id,)).fetchone()
+            act_id = row["act_id"] if row else None
             conn.execute("DELETE FROM writing_scenes WHERE chapter_id = ?", (chapter_id,))
             conn.execute("DELETE FROM writing_chapters WHERE id = ?", (chapter_id,))
             conn.commit()
+            if act_id:
+                remaining = conn.execute("SELECT id FROM writing_chapters WHERE act_id = ? ORDER BY sort_order", (act_id,)).fetchall()
+                for i, r in enumerate(remaining):
+                    conn.execute("UPDATE writing_chapters SET sort_order = ? WHERE id = ?", (i, r["id"]))
+                conn.commit()
         except Exception:
             conn.rollback()
             raise
@@ -414,8 +442,20 @@ def update_scene(scene_id: str, **kwargs) -> dict | None:
 def delete_scene(scene_id: str) -> bool:
     with write_lock:
         conn = get_conn()
-        conn.execute("DELETE FROM writing_scenes WHERE id = ?", (scene_id,))
-        conn.commit()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT chapter_id FROM writing_scenes WHERE id = ?", (scene_id,)).fetchone()
+            chapter_id = row["chapter_id"] if row else None
+            conn.execute("DELETE FROM writing_scenes WHERE id = ?", (scene_id,))
+            conn.commit()
+            if chapter_id:
+                remaining = conn.execute("SELECT id FROM writing_scenes WHERE chapter_id = ? ORDER BY sort_order", (chapter_id,)).fetchall()
+                for i, r in enumerate(remaining):
+                    conn.execute("UPDATE writing_scenes SET sort_order = ? WHERE id = ?", (i, r["id"]))
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
     return True
 
 
@@ -582,3 +622,73 @@ def get_manuscript_flat(project_id: str) -> list[dict]:
         items.append({"type": "add-chapter", "act_id": act["id"]})
     items.append({"type": "add-act", "project_id": project_id})
     return items
+
+
+# ── Snippets ──
+
+def create_snippet(project_id: str, name: str = "") -> dict:
+    with write_lock:
+        conn = get_conn()
+        sid = f"snp-{uuid.uuid4().hex[:12]}"
+        now = time.time()
+        existing = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_snippets WHERE project_id = ?",
+            (project_id,)
+        ).fetchone()
+        sort_order = existing[0] if existing else 0
+        conn.execute(
+            "INSERT INTO writing_snippets (id, project_id, name, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            (sid, project_id, name, sort_order, now, now),
+        )
+        conn.commit()
+        return dict(conn.execute("SELECT * FROM writing_snippets WHERE id = ?", (sid,)).fetchone())
+
+
+def list_snippets(project_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM writing_snippets WHERE project_id = ? ORDER BY pinned DESC, sort_order ASC, created_at ASC",
+        (project_id,)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_snippet(snippet_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM writing_snippets WHERE id = ?", (snippet_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_snippet(snippet_id: str, **fields) -> dict | None:
+    # Safe: column names come from hardcoded set, not user input
+    allowed = {"name", "content", "pinned", "sort_order"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return get_snippet(snippet_id)
+    updates["updated_at"] = time.time()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    with write_lock:
+        conn = get_conn()
+        conn.execute(
+            f"UPDATE writing_snippets SET {set_clause} WHERE id = ?",
+            (*updates.values(), snippet_id),
+        )
+        conn.commit()
+    return get_snippet(snippet_id)
+
+
+def delete_snippet(snippet_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        row = conn.execute("SELECT project_id FROM writing_snippets WHERE id = ?", (snippet_id,)).fetchone()
+        if not row:
+            return
+        project_id = row["project_id"]
+        conn.execute("DELETE FROM writing_snippets WHERE id = ?", (snippet_id,))
+        remaining = conn.execute(
+            "SELECT id FROM writing_snippets WHERE project_id = ? ORDER BY sort_order",
+            (project_id,),
+        ).fetchall()
+        for i, r in enumerate(remaining):
+            conn.execute("UPDATE writing_snippets SET sort_order = ? WHERE id = ?", (i, r["id"]))
+        conn.commit()

@@ -1,28 +1,49 @@
-/**
- * WritingMode — 写作模式主组件
- *
- * 布局结构（写作模式）：
- *   WritingSidebar（左） | 主内容区（右）
- *   主内容区顶部：Plan | Write | Chat | Review（四个 tabs）
- *   主内容区下方：Write→WritingEditor / Plan→PlanView
- */
-import { useState, useEffect, Component } from "react";
+import { Component, useEffect, useState } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
-import { Eye, Type } from "lucide-react";
+import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, List, Search, LayoutGrid } from "lucide-react";
+import { Toggle } from "../components/ui/toggle";
+import { Separator } from "../components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+} from "../components/ui/dropdown-menu";
 import * as writingApi from "../api/writing";
 
-type WritingView = "plan" | "write" | "chat" | "review";
-
-const VIEW_TABS: { id: WritingView; label: string; disabled: boolean }[] = [
-  { id: "plan", label: "Plan", disabled: true },
-  { id: "write", label: "Write", disabled: false },
-  { id: "chat", label: "Chat", disabled: true },
-  { id: "review", label: "Review", disabled: true },
+const writingViewTabs = [
+  { key: "plan" as const, icon: LayoutList, label: "Plan", disabled: false },
+  { key: "write" as const, icon: PenLine, label: "Write", disabled: false },
+  { key: "chat" as const, icon: MessageCircle, label: "Chat", disabled: true },
+  { key: "review" as const, icon: FileCheck, label: "Review", disabled: true },
 ];
+
+const PLAN_VIEWS = [
+  { key: "outline" as const, label: "Grid", icon: LayoutGrid },
+  { key: "matrix" as const, label: "Matrix", icon: Table2 },
+  { key: "grid" as const, label: "Outline", icon: ListTree },
+];
+
+function filterLabel(
+  filter: { type: "act"; id: string } | { type: "chapter"; id: string },
+  acts: any[],
+): string {
+  if (filter.type === "act") {
+    const act = acts.find((a) => a.id === filter.id);
+    return act ? (act.title || `Act ${(act.sort_order ?? 0) + 1}`) : "整卷";
+  }
+  for (const act of acts) {
+    const ch = (act.chapters || []).find((c: any) => c.id === filter.id);
+    if (ch) return ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`;
+  }
+  return "章节";
+}
 
 function SaveStatusDot({ status }: { status: string }) {
   return (
@@ -64,20 +85,25 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 
 export default function WritingMode() {
   const { isChatPanelOpen, activeProjectId } = useWritingStore();
+  const [planSearch, setPlanSearch] = useState("");
   const saveStatus = useWritingStore((s) => s.saveStatus);
   const focusMode = useWritingStore((s) => s.focusMode);
   const typewriterMode = useWritingStore((s) => s.typewriterMode);
   const toggleFocusMode = useWritingStore((s) => s.toggleFocusMode);
   const toggleTypewriterMode = useWritingStore((s) => s.toggleTypewriterMode);
   const acts = useWritingStore((s) => s.acts);
+  const manuscriptFilter = useWritingStore((s) => s.manuscriptFilter);
+  const setManuscriptFilter = useWritingStore((s) => s.setManuscriptFilter);
   const totalWords = acts.reduce((sum, act) => {
     return sum + ((act as any).chapters || []).reduce((cSum: number, ch: any) => {
       return cSum + (ch.scenes || []).reduce((sSum: number, sc: any) => sSum + (sc.word_count || 0), 0);
     }, 0);
   }, 0);
-  const [viewMode, setViewMode] = useState<WritingView>("write");
+  const writingViewTab = useWritingStore((s) => s.writingViewTab);
+  const setWritingViewTab = useWritingStore((s) => s.setWritingViewTab);
+  const planViewMode = useWritingStore((s) => s.planViewMode);
+  const setPlanViewMode = useWritingStore((s) => s.setPlanViewMode);
 
-  // 自动快照
   useEffect(() => {
     if (!activeProjectId) return;
     const timer = setInterval(async () => {
@@ -99,66 +125,136 @@ export default function WritingMode() {
       <div className="flex h-full w-full overflow-hidden">
         <WritingSidebar />
 
-        {/* 主内容区 */}
         <div className="flex flex-col flex-1 min-w-0 h-full">
-          {/* 顶部合并工具栏 — tabs 左侧 + 格式工具右侧 */}
-          <div className="flex-none h-11 flex items-center px-3 border-b border-border-default bg-surface-deep gap-0.5">
-            {/* 左侧：View tabs */}
-            <div className="flex items-center gap-0.5">
-              {VIEW_TABS.map((tab) => (
+          {/* Merged toolbar — tabs + format tools */}
+          <div className="flex-none h-14 flex items-center px-3 border-b border-border-default bg-surface-deep">
+            <div className="flex items-center gap-1">
+              {writingViewTabs.map(({ key, icon: Icon, label, disabled }) => (
                 <button
-                  key={tab.id}
-                  onClick={() => !tab.disabled && setViewMode(tab.id)}
-                  disabled={tab.disabled}
+                  key={key}
+                  onClick={() => setWritingViewTab(key)}
+                  disabled={disabled}
                   className={cn(
-                    "text-xs font-semibold rounded px-3 py-1.5 transition-colors",
-                    viewMode === tab.id
-                      ? "bg-gray-800 text-stone-200"
-                      : "bg-transparent text-stone-400 hover:text-stone-300",
-                    tab.disabled && "opacity-40 pointer-events-none"
+                    "flex items-center gap-1 px-4 py-2 rounded-full text-[12px] font-semibold transition-colors",
+                    writingViewTab === key
+                      ? "bg-zinc-700 text-stone-100"
+                      : "text-stone-400 hover:text-stone-200 hover:bg-white/5",
+                    disabled && "opacity-40 cursor-not-allowed"
                   )}
-                  type="button"
                 >
-                  {tab.label}
+                  <Icon className="w-4 h-4" />
+                  {label}
                 </button>
               ))}
             </div>
 
-            {/* 右侧：格式工具 */}
+            <div className="w-px h-5 bg-zinc-600 mx-3" />
+
+            {writingViewTab === "plan" ? (
+              <>
+                <div className="flex rounded-full border border-zinc-700 overflow-hidden">
+                  {PLAN_VIEWS.map(({ key, label, icon: ViewIcon }, i) => (
+                    <button
+                      key={key}
+                      onClick={() => setPlanViewMode(key)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold transition-colors cursor-pointer",
+                        planViewMode === key
+                          ? "bg-zinc-500 text-zinc-100"
+                          : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200",
+                        i > 0 && "border-l border-zinc-700"
+                      )}
+                      type="button"
+                    >
+                      <ViewIcon className="w-3.5 h-3.5" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {planViewMode === "grid" && (
+                  <div className="ml-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-zinc-800 border border-zinc-700">
+                    <Search className="w-3.5 h-3.5 text-zinc-500 flex-none" />
+                    <input
+                      className="w-36 bg-transparent text-[12px] text-zinc-300 outline-none placeholder:text-zinc-500"
+                      placeholder="Search scenes..."
+                      value={planSearch}
+                      onChange={(e) => setPlanSearch(e.target.value)}
+                    />
+                  </div>
+                )}
+              </>
+            ) : writingViewTab === "write" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="ml-2 flex items-center gap-1.5 px-2.5 py-[7px] rounded text-[12px] font-semibold bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700/50 transition-colors cursor-pointer">
+                  {manuscriptFilter.type === "all" ? "全部手稿" : filterLabel(manuscriptFilter, acts)}
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem onClick={() => setManuscriptFilter({ type: "all" })}>
+                    <BookOpen className="w-4 h-4" />
+                    全部手稿
+                  </DropdownMenuItem>
+                  {acts.map((act) => {
+                    const chapters = (act as any).chapters || [];
+                    const actNum = (act.sort_order ?? 0) + 1;
+                    return (
+                      <DropdownMenuGroup key={act.id}>
+                        <DropdownMenuLabel>
+                          {act.title || `Act ${actNum}`}
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => setManuscriptFilter({ type: "act", id: act.id })}>
+                          <FileText className="w-4 h-4" />
+                          整卷
+                        </DropdownMenuItem>
+                        {chapters.map((ch: any) => (
+                          <DropdownMenuItem
+                            key={ch.id}
+                            onClick={() => setManuscriptFilter({ type: "chapter", id: ch.id })}
+                          >
+                            <FileText className="w-4 h-4" />
+                            {ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuGroup>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+
             <div className="ml-auto flex items-center gap-2">
               <span className="text-[11px] text-text-muted tabular-nums">{totalWords} 词</span>
               <SaveStatusDot status={saveStatus} />
-              <div className="w-px h-3 bg-border-default mx-0.5" />
-              <button
-                onClick={toggleFocusMode}
-                className={cn("p-1 rounded transition-colors cursor-pointer", focusMode ? "text-primary" : "text-text-muted hover:text-text-secondary")}
-                title="专注模式"
-                type="button"
+              <Separator orientation="vertical" className="h-3 mx-0.5" />
+              <Toggle
+                size="sm"
+                pressed={focusMode}
+                onPressedChange={toggleFocusMode}
+                aria-label="专注模式"
               >
                 <Eye className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={toggleTypewriterMode}
-                className={cn("p-1 rounded transition-colors cursor-pointer", typewriterMode ? "text-primary" : "text-text-muted hover:text-text-secondary")}
-                title="打字机模式"
-                type="button"
+              </Toggle>
+              <Toggle
+                size="sm"
+                pressed={typewriterMode}
+                onPressedChange={toggleTypewriterMode}
+                aria-label="打字机模式"
               >
                 <Type className="w-3.5 h-3.5" />
-              </button>
+              </Toggle>
             </div>
           </div>
 
-          {/* 内容 */}
-          {viewMode === "write" ? (
+          {writingViewTab === "write" ? (
             <WritingEditor>
               {isChatPanelOpen && (
                 <div className="w-[380px] flex-shrink-0 border-l border-border-default flex items-center justify-center text-text-muted text-sm">
-                  AI 面板（NC 研究后重写）
+                  AI 面板（待重写）
                 </div>
               )}
             </WritingEditor>
           ) : (
-            <PlanView />
+            <PlanView searchQuery={planSearch} />
           )}
         </div>
       </div>

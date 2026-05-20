@@ -3,7 +3,6 @@ import { cn } from "../../lib/utils";
 import { useModeStore } from "../../stores/useModeStore";
 import { useWritingStore } from "../../stores/useWritingStore";
 import {
-  ArrowLeftToLine,
   BookOpen,
   StickyNote,
   MessagesSquare,
@@ -19,13 +18,20 @@ import {
   Lightbulb,
   Package,
   BookMarked,
-  Search,
 } from "lucide-react";
 import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "../../components/ui/popover";
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../../components/ui/dropdown-menu";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "../../components/ui/collapsible";
+import { SnippetsPanel } from "./SnippetsPanel";
+import { SidebarToolbar } from "./SidebarToolbar";
 
 type SidebarTab = "codex" | "snippets" | "chat";
 
@@ -68,7 +74,7 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
         "flex-none flex flex-col border-r border-[var(--color-border)] overflow-hidden",
         "bg-[var(--color-surface-deep)]"
       )}
-      style={{ width: expanded ? 450 : 48, transition: "width 0.2s ease" }}
+      style={{ width: expanded ? 450 : 128, "--sidebar-width": `${expanded ? 450 : 128}px`, transition: "width 0.2s ease" } as React.CSSProperties}
       aria-label="Sidebar"
     >
       {/* Novel title bar */}
@@ -78,28 +84,39 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
         </div>
       )}
 
-      {/* Tabs */}
-      {expanded && (
-        <div className="flex-none h-11 flex items-center gap-0 px-2 border-b border-[var(--color-border)]">
-          {tabs.map((tab) => (
+      {/* Tabs — expanded: horizontal, collapsed: vertical, same button style */}
+      <div className={cn(
+        "flex-none border-b border-[var(--color-border)]",
+        expanded
+          ? "h-11 flex items-center gap-1 px-2"
+          : "flex flex-col items-center gap-1 py-2 px-2"
+      )}>
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
             <button
               key={tab.id}
-              onClick={() => setWritingSidebarTab(tab.id)}
+              onClick={() => {
+                setWritingSidebarTab(tab.id);
+                useWritingStore.getState().setActiveSnippet(null);
+              }}
               role="tab"
               aria-selected={activeTab === tab.id}
               className={cn(
-                "flex-1 py-1.5 text-[13px] font-medium text-center transition-colors rounded",
+                "flex items-center gap-1.5 py-1.5 px-3 rounded text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap",
+                expanded && "flex-1 justify-center",
                 activeTab === tab.id
-                  ? "text-[var(--color-text-primary)]"
-                  : "text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)]"
+                  ? "text-[var(--color-text-primary)] bg-white/5"
+                  : "text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5"
               )}
               type="button"
             >
-              {tab.label}
+              <Icon className="w-4 h-4 shrink-0" />
+              <span>{tab.label}</span>
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
       {/* Content */}
       {expanded && (
@@ -108,32 +125,8 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
         </div>
       )}
 
-      {/* Collapsed: icon list */}
-      {!expanded && (
-        <div className="grow flex flex-col items-center gap-1 py-2">
-          {tabs.map((tab) => (
-            <SidebarIconButton
-              key={tab.id}
-              icon={tab.icon}
-              label={tab.label}
-              onClick={() => setWritingSidebarTab(tab.id)}
-              active={activeTab === tab.id}
-            />
-          ))}
-        </div>
-      )}
-
       {/* Footer */}
       {expanded && <SidebarFooter />}
-      {!expanded && (
-        <div className="flex-none p-2 flex flex-col items-center gap-1 border-t border-[var(--color-border)]">
-          <SidebarIconButton
-            icon={ArrowLeftToLine}
-            label="展开侧边栏"
-            onClick={toggleWritingSidebar}
-          />
-        </div>
-      )}
     </aside>
   );
 });
@@ -202,9 +195,7 @@ function SidebarContent({ tab }: { tab: SidebarTab }) {
     case "codex":
       return <CodexPanel />;
     case "snippets":
-      return (
-        <div className="p-3 text-sm text-[var(--color-text-dim)]">便签/片段面板（待实现）</div>
-      );
+      return <SnippetsPanel />;
     case "chat":
       return (
         <div className="p-3 text-sm text-[var(--color-text-dim)]">Chat 面板（待实现）</div>
@@ -234,53 +225,38 @@ function CodexPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar — search | filter | New Entry | display */}
-      <div className="flex-none flex items-center gap-1.5 px-2 py-2 border-b border-[var(--color-border)]">
-        <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-white/5 border border-[var(--color-border)]">
-          <Search className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
-          <input
-            className="flex-1 bg-transparent text-[12px] text-[var(--color-text-secondary)] outline-none placeholder:text-[var(--color-text-dim)]"
-            placeholder="Search all entries..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+      <SidebarToolbar search={search} onSearchChange={setSearch} placeholder="搜索所有条目…">
         <button
           className="size-7 flex items-center justify-center rounded-md text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 transition-colors"
           type="button"
-          title="Filter"
+          title="筛选"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M7 9h10M10 14h4M12 19" />
           </svg>
         </button>
-        <Popover>
-          <PopoverTrigger
+        <DropdownMenu>
+          <DropdownMenuTrigger
             className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[var(--color-border)] text-[11px] font-medium text-[var(--color-text-muted)] hover:bg-white/5 hover:text-[var(--color-text-secondary)] transition-colors cursor-pointer"
-            type="button"
           >
             <Plus className="w-3 h-3" />
-            New Entry
-          </PopoverTrigger>
-          <PopoverContent
-            align="end"
-            className="w-48 p-1 bg-[var(--color-surface-deep)] border-[var(--color-border)] rounded-lg shadow-xl"
-          >
+            新建条目
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
             {NEW_ENTRY_TYPES.map((t) => (
-              <button
+              <DropdownMenuItem
                 key={t.id}
                 onClick={async () => {
                   if (!activeProjectId) return;
                   await createSetting(`新${t.label}`, t.id, null);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-[var(--color-text-secondary)] hover:bg-white/5 rounded transition-colors"
-                type="button"
               >
-                <t.icon className="w-3.5 h-3.5 text-[var(--color-text-dim)]" />
+                <t.icon className="w-3.5 h-3.5" />
                 {t.label}
-              </button>
+              </DropdownMenuItem>
             ))}
-          </PopoverContent>
-        </Popover>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <button
           className="size-7 flex items-center justify-center rounded-md text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 transition-colors"
           type="button"
@@ -288,7 +264,7 @@ function CodexPanel() {
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
-      </div>
+      </SidebarToolbar>
 
       {/* Category list — only show categories with items */}
       <div className="flex-1 overflow-y-auto">
@@ -325,14 +301,9 @@ function CodexCategory({
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="border-b border-[var(--color-border)]/50">
-      {/* Category header — label + count + Add entry inline */}
+    <Collapsible open={open} onOpenChange={setOpen} className="border-b border-[var(--color-border)]/50">
       <div className="flex items-center gap-2 px-3 py-2">
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/5 rounded transition-colors text-left"
-          type="button"
-        >
+        <CollapsibleTrigger className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/5 rounded transition-colors text-left">
           <Icon className="w-3.5 h-3.5 text-[var(--color-text-dim)] flex-none" />
           <span className="text-[12px] font-semibold text-[var(--color-text-secondary)] truncate">
             {label}
@@ -345,7 +316,7 @@ function CodexCategory({
           ) : (
             <ChevronRight className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
           )}
-        </button>
+        </CollapsibleTrigger>
         <button
           onClick={(e) => { e.stopPropagation(); onAdd(); }}
           className="flex items-center gap-0.5 px-1.5 py-0.5 text-[11px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 rounded transition-colors flex-none"
@@ -356,8 +327,7 @@ function CodexCategory({
         </button>
       </div>
 
-      {/* Items */}
-      {open && (
+      <CollapsibleContent>
         <div className="pb-1">
           {items.map((item) => (
             <button
@@ -379,8 +349,8 @@ function CodexCategory({
             </div>
           )}
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

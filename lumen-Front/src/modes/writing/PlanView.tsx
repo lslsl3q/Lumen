@@ -1,160 +1,79 @@
-import { useState } from "react";
-import {
-  DndContext,
-  closestCenter,
-  DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { PlanTreeItem } from "./PlanTreeItem";
-import { InsertButton } from "./InsertButton";
+import { useMemo } from "react";
+import { Plus, Upload, MoreHorizontal } from "lucide-react";
 import { useWritingStore } from "../../stores/useWritingStore";
-import * as writingApi from "../../api/writing";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import { PlanGridView } from "./PlanGridView";
+import { PlanMatrixView } from "./PlanMatrixView";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../../components/ui/dropdown-menu";
 
-export function PlanView() {
+export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
+  const planViewMode = useWritingStore((s) => s.planViewMode);
   const acts = useWritingStore((s) => s.acts);
-  const activeProjectId = useWritingStore((s) => s.activeProjectId);
-  const loadManuscript = useWritingStore((s) => s.loadManuscript);
+  const createAct = useWritingStore((s) => s.createAct);
 
-  const [expandedActs, setExpandedActs] = useState<Set<string>>(
-    new Set(acts.map((a) => a.id))
-  );
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  );
-
-  const toggleAct = (id: string) => {
-    setExpandedActs((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    // Full DnD reorder logic will be implemented in a follow-up task
-    // For now, log the drag event
-    console.log("Plan drag:", active.id, "->", over.id);
-  };
-
-  const handleInsert = async (type: string, parentId?: string) => {
-    const store = useWritingStore.getState();
-    switch (type) {
-      case "scene":
-        if (parentId) await store.createScene(parentId);
-        break;
-      case "chapter":
-        if (parentId) await store.createChapter(parentId, "新章节");
-        break;
-      case "act":
-        await store.createAct("新卷");
-        break;
-    }
-    if (activeProjectId) await loadManuscript(activeProjectId);
-  };
-
-  const handleDelete = async (type: string, id: string) => {
-    switch (type) {
-      case "scene":
-        await writingApi.deleteScene(id);
-        break;
-      case "chapter":
-        await writingApi.deleteChapter(id);
-        break;
-      case "act":
-        await writingApi.deleteAct(id);
-        break;
-    }
-    if (activeProjectId) await loadManuscript(activeProjectId);
-  };
-
-  // Collect all sortable item IDs for SortableContext
-  const allItemIds: string[] = [];
-  for (const act of acts) {
-    allItemIds.push(act.id);
-    for (const ch of (act as any).chapters || []) {
-      allItemIds.push(ch.id);
-      for (const sc of ch.scenes || []) {
-        allItemIds.push(sc.id);
+  const stats = useMemo(() => {
+    let scenes = 0;
+    let words = 0;
+    for (const act of acts) {
+      for (const ch of (act as any).chapters || []) {
+        for (const sc of ch.scenes || []) {
+          scenes++;
+          words += sc.word_count || 0;
+        }
       }
     }
-  }
+    return { scenes, words };
+  }, [acts]);
 
   return (
-    <div className="flex flex-col h-full bg-surface-deep">
-      <div className="flex items-center h-12 px-3 border-b border-border-default">
-        <span className="text-sm font-medium text-text-primary">Plan</span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={allItemIds}
-            strategy={verticalListSortingStrategy}
-          >
-            {acts.map((act) => (
-              <div key={act.id}>
-                <PlanTreeItem
-                  id={act.id}
-                  type="act"
-                  title={act.title || `Act ${act.sort_order + 1}`}
-                  isExpanded={expandedActs.has(act.id)}
-                  onToggleExpand={() => toggleAct(act.id)}
-                  onDelete={async () => handleDelete("act", act.id)}
-                />
-                {expandedActs.has(act.id) &&
-                  ((act as any).chapters || []).map((ch: any) => (
-                    <div key={ch.id}>
-                      <PlanTreeItem
-                        id={ch.id}
-                        type="chapter"
-                        title={ch.title || `Chapter ${ch.sort_order + 1}`}
-                        onDelete={async () => handleDelete("chapter", ch.id)}
-                      />
-                      {(ch.scenes || []).map((sc: any) => (
-                        <PlanTreeItem
-                          key={sc.id}
-                          id={sc.id}
-                          type="scene"
-                          title={
-                            sc.summary ||
-                            sc.subtitle ||
-                            `Scene ${sc.sort_order + 1}`
-                          }
-                          onDelete={async () => handleDelete("scene", sc.id)}
-                        />
-                      ))}
-                      <div className="ml-12 my-1">
-                        <InsertButton
-                          label="+ Scene"
-                          onClick={() => handleInsert("scene", ch.id)}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                <div className="ml-6 my-1">
-                  <InsertButton
-                    label="+ Chapter"
-                    onClick={() => handleInsert("chapter", act.id)}
-                  />
-                </div>
-              </div>
-            ))}
-          </SortableContext>
-        </DndContext>
-        <InsertButton label="+ New Act" onClick={() => handleInsert("act")} />
-      </div>
+    <div className="flex flex-col h-full bg-[var(--color-surface-deep)]">
+      <ScrollArea className="flex-1 plan-scroll-area">
+        <div className="p-4 max-w-4xl mx-auto">
+          {/* grid key = NC Outline (tree view) */}
+          {planViewMode === "grid" && <PlanGridView searchQuery={searchQuery} />}
+          {/* outline key = NC Grid (kanban — not yet implemented) */}
+          {planViewMode === "outline" && (
+            <div className="flex flex-col items-center justify-center py-20 text-zinc-500">
+              <p className="text-[14px] font-medium mb-2">Grid 视图</p>
+              <p className="text-[12px] text-zinc-600">看板式卡片布局，即将推出</p>
+            </div>
+          )}
+          {planViewMode === "matrix" && <PlanMatrixView />}
+
+          {/* Bottom action row */}
+          <div className="flex gap-2 items-start mt-4">
+            <button
+              type="button"
+              onClick={() => createAct("新卷")}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700/80 transition-colors cursor-pointer"
+            >
+              <Plus className="w-3 h-3" />
+              Add Act
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700/80 transition-colors cursor-pointer">
+                <MoreHorizontal className="w-3 h-3" />
+                Actions
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem>
+                  <Upload className="w-3.5 h-3.5" />
+                  Import
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="flex-1" />
+            <span className="text-[11px] text-[var(--color-text-dim)] tabular-nums self-center">
+              {stats.scenes} 场景 / {stats.words.toLocaleString()} 词
+            </span>
+          </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 }

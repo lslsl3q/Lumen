@@ -21,7 +21,7 @@ import { SectionHeader } from './shared/SectionHeader';
 import { handleListKeyDown, navItemClass } from './shared/listNavigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import { ToggleSwitch } from '@/components/ui/toggle-switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -509,12 +509,11 @@ export default function CharacterPanel({
                   </div>
                 )}
               </div>
-              <Switch
+              <ToggleSwitch
                 checked={form.thinking?.enabled ?? false}
-                onCheckedChange={() => updateForm({
+                onChange={() => updateForm({
                   thinking: { ...form.thinking!, enabled: !(form.thinking?.enabled ?? false), budget_tokens: form.thinking?.budget_tokens ?? 1024 }
                 })}
-                size="sm"
               />
             </div>
           </div>
@@ -536,18 +535,16 @@ export default function CharacterPanel({
                   </div>
                 )}
               </div>
-              <Switch
+              <ToggleSwitch
                 checked={!!form.auto_compact}
-                onCheckedChange={() => updateForm({ auto_compact: !form.auto_compact })}
-                size="sm"
+                onChange={() => updateForm({ auto_compact: !form.auto_compact })}
               />
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-xs text-text-secondary">记忆召回</Label>
-              <Switch
+              <ToggleSwitch
                 checked={form.memory_enabled !== false}
-                onCheckedChange={() => updateForm({ memory_enabled: !(form.memory_enabled === true) })}
-                size="sm"
+                onChange={() => updateForm({ memory_enabled: !(form.memory_enabled === true) })}
               />
             </div>
             {form.memory_enabled !== false && (
@@ -569,10 +566,9 @@ export default function CharacterPanel({
                 </div>
                 <div className="flex items-center justify-between">
                   <Label className="text-[10px] text-text-muted">超预算总结</Label>
-                  <Switch
+                  <ToggleSwitch
                     checked={!!form.memory_auto_summarize}
-                    onCheckedChange={() => updateForm({ memory_auto_summarize: !form.memory_auto_summarize })}
-                    size="sm"
+                    onChange={() => updateForm({ memory_auto_summarize: !form.memory_auto_summarize })}
                   />
                 </div>
               </div>
@@ -588,9 +584,9 @@ export default function CharacterPanel({
                   <Label className="text-xs text-text-secondary">公共知识</Label>
                   <p className="text-[10px] text-text-dim">导入的文档、世界观、技术参考</p>
                 </div>
-                <Switch
+                <ToggleSwitch
                   checked={form.accessible_knowledge?.includes('public') ?? true}
-                  onCheckedChange={() => {
+                  onChange={() => {
                     const has = form.accessible_knowledge?.includes('public') ?? true;
                     updateForm({
                       accessible_knowledge: has
@@ -598,7 +594,6 @@ export default function CharacterPanel({
                         : [...(form.accessible_knowledge || []), 'public'],
                     });
                   }}
-                  size="sm"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -606,9 +601,9 @@ export default function CharacterPanel({
                   <Label className="text-xs text-text-secondary">共享记忆</Label>
                   <p className="text-[10px] text-text-dim">Agent 间共享的经历、偏好</p>
                 </div>
-                <Switch
+                <ToggleSwitch
                   checked={form.accessible_knowledge?.includes('shared') ?? false}
-                  onCheckedChange={() => {
+                  onChange={() => {
                     const has = form.accessible_knowledge?.includes('shared') ?? false;
                     updateForm({
                       accessible_knowledge: has
@@ -616,7 +611,6 @@ export default function CharacterPanel({
                         : [...(form.accessible_knowledge || []), 'shared'],
                     });
                   }}
-                  size="sm"
                 />
               </div>
             </div>
