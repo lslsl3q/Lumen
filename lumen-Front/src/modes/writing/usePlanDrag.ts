@@ -84,8 +84,8 @@ export async function handleSceneDrag(
 
   if (srcInfo.chapterId !== tgtChapterId) {
     // Cross-chapter move — optimistic local update
-    const acts = store.acts as any[];
-    const updatedActs = acts.map((act) => ({
+    const currentActs = store.acts as any[];
+    const updatedActs = currentActs.map((act) => ({
       ...act,
       chapters: (act.chapters || []).map((ch: any) => {
         if (ch.id === srcInfo.chapterId) {
@@ -95,7 +95,7 @@ export async function handleSceneDrag(
         if (ch.id === tgtChapterId) {
           // Insert scene into target at position
           const overIdx = overType === "scene" ? tgtSceneIds.indexOf(overId) : -1;
-          const scene = acts.flatMap((a) => (a.chapters || [])).flatMap((c: any) => c.scenes || []).find((sc: any) => sc.id === sceneId);
+          const scene = currentActs.flatMap((a) => (a.chapters || [])).flatMap((c: any) => c.scenes || []).find((sc: any) => sc.id === sceneId);
           const newScenes = [...ch.scenes.filter((sc: any) => sc.id !== sceneId)];
           if (overIdx === -1) newScenes.push(scene);
           else newScenes.splice(overIdx, 0, scene);
@@ -104,14 +104,6 @@ export async function handleSceneDrag(
         return ch;
       }),
     }));
-    // Patch scene's chapter_id locally
-    for (const act of updatedActs) {
-      for (const ch of act.chapters || []) {
-        for (const sc of ch.scenes || []) {
-          if (sc.id === sceneId) sc.chapter_id = tgtChapterId;
-        }
-      }
-    }
     useWritingStore.setState({ acts: updatedActs });
     // Persist in background
     const updatedTgtIds = [...tgtSceneIds];
