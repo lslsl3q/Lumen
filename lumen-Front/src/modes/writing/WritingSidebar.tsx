@@ -2,6 +2,7 @@ import { forwardRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { useModeStore } from "../../stores/useModeStore";
 import { useWritingStore } from "../../stores/useWritingStore";
+import type { CodexEntry } from "../../api/writing";
 import {
   BookOpen,
   StickyNote,
@@ -18,6 +19,8 @@ import {
   Lightbulb,
   Package,
   BookMarked,
+  FileText,
+  FolderTree,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -295,10 +298,13 @@ function CodexCategory({
 }: {
   label: string;
   icon: React.ElementType;
-  items: { id: string; name: string }[];
+  items: CodexEntry[];
   onAdd: () => void;
 }) {
   const [open, setOpen] = useState(true);
+  const activeCodexEntryId = useWritingStore((s) => s.activeCodexEntryId);
+  const setActiveCodexEntry = useWritingStore((s) => s.setActiveCodexEntry);
+  const allEntries = useWritingStore((s) => s.codexEntries);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border-b border-[var(--color-border)]/50">
@@ -330,18 +336,14 @@ function CodexCategory({
       <CollapsibleContent>
         <div className="pb-1">
           {items.map((item) => (
-            <button
+            <EntryRow
               key={item.id}
-              className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer transition-colors text-left"
-              type="button"
-            >
-              <div className="w-7 h-7 rounded bg-white/5 flex items-center justify-center flex-none">
-                <Icon className="w-3 h-3 text-[var(--color-text-dim)]" />
-              </div>
-              <span className="text-[12px] text-[var(--color-text-muted)] truncate">
-                {item.name}
-              </span>
-            </button>
+              entry={item}
+              allEntries={allEntries}
+              isActive={activeCodexEntryId === item.id}
+              icon={Icon}
+              onClick={() => setActiveCodexEntry(activeCodexEntryId === item.id ? null : item.id)}
+            />
           ))}
           {items.length === 0 && (
             <div className="px-3 py-2 text-[11px] text-[var(--color-text-dim)] text-center">
@@ -351,6 +353,60 @@ function CodexCategory({
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+/* ── EntryRow — 带状态图标的条目行 ── */
+
+function EntryRow({
+  entry,
+  allEntries,
+  isActive,
+  icon: Icon,
+  onClick,
+}: {
+  entry: CodexEntry;
+  allEntries: CodexEntry[];
+  isActive: boolean;
+  icon: React.ElementType;
+  onClick: () => void;
+}) {
+  const hasDesc = !!(entry.description && (entry.description as any).text);
+  const hasNotes = !!(entry.description && (entry.description as any)._research);
+  const hasChildren = allEntries.some((e) => e.parent_id === entry.id);
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors text-left",
+        isActive
+          ? "bg-white/8 text-[var(--color-text-primary)]"
+          : "hover:bg-white/5 text-[var(--color-text-muted)]"
+      )}
+      type="button"
+    >
+      <div className={cn(
+        "w-7 h-7 rounded flex items-center justify-center flex-none",
+        isActive ? "bg-white/10" : "bg-white/5"
+      )}>
+        <Icon className="w-3 h-3 text-[var(--color-text-dim)]" />
+      </div>
+      <span className="text-[12px] truncate flex-1 min-w-0">
+        {entry.name}
+      </span>
+      <div className="flex items-center gap-0.5 flex-none">
+        {hasDesc && (
+          <span title="有描述"><FileText className="w-2.5 h-2.5 text-zinc-500" /></span>
+        )}
+        {hasNotes && (
+          <span title="有笔记"><StickyNote className="w-2.5 h-2.5 text-zinc-500" /></span>
+        )}
+        {hasChildren && (
+          <span title="有子条目"><FolderTree className="w-2.5 h-2.5 text-zinc-500" /></span>
+        )}
+      </div>
+    </button>
   );
 }
 

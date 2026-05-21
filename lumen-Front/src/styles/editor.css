@@ -1681,6 +1681,14 @@
   min-width: 0;
 }
 
+/* 文字选中高亮 — 淡灰不扎眼 */
+.manuscript-content ::selection {
+  background: rgba(140, 140, 160, 0.35);
+}
+.manuscript-content ::-moz-selection {
+  background: rgba(140, 140, 160, 0.35);
+}
+
 /* Right column: Actions & scene sidebar — same width, same position */
 .manuscript-side {
   width: var(--sidebar-w);

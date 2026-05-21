@@ -19,6 +19,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { Tag, Plus, Trash2 } from "lucide-react";
 import { ActionsMenu } from "./ActionsMenu";
+import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
 import type { WritingScene } from "../../api/writing";
 import { useWritingStore } from "../../stores/useWritingStore";
 import * as writingApi from "../../api/writing";
@@ -125,6 +126,7 @@ export function SceneEditor({ scene }: { scene: WritingScene }) {
       <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-[var(--gap)]">
       <div className="manuscript-content">
         <EditorContent editor={editor} />
+        <SelectionToolbar editor={editor} />
       </div>
 
       <div className="manuscript-side opacity-70 hover:opacity-100 transition-opacity">

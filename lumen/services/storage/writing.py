@@ -187,12 +187,11 @@ def update_project(project_id: str, **kwargs) -> dict | None:
 
 
 def delete_project(project_id: str) -> bool:
+    # 外键 CASCADE 自动删除 acts→chapters→scenes, codex, snippets
     with write_lock:
         conn = get_conn()
         try:
             conn.execute("BEGIN IMMEDIATE")
-            conn.execute("DELETE FROM writing_settings WHERE project_id = ?", (project_id,))
-            conn.execute("DELETE FROM writing_chapters WHERE project_id = ?", (project_id,))
             conn.execute("DELETE FROM writing_projects WHERE id = ?", (project_id,))
             conn.commit()
         except Exception:

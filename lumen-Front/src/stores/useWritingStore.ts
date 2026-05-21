@@ -11,6 +11,7 @@ interface WritingState {
   acts: WritingAct[];
   activeSceneId: string | null;
   codexEntries: CodexEntry[];
+  activeCodexEntryId: string | null;
   snippets: WritingSnippet[];
   activeSnippetId: string | null;
   manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
@@ -78,6 +79,7 @@ interface WritingState {
   createCodexEntry: (name: string, type?: string, parentId?: string | null) => Promise<CodexEntry>;
   updateCodexEntry: (id: string, data: Partial<CodexEntry>) => Promise<void>;
   deleteCodexEntry: (id: string) => Promise<void>;
+  setActiveCodexEntry: (id: string | null) => void;
 
   // Snapshots
   snapshots: WritingSnapshot[];
@@ -106,6 +108,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   acts: [],
   activeSceneId: null,
   codexEntries: [],
+  activeCodexEntryId: null,
   aiMode: "chat",
   sidebarWidth: 280,
   isChatPanelOpen: false,
@@ -227,7 +230,19 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   updateSceneContent: async (sceneId, content) => {
-    set({ saveStatus: "saving" });
+    // 乐观更新 acts 中的场景内容，让提及检测能立即看到变化
+    set((s) => ({
+      acts: s.acts.map((act) => ({
+        ...act,
+        chapters: ((act as any).chapters || []).map((ch: any) => ({
+          ...ch,
+          scenes: (ch.scenes || []).map((sc: any) =>
+            sc.id === sceneId ? { ...sc, content } : sc,
+          ),
+        })),
+      })),
+      saveStatus: "saving",
+    }));
     try {
       await writingApi.updateScene(sceneId, { content: content as any });
       set({ saveStatus: "saved", lastSavedAt: Date.now(), contentDirty: false });
@@ -384,6 +399,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveSnippet: (id) => set({ activeSnippetId: id }),
+
+  setActiveCodexEntry: (id) => set({ activeCodexEntryId: id }),
 
   getActiveProject: () => {
     const { projects, activeProjectId } = get();

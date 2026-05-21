@@ -2,6 +2,7 @@ import { Component, useEffect, useState } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
+import { CodexDetailPanel } from "./writing/CodexDetailPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
 import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, Search, LayoutGrid } from "lucide-react";
@@ -85,6 +86,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 
 export default function WritingMode() {
   const { isChatPanelOpen, activeProjectId } = useWritingStore();
+  const activeCodexEntryId = useWritingStore((s) => s.activeCodexEntryId);
   const [planSearch, setPlanSearch] = useState("");
   const saveStatus = useWritingStore((s) => s.saveStatus);
   const focusMode = useWritingStore((s) => s.focusMode);
@@ -258,6 +260,8 @@ export default function WritingMode() {
           )}
         </div>
       </div>
+
+      {activeCodexEntryId && <CodexDetailPanel />}
     </ErrorBoundary>
   );
 }

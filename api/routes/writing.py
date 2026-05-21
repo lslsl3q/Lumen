@@ -278,7 +278,12 @@ async def api_get_codex(codex_id: str):
 
 @router.patch("/codex/{codex_id}")
 async def api_update_codex(codex_id: str, req: UpdateCodexRequest):
-    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    updates = req.model_dump(exclude_unset=True)
+    if not updates:
+        s = await asyncio.to_thread(get_codex, codex_id)
+        if not s:
+            raise HTTPException(status_code=404, detail="Codex 条目不存在")
+        return s
     s = await asyncio.to_thread(update_codex, codex_id, **updates)
     if not s:
         raise HTTPException(status_code=404, detail="Codex 条目不存在")
