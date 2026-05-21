@@ -53,6 +53,17 @@ function autoResize(el: HTMLTextAreaElement) {
 // ── Draggable Scene Card ──
 
 function KanbanSceneCard({ scene }: { scene: WritingScene }) {
+  const threadNodes = useWritingStore((s) => {
+    const all: { color: string; name: string }[] = [];
+    for (const t of s.threads) {
+      const nodes = s.threadNodes[t.id] || [];
+      if (nodes.some((n) => n.scene_id === scene.id)) {
+        all.push({ color: t.color, name: t.name });
+      }
+    }
+    return all;
+  });
+
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: scene.id,
     data: {
@@ -131,6 +142,18 @@ function KanbanSceneCard({ scene }: { scene: WritingScene }) {
           onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
           rows={1}
         />
+        {threadNodes.length > 0 && (
+          <div className="flex items-center gap-1 px-2 pb-1.5">
+            {threadNodes.map((tn, i) => (
+              <span
+                key={i}
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: tn.color }}
+                title={tn.name}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

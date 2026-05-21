@@ -19,6 +19,10 @@ from lumen.services.storage.writing import (
     create_scene, list_scenes, get_scene, update_scene, delete_scene, reorder_scenes,
     get_manuscript, get_manuscript_flat,
     create_snippet, list_snippets, get_snippet, update_snippet, delete_snippet,
+    # Threads
+    create_thread, list_threads, get_thread, update_thread, delete_thread, reorder_threads,
+    create_thread_node, list_thread_nodes, get_thread_node, update_thread_node, delete_thread_node, reorder_thread_nodes,
+    get_threads_for_scene,
 )
 from lumen.services.storage.writing_snapshot import (
     create_snapshot, list_snapshots, get_snapshot_detail, restore_snapshot, delete_snapshot,
@@ -576,3 +580,153 @@ async def api_update_snippet(snippet_id: str, req: UpdateSnippetRequest):
 async def api_delete_snippet(snippet_id: str):
     await asyncio.to_thread(delete_snippet, snippet_id)
     return {"ok": True}
+
+
+# ── 叙事线 (Threads) ──
+
+class CreateThreadRequest(BaseModel):
+    project_id: str
+    type: str = "dark"
+    name: str = ""
+    color: str = "#6b7280"
+    description: dict = Field(default_factory=dict)
+    linked_codex_ids: list[str] = Field(default_factory=list)
+
+
+class UpdateThreadRequest(BaseModel):
+    type: str | None = None
+    name: str | None = None
+    description: dict | None = None
+    color: str | None = None
+    status: str | None = None
+    linked_codex_ids: list[str] | None = None
+    metadata: dict | None = None
+
+
+class ReorderThreadsRequest(BaseModel):
+    project_id: str
+    ordered_ids: list[str]
+
+
+class CreateThreadNodeRequest(BaseModel):
+    thread_id: str
+    type: str = "event"
+    title: str = ""
+    note: str = ""
+    scene_id: str | None = None
+    story_time: str = ""
+
+
+class UpdateThreadNodeRequest(BaseModel):
+    type: str | None = None
+    title: str | None = None
+    note: str | None = None
+    scene_id: str | None = None
+    story_time: str | None = None
+    metadata: dict | None = None
+
+
+class ReorderThreadNodesRequest(BaseModel):
+    thread_id: str
+    ordered_ids: list[str]
+
+
+@router.get("/projects/{project_id}/threads")
+async def api_list_threads(project_id: str):
+    return await asyncio.to_thread(list_threads, project_id)
+
+
+@router.post("/threads")
+async def api_create_thread(req: CreateThreadRequest):
+    return await asyncio.to_thread(
+        create_thread, req.project_id, req.type, req.name, req.color, req.description, req.linked_codex_ids
+    )
+
+
+@router.get("/threads/{thread_id}")
+async def api_get_thread(thread_id: str):
+    t = await asyncio.to_thread(get_thread, thread_id)
+    if not t:
+        raise HTTPException(status_code=404, detail="叙事线不存在")
+    return t
+
+
+@router.patch("/threads/{thread_id}")
+async def api_update_thread(thread_id: str, req: UpdateThreadRequest):
+    updates = req.model_dump(exclude_unset=True)
+    if not updates:
+        t = await asyncio.to_thread(get_thread, thread_id)
+        if not t:
+            raise HTTPException(status_code=404, detail="叙事线不存在")
+        return t
+    t = await asyncio.to_thread(update_thread, thread_id, **updates)
+    if not t:
+        raise HTTPException(status_code=404, detail="叙事线不存在")
+    return t
+
+
+@router.delete("/threads/{thread_id}")
+async def api_delete_thread(thread_id: str):
+    await asyncio.to_thread(delete_thread, thread_id)
+    return {"status": "deleted"}
+
+
+@router.post("/threads/reorder")
+async def api_reorder_threads(req: ReorderThreadsRequest):
+    await asyncio.to_thread(reorder_threads, req.project_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# ── 叙事线节点 (Thread Nodes) ──
+
+@router.get("/threads/{thread_id}/nodes")
+async def api_list_thread_nodes(thread_id: str):
+    return await asyncio.to_thread(list_thread_nodes, thread_id)
+
+
+@router.post("/thread-nodes")
+async def api_create_thread_node(req: CreateThreadNodeRequest):
+    return await asyncio.to_thread(
+        create_thread_node, req.thread_id, req.type, req.title, req.note, req.scene_id, req.story_time
+    )
+
+
+@router.get("/thread-nodes/{node_id}")
+async def api_get_thread_node(node_id: str):
+    n = await asyncio.to_thread(get_thread_node, node_id)
+    if not n:
+        raise HTTPException(status_code=404, detail="节点不存在")
+    return n
+
+
+@router.patch("/thread-nodes/{node_id}")
+async def api_update_thread_node(node_id: str, req: UpdateThreadNodeRequest):
+    updates = req.model_dump(exclude_unset=True)
+    if not updates:
+        n = await asyncio.to_thread(get_thread_node, node_id)
+        if not n:
+            raise HTTPException(status_code=404, detail="节点不存在")
+        return n
+    n = await asyncio.to_thread(update_thread_node, node_id, **updates)
+    if not n:
+        raise HTTPException(status_code=404, detail="节点不存在")
+    return n
+
+
+@router.delete("/thread-nodes/{node_id}")
+async def api_delete_thread_node(node_id: str):
+    await asyncio.to_thread(delete_thread_node, node_id)
+    return {"status": "deleted"}
+
+
+@router.post("/thread-nodes/reorder")
+async def api_reorder_thread_nodes(req: ReorderThreadNodesRequest):
+    await asyncio.to_thread(reorder_thread_nodes, req.thread_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# ── 查询：场景关联的线程节点 ──
+
+@router.get("/scenes/{scene_id}/thread-nodes")
+async def api_get_threads_for_scene(scene_id: str):
+    return await asyncio.to_thread(get_threads_for_scene, scene_id)

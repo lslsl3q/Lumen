@@ -424,3 +424,142 @@ export async function deleteSnippet(id: string): Promise<void> {
   const res = await fetch(`${BASE}/snippets/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }
+
+// ── Threads (叙事线) ──
+
+export interface WritingThread {
+  id: string;
+  project_id: string;
+  type: "main" | "subplot" | "dark";
+  name: string;
+  description: Record<string, unknown>;
+  color: string;
+  status: "active" | "dormant" | "surfaced" | "resolved";
+  sort_order: number;
+  linked_codex_ids: string[];
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface WritingThreadNode {
+  id: string;
+  thread_id: string;
+  type: "event" | "emergence" | "crossing" | "resolution" | "seed";
+  scene_id: string | null;
+  title: string;
+  note: string;
+  story_time: string;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ThreadNodeWithThread extends WritingThreadNode {
+  thread_name: string;
+  thread_type: string;
+  thread_color: string;
+  thread_status: string;
+}
+
+export async function listThreads(projectId: string): Promise<WritingThread[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/threads`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createThread(
+  projectId: string, type: WritingThread["type"] = "dark", name = "",
+  color = "#6b7280", description: Record<string, unknown> = {},
+  linkedCodexIds: string[] = [],
+): Promise<WritingThread> {
+  const res = await fetch(`${BASE}/threads`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, type, name, color, description, linked_codex_ids: linkedCodexIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getThread(id: string): Promise<WritingThread> {
+  const res = await fetch(`${BASE}/threads/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateThread(id: string, data: Partial<WritingThread>): Promise<WritingThread> {
+  const res = await fetch(`${BASE}/threads/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteThread(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/threads/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function reorderThreads(projectId: string, orderedIds: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/threads/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── Thread Nodes ──
+
+export async function listThreadNodes(threadId: string): Promise<WritingThreadNode[]> {
+  const res = await fetch(`${BASE}/threads/${encodeURIComponent(threadId)}/nodes`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createThreadNode(
+  threadId: string, type: WritingThreadNode["type"] = "event", title = "",
+  note = "", sceneId: string | null = null, storyTime = "",
+): Promise<WritingThreadNode> {
+  const res = await fetch(`${BASE}/thread-nodes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ thread_id: threadId, type, title, note, scene_id: sceneId, story_time: storyTime }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateThreadNode(id: string, data: Partial<WritingThreadNode>): Promise<WritingThreadNode> {
+  const res = await fetch(`${BASE}/thread-nodes/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteThreadNode(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/thread-nodes/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function reorderThreadNodes(threadId: string, orderedIds: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/thread-nodes/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ thread_id: threadId, ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function getThreadsForScene(sceneId: string): Promise<ThreadNodeWithThread[]> {
+  const res = await fetch(`${BASE}/scenes/${encodeURIComponent(sceneId)}/thread-nodes`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet } from "../api/writing";
+import type { WritingProject, WritingAct, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingThread, WritingThreadNode } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -14,11 +14,13 @@ interface WritingState {
   activeCodexEntryId: string | null;
   snippets: WritingSnippet[];
   activeSnippetId: string | null;
+  threads: WritingThread[];
+  threadNodes: Record<string, WritingThreadNode[]>;
   manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
   setManuscriptFilter: (filter: WritingState["manuscriptFilter"]) => void;
 
   // Plan view state
-  planViewMode: "grid" | "outline" | "matrix";
+  planViewMode: "grid" | "outline" | "matrix" | "threads";
   setPlanViewMode: (mode: WritingState["planViewMode"]) => void;
   writingViewTab: "plan" | "write" | "chat" | "review";
   setWritingViewTab: (tab: WritingState["writingViewTab"]) => void;
@@ -99,6 +101,17 @@ interface WritingState {
   setAiMode: (mode: AiMode) => void;
   setSidebarWidth: (w: number) => void;
   toggleChatPanel: () => void;
+
+  // Threads
+  loadThreads: (projectId: string) => Promise<void>;
+  createThread: (type?: WritingThread["type"], name?: string, color?: string) => Promise<WritingThread>;
+  updateThreadAction: (id: string, data: Partial<WritingThread>) => Promise<void>;
+  deleteThreadAction: (id: string) => Promise<void>;
+  loadThreadNodes: (threadId: string) => Promise<void>;
+  createThreadNodeAction: (threadId: string, type?: WritingThreadNode["type"], title?: string, sceneId?: string | null) => Promise<WritingThreadNode>;
+  updateThreadNodeAction: (id: string, data: Partial<WritingThreadNode>) => Promise<void>;
+  deleteThreadNodeAction: (id: string) => Promise<void>;
+
   getActiveProject: () => WritingProject | undefined;
 }
 
@@ -122,6 +135,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   snippets: [],
   activeSnippetId: null,
   manuscriptFilter: { type: "all" },
+  threads: [],
+  threadNodes: {},
   planViewMode: "outline",
   writingViewTab: "write",
   ghostTextContent: "",
@@ -163,10 +178,11 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveProject: async (id) => {
-    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [] });
+    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], threads: [], threadNodes: {} });
     if (id) {
       await get().loadManuscript(id);
       await get().loadCodex(id);
+      await get().loadThreads(id);
     }
   },
 
@@ -401,6 +417,88 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   setActiveSnippet: (id) => set({ activeSnippetId: id }),
 
   setActiveCodexEntry: (id) => set({ activeCodexEntryId: id }),
+
+  // ── Threads ──
+
+  loadThreads: async (projectId) => {
+    const threads = await writingApi.listThreads(projectId);
+    set({ threads });
+    // 自动加载每条线的节点
+    for (const t of threads) {
+      const nodes = await writingApi.listThreadNodes(t.id);
+      set((s) => ({ threadNodes: { ...s.threadNodes, [t.id]: nodes } }));
+    }
+  },
+
+  createThread: async (type = "dark", name = "", color = "#6b7280") => {
+    const { activeProjectId } = get();
+    if (!activeProjectId) throw new Error("No active project");
+    const thread = await writingApi.createThread(activeProjectId, type, name, color);
+    set((s) => ({
+      threads: [...s.threads, thread],
+      threadNodes: { ...s.threadNodes, [thread.id]: [] },
+    }));
+    return thread;
+  },
+
+  updateThreadAction: async (id, data) => {
+    const updated = await writingApi.updateThread(id, data);
+    set((s) => ({ threads: s.threads.map((t) => t.id === id ? updated : t) }));
+  },
+
+  deleteThreadAction: async (id) => {
+    await writingApi.deleteThread(id);
+    set((s) => {
+      const { [id]: _, ...rest } = s.threadNodes;
+      return { threads: s.threads.filter((t) => t.id !== id), threadNodes: rest };
+    });
+  },
+
+  loadThreadNodes: async (threadId) => {
+    const nodes = await writingApi.listThreadNodes(threadId);
+    set((s) => ({ threadNodes: { ...s.threadNodes, [threadId]: nodes } }));
+  },
+
+  createThreadNodeAction: async (threadId, type = "event", title = "", sceneId = null) => {
+    const node = await writingApi.createThreadNode(threadId, type, title, "", sceneId);
+    set((s) => ({
+      threadNodes: {
+        ...s.threadNodes,
+        [threadId]: [...(s.threadNodes[threadId] || []), node],
+      },
+    }));
+    return node;
+  },
+
+  updateThreadNodeAction: async (id, data) => {
+    const updated = await writingApi.updateThreadNode(id, data);
+    set((s) => ({
+      threadNodes: Object.fromEntries(
+        Object.entries(s.threadNodes).map(([tid, nodes]) => [
+          tid,
+          nodes.map((n) => n.id === id ? updated : n),
+        ]),
+      ),
+    }));
+  },
+
+  deleteThreadNodeAction: async (id) => {
+    // 找到节点所属的 thread
+    const { threadNodes } = get();
+    let targetThreadId: string | null = null;
+    for (const [tid, nodes] of Object.entries(threadNodes)) {
+      if (nodes.some((n) => n.id === id)) { targetThreadId = tid; break; }
+    }
+    await writingApi.deleteThreadNode(id);
+    if (targetThreadId) {
+      set((s) => ({
+        threadNodes: {
+          ...s.threadNodes,
+          [targetThreadId]: (s.threadNodes[targetThreadId] || []).filter((n) => n.id !== id),
+        },
+      }));
+    }
+  },
 
   getActiveProject: () => {
     const { projects, activeProjectId } = get();

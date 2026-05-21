@@ -133,6 +133,42 @@ def _init_tables(conn: sqlite3.Connection):
             FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_wsnip_project ON writing_snippets(project_id);
+
+        -- 叙事线（明线/支线/暗线）
+        CREATE TABLE IF NOT EXISTS writing_threads (
+            id          TEXT PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            type        TEXT NOT NULL DEFAULT 'dark',
+            name        TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '{}',
+            color       TEXT NOT NULL DEFAULT '#6b7280',
+            status      TEXT NOT NULL DEFAULT 'active',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            linked_codex_ids TEXT NOT NULL DEFAULT '[]',
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wt_project ON writing_threads(project_id);
+
+        -- 叙事线节点
+        CREATE TABLE IF NOT EXISTS writing_thread_nodes (
+            id          TEXT PRIMARY KEY,
+            thread_id   TEXT NOT NULL,
+            type        TEXT NOT NULL DEFAULT 'event',
+            scene_id    TEXT DEFAULT NULL,
+            title       TEXT NOT NULL DEFAULT '',
+            note        TEXT NOT NULL DEFAULT '',
+            story_time  TEXT DEFAULT '',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES writing_threads(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wtn_thread ON writing_thread_nodes(thread_id);
+        CREATE INDEX IF NOT EXISTS idx_wtn_scene ON writing_thread_nodes(scene_id);
     """)
 
     # 删旧表（测试数据，无需迁移）
@@ -578,6 +614,214 @@ def reorder_codex(ordered_ids: list[str]):
             raise
 
 
+# ── 叙事线 (Threads) ──
+
+def create_thread(project_id: str, type: str = "dark", name: str = "",
+                  color: str = "#6b7280", description: dict | None = None,
+                  linked_codex_ids: list | None = None) -> dict:
+    with write_lock:
+        conn = get_conn()
+        tid = f"thrd-{uuid.uuid4().hex[:10]}"
+        now = time.time()
+        max_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_threads WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()[0]
+        conn.execute(
+            """INSERT INTO writing_threads
+               (id, project_id, type, name, description, color, status, sort_order, linked_codex_ids, metadata, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, '{}', ?, ?)""",
+            (tid, project_id, type, name,
+             json.dumps(description or {}, ensure_ascii=False),
+             color, max_order,
+             json.dumps(linked_codex_ids or [], ensure_ascii=False),
+             now, now),
+        )
+        conn.commit()
+        return _row_to_dict(conn.execute("SELECT * FROM writing_threads WHERE id = ?", (tid,)).fetchone())
+
+
+def list_threads(project_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM writing_threads WHERE project_id = ? ORDER BY sort_order",
+        (project_id,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_thread(thread_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM writing_threads WHERE id = ?", (thread_id,)).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def update_thread(thread_id: str, **kwargs) -> dict | None:
+    with write_lock:
+        conn = get_conn()
+        allowed = {"type", "name", "description", "color", "status", "linked_codex_ids", "metadata"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return get_thread(thread_id)
+        for json_field in ("description", "linked_codex_ids", "metadata"):
+            if json_field in updates and not isinstance(updates[json_field], str):
+                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
+        updates["updated_at"] = time.time()
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [thread_id]
+        conn.execute(f"UPDATE writing_threads SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+    return get_thread(thread_id)
+
+
+def delete_thread(thread_id: str) -> bool:
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT project_id FROM writing_threads WHERE id = ?", (thread_id,)).fetchone()
+            project_id = row["project_id"] if row else None
+            conn.execute("DELETE FROM writing_threads WHERE id = ?", (thread_id,))
+            conn.commit()
+            if project_id:
+                remaining = conn.execute(
+                    "SELECT id FROM writing_threads WHERE project_id = ? ORDER BY sort_order",
+                    (project_id,),
+                ).fetchall()
+                for i, r in enumerate(remaining):
+                    conn.execute("UPDATE writing_threads SET sort_order = ? WHERE id = ?", (i, r["id"]))
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return True
+
+
+def reorder_threads(project_id: str, ordered_ids: list[str]):
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for i, tid in enumerate(ordered_ids):
+                conn.execute(
+                    "UPDATE writing_threads SET sort_order = ?, updated_at = ? WHERE id = ? AND project_id = ?",
+                    (i, time.time(), tid, project_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+# ── 叙事线节点 (Thread Nodes) ──
+
+def create_thread_node(thread_id: str, type: str = "event", title: str = "",
+                       note: str = "", scene_id: str | None = None,
+                       story_time: str = "") -> dict:
+    with write_lock:
+        conn = get_conn()
+        nid = f"tn-{uuid.uuid4().hex[:11]}"
+        now = time.time()
+        max_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_thread_nodes WHERE thread_id = ?",
+            (thread_id,),
+        ).fetchone()[0]
+        conn.execute(
+            """INSERT INTO writing_thread_nodes
+               (id, thread_id, type, scene_id, title, note, story_time, sort_order, metadata, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)""",
+            (nid, thread_id, type, scene_id, title, note, story_time, max_order, now, now),
+        )
+        conn.commit()
+        return _row_to_dict(conn.execute("SELECT * FROM writing_thread_nodes WHERE id = ?", (nid,)).fetchone())
+
+
+def list_thread_nodes(thread_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM writing_thread_nodes WHERE thread_id = ? ORDER BY sort_order",
+        (thread_id,),
+    ).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def get_thread_node(node_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM writing_thread_nodes WHERE id = ?", (node_id,)).fetchone()
+    return _row_to_dict(row) if row else None
+
+
+def update_thread_node(node_id: str, **kwargs) -> dict | None:
+    with write_lock:
+        conn = get_conn()
+        allowed = {"type", "title", "note", "scene_id", "story_time", "metadata"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return get_thread_node(node_id)
+        for json_field in ("metadata",):
+            if json_field in updates and not isinstance(updates[json_field], str):
+                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
+        updates["updated_at"] = time.time()
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [node_id]
+        conn.execute(f"UPDATE writing_thread_nodes SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+    return get_thread_node(node_id)
+
+
+def delete_thread_node(node_id: str) -> bool:
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute("SELECT thread_id FROM writing_thread_nodes WHERE id = ?", (node_id,)).fetchone()
+            thread_id = row["thread_id"] if row else None
+            conn.execute("DELETE FROM writing_thread_nodes WHERE id = ?", (node_id,))
+            conn.commit()
+            if thread_id:
+                remaining = conn.execute(
+                    "SELECT id FROM writing_thread_nodes WHERE thread_id = ? ORDER BY sort_order",
+                    (thread_id,),
+                ).fetchall()
+                for i, r in enumerate(remaining):
+                    conn.execute("UPDATE writing_thread_nodes SET sort_order = ? WHERE id = ?", (i, r["id"]))
+                conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return True
+
+
+def reorder_thread_nodes(thread_id: str, ordered_ids: list[str]):
+    with write_lock:
+        conn = get_conn()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for i, nid in enumerate(ordered_ids):
+                conn.execute(
+                    "UPDATE writing_thread_nodes SET sort_order = ?, updated_at = ? WHERE id = ? AND thread_id = ?",
+                    (i, time.time(), nid, thread_id),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def get_threads_for_scene(scene_id: str) -> list[dict]:
+    """返回绑定了指定 scene_id 的所有节点及其所属线程（用于 PlanView 标记）。"""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT n.*, t.name AS thread_name, t.type AS thread_type, t.color AS thread_color, t.status AS thread_status
+           FROM writing_thread_nodes n
+           JOIN writing_threads t ON n.thread_id = t.id
+           WHERE n.scene_id = ?
+           ORDER BY t.sort_order, n.sort_order""",
+        (scene_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ── 辅助 ──
 
 def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
@@ -585,7 +829,7 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
         return None
     d = dict(row)
     # 解析 JSON 字段
-    for key in ("description", "aliases", "tags", "custom_fields", "relations", "metadata"):
+    for key in ("description", "aliases", "tags", "custom_fields", "relations", "metadata", "linked_codex_ids"):
         if key in d and isinstance(d[key], str):
             try:
                 d[key] = json.loads(d[key])

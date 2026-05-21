@@ -5,7 +5,7 @@ import { PlanView } from "./writing/PlanView";
 import { CodexDetailPanel } from "./writing/CodexDetailPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
-import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, Search, LayoutGrid } from "lucide-react";
+import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, Search, LayoutGrid, GitBranch } from "lucide-react";
 import { Toggle } from "../components/ui/toggle";
 import { Separator } from "../components/ui/separator";
 import {
@@ -29,6 +29,7 @@ const PLAN_VIEWS = [
   { key: "grid" as const, label: "Grid", icon: LayoutGrid },
   { key: "matrix" as const, label: "Matrix", icon: Table2 },
   { key: "outline" as const, label: "Outline", icon: ListTree },
+  { key: "threads" as const, label: "Threads", icon: GitBranch },
 ];
 
 function filterLabel(

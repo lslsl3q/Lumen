@@ -5,6 +5,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { PlanGridView } from "./PlanGridView";
 import { PlanMatrixView } from "./PlanMatrixView";
 import { PlanKanbanView } from "./PlanKanbanView";
+import { ThreadListView } from "./ThreadListView";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -40,8 +41,10 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
           {/* grid key = NC Grid (kanban cards) */}
           {planViewMode === "grid" && <PlanKanbanView searchQuery={searchQuery} />}
           {planViewMode === "matrix" && <PlanMatrixView />}
+          {planViewMode === "threads" && <ThreadListView />}
 
-          {/* Bottom action row */}
+          {/* Bottom action row — only for structure views */}
+          {planViewMode !== "threads" && (
           <div className="flex gap-2 items-start mt-4">
             <button
               type="button"
@@ -68,6 +71,7 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
               {stats.scenes} 场景 / {stats.words.toLocaleString()} 词
             </span>
           </div>
+          )}
         </div>
       </ScrollArea>
     </div>
