@@ -9,21 +9,22 @@ const NODE_META: Record<
   { label: string; color: string; shape: "circle" | "diamond" | "triangle" | "cross" | "check" }
 > = {
   event: { label: "事件", color: "#94a3b8", shape: "circle" },
-  emergence: { label: "浮现", color: "#3b82f6", shape: "triangle" },
-  crossing: { label: "交叉", color: "#f59e0b", shape: "cross" },
-  resolution: { label: "收束", color: "#22c55e", shape: "check" },
-  seed: { label: "伏笔", color: "#a855f7", shape: "diamond" },
+  emergence: { label: "浮现", color: "#60a5fa", shape: "triangle" },
+  crossing: { label: "交叉", color: "#fbbf24", shape: "cross" },
+  resolution: { label: "收束", color: "#4ade80", shape: "check" },
+  seed: { label: "伏笔", color: "#c084fc", shape: "diamond" },
 };
 
 // ── Layout constants ──
 
-const LEFT_MARGIN = 110;
-const COL_MIN_WIDTH = 90;
-const HEADER_HEIGHT = 42;
-const LANE_HEIGHT = 52;
-const LANE_GAP = 6;
-const NODE_R = 6;
-const LINE_THICK = 3;
+const LEFT_MARGIN = 120;
+const COL_MIN_WIDTH = 100;
+const HEADER_HEIGHT = 44;
+const LANE_HEIGHT = 48;
+const LANE_GAP = 10;
+const NODE_R = 5;
+const LINE_THICK = 5;
+const PARALLEL_GAP = 16;
 
 // ── Types ──
 
@@ -38,8 +39,49 @@ interface FlatChapter {
 interface PlacedNode {
   node: WritingThreadNode;
   threadId: string;
-  colIndex: number; // -1 = unplaced
+  colIndex: number;
   threadIndex: number;
+}
+
+interface Waypoint {
+  x: number;
+  y: number;
+}
+
+// ── 45° subway path builder ──
+// Draws thick marker-like lines with 45° transitions and rounded corners
+
+function buildSubwayPath(waypoints: Waypoint[]): string {
+  if (waypoints.length < 2) {
+    return waypoints.length === 1 ? `M ${waypoints[0].x},${waypoints[0].y}` : "";
+  }
+
+  const parts: string[] = [`M ${waypoints[0].x},${waypoints[0].y}`];
+
+  for (let i = 1; i < waypoints.length; i++) {
+    const prev = waypoints[i - 1];
+    const curr = waypoints[i];
+    const dx = curr.x - prev.x;
+    const dy = curr.y - prev.y;
+
+    if (dy === 0) {
+      // Same Y: straight horizontal
+      parts.push(`L ${curr.x},${curr.y}`);
+    } else {
+      const absDy = Math.abs(dy);
+      if (dx >= absDy) {
+        // 45° diagonal fits: horizontal → diagonal
+        const diagStartX = curr.x - absDy;
+        parts.push(`L ${diagStartX},${prev.y}`);
+        parts.push(`L ${curr.x},${curr.y}`);
+      } else {
+        // Not enough horizontal space, direct line
+        parts.push(`L ${curr.x},${curr.y}`);
+      }
+    }
+  }
+
+  return parts.join(" ");
 }
 
 // ── Data hook ──
@@ -106,18 +148,91 @@ function useTimelineData() {
     return result;
   }, [threads, threadNodes, sceneToChapter, chIdToIndex, threadIndexMap]);
 
-  // Per-chapter: which threads have nodes there?
-  const chapterThreadMap = useMemo(() => {
-    const m = new Map<number, Set<string>>();
-    for (const pn of placedNodes) {
-      if (pn.colIndex < 0) continue;
-      if (!m.has(pn.colIndex)) m.set(pn.colIndex, new Set());
-      m.get(pn.colIndex)!.add(pn.threadId);
-    }
-    return m;
-  }, [placedNodes]);
+  // Find main thread index
+  const mainThreadIndex = useMemo(
+    () => Math.max(0, threads.findIndex((t) => t.type === "main")),
+    [threads],
+  );
 
-  return { chapters, threads, placedNodes, threadIndexMap, chapterThreadMap };
+  return { chapters, threads, placedNodes, mainThreadIndex };
+}
+
+// ── Convergence state machine ──
+// emergence/resolution → converge to main
+// seed → diverge back to own lane
+// crossing → temporary converge (just this node)
+// event → keep current state
+
+const CONVERGE_ACTION: Record<WritingThreadNode["type"], "converge" | "diverge" | "keep"> = {
+  emergence: "converge",
+  crossing: "converge",
+  resolution: "converge",
+  seed: "diverge",
+  event: "keep",
+};
+
+// ── Compute thread waypoints with auto-convergence ──
+
+function computeThreadWaypoints(
+  thread: WritingThread,
+  threadIndex: number,
+  mainThreadIndex: number,
+  nodes: PlacedNode[],
+  getY: (idx: number) => number,
+  getX: (colIndex: number) => number,
+): { waypoints: Waypoint[]; nodePositions: { x: number; y: number; pn: PlacedNode }[] } {
+  const homeY = getY(threadIndex);
+  const mainY = getY(mainThreadIndex);
+  const isMain = thread.type === "main";
+
+  // Convergence offset: threads stack relative to main
+  const offset = isMain ? 0 : (threadIndex - mainThreadIndex) * PARALLEL_GAP;
+  const convergedY = mainY + offset;
+
+  const sortedNodes = nodes
+    .filter((n) => n.colIndex >= 0)
+    .sort((a, b) => a.colIndex - b.colIndex);
+
+  if (sortedNodes.length === 0) return { waypoints: [], nodePositions: [] };
+
+  let converged = isMain; // main is always at its home (which is its convergedY)
+  const nodePositions: { x: number; y: number; pn: PlacedNode }[] = [];
+  const waypoints: Waypoint[] = [];
+
+  for (let i = 0; i < sortedNodes.length; i++) {
+    const pn = sortedNodes[i];
+    const action = CONVERGE_ACTION[pn.node.type];
+
+    // Update convergence state
+    if (action === "converge") {
+      converged = true;
+    } else if (action === "diverge") {
+      converged = false;
+    }
+    // "keep" does not change state
+
+    // Crossing: temporarily converge for this node only
+    const isCrossing = pn.node.type === "crossing";
+    const effectiveConverged = converged || isCrossing;
+    const y = effectiveConverged ? convergedY : homeY;
+    const x = getX(pn.colIndex);
+
+    waypoints.push({ x, y });
+    nodePositions.push({ x, y, pn });
+
+    // If crossing, insert a diverge waypoint right after (to go back)
+    if (isCrossing && !converged) {
+      // Add a waypoint slightly to the right, back at homeY
+      // This creates the "dip in, dip out" visual
+      const nextX = i < sortedNodes.length - 1
+        ? getX(sortedNodes[i + 1].colIndex)
+        : x + COL_MIN_WIDTH * 0.4;
+      const midX = (x + nextX) / 2;
+      waypoints.push({ x: midX, y: homeY });
+    }
+  }
+
+  return { waypoints, nodePositions };
 }
 
 // ── SVG shape renderers ──
@@ -136,9 +251,8 @@ function NodeMarker({
   isHovered: boolean;
 }) {
   const r = isHovered ? NODE_R + 2 : NODE_R;
-  const meta = NODE_META[type];
 
-  switch (meta.shape) {
+  switch (NODE_META[type].shape) {
     case "diamond":
       return (
         <polygon
@@ -162,14 +276,8 @@ function NodeMarker({
       return (
         <g>
           <circle cx={cx} cy={cy} r={r} fill="#09090b" stroke={color} strokeWidth={2} />
-          <line
-            x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s}
-            stroke={color} strokeWidth={2.5} strokeLinecap="round"
-          />
-          <line
-            x1={cx + s} y1={cy - s} x2={cx - s} y2={cy + s}
-            stroke={color} strokeWidth={2.5} strokeLinecap="round"
-          />
+          <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+          <line x1={cx + s} y1={cy - s} x2={cx - s} y2={cy + s} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
         </g>
       );
     }
@@ -184,61 +292,8 @@ function NodeMarker({
         </g>
       );
     default:
-      return (
-        <circle cx={cx} cy={cy} r={r} fill={color} stroke="#09090b" strokeWidth={2} />
-      );
+      return <circle cx={cx} cy={cy} r={r} fill={color} stroke="#09090b" strokeWidth={2} />;
   }
-}
-
-// ── Junction renderer (transfer station between threads) ──
-
-function JunctionConnector({
-  x,
-  threadIds,
-  threads,
-  getY,
-}: {
-  x: number;
-  threadIds: string[];
-  threads: WritingThread[];
-  getY: (threadIndex: number) => number;
-}) {
-  if (threadIds.length < 2) return null;
-
-  // Sort threads by index to get top/bottom Y
-  const indices = threadIds
-    .map((id) => threads.findIndex((t) => t.id === id))
-    .filter((i) => i >= 0)
-    .sort((a, b) => a - b);
-
-  if (indices.length < 2) return null;
-
-  const topY = getY(indices[0]);
-  const bottomY = getY(indices[indices.length - 1]);
-
-  return (
-    <g>
-      {/* Vertical connector bar */}
-      <line
-        x1={x} y1={topY} x2={x} y2={bottomY}
-        stroke="#f59e0b"
-        strokeWidth={2}
-        strokeOpacity={0.35}
-        strokeDasharray="3 3"
-      />
-      {/* Junction dot at midpoint */}
-      <circle
-        cx={x}
-        cy={(topY + bottomY) / 2}
-        r={4}
-        fill="#f59e0b"
-        fillOpacity={0.5}
-        stroke="#f59e0b"
-        strokeWidth={1}
-        strokeOpacity={0.7}
-      />
-    </g>
-  );
 }
 
 // ── Main Component ──
@@ -248,19 +303,17 @@ export function ThreadTimelineView({
 }: {
   onNodeClick?: (threadId: string, nodeId: string) => void;
 }) {
-  const { chapters, threads, placedNodes, chapterThreadMap } = useTimelineData();
+  const { chapters, threads, placedNodes, mainThreadIndex } = useTimelineData();
   const [zoom, setZoom] = useState(1);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   const colWidth = COL_MIN_WIDTH * zoom;
 
-  // Y position helper
   const getY = useCallback(
     (threadIndex: number) => HEADER_HEIGHT + threadIndex * (LANE_HEIGHT + LANE_GAP) + LANE_HEIGHT / 2,
     [],
   );
 
-  // X position helper
   const getX = useCallback(
     (colIndex: number) => LEFT_MARGIN + colIndex * colWidth + colWidth / 2,
     [colWidth],
@@ -283,12 +336,39 @@ export function ThreadTimelineView({
       if (!m.has(pn.threadId)) m.set(pn.threadId, []);
       m.get(pn.threadId)!.push(pn);
     }
-    // Sort each list by colIndex
     for (const [, nodes] of m) {
       nodes.sort((a, b) => a.colIndex - b.colIndex);
     }
     return m;
   }, [placedNodes]);
+
+  // Compute waypoints for each thread
+  const threadPaths = useMemo(() => {
+    const result: {
+      threadId: string;
+      thread: WritingThread;
+      threadIndex: number;
+      path: string;
+      nodePositions: { x: number; y: number; pn: PlacedNode }[];
+    }[] = [];
+
+    for (let ti = 0; ti < threads.length; ti++) {
+      const thread = threads[ti];
+      const nodes = threadNodeMap.get(thread.id) || [];
+      const { waypoints, nodePositions } = computeThreadWaypoints(
+        thread, ti, mainThreadIndex, nodes, getY, getX,
+      );
+      result.push({
+        threadId: thread.id,
+        thread,
+        threadIndex: ti,
+        path: buildSubwayPath(waypoints),
+        nodePositions,
+      });
+    }
+
+    return result;
+  }, [threads, threadNodeMap, mainThreadIndex, getY, getX]);
 
   if (chapters.length === 0) {
     return (
@@ -307,16 +387,12 @@ export function ThreadTimelineView({
   }
 
   return (
-    <div className="rounded-lg border border-zinc-700/60 bg-zinc-900/30 overflow-hidden">
+    <div className="rounded-lg border border-zinc-700/60 bg-[#0f0f12] overflow-hidden">
       {/* Zoom controls */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-700/40 bg-zinc-900/60">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-zinc-800 bg-zinc-950/60">
         <span className="text-[11px] text-zinc-500">缩放</span>
         <input
-          type="range"
-          min={0.5}
-          max={3}
-          step={0.1}
-          value={zoom}
+          type="range" min={0.5} max={3} step={0.1} value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
           className="w-24 accent-zinc-500"
         />
@@ -330,34 +406,20 @@ export function ThreadTimelineView({
 
       <div className="overflow-auto" onWheel={handleWheel} style={{ maxHeight: 420 }}>
         <svg width={totalWidth} height={totalHeight} className="select-none">
-          {/* ── Layer 1: Chapter grid ── */}
-          <g opacity={0.3}>
+          {/* ── Layer 1: Chapter grid (very subtle) ── */}
+          <g opacity={0.15}>
             {chapters.map((ch, i) => {
-              const x = LEFT_MARGIN + i * colWidth + colWidth / 2;
               const isNewAct = i === 0 || ch.actId !== chapters[i - 1]?.actId;
               return (
                 <g key={ch.id}>
-                  {/* Act separator */}
                   {isNewAct && i > 0 && (
                     <line
-                      x1={LEFT_MARGIN + i * colWidth}
-                      y1={0}
-                      x2={LEFT_MARGIN + i * colWidth}
-                      y2={totalHeight}
-                      stroke="#3f3f46"
-                      strokeWidth={1}
-                      strokeDasharray="6 3"
+                      x1={LEFT_MARGIN + i * colWidth} y1={0}
+                      x2={LEFT_MARGIN + i * colWidth} y2={totalHeight}
+                      stroke="#3f3f46" strokeWidth={1} strokeDasharray="6 3"
                     />
                   )}
-                  {/* Chapter column guide */}
-                  <line
-                    x1={x}
-                    y1={HEADER_HEIGHT}
-                    x2={x}
-                    y2={totalHeight}
-                    stroke="#27272a"
-                    strokeWidth={1}
-                  />
+                  <line x1={getX(i)} y1={HEADER_HEIGHT} x2={getX(i)} y2={totalHeight} stroke="#27272a" strokeWidth={1} />
                 </g>
               );
             })}
@@ -375,13 +437,7 @@ export function ThreadTimelineView({
                       {ch.actTitle}
                     </text>
                   )}
-                  <text
-                    x={x}
-                    y={isNewAct ? 28 : 22}
-                    textAnchor="middle"
-                    fill="#71717a"
-                    fontSize={10}
-                  >
+                  <text x={x} y={isNewAct ? 28 : 22} textAnchor="middle" fill="#52525b" fontSize={10}>
                     {ch.title}
                   </text>
                 </g>
@@ -390,202 +446,88 @@ export function ThreadTimelineView({
           </g>
 
           {/* Header separator */}
-          <line
-            x1={0} y1={HEADER_HEIGHT}
-            x2={totalWidth} y2={HEADER_HEIGHT}
-            stroke="#3f3f46"
-            strokeWidth={1}
-          />
+          <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth={1} />
 
-          {/* ── Layer 3: Thread subway lines ── */}
+          {/* ── Layer 3: Thread labels ── */}
           {threads.map((thread, ti) => {
             const y = getY(ti);
-            const nodes = threadNodeMap.get(thread.id) || [];
-            const placedNodes_ = nodes.filter((n) => n.colIndex >= 0);
-            const isDark = thread.type === "dark";
             const isDormant = thread.status === "dormant";
-
             return (
-              <g key={thread.id}>
-                {/* Thread label */}
+              <g key={`label-${thread.id}`}>
                 <text
-                  x={LEFT_MARGIN - 8}
-                  y={y + 4}
-                  textAnchor="end"
-                  fill={thread.color}
-                  fontSize={11}
-                  fontWeight={600}
-                  opacity={isDormant ? 0.5 : 1}
+                  x={LEFT_MARGIN - 8} y={y + 3} textAnchor="end"
+                  fill={thread.color} fontSize={11} fontWeight={700}
+                  opacity={isDormant ? 0.4 : 0.9}
                 >
                   {thread.name || "未命名"}
                 </text>
-                {/* Thread type indicator */}
-                <text
-                  x={LEFT_MARGIN - 8}
-                  y={y + 14}
-                  textAnchor="end"
-                  fill="#52525b"
-                  fontSize={8}
-                >
+                <text x={LEFT_MARGIN - 8} y={y + 14} textAnchor="end" fill="#3f3f46" fontSize={8}>
                   {thread.type === "main" ? "主线" : thread.type === "subplot" ? "支线" : "暗线"}
                 </text>
-
-                {/* ── Subway line path ── */}
-                {placedNodes_.length >= 2 && (
-                  <polyline
-                    points={placedNodes_
-                      .map((pn) => `${getX(pn.colIndex)},${y}`)
-                      .join(" ")}
-                    fill="none"
-                    stroke={thread.color}
-                    strokeWidth={LINE_THICK}
-                    strokeOpacity={isDormant ? 0.25 : 0.6}
-                    strokeDasharray={isDark ? "8 4" : "none"}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                )}
-
-                {/* Single node: short line stub */}
-                {placedNodes_.length === 1 && (
-                  <line
-                    x1={getX(placedNodes_[0].colIndex) - 12}
-                    y1={y}
-                    x2={getX(placedNodes_[0].colIndex) + 12}
-                    y2={y}
-                    stroke={thread.color}
-                    strokeWidth={LINE_THICK}
-                    strokeOpacity={isDormant ? 0.25 : 0.6}
-                    strokeDasharray={isDark ? "8 4" : "none"}
-                    strokeLinecap="round"
-                  />
-                )}
-
-                {/* Unplaced node stubs (right side) */}
-                {nodes
-                  .filter((n) => n.colIndex < 0)
-                  .map((pn, idx) => {
-                    const nx = LEFT_MARGIN + chapters.length * colWidth + 16 + idx * 14;
-                    return (
-                      <g key={pn.node.id}>
-                        <circle
-                          cx={nx}
-                          cy={y}
-                          r={3}
-                          fill={thread.color}
-                          opacity={0.3}
-                        />
-                      </g>
-                    );
-                  })}
               </g>
             );
           })}
 
-          {/* ── Layer 4: Junction connectors (where threads share a chapter) ── */}
-          {chapters.map((_, ci) => {
-            const threadIds = chapterThreadMap.get(ci);
-            if (!threadIds || threadIds.size < 2) return null;
+          {/* ── Layer 4: Thread subway lines (thick, 45°, auto-converge) ── */}
+          {threadPaths.map(({ threadId, thread, path }) => {
+            const isDark = thread.type === "dark";
+            const isDormant = thread.status === "dormant";
+            if (!path) return null;
+
             return (
-              <JunctionConnector
-                key={`junc-${ci}`}
-                x={getX(ci)}
-                threadIds={Array.from(threadIds)}
-                threads={threads}
-                getY={getY}
+              <path
+                key={`path-${threadId}`}
+                d={path}
+                fill="none"
+                stroke={thread.color}
+                strokeWidth={LINE_THICK}
+                strokeOpacity={isDormant ? 0.3 : 0.8}
+                strokeDasharray={isDark ? "12 6" : "none"}
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             );
           })}
 
-          {/* ── Layer 5: Node markers (on top) ── */}
-          {threads.map((thread, ti) => {
-            const y = getY(ti);
-            const nodes = threadNodeMap.get(thread.id) || [];
+          {/* ── Layer 5: Node markers ── */}
+          {threadPaths.map(({ threadId, thread, nodePositions }) => (
+            <g key={`nodes-${threadId}`}>
+              {nodePositions.map(({ x, y, pn }) => {
+                const meta = NODE_META[pn.node.type];
+                const isHovered = hoveredNode === pn.node.id;
 
-            return (
-              <g key={`nodes-${thread.id}`}>
-                {nodes
-                  .filter((pn) => pn.colIndex >= 0)
-                  .map((pn) => {
-                    const nx = getX(pn.colIndex);
-                    const meta = NODE_META[pn.node.type];
-                    const isHovered = hoveredNode === pn.node.id;
-
-                    return (
-                      <g
-                        key={pn.node.id}
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredNode(pn.node.id)}
-                        onMouseLeave={() => setHoveredNode(null)}
-                        onClick={() => onNodeClick?.(thread.id, pn.node.id)}
-                      >
-                        {/* Hover glow ring */}
-                        {isHovered && (
-                          <circle
-                            cx={nx}
-                            cy={y}
-                            r={NODE_R + 6}
-                            fill="none"
-                            stroke={thread.color}
-                            strokeWidth={1.5}
-                            strokeOpacity={0.4}
-                          />
-                        )}
-
-                        {/* Seed outer ring */}
-                        {pn.node.type === "seed" && (
-                          <circle
-                            cx={nx}
-                            cy={y}
-                            r={NODE_R + 3}
-                            fill="none"
-                            stroke={meta.color}
-                            strokeWidth={1}
-                            strokeOpacity={0.4}
-                          />
-                        )}
-
-                        {/* Node shape */}
-                        <NodeMarker
-                          cx={nx}
-                          cy={y}
-                          type={pn.node.type}
-                          color={meta.color}
-                          isHovered={isHovered}
-                        />
-
-                        {/* Tooltip */}
-                        {isHovered && (
-                          <g>
-                            <rect
-                              x={nx - 70}
-                              y={y - 32}
-                              width={140}
-                              height={22}
-                              rx={4}
-                              fill="#18181b"
-                              stroke="#3f3f46"
-                              strokeWidth={1}
-                            />
-                            <text
-                              x={nx}
-                              y={y - 17}
-                              textAnchor="middle"
-                              fill="#e4e4e7"
-                              fontSize={10}
-                              fontWeight={500}
-                              pointerEvents="none"
-                            >
-                              {pn.node.title || meta.label}
-                            </text>
-                          </g>
-                        )}
+                return (
+                  <g
+                    key={pn.node.id}
+                    className="cursor-pointer"
+                    onMouseEnter={() => setHoveredNode(pn.node.id)}
+                    onMouseLeave={() => setHoveredNode(null)}
+                    onClick={() => onNodeClick?.(thread.id, pn.node.id)}
+                  >
+                    {/* Hover glow */}
+                    {isHovered && (
+                      <circle cx={x} cy={y} r={NODE_R + 6} fill="none" stroke={thread.color} strokeWidth={1.5} strokeOpacity={0.5} />
+                    )}
+                    {/* Seed outer ring */}
+                    {pn.node.type === "seed" && (
+                      <circle cx={x} cy={y} r={NODE_R + 3} fill="none" stroke={meta.color} strokeWidth={1} strokeOpacity={0.4} />
+                    )}
+                    {/* Node shape */}
+                    <NodeMarker cx={x} cy={y} type={pn.node.type} color={meta.color} isHovered={isHovered} />
+                    {/* Tooltip */}
+                    {isHovered && (
+                      <g>
+                        <rect x={x - 70} y={y - 32} width={140} height={22} rx={4} fill="#18181b" stroke="#3f3f46" strokeWidth={1} />
+                        <text x={x} y={y - 17} textAnchor="middle" fill="#e4e4e7" fontSize={10} fontWeight={500} pointerEvents="none">
+                          {pn.node.title || meta.label}
+                        </text>
                       </g>
-                    );
-                  })}
-              </g>
-            );
-          })}
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          ))}
         </svg>
       </div>
     </div>
