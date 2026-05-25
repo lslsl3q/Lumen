@@ -38,10 +38,17 @@
   --color-amber-500: #B86A4A;
   --color-amber-950: #331610;
 
-  /* === 语义色（真实值，不再自引用）=== */
+  /* === 语义色 — 值来自 lumen-dark.json，此处为 Tailwind 类名生成 === */
   --color-primary: var(--color-amber-400);
   --color-primary-dim: var(--color-amber-500);
   --color-primary-deep: var(--color-amber-950);
+  --color-primary-subtle: rgba(204, 124, 94, 0.08);
+  --color-primary-foreground: #09090b;
+  --color-success: #10b981;
+  --color-success-light: #34d399;
+  --color-error: #ef4444;
+  --color-error-light: #f87171;
+  --color-warning: #f59e0b;
 
   /* 表面层级：越深越底层 */
   --color-surface-canvas: #09090b;        /* body 底色 — NC zinc-950 */
