@@ -48,7 +48,7 @@
   --color-surface-deep: #18181b;          /* 内容区 — NC zinc-900 */
   --color-surface-base: #18181b;          /* 基础面 — 同 deep */
   --color-surface-elevated: #27272a;      /* 浮起面 — AI 气泡、卡片 — NC zinc-800 */
-  --color-surface-rail: #18181b;          /* 侧轨 — NC zinc-900 */
+  --color-surface-rail: #09090b;          /* 侧轨 — NC zinc-950 */
   --color-surface-panel: #27272a;         /* 面板 — NC zinc-800 */
 
   /* 文字层级 */
