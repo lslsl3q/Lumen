@@ -192,7 +192,10 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
         }
       }
 
-      if (!activeProject || !activeChapter) return;
+      if (!activeProject) return;
+
+      const chapterTitle = activeChapter?.title ?? "";
+      const chapterContent = activeChapter?.content ?? "";
 
       const requestId = crypto.randomUUID();
       requestIdRef.current = requestId;
@@ -218,7 +221,6 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
       setError(null);
       streamingMsgIdRef.current = assistantId;
 
-      const chapterContent = activeChapter.content ?? "";
       const trimmedContent =
         chapterContent.length > 8000
           ? chapterContent.slice(-8000)
@@ -228,8 +230,8 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
         type: "writing",
         ai_mode: "chat",
         book_id: activeProjectId,
-        chapter_id: activeChapterId,
-        chapter_title: activeChapter.title,
+        chapter_id: activeChapterId ?? "",
+        chapter_title: chapterTitle,
         chapter_content: trimmedContent,
         book_name: activeProject.name,
         selected_text: "",
