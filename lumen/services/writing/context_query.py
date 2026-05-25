@@ -12,7 +12,10 @@ import re
 import logging
 from typing import Any
 
-from lumen.services.storage.writing import list_chapters, list_codex
+from lumen.services.storage.writing import (
+    list_chapters, list_codex, list_threads, list_thread_nodes,
+    list_acts, list_snippets, list_scenes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +175,11 @@ class ContextQueryService:
         self._chapter_id = chapter_id
         self._all_chapters: list[dict[str, Any]] | None = None
         self._all_settings: list[dict[str, Any]] | None = None
+        self._all_threads: list[dict[str, Any]] = []
+        self._thread_nodes: dict[str, list[dict[str, Any]]] = {}
         self._current_index: int = 0
+        self._context_selection: dict[str, Any] | None = None
+        self._resolved_context: str = ""
 
     def preload(self):
         """预加载章节数据和设定数据到内存"""
@@ -192,6 +199,123 @@ class ContextQueryService:
             (i for i, ch in enumerate(self._all_chapters) if ch.get("id") == self._chapter_id),
             len(self._all_chapters),
         )
+
+        # 预加载叙事线及节点
+        self._all_threads = list_threads(self._book_id) or []
+        for t in self._all_threads:
+            tid = t.get("id", "")
+            self._thread_nodes[tid] = list_thread_nodes(tid) or []
+
+    # ── Context Selection (NC-aligned) ──
+
+    def set_context_selection(self, selection: dict[str, Any]):
+        """接收前端传入的结构化上下文选择，预解析为模板可用的文本块。"""
+        self._context_selection = selection
+        self._resolved_context = self._resolve_selection(selection)
+
+    def _resolve_selection(self, sel: dict[str, Any]) -> str:
+        """将前端 context_selection 聚合为一段注入文本。"""
+        parts: list[str] = []
+
+        # 全部手稿
+        if sel.get("fullNovelText") and self._all_chapters:
+            texts = [_chapter_full(ch) for ch in self._all_chapters]
+            if texts:
+                parts.append("全部手稿正文：\n" + "\n\n".join(texts))
+
+        # 全部大纲
+        if sel.get("fullOutline") and self._all_chapters:
+            outlines = [_chapter_title(ch) for ch in self._all_chapters]
+            if outlines:
+                parts.append("全部大纲：\n" + "\n".join(outlines))
+
+        # 选中的卷
+        act_ids = sel.get("acts", [])
+        if act_ids and self._all_chapters:
+            all_acts = list_acts(self._book_id) if self._book_id else []
+            for aid in act_ids:
+                act = next((a for a in all_acts if a.get("id") == aid), None)
+                if not act:
+                    continue
+                title = act.get("title", f"Act {(act.get('sort_order', 0) + 1)}")
+                act_chs = [ch for ch in self._all_chapters if ch.get("act_id") == aid]
+                ch_summaries = [_chapter_summary(ch) for ch in act_chs]
+                if ch_summaries:
+                    parts.append(f"卷「{title}」：\n" + "\n\n".join(ch_summaries))
+
+        # 选中的章节
+        chapter_ids = sel.get("chapters", [])
+        if chapter_ids and self._all_chapters:
+            for ch in self._all_chapters:
+                if ch.get("id") in chapter_ids:
+                    parts.append(_chapter_summary(ch))
+
+        # 选中的场景
+        scene_ids = sel.get("scenes", [])
+        if scene_ids and self._all_chapters:
+            for ch in self._all_chapters:
+                scenes = list_scenes(ch.get("id", ""))
+                for sc in scenes:
+                    if sc.get("id") in scene_ids:
+                        text = _pm_json_text(sc.get("content", "{}"))
+                        subtitle = sc.get("subtitle", "") or sc.get("summary", "")
+                        header = f"场景: {subtitle}" if subtitle else "场景"
+                        if text:
+                            parts.append(f"{header}\n{text[:_SUMMARY_LENGTH]}")
+
+        # 选中的片段
+        snippet_ids = sel.get("snippets", [])
+        if snippet_ids and self._book_id:
+            all_snippets = list_snippets(self._book_id)
+            for sn in all_snippets:
+                if sn.get("id") in snippet_ids:
+                    name = sn.get("name", "未命名片段")
+                    content = sn.get("content", "")
+                    if content:
+                        parts.append(f"片段「{name}」：\n{content[:_SUMMARY_LENGTH]}")
+
+        # 选中的法典条目（individual）
+        codex_entry_ids = sel.get("codexEntries", [])
+        if codex_entry_ids and self._all_settings:
+            entries = [s for s in self._all_settings if s.get("id") in codex_entry_ids]
+            if entries:
+                parts.append(_format_settings_grouped(entries))
+
+        # 按类型选择的法典条目
+        codex_types = sel.get("codexTypes", [])
+        if codex_types and self._all_settings:
+            entries = [s for s in self._all_settings if s.get("category") in codex_types or s.get("type") in codex_types]
+            if entries:
+                parts.append(_format_settings_grouped(entries))
+
+        # 按标签选择的法典条目
+        codex_tags = sel.get("codexTags", [])
+        if codex_tags and self._all_settings:
+            entries = [s for s in self._all_settings if set(s.get("tags", []) or []) & set(codex_tags)]
+            if entries:
+                parts.append(_format_settings_grouped(entries))
+
+        # 按详情选择的法典条目（custom_fields key 维度）
+        codex_details = sel.get("codexDetails", [])
+        if codex_details and self._all_settings:
+            entries = [s for s in self._all_settings
+                       if isinstance(s.get("custom_fields"), dict)
+                       and set(s["custom_fields"].keys()) & set(codex_details)]
+            if entries:
+                parts.append(_format_settings_grouped(entries))
+
+        # 按分类选择的法典条目
+        codex_categories = sel.get("codexCategories", [])
+        if codex_categories and self._all_settings:
+            entries = [s for s in self._all_settings if s.get("category") in codex_categories]
+            if entries:
+                parts.append(_format_settings_grouped(entries))
+
+        return "\n\n".join(parts)
+
+    def resolved_context(self) -> str:
+        """模板调用：返回前端选择的上下文文本。空字符串表示无选择。"""
+        return self._resolved_context
 
     # ── 章节查询 ──
 
@@ -382,6 +506,59 @@ class ContextQueryService:
         # Step 7: 格式化输出
         return _format_settings_grouped(active_list)
 
+    # ── 叙事线查询 ──
+
+    def active_threads(self) -> str:
+        """格式化所有活跃叙事线及其最新节点状态"""
+        if not self._all_threads:
+            return ""
+        type_labels = {"main": "明线", "subplot": "支线", "dark": "暗线"}
+        status_labels = {"active": "活跃", "dormant": "潜伏", "surfaced": "浮现", "resolved": "收束"}
+        node_labels = {"advance": "推进", "surface": "浮现", "resolve": "收束", "background": "背景"}
+
+        lines = ["当前叙事线："]
+        for t in self._all_threads:
+            tid = t.get("id", "")
+            name = t.get("name", "未命名")
+            ttype = type_labels.get(t.get("type", ""), t.get("type", ""))
+            status = status_labels.get(t.get("status", ""), t.get("status", ""))
+            nodes = self._thread_nodes.get(tid, [])
+            line = f"- [{ttype}] {name}（{status}，{len(nodes)} 个节点）"
+
+            # 最近 3 个节点摘要
+            recent = nodes[-3:] if len(nodes) > 3 else nodes
+            if recent:
+                parts = []
+                for n in recent:
+                    ntype = node_labels.get(n.get("type", "advance"), n.get("type", "advance"))
+                    title = n.get("title", "")
+                    goal = " ★目标" if n.get("goal") else ""
+                    parts.append(f"{ntype}{goal}: {title or '无标题'}")
+                line += "\n  最近: " + " → ".join(parts)
+            lines.append(line)
+        return "\n".join(lines)
+
+    def unfilled_pits(self) -> str:
+        """格式化未填的伏笔（surface 节点无配对 resolve）"""
+        pits: list[str] = []
+        for t in self._all_threads:
+            tid = t.get("id", "")
+            nodes = self._thread_nodes.get(tid, [])
+            surface_nodes = [n for n in nodes if n.get("type") == "surface"]
+            if not surface_nodes:
+                continue
+            has_resolve = any(n.get("type") == "resolve" for n in nodes)
+            if has_resolve:
+                continue
+            name = t.get("name", "未命名")
+            for n in surface_nodes:
+                title = n.get("title", "未命名浮现节点")
+                pits.append(f"- [{name}] {title}")
+
+        if not pits:
+            return ""
+        return "未填的伏笔（已浮现但未收束）：\n" + "\n".join(pits)
+
 
 class _TemplateQueryProxy:
     """包装 ContextQueryService，提供 Jinja2 安全的模板调用接口
@@ -419,3 +596,13 @@ class _TemplateQueryProxy:
 
     def codex_injection(self, text: str = "") -> str:
         return self._svc.codex_injection(text=text)
+
+    def active_threads(self) -> str:
+        return self._svc.active_threads()
+
+    def unfilled_pits(self) -> str:
+        return self._svc.unfilled_pits()
+
+    def resolved_context(self) -> str:
+        """返回前端选择的上下文文本（NC-aligned context selection）"""
+        return self._svc.resolved_context()

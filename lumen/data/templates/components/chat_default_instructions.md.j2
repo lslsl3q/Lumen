@@ -1,0 +1,12 @@
+---
+name: "Chat Default Instructions"
+type: prompt_component
+category: components
+---
+
+{# Default instructions for chat prompts #}
+Always write your answer in Markdown format, don't use HTML tags to format the response.
+
+{% if book_language is defined and book_language %}
+Use {{ book_language }} spelling and grammar.
+{% endif %}

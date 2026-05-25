@@ -1,0 +1,12 @@
+---
+name: "Additional Instructions"
+type: prompt_component
+category: components
+---
+
+{% if instructions is defined and instructions %}
+Additional instructions have been provided to tweak your role, behavior and capabilities. Follow them closely:
+<instructions>
+{{ instructions }}
+</instructions>
+{% endif %}

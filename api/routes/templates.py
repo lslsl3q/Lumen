@@ -46,6 +46,8 @@ class UpdateTemplateRequest(BaseModel):
 
 class PreviewRequest(BaseModel):
     mock_data: dict | None = None
+    book_id: str | None = None
+    chapter_id: str | None = None
 
 
 # ── 列出模板 ──
@@ -83,6 +85,27 @@ async def get_template(path: str):
     meta, body = _parse_frontmatter(j2_path)
     has_user_section = "# --- USER ---" in body
 
+    # Compute usages: which templates include this component
+    usages: list[str] = []
+    include_pattern = re.compile(r'\{%[-\s]*include\s+"([^"]+)"\s*[-]?%}')
+    component_rel = f"{template_name}.md.j2"
+    for other in get_template_names():
+        other_name = other.get("name", "")
+        if other_name == template_name:
+            continue
+        other_path = os.path.join(_TEMPLATES_DIR, f"{other_name}.md.j2")
+        if not os.path.isfile(other_path):
+            continue
+        try:
+            with open(other_path, "r", encoding="utf-8") as f:
+                other_content = f.read()
+            for match in include_pattern.finditer(other_content):
+                if match.group(1) == component_rel or match.group(1).endswith(component_rel):
+                    usages.append(other.get("label", other_name))
+                    break
+        except IOError:
+            continue
+
     return {
         "name": template_name,
         "path": f"{template_name}.md.j2",
@@ -92,6 +115,7 @@ async def get_template(path: str):
         "category": meta.get("category", ""),
         "model": meta.get("model", "default"),
         "has_user_section": has_user_section,
+        "usages": usages,
     }
 
 
@@ -127,12 +151,24 @@ async def update_template(path: str, body: UpdateTemplateRequest):
 
 @router.post("/{path:path}/preview")
 async def preview_template(path: str, body: PreviewRequest = None):
-    """用 mock 数据预览模板渲染结果"""
+    """用 mock 数据或真实上下文预览模板渲染结果"""
+    import asyncio
     template_name, _ = _validate_path(path)
 
-    # 加载数据：build_context 提供 sys.*，mock 数据 / 前端传参提供业务变量
     context = build_context()
-    if body and body.mock_data:
+
+    # 如果提供了 book_id，用 ContextQueryService 注入真实数据
+    if body and body.book_id:
+        try:
+            from lumen.services.writing.context_query import ContextQueryService, _TemplateQueryProxy
+            svc = ContextQueryService(body.book_id, body.chapter_id or "")
+            await asyncio.to_thread(svc.preload)
+            query_proxy = _TemplateQueryProxy(svc)
+            context["query"] = query_proxy
+        except Exception as e:
+            logger.warning(f"ContextQueryService 预加载失败，回退 mock: {e}")
+            context.update(load_mock_data(template_name))
+    elif body and body.mock_data:
         context.update(body.mock_data)
     else:
         context.update(load_mock_data(template_name))

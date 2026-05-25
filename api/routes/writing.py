@@ -5,9 +5,12 @@ T11 写作模式 REST API — 作品/章节/世界观设定 CRUD
 import asyncio
 import json
 import logging
+import os
 import re
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import PlainTextResponse, StreamingResponse
+import shutil
+import uuid
+from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import PlainTextResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 
 from lumen.services.storage.writing import (
@@ -19,6 +22,8 @@ from lumen.services.storage.writing import (
     create_scene, list_scenes, get_scene, update_scene, delete_scene, reorder_scenes,
     get_manuscript, get_manuscript_flat,
     create_snippet, list_snippets, get_snippet, update_snippet, delete_snippet,
+    # Labels
+    create_label, list_labels, update_label, delete_label, reorder_labels,
     # Threads
     create_thread, list_threads, get_thread, update_thread, delete_thread, reorder_threads,
     create_thread_node, list_thread_nodes, get_thread_node, update_thread_node, delete_thread_node, reorder_thread_nodes,
@@ -80,6 +85,8 @@ class UpdateSceneRequest(BaseModel):
     summary: str | None = None
     subtitle: str | None = None
     chapter_id: str | None = None
+    codex_ids: list[str] | None = None
+    label_ids: list[str] | None = None
 
 
 class ReorderScenesRequest(BaseModel):
@@ -107,6 +114,7 @@ class CreateCodexRequest(BaseModel):
     description: dict = Field(default_factory=dict)
     aliases: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
+    category: str | None = None
 
 
 class UpdateCodexRequest(BaseModel):
@@ -115,6 +123,7 @@ class UpdateCodexRequest(BaseModel):
     description: dict | None = None
     aliases: list[str] | None = None
     tags: list[str] | None = None
+    category: str | None = None
     custom_fields: dict | None = None
     relations: list | None = None
     graph_entity_id: str | None = None
@@ -172,6 +181,41 @@ async def api_update_project(project_id: str, req: UpdateProjectRequest):
 async def api_delete_project(project_id: str):
     await asyncio.to_thread(delete_project, project_id)
     return {"status": "deleted"}
+
+
+# ── 封面 ──
+
+COVERS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "assets", "writing", "covers")
+os.makedirs(COVERS_DIR, exist_ok=True)
+
+
+@router.post("/projects/{project_id}/cover")
+async def api_upload_cover(project_id: str, file: UploadFile = File(...)):
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    ext = file.content_type.split("/")[-1].replace("jpeg", "jpg")
+    if ext not in ("jpg", "png", "gif", "webp", "bmp"):
+        ext = "jpg"
+    filename = f"{project_id}.{ext}"
+    dest = os.path.join(COVERS_DIR, filename)
+    # Remove old cover (different extension)
+    for old in os.listdir(COVERS_DIR):
+        if old.startswith(f"{project_id}.") and old != filename:
+            os.remove(os.path.join(COVERS_DIR, old))
+    with open(dest, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+    cover_path = f"covers/{filename}"
+    await asyncio.to_thread(update_project, project_id, metadata={"cover": cover_path})
+    return {"cover": cover_path}
+
+
+@router.get("/projects/{project_id}/cover")
+async def api_get_cover(project_id: str):
+    for ext in ("jpg", "png", "gif", "webp", "bmp"):
+        path = os.path.join(COVERS_DIR, f"{project_id}.{ext}")
+        if os.path.exists(path):
+            return FileResponse(path, media_type=f"image/{ext.replace('jpg', 'jpeg')}")
+    raise HTTPException(status_code=404, detail="No cover")
 
 
 # ── 章节 ──
@@ -268,7 +312,7 @@ async def api_list_codex(project_id: str, type: str | None = None):
 @router.post("/codex")
 async def api_create_codex(req: CreateCodexRequest):
     return await asyncio.to_thread(
-        create_codex, req.project_id, req.name, req.type, req.parent_id, req.description, req.aliases, req.tags
+        create_codex, req.project_id, req.name, req.type, req.parent_id, req.description, req.aliases, req.tags, req.category
     )
 
 
@@ -582,6 +626,49 @@ async def api_delete_snippet(snippet_id: str):
     return {"ok": True}
 
 
+# ── 标签 (Labels) ──
+
+class CreateLabelRequest(BaseModel):
+    name: str = ""
+    color: str = "Gray"
+
+
+class UpdateLabelRequest(BaseModel):
+    name: str | None = None
+    color: str | None = None
+
+
+@router.get("/projects/{project_id}/labels")
+async def api_list_labels(project_id: str):
+    return await asyncio.to_thread(list_labels, project_id)
+
+
+@router.post("/projects/{project_id}/labels")
+async def api_create_label(project_id: str, req: CreateLabelRequest):
+    return await asyncio.to_thread(create_label, project_id, req.name, req.color)
+
+
+@router.patch("/labels/{label_id}")
+async def api_update_label(label_id: str, req: UpdateLabelRequest):
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    result = await asyncio.to_thread(update_label, label_id, **updates)
+    if not result:
+        raise HTTPException(status_code=404, detail="标签不存在")
+    return result
+
+
+@router.delete("/labels/{label_id}")
+async def api_delete_label(label_id: str):
+    await asyncio.to_thread(delete_label, label_id)
+    return {"ok": True}
+
+
+@router.post("/projects/{project_id}/labels/reorder")
+async def api_reorder_labels(project_id: str, req: ReorderRequest):
+    await asyncio.to_thread(reorder_labels, project_id, req.ordered_ids)
+    return {"ok": True}
+
+
 # ── 叙事线 (Threads) ──
 
 class CreateThreadRequest(BaseModel):
@@ -591,6 +678,7 @@ class CreateThreadRequest(BaseModel):
     color: str = "#6b7280"
     description: dict = Field(default_factory=dict)
     linked_codex_ids: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class UpdateThreadRequest(BaseModel):
@@ -601,6 +689,7 @@ class UpdateThreadRequest(BaseModel):
     status: str | None = None
     linked_codex_ids: list[str] | None = None
     metadata: dict | None = None
+    tags: list[str] | None = None
 
 
 class ReorderThreadsRequest(BaseModel):
@@ -610,11 +699,13 @@ class ReorderThreadsRequest(BaseModel):
 
 class CreateThreadNodeRequest(BaseModel):
     thread_id: str
-    type: str = "event"
+    type: str = "advance"
     title: str = ""
     note: str = ""
     scene_id: str | None = None
     story_time: str = ""
+    goal: bool = False
+    satisfaction: dict | None = None
 
 
 class UpdateThreadNodeRequest(BaseModel):
@@ -624,6 +715,8 @@ class UpdateThreadNodeRequest(BaseModel):
     scene_id: str | None = None
     story_time: str | None = None
     metadata: dict | None = None
+    goal: bool | None = None
+    satisfaction: dict | None = None
 
 
 class ReorderThreadNodesRequest(BaseModel):
@@ -639,7 +732,7 @@ async def api_list_threads(project_id: str):
 @router.post("/threads")
 async def api_create_thread(req: CreateThreadRequest):
     return await asyncio.to_thread(
-        create_thread, req.project_id, req.type, req.name, req.color, req.description, req.linked_codex_ids
+        create_thread, req.project_id, req.type, req.name, req.color, req.description, req.linked_codex_ids, req.tags
     )
 
 
@@ -687,7 +780,7 @@ async def api_list_thread_nodes(thread_id: str):
 @router.post("/thread-nodes")
 async def api_create_thread_node(req: CreateThreadNodeRequest):
     return await asyncio.to_thread(
-        create_thread_node, req.thread_id, req.type, req.title, req.note, req.scene_id, req.story_time
+        create_thread_node, req.thread_id, req.type, req.title, req.note, req.scene_id, req.story_time, req.goal, req.satisfaction
     )
 
 

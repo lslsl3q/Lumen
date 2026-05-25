@@ -39,11 +39,16 @@ async def direct_writing_stream(
     beat_context: str = "",
     max_words: int | None = None,
     model_id: str = "",
+    context_selection: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """直接模板渲染 + LLM 调用，不经过 Agent 管道
 
     用于 continue / expand / rewrite / condense / beat_generate。
     无 persona、无记忆、无 ReAct。
+
+    context_selection: 前端传入的结构化上下文选择，包含：
+      fullNovelText, fullOutline, acts, chapters, scenes,
+      snippets, codexEntries, codexTypes
     """
     from lumen.prompt.template_engine import render_message, build_context, TemplateError
     from lumen.services.writing.context_query import ContextQueryService, _TemplateQueryProxy
@@ -51,6 +56,25 @@ async def direct_writing_stream(
     from lumen.config import DEFAULT_MODEL
 
     model = model_id or DEFAULT_MODEL
+
+    # Load project metadata for tense/POV/language/narrative character
+    from lumen.services.storage.writing import get_project
+    project = await asyncio.to_thread(get_project, book_id)
+    project_meta = (project or {}).get("metadata", {}) or {}
+
+    # Resolve narrative character from Codex
+    narrative_character = ""
+    nc_id = project_meta.get("narrative_character_id", "")
+    if nc_id and book_id:
+        from lumen.services.storage.writing import list_codex
+        codex_entries = await asyncio.to_thread(list_codex, book_id)
+        char = next((e for e in (codex_entries or []) if e.get("id") == nc_id), None)
+        if char:
+            from lumen.services.writing.context_query import _format_entity
+            narrative_character = _format_entity(
+                char.get("name", ""),
+                char.get("content", {}),
+            )
 
     # Content truncation
     content_truncated = False
@@ -62,6 +86,9 @@ async def direct_writing_stream(
     svc = ContextQueryService(book_id, chapter_id)
     if book_id:
         await asyncio.to_thread(svc.preload)
+        # 如果有前端传入的 context_selection，预加载选中数据
+        if context_selection:
+            await asyncio.to_thread(svc.set_context_selection, context_selection)
     query_proxy = _TemplateQueryProxy(svc)
 
     template_context = build_context(
@@ -78,6 +105,10 @@ async def direct_writing_stream(
         beat_context=beat_context,
         max_words=max_words,
         query=query_proxy,
+        tense=project_meta.get("tense", "past"),
+        pov=project_meta.get("pov", "3rd"),
+        language=project_meta.get("language", "zh-CN"),
+        narrative_character=narrative_character,
     )
 
     try:
@@ -285,5 +316,6 @@ class WritingEnvironment(BaseEnvironment):
                 beat_context=metadata.get("beat_context", ""),
                 max_words=metadata.get("max_words"),
                 model_id=metadata.get("model_id", ""),
+                context_selection=metadata.get("context_selection"),
             ):
                 yield event

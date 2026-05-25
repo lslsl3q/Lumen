@@ -91,6 +91,8 @@ def _init_tables(conn: sqlite3.Connection):
             content      TEXT NOT NULL DEFAULT '{"type":"doc","content":[{"type":"paragraph"}]}',
             summary      TEXT NOT NULL DEFAULT '',
             subtitle     TEXT NOT NULL DEFAULT '',
+            codex_ids    TEXT NOT NULL DEFAULT '[]',
+            label_ids    TEXT NOT NULL DEFAULT '[]',
             scene_number INTEGER NOT NULL DEFAULT 0,
             sort_order   INTEGER NOT NULL DEFAULT 0,
             created_at   REAL NOT NULL,
@@ -134,11 +136,25 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_wsnip_project ON writing_snippets(project_id);
 
-        -- 叙事线（明线/支线/暗线）
+        -- 场景标签
+        CREATE TABLE IF NOT EXISTS writing_labels (
+            id          TEXT PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            name        TEXT NOT NULL DEFAULT '',
+            color       TEXT NOT NULL DEFAULT 'Gray',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wlbl_project ON writing_labels(project_id);
+
+        -- 叙事线（标签化，不再限制 main/subplot/dark）
         CREATE TABLE IF NOT EXISTS writing_threads (
             id          TEXT PRIMARY KEY,
             project_id  TEXT NOT NULL,
             type        TEXT NOT NULL DEFAULT 'dark',
+            tags        TEXT NOT NULL DEFAULT '[]',
             name        TEXT NOT NULL DEFAULT '',
             description TEXT NOT NULL DEFAULT '{}',
             color       TEXT NOT NULL DEFAULT '#6b7280',
@@ -152,15 +168,17 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_wt_project ON writing_threads(project_id);
 
-        -- 叙事线节点
+        -- 叙事线节点（advance/surface/resolve/background，crossing 改为自动检测）
         CREATE TABLE IF NOT EXISTS writing_thread_nodes (
             id          TEXT PRIMARY KEY,
             thread_id   TEXT NOT NULL,
-            type        TEXT NOT NULL DEFAULT 'event',
+            type        TEXT NOT NULL DEFAULT 'advance',
             scene_id    TEXT DEFAULT NULL,
             title       TEXT NOT NULL DEFAULT '',
             note        TEXT NOT NULL DEFAULT '',
             story_time  TEXT DEFAULT '',
+            goal        INTEGER NOT NULL DEFAULT 0,
+            satisfaction TEXT DEFAULT NULL,
             sort_order  INTEGER NOT NULL DEFAULT 0,
             metadata    TEXT NOT NULL DEFAULT '{}',
             created_at  REAL NOT NULL,
@@ -173,6 +191,55 @@ def _init_tables(conn: sqlite3.Connection):
 
     # 删旧表（测试数据，无需迁移）
     conn.execute("DROP TABLE IF EXISTS writing_settings")
+
+    # 迁移旧节点类型 → 新类型（event→advance, emergence→surface, seed→surface, crossing→advance）
+    _migrate_node_types(conn)
+
+
+# 旧→新节点类型映射（幂等，已迁移的不会重复执行）
+_NODE_TYPE_MIGRATION = {
+    "event": "advance",
+    "emergence": "surface",
+    "seed": "surface",
+    "crossing": "advance",
+    # resolution→resolve
+    "resolution": "resolve",
+}
+
+
+def _migrate_node_types(conn: sqlite3.Connection):
+    for old_type, new_type in _NODE_TYPE_MIGRATION.items():
+        conn.execute(
+            "UPDATE writing_thread_nodes SET type = ? WHERE type = ?",
+            (new_type, old_type),
+        )
+    # 迁移旧列：添加 goal/satisfaction 列（如果不存在）
+    _ensure_columns(conn, "writing_thread_nodes", {
+        "goal": "INTEGER NOT NULL DEFAULT 0",
+        "satisfaction": "TEXT DEFAULT NULL",
+    })
+    # 迁移 writing_threads：添加 tags 列（如果不存在）
+    _ensure_columns(conn, "writing_threads", {
+        "tags": "TEXT NOT NULL DEFAULT '[]'",
+    })
+    # 迁移 writing_scenes：添加 codex_ids 列（如果不存在）
+    _ensure_columns(conn, "writing_scenes", {
+        "codex_ids": "TEXT NOT NULL DEFAULT '[]'",
+        "label_ids": "TEXT NOT NULL DEFAULT '[]'",
+    })
+    # 迁移 codex：添加 category 列（如果不存在）
+    _ensure_columns(conn, "codex", {
+        "category": "TEXT DEFAULT NULL",
+    })
+    conn.commit()
+
+
+def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]):
+    for col, definition in columns.items():
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {definition}")
+        except Exception:
+            pass  # 列已存在，忽略
 
 
 # ── 作品管理 ──
@@ -212,6 +279,8 @@ def update_project(project_id: str, **kwargs) -> dict | None:
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_project(project_id)
+        if "metadata" in updates and not isinstance(updates["metadata"], str):
+            updates["metadata"] = json.dumps(updates["metadata"], ensure_ascii=False)
         updates["updated_at"] = time.time()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [project_id]
@@ -468,12 +537,16 @@ def get_scene(scene_id: str) -> dict | None:
 def update_scene(scene_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"content", "summary", "subtitle", "chapter_id"}
+        allowed = {"content", "summary", "subtitle", "chapter_id", "codex_ids", "label_ids"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_scene(scene_id)
         if "content" in updates and isinstance(updates["content"], dict):
             updates["content"] = json.dumps(updates["content"], ensure_ascii=False)
+        if "codex_ids" in updates and isinstance(updates["codex_ids"], list):
+            updates["codex_ids"] = json.dumps(updates["codex_ids"], ensure_ascii=False)
+        if "label_ids" in updates and isinstance(updates["label_ids"], list):
+            updates["label_ids"] = json.dumps(updates["label_ids"], ensure_ascii=False)
         updates["updated_at"] = time.time()
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [scene_id]
@@ -522,7 +595,8 @@ def reorder_scenes(chapter_id: str, ordered_ids: list[str]):
 
 def create_codex(project_id: str, name: str, type: str = "custom",
                  parent_id: str | None = None, description: dict | None = None,
-                 aliases: list | None = None, tags: list | None = None) -> dict:
+                 aliases: list | None = None, tags: list | None = None,
+                 category: str | None = None) -> dict:
     with write_lock:
         conn = get_conn()
         sid = f"cdx-{uuid.uuid4().hex[:12]}"
@@ -532,12 +606,13 @@ def create_codex(project_id: str, name: str, type: str = "custom",
             (project_id, parent_id),
         ).fetchone()[0]
         conn.execute(
-            """INSERT INTO codex (id, project_id, parent_id, name, type, description, aliases, tags, sort_order, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO codex (id, project_id, parent_id, name, type, description, aliases, tags, category, sort_order, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (sid, project_id, parent_id, name, type,
              json.dumps(description or {}, ensure_ascii=False),
              json.dumps(aliases or [], ensure_ascii=False),
              json.dumps(tags or [], ensure_ascii=False),
+             category,
              max_order, now, now),
         )
         conn.commit()
@@ -568,8 +643,8 @@ def get_codex(codex_id: str) -> dict | None:
 def update_codex(codex_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"name", "type", "description", "aliases", "tags", "custom_fields",
-                   "relations", "graph_entity_id", "enabled", "parent_id"}
+        allowed = {"name", "type", "description", "aliases", "tags", "category",
+                   "custom_fields", "relations", "graph_entity_id", "enabled", "parent_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_codex(codex_id)
@@ -614,11 +689,68 @@ def reorder_codex(ordered_ids: list[str]):
             raise
 
 
+# ── 标签 (Labels) ──
+
+def create_label(project_id: str, name: str = "", color: str = "Gray") -> dict:
+    with write_lock:
+        conn = get_conn()
+        lid = f"lbl-{uuid.uuid4().hex[:12]}"
+        now = time.time()
+        max_order = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_labels WHERE project_id = ?",
+            (project_id,)
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO writing_labels (id, project_id, name, color, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (lid, project_id, name, color, max_order, now, now),
+        )
+        conn.commit()
+    return {"id": lid, "project_id": project_id, "name": name, "color": color, "sort_order": max_order}
+
+
+def list_labels(project_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM writing_labels WHERE project_id = ? ORDER BY sort_order", (project_id,)).fetchall()
+    return [_row_to_dict(r) for r in rows]
+
+
+def update_label(label_id: str, **fields) -> dict | None:
+    with write_lock:
+        conn = get_conn()
+        allowed = {"name", "color", "sort_order"}
+        updates = {k: v for k, v in fields.items() if k in allowed}
+        if not updates:
+            row = conn.execute("SELECT * FROM writing_labels WHERE id = ?", (label_id,)).fetchone()
+            return dict(row) if row else None
+        updates["updated_at"] = time.time()
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        conn.execute(f"UPDATE writing_labels SET {set_clause} WHERE id = ?", list(updates.values()) + [label_id])
+        conn.commit()
+    row = conn.execute("SELECT * FROM writing_labels WHERE id = ?", (label_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_label(label_id: str) -> bool:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM writing_labels WHERE id = ?", (label_id,))
+        conn.commit()
+    return True
+
+
+def reorder_labels(project_id: str, ordered_ids: list[str]):
+    with write_lock:
+        conn = get_conn()
+        for i, lid in enumerate(ordered_ids):
+            conn.execute("UPDATE writing_labels SET sort_order = ? WHERE id = ? AND project_id = ?", (i, lid, project_id))
+        conn.commit()
+
+
 # ── 叙事线 (Threads) ──
 
 def create_thread(project_id: str, type: str = "dark", name: str = "",
                   color: str = "#6b7280", description: dict | None = None,
-                  linked_codex_ids: list | None = None) -> dict:
+                  linked_codex_ids: list | None = None, tags: list | None = None) -> dict:
     with write_lock:
         conn = get_conn()
         tid = f"thrd-{uuid.uuid4().hex[:10]}"
@@ -627,11 +759,15 @@ def create_thread(project_id: str, type: str = "dark", name: str = "",
             "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_threads WHERE project_id = ?",
             (project_id,),
         ).fetchone()[0]
+        # Auto-derive tags from type if not provided
+        thread_tags = tags if tags is not None else [type]
         conn.execute(
             """INSERT INTO writing_threads
-               (id, project_id, type, name, description, color, status, sort_order, linked_codex_ids, metadata, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, '{}', ?, ?)""",
-            (tid, project_id, type, name,
+               (id, project_id, type, tags, name, description, color, status, sort_order, linked_codex_ids, metadata, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, '{}', ?, ?)""",
+            (tid, project_id, type,
+             json.dumps(thread_tags, ensure_ascii=False),
+             name,
              json.dumps(description or {}, ensure_ascii=False),
              color, max_order,
              json.dumps(linked_codex_ids or [], ensure_ascii=False),
@@ -659,11 +795,11 @@ def get_thread(thread_id: str) -> dict | None:
 def update_thread(thread_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"type", "name", "description", "color", "status", "linked_codex_ids", "metadata"}
+        allowed = {"type", "tags", "name", "description", "color", "status", "linked_codex_ids", "metadata"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_thread(thread_id)
-        for json_field in ("description", "linked_codex_ids", "metadata"):
+        for json_field in ("description", "linked_codex_ids", "metadata", "tags"):
             if json_field in updates and not isinstance(updates[json_field], str):
                 updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
         updates["updated_at"] = time.time()
@@ -715,9 +851,10 @@ def reorder_threads(project_id: str, ordered_ids: list[str]):
 
 # ── 叙事线节点 (Thread Nodes) ──
 
-def create_thread_node(thread_id: str, type: str = "event", title: str = "",
+def create_thread_node(thread_id: str, type: str = "advance", title: str = "",
                        note: str = "", scene_id: str | None = None,
-                       story_time: str = "") -> dict:
+                       story_time: str = "", goal: bool = False,
+                       satisfaction: dict | None = None) -> dict:
     with write_lock:
         conn = get_conn()
         nid = f"tn-{uuid.uuid4().hex[:11]}"
@@ -726,11 +863,14 @@ def create_thread_node(thread_id: str, type: str = "event", title: str = "",
             "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_thread_nodes WHERE thread_id = ?",
             (thread_id,),
         ).fetchone()[0]
+        sat_json = json.dumps(satisfaction, ensure_ascii=False) if satisfaction else None
         conn.execute(
             """INSERT INTO writing_thread_nodes
-               (id, thread_id, type, scene_id, title, note, story_time, sort_order, metadata, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)""",
-            (nid, thread_id, type, scene_id, title, note, story_time, max_order, now, now),
+               (id, thread_id, type, scene_id, title, note, story_time, goal, satisfaction, sort_order, metadata, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)""",
+            (nid, thread_id, type, scene_id, title, note, story_time,
+             1 if goal else 0, sat_json,
+             max_order, now, now),
         )
         conn.commit()
         return _row_to_dict(conn.execute("SELECT * FROM writing_thread_nodes WHERE id = ?", (nid,)).fetchone())
@@ -754,11 +894,13 @@ def get_thread_node(node_id: str) -> dict | None:
 def update_thread_node(node_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"type", "title", "note", "scene_id", "story_time", "metadata"}
+        allowed = {"type", "title", "note", "scene_id", "story_time", "metadata", "goal", "satisfaction"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_thread_node(node_id)
-        for json_field in ("metadata",):
+        for json_field in ("metadata", "satisfaction"):
+            if json_field in updates and not isinstance(updates[json_field], str):
+                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
             if json_field in updates and not isinstance(updates[json_field], str):
                 updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
         updates["updated_at"] = time.time()

@@ -1,0 +1,16 @@
+---
+name: "Chat Default Context"
+type: prompt_component
+category: components
+---
+
+{# Aggregator component: pulls in series, personas, instructions, codex, and additional context for chat #}
+{% include "components/series_context.md.j2" %}
+
+{% include "components/personas.md.j2" %}
+
+{% include "components/additional_instructions.md.j2" %}
+
+{% include "components/codex.md.j2" %}
+
+{% include "components/additional_context.md.j2" %}

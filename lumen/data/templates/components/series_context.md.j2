@@ -1,0 +1,17 @@
+---
+name: "Series Context"
+type: prompt_component
+category: components
+---
+
+{# The following tells the AI about the series the author is currently working on #}
+{% if series_title is defined and series_title %}
+The author is currently working on a series called "{{ series_title }}".
+
+{% if series_description is defined and series_description %}
+Here is the description of the series:
+<seriesDescription>
+{{ series_description }}
+</seriesDescription>
+{% endif %}
+{% endif %}
