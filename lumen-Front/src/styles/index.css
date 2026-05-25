@@ -11,91 +11,69 @@
  * 使用 @theme 指令定义自定义设计令牌
  */
 @theme {
-  /* === 静态色阶（不随主题变化）=== */
-  --color-slate-50: #FAFAF8;
-  --color-slate-100: #F3F3F0;
-  --color-slate-200: #EBEAE6;
-  --color-slate-300: #D4D3CF;
-  --color-slate-400: #B5AFA5;
-  --color-slate-500: #948E84;
-  --color-slate-600: #757068;
-  --color-slate-700: #4C4A47;
-  --color-slate-800: #363432;
-  --color-slate-900: #262422;
-  --color-slate-950: #1C1B19;
+  /* === 静态色阶 === */
+  /* Zinc — NC 主灰阶（冷灰） */
+  --color-zinc-50: #fafafa;
+  --color-zinc-100: #f4f4f5;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-500: #71717a;
+  --color-zinc-600: #52525b;
+  --color-zinc-700: #3f3f46;
+  --color-zinc-800: #27272a;
+  --color-zinc-900: #18181b;
+  --color-zinc-950: #09090b;
 
-  --color-amber-50: #FEF6F2;
-  --color-amber-100: #FDE8DF;
-  --color-amber-200: #F5CFC0;
-  --color-amber-300: #E8A48C;
+  /* Stone — NC 暖文字灰 */
+  --color-stone-300: #d6d3d1;
+  --color-stone-400: #a8a29e;
+  --color-stone-500: #78716c;
+
+  /* Slate — NC 气泡蓝灰 */
+  --color-slate-800: #1e293b;
+
+  /* Amber — Lumen 品牌暖橙（保留） */
   --color-amber-400: #CC7C5E;
   --color-amber-500: #B86A4A;
-  --color-amber-600: #A05838;
-  --color-amber-700: #86462C;
-  --color-amber-800: #6E3824;
-  --color-amber-900: #5C2F20;
   --color-amber-950: #331610;
 
-  /* === 语义色（引用 CSS 变量，随主题切换）=== */
-  --color-primary: var(--color-primary);
-  --color-primary-dim: var(--color-primary-dim);
-  --color-primary-deep: var(--color-primary-deep);
-  --color-primary-subtle: var(--color-primary-subtle);
-  --color-primary-foreground: var(--color-primary-foreground);
-  --color-success: var(--color-success);
-  --color-success-light: var(--color-success-light);
-  --color-error: var(--color-error);
-  --color-error-light: var(--color-error-light);
-  --color-warning: var(--color-warning);
-  --color-surface-deep: var(--color-surface-deep);
-  --color-surface-base: var(--color-surface-base);
-  --color-surface: var(--color-surface);
-  --color-surface-elevated: var(--color-surface-elevated);
-  --color-surface-rail: var(--color-surface-rail);
-  --color-surface-panel: var(--color-surface-panel);
-  --color-surface-canvas: var(--color-surface-canvas);
-  --color-text-primary: var(--color-text-primary);
-  --color-text-secondary: var(--color-text-secondary);
-  --color-text-muted: var(--color-text-muted);
-  --color-text-dim: var(--color-text-dim);
-  --color-border-default: var(--color-border);
-  --color-border-subtle: var(--color-border-subtle);
+  /* === 语义色（真实值，不再自引用）=== */
+  --color-primary: var(--color-amber-400);
+  --color-primary-dim: var(--color-amber-500);
+  --color-primary-deep: var(--color-amber-950);
 
-  /* === 交互 === */
-  --color-surface-tint: var(--color-surface-tint);
-  --color-hover-surface: var(--color-hover-surface);
-  --color-interactive-hover: var(--color-interactive-hover);
-  --color-ghost-text: var(--color-ghost-text);
-  --color-selection-bg: var(--color-selection-bg);
+  /* 表面层级：越深越底层 */
+  --color-surface-canvas: #09090b;        /* body 底色 — NC zinc-950 */
+  --color-surface-deep: #18181b;          /* 内容区 — NC zinc-900 */
+  --color-surface-base: #18181b;          /* 基础面 — 同 deep */
+  --color-surface-elevated: #27272a;      /* 浮起面 — AI 气泡、卡片 — NC zinc-800 */
+  --color-surface-rail: #18181b;          /* 侧轨 — NC zinc-900 */
+  --color-surface-panel: #27272a;         /* 面板 — NC zinc-800 */
 
-  /* === 间距 === */
-  --spacing-tight: var(--spacing-tight);
-  --spacing-normal: var(--spacing-normal);
-  --spacing-relaxed: var(--spacing-relaxed);
-  --spacing-spacious: var(--spacing-spacious);
+  /* 文字层级 */
+  --color-text-primary: #d6d3d1;          /* 正文 — NC stone-300 */
+  --color-text-secondary: #a8a29e;        /* 次要 — NC stone-400 */
+  --color-text-muted: #a8a29e;           /* 静音 — NC stone-400 */
+  --color-text-dim: #78716c;             /* 暗淡 — NC stone-500 */
 
-  /* === 阴影 === */
-  --shadow-subtle: var(--shadow-subtle);
-  --shadow-card: var(--shadow-card);
-  --shadow-modal: var(--shadow-modal);
-  --shadow-deep: var(--shadow-deep);
+  /* 边框 */
+  --color-border-default: #3f3f46;        /* 默认边框 — NC zinc-700 */
+  --color-border-subtle: #27272a;         /* 细微边框 — NC zinc-800 */
+  --color-border: var(--color-border-default);
+
+  /* 交互 */
+  --color-surface-tint: #1e293b;         /* 强调面 — NC 用户气泡 slate-800 */
+  --color-hover-surface: rgba(255, 255, 255, 0.05);
+  --color-interactive-hover: rgba(255, 255, 255, 0.08);
+  --color-ghost-text: rgba(214, 211, 209, 0.3);
+  --color-selection-bg: rgba(204, 124, 94, 0.2);
 
   /* === 圆角 === */
   --radius-sm: 3px;
   --radius-md: 5px;
   --radius-lg: 7px;
   --radius-full: 9999px;
-
-  /* === 动画时长 === */
-  --duration-instant: var(--duration-instant);
-  --duration-fast: var(--duration-fast);
-  --duration-normal: var(--duration-normal);
-  --duration-slow: var(--duration-slow);
-
-  /* === 缓动函数 === */
-  --ease-default: var(--ease-default);
-  --ease-spring: var(--ease-spring);
-  --ease-decelerate: var(--ease-decelerate);
 
   /* === 字体 === */
   --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
