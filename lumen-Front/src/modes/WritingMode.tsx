@@ -7,8 +7,9 @@ import { CodexDetailPanel } from "./writing/CodexDetailPanel";
 import { PromptManagerView } from "./writing/prompt-manager/PromptManagerView";
 import { ProjectSettingsPanel } from "./writing/ProjectSettingsPanel";
 import { useWritingStore } from "../stores/useWritingStore";
+import type { ManuscriptAct } from "../api/writing";
 import { cn } from "../lib/utils";
-import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, Search, LayoutGrid, GitBranch } from "lucide-react";
+import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, FolderTree, ListTree, Table2, Search, LayoutGrid, GitBranch } from "lucide-react";
 import { Toggle } from "../components/ui/toggle";
 import { Separator } from "../components/ui/separator";
 import {
@@ -16,8 +17,9 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuGroup,
-  DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "../components/ui/dropdown-menu";
 import * as writingApi from "../api/writing";
 
@@ -37,14 +39,14 @@ const PLAN_VIEWS = [
 
 function filterLabel(
   filter: { type: "act"; id: string } | { type: "chapter"; id: string },
-  acts: any[],
+  acts: ManuscriptAct[],
 ): string {
   if (filter.type === "act") {
     const act = acts.find((a) => a.id === filter.id);
     return act ? (act.title || `Act ${(act.sort_order ?? 0) + 1}`) : "整卷";
   }
   for (const act of acts) {
-    const ch = (act.chapters || []).find((c: any) => c.id === filter.id);
+    const ch = act.chapters.find((c) => c.id === filter.id);
     if (ch) return ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`;
   }
   return "章节";
@@ -204,27 +206,30 @@ export default function WritingMode() {
                     全部手稿
                   </DropdownMenuItem>
                   {acts.map((act) => {
-                    const chapters = (act as any).chapters || [];
                     const actNum = (act.sort_order ?? 0) + 1;
+                    const actLabel = act.title || `Act ${actNum}`;
                     return (
-                      <DropdownMenuGroup key={act.id}>
-                        <DropdownMenuLabel>
-                          {act.title || `Act ${actNum}`}
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setManuscriptFilter({ type: "act", id: act.id })}>
-                          <FileText className="w-4 h-4" />
-                          整卷
-                        </DropdownMenuItem>
-                        {chapters.map((ch: any) => (
-                          <DropdownMenuItem
-                            key={ch.id}
-                            onClick={() => setManuscriptFilter({ type: "chapter", id: ch.id })}
-                          >
-                            <FileText className="w-4 h-4" />
-                            {ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`}
+                      <DropdownMenuSub key={act.id}>
+                        <DropdownMenuSubTrigger>
+                          <FolderTree className="w-4 h-4" />
+                          {actLabel}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem onClick={() => setManuscriptFilter({ type: "act", id: act.id })}>
+                            <BookOpen className="w-4 h-4" />
+                            整卷
                           </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuGroup>
+                          {act.chapters.map((ch) => (
+                            <DropdownMenuItem
+                              key={ch.id}
+                              onClick={() => setManuscriptFilter({ type: "chapter", id: ch.id })}
+                            >
+                              <FileText className="w-4 h-4" />
+                              {ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
                     );
                   })}
                 </DropdownMenuContent>
