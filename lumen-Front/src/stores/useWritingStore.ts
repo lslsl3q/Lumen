@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode } from "../api/writing";
+import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -8,7 +8,7 @@ interface WritingState {
   // Data
   projects: WritingProject[];
   activeProjectId: string | null;
-  acts: WritingAct[];
+  acts: ManuscriptAct[];
   activeSceneId: string | null;
   codexEntries: CodexEntry[];
   activeCodexEntryId: string | null;
@@ -74,7 +74,7 @@ interface WritingState {
 
   // Scenes
   createScene: (chapterId: string) => Promise<WritingScene>;
-  updateSceneContent: (sceneId: string, content: object) => Promise<void>;
+  updateSceneContent: (sceneId: string, content: unknown) => Promise<void>;
   patchScene: (sceneId: string, data: Partial<WritingScene>) => Promise<void>;
   updateSceneAction: (sceneId: string, data: Partial<WritingScene>) => Promise<void>;
   deleteSceneAction: (sceneId: string) => Promise<void>;
@@ -207,7 +207,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   loadManuscript: async (projectId) => {
     try {
       const data = await writingApi.getManuscript(projectId);
-      set({ acts: data.acts as WritingAct[] });
+      set({ acts: data.acts });
       await Promise.all([
         get().loadSnippets(projectId),
         get().loadLabels(projectId),
@@ -271,17 +271,17 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({
       acts: s.acts.map((act) => ({
         ...act,
-        chapters: ((act as any).chapters || []).map((ch: any) => ({
+        chapters: act.chapters.map((ch) => ({
           ...ch,
-          scenes: (ch.scenes || []).map((sc: any) =>
-            sc.id === sceneId ? { ...sc, content } : sc,
+          scenes: ch.scenes.map((sc) =>
+            sc.id === sceneId ? { ...sc, content: content as WritingScene["content"] } : sc,
           ),
         })),
       })),
       saveStatus: "saving",
     }));
     try {
-      await writingApi.updateScene(sceneId, { content: content as any });
+      await writingApi.updateScene(sceneId, { content: content as WritingScene["content"] });
       set({ saveStatus: "saved", lastSavedAt: Date.now(), contentDirty: false });
     } catch {
       set({ saveStatus: "error" });
@@ -293,9 +293,9 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({
       acts: s.acts.map((act) => ({
         ...act,
-        chapters: ((act as any).chapters || []).map((ch: any) => ({
+        chapters: act.chapters.map((ch) => ({
           ...ch,
-          scenes: (ch.scenes || []).map((sc: any) =>
+          scenes: ch.scenes.map((sc) =>
             sc.id === sceneId ? { ...sc, ...data } : sc,
           ),
         })),
@@ -321,7 +321,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     // Optimistic: reorder acts locally
     const acts = get().acts;
     const idToAct = new Map(acts.map((a) => [a.id, a]));
-    const reordered = orderedIds.map((id) => idToAct.get(id)).filter(Boolean) as WritingAct[];
+    const reordered = orderedIds.map((id) => idToAct.get(id)).filter(Boolean) as ManuscriptAct[];
     set({ acts: reordered });
     // Persist in background
     writingApi.reorderActs(projectId, orderedIds).catch(() => {
@@ -335,8 +335,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({
       acts: s.acts.map((act) => {
         if (act.id !== actId) return act;
-        const chMap = new Map((act as any).chapters?.map((ch: any) => [ch.id, ch]) ?? []);
-        return { ...act, chapters: orderedIds.map((id) => chMap.get(id)).filter(Boolean) };
+        const chMap = new Map(act.chapters.map((ch) => [ch.id, ch]));
+        return { ...act, chapters: orderedIds.map((id) => chMap.get(id)).filter((c): c is ManuscriptChapter => !!c) };
       }),
     }));
     // Persist in background
@@ -351,10 +351,10 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({
       acts: s.acts.map((act) => ({
         ...act,
-        chapters: ((act as any).chapters || []).map((ch: any) => {
+        chapters: act.chapters.map((ch) => {
           if (ch.id !== chapterId) return ch;
-          const scMap = new Map((ch.scenes || []).map((sc: any) => [sc.id, sc]));
-          return { ...ch, scenes: orderedIds.map((id) => scMap.get(id)).filter(Boolean) };
+          const scMap = new Map(ch.scenes.map((sc) => [sc.id, sc]));
+          return { ...ch, scenes: orderedIds.map((id) => scMap.get(id)).filter((s): s is WritingScene => !!s) };
         }),
       })),
     }));

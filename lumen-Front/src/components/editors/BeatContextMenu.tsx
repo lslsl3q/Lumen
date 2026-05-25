@@ -85,7 +85,7 @@ export function BeatContextMenu({
     const result: (WritingChapter & { actTitle: string; actId: string })[] = [];
     for (const act of acts) {
       const actTitle = act.title || `Act ${(act.sort_order ?? 0) + 1}`;
-      for (const ch of (act.chapters || []) as WritingChapter[]) {
+      for (const ch of act.chapters) {
         result.push({ ...ch, actTitle, actId: act.id });
       }
     }
@@ -95,9 +95,9 @@ export function BeatContextMenu({
   const allScenes = useMemo(() => {
     const result: (WritingScene & { chapterTitle: string; chapterId: string })[] = [];
     for (const act of acts) {
-      for (const ch of (act.chapters || []) as WritingChapter[]) {
+      for (const ch of act.chapters) {
         const chTitle = ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`;
-        for (const sc of (ch.scenes || []) as WritingScene[]) {
+        for (const sc of ch.scenes) {
           result.push({ ...sc, chapterTitle: chTitle, chapterId: ch.id });
         }
       }
@@ -172,7 +172,7 @@ export function BeatContextMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuTrigger>{children}</DropdownMenuTrigger>
 
       <DropdownMenuContent className={`min-w-[224px] p-0 ${menuContentCls}`} style={{ borderRadius: '8px' }}>
         {/* ── Group 1: Toggles ── */}
@@ -229,7 +229,7 @@ export function BeatContextMenu({
                         {act.title || `Act ${(act.sort_order ?? 0) + 1}`}
                       </DropdownMenuLabel>
                     )}
-                    {((act.chapters || []) as WritingChapter[]).map(ch => (
+                    {act.chapters.map(ch => (
                       <DropdownMenuCheckboxItem
                         key={ch.id}
                         checked={(selection.chapters || []).includes(ch.id)}
@@ -442,7 +442,7 @@ export function ContextSelectionTags({
     const result: (WritingChapter & { actTitle: string })[] = [];
     for (const act of acts) {
       const actTitle = act.title || `Act ${(act.sort_order ?? 0) + 1}`;
-      for (const ch of (act.chapters || []) as WritingChapter[]) {
+      for (const ch of act.chapters) {
         result.push({ ...ch, actTitle });
       }
     }
@@ -451,9 +451,9 @@ export function ContextSelectionTags({
   const allScenes = useMemo(() => {
     const result: (WritingScene & { chapterTitle: string })[] = [];
     for (const act of acts) {
-      for (const ch of (act.chapters || []) as WritingChapter[]) {
+      for (const ch of act.chapters) {
         const chTitle = ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`;
-        for (const sc of (ch.scenes || []) as WritingScene[]) {
+        for (const sc of ch.scenes) {
           result.push({ ...sc, chapterTitle: chTitle });
         }
       }

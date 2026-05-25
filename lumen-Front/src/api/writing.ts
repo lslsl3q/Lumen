@@ -61,10 +61,14 @@ export interface WritingSnippet {
   updated_at: number;
 }
 
+export type ManuscriptChapter = WritingChapter & { scenes: WritingScene[] };
+
+export type ManuscriptAct = WritingAct & {
+  chapters: ManuscriptChapter[];
+};
+
 export interface ManuscriptTree {
-  acts: Array<WritingAct & {
-    chapters: Array<WritingChapter & { scenes: WritingScene[] }>;
-  }>;
+  acts: ManuscriptAct[];
 }
 
 export interface ManuscriptFlatItem {
