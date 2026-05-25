@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingThread, WritingThreadNode } from "../api/writing";
+import type { WritingProject, WritingAct, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -14,6 +14,7 @@ interface WritingState {
   activeCodexEntryId: string | null;
   snippets: WritingSnippet[];
   activeSnippetId: string | null;
+  labels: WritingLabel[];
   threads: WritingThread[];
   threadNodes: Record<string, WritingThreadNode[]>;
   manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
@@ -24,6 +25,11 @@ interface WritingState {
   setPlanViewMode: (mode: WritingState["planViewMode"]) => void;
   writingViewTab: "plan" | "write" | "chat" | "review";
   setWritingViewTab: (tab: WritingState["writingViewTab"]) => void;
+  showPromptManager: boolean;
+  setShowPromptManager: (show: boolean) => void;
+  showSettingsPanel: boolean;
+  settingsPanelTab: "metadata" | "writing" | "export";
+  setShowSettingsPanel: (show: boolean, tab?: "metadata" | "writing" | "export") => void;
 
   // UI
   aiMode: AiMode;
@@ -69,6 +75,7 @@ interface WritingState {
   // Scenes
   createScene: (chapterId: string) => Promise<WritingScene>;
   updateSceneContent: (sceneId: string, content: object) => Promise<void>;
+  patchScene: (sceneId: string, data: Partial<WritingScene>) => Promise<void>;
   updateSceneAction: (sceneId: string, data: Partial<WritingScene>) => Promise<void>;
   deleteSceneAction: (sceneId: string) => Promise<void>;
   setActiveScene: (sceneId: string | null) => void;
@@ -96,6 +103,13 @@ interface WritingState {
   updateSnippetAction: (id: string, data: Partial<Pick<WritingSnippet, "name" | "content" | "pinned">>) => Promise<void>;
   deleteSnippetAction: (id: string) => Promise<void>;
   setActiveSnippet: (id: string | null) => void;
+
+  // Labels
+  loadLabels: (projectId: string) => Promise<void>;
+  createLabelAction: (name?: string, color?: string) => Promise<WritingLabel>;
+  updateLabelAction: (id: string, data: Partial<Pick<WritingLabel, "name" | "color">>) => Promise<void>;
+  deleteLabelAction: (id: string) => Promise<void>;
+  reorderLabelsAction: (projectId: string, orderedIds: string[]) => Promise<void>;
 
   // UI
   setAiMode: (mode: AiMode) => void;
@@ -134,11 +148,15 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   snapshots: [],
   snippets: [],
   activeSnippetId: null,
+  labels: [],
   manuscriptFilter: { type: "all" },
   threads: [],
   threadNodes: {},
   planViewMode: "outline",
   writingViewTab: "write",
+  showPromptManager: false,
+  showSettingsPanel: false,
+  settingsPanelTab: "metadata",
   ghostTextContent: "",
   ghostRequestId: null,
 
@@ -190,9 +208,12 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     try {
       const data = await writingApi.getManuscript(projectId);
       set({ acts: data.acts as WritingAct[] });
-      await get().loadSnippets(projectId);
+      await Promise.all([
+        get().loadSnippets(projectId),
+        get().loadLabels(projectId),
+      ]);
     } catch {
-      set({ acts: [], snippets: [] });
+      set({ acts: [], snippets: [], labels: [] });
     }
   },
 
@@ -265,6 +286,22 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     } catch {
       set({ saveStatus: "error" });
     }
+  },
+
+  patchScene: async (sceneId, data) => {
+    // 乐观更新 acts 中的场景字段（summary 等），不触发全量 reload
+    set((s) => ({
+      acts: s.acts.map((act) => ({
+        ...act,
+        chapters: ((act as any).chapters || []).map((ch: any) => ({
+          ...ch,
+          scenes: (ch.scenes || []).map((sc: any) =>
+            sc.id === sceneId ? { ...sc, ...data } : sc,
+          ),
+        })),
+      })),
+    }));
+    await writingApi.updateScene(sceneId, data);
   },
 
   updateSceneAction: async (sceneId, data) => {
@@ -387,6 +424,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   setManuscriptFilter: (filter) => set({ manuscriptFilter: filter }),
   setPlanViewMode: (mode) => set({ planViewMode: mode }),
   setWritingViewTab: (tab) => set({ writingViewTab: tab }),
+  setShowPromptManager: (show) => set({ showPromptManager: show }),
+  setShowSettingsPanel: (show, tab) => set({ showSettingsPanel: show, ...(tab ? { settingsPanelTab: tab } : {}) }),
 
   loadSnippets: async (projectId) => {
     const snippets = await writingApi.listSnippets(projectId);
@@ -415,6 +454,40 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveSnippet: (id) => set({ activeSnippetId: id }),
+
+  // ── Labels ──
+
+  loadLabels: async (projectId) => {
+    const labels = await writingApi.listLabels(projectId);
+    set({ labels });
+  },
+
+  createLabelAction: async (name = "", color = "Gray") => {
+    const pid = get().activeProjectId;
+    if (!pid) throw new Error("No active project");
+    const label = await writingApi.createLabel(pid, name, color);
+    set((s) => ({ labels: [...s.labels, label] }));
+    return label;
+  },
+
+  updateLabelAction: async (id, data) => {
+    const updated = await writingApi.updateLabel(id, data);
+    set((s) => ({ labels: s.labels.map((l) => (l.id === id ? { ...l, ...updated } : l)) }));
+  },
+
+  deleteLabelAction: async (id) => {
+    await writingApi.deleteLabel(id);
+    set((s) => ({ labels: s.labels.filter((l) => l.id !== id) }));
+  },
+
+  reorderLabelsAction: async (projectId, orderedIds) => {
+    const idToLabel = new Map(get().labels.map((l) => [l.id, l]));
+    const reordered = orderedIds.map((id) => idToLabel.get(id)).filter(Boolean) as WritingLabel[];
+    set({ labels: reordered });
+    writingApi.reorderLabels(projectId, orderedIds).catch(() => {
+      set({ labels: get().labels });
+    });
+  },
 
   setActiveCodexEntry: (id) => set({ activeCodexEntryId: id }),
 
@@ -459,7 +532,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     set((s) => ({ threadNodes: { ...s.threadNodes, [threadId]: nodes } }));
   },
 
-  createThreadNodeAction: async (threadId, type = "event", title = "", sceneId = null) => {
+  createThreadNodeAction: async (threadId, type = "advance", title = "", sceneId = null) => {
     const node = await writingApi.createThreadNode(threadId, type, title, "", sceneId);
     set((s) => ({
       threadNodes: {

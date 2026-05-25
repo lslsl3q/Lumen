@@ -32,6 +32,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { useWritingStore } from "../../stores/useWritingStore";
 import type { WritingScene } from "../../api/writing";
+import { SceneEditor } from "./SceneEditor";
 import {
   type DragData,
   type SceneDragData,
@@ -45,25 +46,9 @@ import {
   filterActs,
 } from "./usePlanDrag";
 
-function autoResize(el: HTMLTextAreaElement) {
-  el.style.height = "auto";
-  el.style.height = el.scrollHeight + "px";
-}
-
 // ── Draggable Scene Card ──
 
-function KanbanSceneCard({ scene }: { scene: WritingScene }) {
-  const threadNodes = useWritingStore((s) => {
-    const all: { color: string; name: string }[] = [];
-    for (const t of s.threads) {
-      const nodes = s.threadNodes[t.id] || [];
-      if (nodes.some((n) => n.scene_id === scene.id)) {
-        all.push({ color: t.color, name: t.name });
-      }
-    }
-    return all;
-  });
-
+export function KanbanSceneCard({ scene }: { scene: WritingScene }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: scene.id,
     data: {
@@ -73,21 +58,9 @@ function KanbanSceneCard({ scene }: { scene: WritingScene }) {
     } satisfies SceneDragData,
   });
 
-  const [summary, setSummary] = useState(scene.summary || "");
-
-  const handleBlur = useCallback(() => {
-    if (summary !== (scene.summary || "")) {
-      useWritingStore.getState().updateSceneAction(scene.id, { summary });
-    }
-  }, [summary, scene.id, scene.summary]);
-
   const handleOpen = useCallback(() => {
     useWritingStore.getState().setActiveScene(scene.id);
     useWritingStore.getState().setWritingViewTab("write");
-  }, [scene.id]);
-
-  const handleDelete = useCallback(async () => {
-    await useWritingStore.getState().deleteSceneAction(scene.id);
   }, [scene.id]);
 
   return (
@@ -97,7 +70,8 @@ function KanbanSceneCard({ scene }: { scene: WritingScene }) {
       className="rounded bg-zinc-900 border border-zinc-600/50 shadow-sm flex min-w-0"
     >
       <div className="grow flex flex-col overflow-hidden">
-        <div className="flex items-center gap-1 px-2 py-1 border-b border-zinc-700/50">
+        {/* Header */}
+        <div className="flex items-center gap-1 px-2 py-1 border-b border-zinc-700/50 shrink-0">
           <button
             {...attributes}
             {...listeners}
@@ -118,42 +92,10 @@ function KanbanSceneCard({ scene }: { scene: WritingScene }) {
             >
               <SquarePen size={12} />
             </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="p-0.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors cursor-pointer">
-                <MoreVertical size={12} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
-                <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-                  <Trash2 className="w-3 h-3" />
-                  删除场景
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
-        <textarea
-          className="flex-1 min-h-[40px] text-[12px] leading-[18px] text-zinc-400 resize-none outline-none bg-transparent border-none p-2 placeholder:text-zinc-600"
-          placeholder="场景摘要…"
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          onFocus={(e) => autoResize(e.currentTarget)}
-          onInput={(e) => autoResize(e.currentTarget as HTMLTextAreaElement)}
-          onBlur={handleBlur}
-          onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
-          rows={1}
-        />
-        {threadNodes.length > 0 && (
-          <div className="flex items-center gap-1 px-2 pb-1.5">
-            {threadNodes.map((tn, i) => (
-              <span
-                key={i}
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: tn.color }}
-                title={tn.name}
-              />
-            ))}
-          </div>
-        )}
+        {/* SceneEditor (compact) */}
+        <SceneEditor scene={scene} compact />
       </div>
     </div>
   );

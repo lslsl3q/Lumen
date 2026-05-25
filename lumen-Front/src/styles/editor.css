@@ -947,6 +947,227 @@
   opacity: 1;
 }
 
+/* ── Beat Context Menu (NC-aligned cascading) ── */
+
+.beat-ctx-wrapper {
+  position: relative;
+}
+
+.beat-ctx-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  min-width: 240px;
+  background: #1e1e2e;
+  border: 1px solid #3a3a4a;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+}
+
+.beat-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  background: none;
+  color: #c0c0d0;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: left;
+  transition: background 75ms;
+}
+
+.beat-ctx-item:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e0e0f0;
+}
+
+.beat-ctx-item.active {
+  color: #e0e0f0;
+}
+
+.beat-ctx-item.disabled {
+  color: #555;
+  cursor: default;
+  pointer-events: none;
+}
+
+.beat-ctx-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font-size: 10px;
+  flex-shrink: 0;
+  color: #a0a0ff;
+}
+
+.beat-ctx-item.active .beat-ctx-checkbox {
+  border-color: #8888cc;
+  background: rgba(120, 120, 220, 0.2);
+}
+
+.beat-ctx-item-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.beat-ctx-item-hint-inline {
+  font-size: 10px;
+  color: #666;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.beat-ctx-arrow {
+  color: #666;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Divider line between groups */
+.beat-ctx-divider {
+  height: 1px;
+  background: #2a2a3a;
+  margin: 4px 8px;
+}
+
+/* Group header inside submenu */
+.beat-ctx-group-header {
+  padding: 6px 12px 2px;
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Submenu — rendered via Portal, positioned by inline fixed style */
+.beat-ctx-submenu {
+  min-width: 260px;
+  max-height: 400px;
+  overflow-y: auto;
+  background: #1e1e2e;
+  border: 1px solid #3a3a4a;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+}
+
+.beat-ctx-submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: #b0b0c0;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  text-align: left;
+  transition: background 75ms;
+}
+
+.beat-ctx-submenu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e0e0f0;
+}
+
+.beat-ctx-submenu-item.selected {
+  color: #d0d0ff;
+}
+
+.beat-ctx-submenu-item .beat-ctx-checkbox {
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+}
+
+.beat-ctx-submenu-item.selected .beat-ctx-checkbox {
+  border-color: #8888cc;
+  background: rgba(120, 120, 220, 0.2);
+}
+
+.beat-ctx-item-hint {
+  font-size: 10px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.beat-ctx-clear {
+  color: #888;
+  font-size: 11px;
+}
+
+.beat-ctx-clear:hover {
+  color: #ccc;
+}
+
+/* Context selection tags */
+.beat-ctx-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 12px;
+}
+
+.beat-ctx-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(120, 120, 220, 0.12);
+  border: 1px solid rgba(120, 120, 220, 0.2);
+  color: #b0b0d0;
+  font-size: 11px;
+  max-width: 120px;
+}
+
+.beat-ctx-tag span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.beat-ctx-tag button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  background: none;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  border-radius: 2px;
+}
+
+.beat-ctx-tag button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
 /* Footer — no separator, natural flow */
 .scene-beat-footer {
   display: flex;

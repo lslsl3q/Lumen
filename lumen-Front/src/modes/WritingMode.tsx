@@ -2,7 +2,10 @@ import { Component, useEffect, useState } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
+import { ReviewView } from "./writing/ReviewView";
 import { CodexDetailPanel } from "./writing/CodexDetailPanel";
+import { PromptManagerView } from "./writing/prompt-manager/PromptManagerView";
+import { ProjectSettingsPanel } from "./writing/ProjectSettingsPanel";
 import { useWritingStore } from "../stores/useWritingStore";
 import { cn } from "../lib/utils";
 import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, ListTree, Table2, Search, LayoutGrid, GitBranch } from "lucide-react";
@@ -19,17 +22,17 @@ import {
 import * as writingApi from "../api/writing";
 
 const writingViewTabs = [
-  { key: "plan" as const, icon: LayoutList, label: "Plan", disabled: false },
-  { key: "write" as const, icon: PenLine, label: "Write", disabled: false },
-  { key: "chat" as const, icon: MessageCircle, label: "Chat", disabled: true },
-  { key: "review" as const, icon: FileCheck, label: "Review", disabled: true },
+  { key: "plan" as const, icon: LayoutList, label: "计划", disabled: false },
+  { key: "write" as const, icon: PenLine, label: "写", disabled: false },
+  { key: "chat" as const, icon: MessageCircle, label: "聊天", disabled: true },
+  { key: "review" as const, icon: FileCheck, label: "统计", disabled: false },
 ];
 
 const PLAN_VIEWS = [
-  { key: "grid" as const, label: "Grid", icon: LayoutGrid },
-  { key: "matrix" as const, label: "Matrix", icon: Table2 },
-  { key: "outline" as const, label: "Outline", icon: ListTree },
-  { key: "threads" as const, label: "Threads", icon: GitBranch },
+  { key: "grid" as const, label: "网格", icon: LayoutGrid },
+  { key: "matrix" as const, label: "矩阵", icon: Table2 },
+  { key: "outline" as const, label: "大纲", icon: ListTree },
+  { key: "threads" as const, label: "线索", icon: GitBranch },
 ];
 
 function filterLabel(
@@ -106,6 +109,9 @@ export default function WritingMode() {
   const setWritingViewTab = useWritingStore((s) => s.setWritingViewTab);
   const planViewMode = useWritingStore((s) => s.planViewMode);
   const setPlanViewMode = useWritingStore((s) => s.setPlanViewMode);
+  const showPromptManager = useWritingStore((s) => s.showPromptManager);
+  const setShowPromptManager = useWritingStore((s) => s.setShowPromptManager);
+  const showSettingsPanel = useWritingStore((s) => s.showSettingsPanel);
 
   useEffect(() => {
     if (!activeProjectId) return;
@@ -135,7 +141,7 @@ export default function WritingMode() {
               {writingViewTabs.map(({ key, icon: Icon, label, disabled }) => (
                 <button
                   key={key}
-                  onClick={() => setWritingViewTab(key)}
+                  onClick={() => { setWritingViewTab(key); setShowPromptManager(false); useWritingStore.getState().setShowSettingsPanel(false); }}
                   disabled={disabled}
                   className={cn(
                     "flex items-center gap-1 px-4 py-2 rounded-full text-[12px] font-semibold transition-colors",
@@ -226,29 +232,37 @@ export default function WritingMode() {
             ) : null}
 
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-[11px] text-text-muted tabular-nums">{totalWords} 词</span>
-              <SaveStatusDot status={saveStatus} />
-              <Separator orientation="vertical" className="h-3 mx-0.5" />
-              <Toggle
-                size="sm"
-                pressed={focusMode}
-                onPressedChange={toggleFocusMode}
-                aria-label="专注模式"
-              >
-                <Eye className="w-3.5 h-3.5" />
-              </Toggle>
-              <Toggle
-                size="sm"
-                pressed={typewriterMode}
-                onPressedChange={toggleTypewriterMode}
-                aria-label="打字机模式"
-              >
-                <Type className="w-3.5 h-3.5" />
-              </Toggle>
+              {writingViewTab === "write" && !showPromptManager && !showSettingsPanel && (
+                <>
+                  <span className="text-[11px] text-text-muted tabular-nums">{totalWords} 词</span>
+                  <SaveStatusDot status={saveStatus} />
+                  <Separator orientation="vertical" className="h-3 mx-0.5" />
+                  <Toggle
+                    size="sm"
+                    pressed={focusMode}
+                    onPressedChange={toggleFocusMode}
+                    aria-label="专注模式"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </Toggle>
+                  <Toggle
+                    size="sm"
+                    pressed={typewriterMode}
+                    onPressedChange={toggleTypewriterMode}
+                    aria-label="打字机模式"
+                  >
+                    <Type className="w-3.5 h-3.5" />
+                  </Toggle>
+                </>
+              )}
             </div>
           </div>
 
-          {writingViewTab === "write" ? (
+          {showSettingsPanel ? (
+            <ProjectSettingsPanel />
+          ) : showPromptManager ? (
+            <PromptManagerView />
+          ) : writingViewTab === "write" ? (
             <WritingEditor>
               {isChatPanelOpen && (
                 <div className="w-[380px] flex-shrink-0 border-l border-border-default flex items-center justify-center text-text-muted text-sm">
@@ -256,6 +270,8 @@ export default function WritingMode() {
                 </div>
               )}
             </WritingEditor>
+          ) : writingViewTab === "review" ? (
+            <ReviewView />
           ) : (
             <PlanView searchQuery={planSearch} />
           )}

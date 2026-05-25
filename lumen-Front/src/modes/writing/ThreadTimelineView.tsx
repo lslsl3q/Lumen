@@ -6,13 +6,12 @@ import type { WritingThreadNode, WritingThread } from "../../api/writing";
 
 const NODE_META: Record<
   WritingThreadNode["type"],
-  { label: string; color: string; shape: "circle" | "diamond" | "triangle" | "cross" | "check" }
+  { label: string; color: string; shape: "circle" | "diamond" | "triangle" | "check" | "square" }
 > = {
-  event: { label: "事件", color: "#94a3b8", shape: "circle" },
-  emergence: { label: "浮现", color: "#60a5fa", shape: "triangle" },
-  crossing: { label: "交叉", color: "#fbbf24", shape: "cross" },
-  resolution: { label: "收束", color: "#4ade80", shape: "check" },
-  seed: { label: "伏笔", color: "#c084fc", shape: "diamond" },
+  advance: { label: "推进", color: "#94a3b8", shape: "circle" },
+  surface: { label: "浮现", color: "#60a5fa", shape: "triangle" },
+  resolve: { label: "收束", color: "#4ade80", shape: "check" },
+  background: { label: "背景", color: "#a78bfa", shape: "square" },
 };
 
 // ── Layout constants ──
@@ -158,17 +157,15 @@ function useTimelineData() {
 }
 
 // ── Convergence state machine ──
-// emergence/resolution → converge to main
-// seed → diverge back to own lane
-// crossing → temporary converge (just this node)
-// event → keep current state
+// surface/resolve → converge to main
+// background → diverge back to own lane
+// advance → keep current state
 
 const CONVERGE_ACTION: Record<WritingThreadNode["type"], "converge" | "diverge" | "keep"> = {
-  emergence: "converge",
-  crossing: "converge",
-  resolution: "converge",
-  seed: "diverge",
-  event: "keep",
+  surface: "converge",
+  resolve: "converge",
+  background: "diverge",
+  advance: "keep",
 };
 
 // ── Compute thread waypoints with auto-convergence ──
@@ -211,25 +208,11 @@ function computeThreadWaypoints(
     }
     // "keep" does not change state
 
-    // Crossing: temporarily converge for this node only
-    const isCrossing = pn.node.type === "crossing";
-    const effectiveConverged = converged || isCrossing;
-    const y = effectiveConverged ? convergedY : homeY;
+    const y = converged ? convergedY : homeY;
     const x = getX(pn.colIndex);
 
     waypoints.push({ x, y });
     nodePositions.push({ x, y, pn });
-
-    // If crossing, insert a diverge waypoint right after (to go back)
-    if (isCrossing && !converged) {
-      // Add a waypoint slightly to the right, back at homeY
-      // This creates the "dip in, dip out" visual
-      const nextX = i < sortedNodes.length - 1
-        ? getX(sortedNodes[i + 1].colIndex)
-        : x + COL_MIN_WIDTH * 0.4;
-      const midX = (x + nextX) / 2;
-      waypoints.push({ x: midX, y: homeY });
-    }
   }
 
   return { waypoints, nodePositions };
@@ -271,16 +254,6 @@ function NodeMarker({
           strokeWidth={2}
         />
       );
-    case "cross": {
-      const s = r * 0.75;
-      return (
-        <g>
-          <circle cx={cx} cy={cy} r={r} fill="#09090b" stroke={color} strokeWidth={2} />
-          <line x1={cx - s} y1={cy - s} x2={cx + s} y2={cy + s} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-          <line x1={cx + s} y1={cy - s} x2={cx - s} y2={cy + s} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-        </g>
-      );
-    }
     case "check":
       return (
         <g>
@@ -290,6 +263,17 @@ function NodeMarker({
             fill="none" stroke="#09090b" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
           />
         </g>
+      );
+    case "square":
+      return (
+        <rect
+          x={cx - r * 0.75} y={cy - r * 0.75}
+          width={r * 1.5} height={r * 1.5}
+          rx={2}
+          fill={color}
+          stroke="#09090b"
+          strokeWidth={2}
+        />
       );
     default:
       return <circle cx={cx} cy={cy} r={r} fill={color} stroke="#09090b" strokeWidth={2} />;
@@ -508,12 +492,16 @@ export function ThreadTimelineView({
                     {isHovered && (
                       <circle cx={x} cy={y} r={NODE_R + 6} fill="none" stroke={thread.color} strokeWidth={1.5} strokeOpacity={0.5} />
                     )}
-                    {/* Seed outer ring */}
-                    {pn.node.type === "seed" && (
-                      <circle cx={x} cy={y} r={NODE_R + 3} fill="none" stroke={meta.color} strokeWidth={1} strokeOpacity={0.4} />
+                    {/* Goal node: dashed outer ring */}
+                    {pn.node.goal && (
+                      <circle cx={x} cy={y} r={NODE_R + 3} fill="none" stroke={meta.color} strokeWidth={1.5} strokeDasharray="3 2" strokeOpacity={0.6} />
                     )}
                     {/* Node shape */}
-                    <NodeMarker cx={x} cy={y} type={pn.node.type} color={meta.color} isHovered={isHovered} />
+                    <NodeMarker
+                      cx={x} cy={y} type={pn.node.type}
+                      color={pn.node.goal ? "transparent" : meta.color}
+                      isHovered={isHovered}
+                    />
                     {/* Tooltip */}
                     {isHovered && (
                       <g>

@@ -35,7 +35,7 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface-deep)]">
       <ScrollArea className="flex-1 plan-scroll-area">
-        <div className={planViewMode === "grid" ? "p-4 pl-6" : "p-4 max-w-4xl mx-auto"}>
+        <div className={planViewMode === "grid" ? "p-4 pl-6" : planViewMode === "matrix" ? "p-3" : "p-4 max-w-4xl mx-auto"}>
           {/* outline key = NC Outline (tree view) */}
           {planViewMode === "outline" && <PlanGridView searchQuery={searchQuery} />}
           {/* grid key = NC Grid (kanban cards) */}
@@ -52,17 +52,17 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700/80 transition-colors cursor-pointer"
             >
               <Plus className="w-3 h-3" />
-              Add Act
+              添加卷
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded text-[12px] font-semibold bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700/80 transition-colors cursor-pointer">
                 <MoreHorizontal className="w-3 h-3" />
-                Actions
+                操作
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem>
                   <Upload className="w-3.5 h-3.5" />
-                  Import
+                  导入
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

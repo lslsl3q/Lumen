@@ -14,21 +14,13 @@ import { useWebSocket } from "../../hooks/useWebSocket";
 import type { StreamEvent } from "../../api/chat";
 import { GenerationBar } from "./GenerationBar";
 import { GenerateTextDialog, type GenerateOptions } from "./GenerateTextDialog";
-import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
+import { BeatContextMenu, ContextSelectionTags, type ContextSelection } from "./BeatContextMenu";
 
 const WORD_LIMITS = [200, 400, 600] as const;
 
 const TYPE_LABELS: Record<string, string> = {
   beat: "SCENE BEAT",
   continue: "CONTINUE WRITING",
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  character: "角色",
-  location: "地点",
-  item: "物品",
-  event: "事件",
-  custom: "自定义",
 };
 
 function GripDotsIcon() {
@@ -65,7 +57,13 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
   const activeChapterId = useWritingStore((s) => s.activeChapterId);
   const activeProject = useWritingStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
-  const activeChapter = useWritingStore((s) => s.chapters.find((c) => c.id === s.activeChapterId));
+  const activeChapter = useWritingStore((s) => {
+    for (const act of s.acts) {
+      const ch = (act.chapters || []).find((c: any) => c.id === s.activeChapterId);
+      if (ch) return ch;
+    }
+    return undefined;
+  });
   const setGhostText = useWritingStore((s) => s.setGhostText);
   const clearGhostText = useWritingStore((s) => s.clearGhostText);
 
@@ -80,20 +78,38 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const selectedContextIds = (node.attrs.contextIds as string[]) ?? [];
-  const settings = useWritingStore((s) => s.settings);
-  const selectedContexts = settings.filter((s) => selectedContextIds.includes(s.id));
+  // New structured context selection (NC-aligned)
+  const contextSelection: ContextSelection = (node.attrs.contextSelection as ContextSelection) ?? {};
+  const legacyContextIds = (node.attrs.contextIds as string[]) ?? [];
+  // Migrate: if contextSelection is empty but legacy has IDs, use legacy
+  const effectiveSelection: ContextSelection = useMemo(() => {
+    if (Object.keys(contextSelection).length > 0) return contextSelection;
+    if (legacyContextIds.length > 0) return { codexEntries: legacyContextIds };
+    return {};
+  }, [contextSelection, legacyContextIds]);
 
-  // Group settings by category for the context dropdown
-  const settingsByCategory = useMemo(() => {
-    const groups: Record<string, typeof settings> = {};
-    for (const s of settings) {
-      const cat = s.category || "custom";
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(s);
-    }
-    return groups;
-  }, [settings]);
+  const updateContextSelection = useCallback(
+    (sel: ContextSelection) => {
+      updateAttributes({ contextSelection: sel });
+    },
+    [updateAttributes],
+  );
+
+  const removeContextTag = useCallback(
+    (key: keyof ContextSelection, id?: string) => {
+      const sel = { ...effectiveSelection };
+      if (key === "fullNovelText" || key === "fullOutline") {
+        delete sel[key];
+      } else if (id !== undefined) {
+        const arr = (sel[key] as string[]) || [];
+        const next = arr.filter(x => x !== id);
+        if (next.length > 0) (sel as any)[key] = next;
+        else delete sel[key];
+      }
+      updateAttributes({ contextSelection: sel });
+    },
+    [effectiveSelection, updateAttributes],
+  );
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [genBarRect, setGenBarRect] = useState<{ left: number; top: number } | null>(null);
@@ -248,23 +264,6 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     [updateAttributes]
   );
 
-  const toggleContext = useCallback(
-    (id: string) => {
-      const next = selectedContextIds.includes(id)
-        ? selectedContextIds.filter((x: string) => x !== id)
-        : [...selectedContextIds, id];
-      updateAttributes({ contextIds: next });
-    },
-    [selectedContextIds, updateAttributes]
-  );
-
-  const removeContext = useCallback(
-    (id: string) => {
-      updateAttributes({ contextIds: selectedContextIds.filter((x: string) => x !== id) });
-    },
-    [selectedContextIds, updateAttributes]
-  );
-
   const handleGenerate = useCallback((opts?: GenerateOptions) => {
     if (!activeProjectId || !activeChapterId || !activeProject || !activeChapter) return;
 
@@ -307,6 +306,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       model_id: finalModelId,
       instructions: finalInstructions,
       request_id: requestId,
+      context_selection: effectiveSelection,
     });
   }, [
     activeChapter,
@@ -315,6 +315,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     activeProjectId,
     clearGhostText,
     editor,
+    effectiveSelection,
     getPos,
     maxWords,
     modelId,
@@ -442,55 +443,29 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                   )}
                 </div>
 
-                {/* Context button — grouped dropdown */}
-                <Popover>
-                  <PopoverTrigger className="scene-beat-ghost-btn" title="添加上下文">
+                {/* Context button — shadcn DropdownMenu */}
+                <BeatContextMenu
+                  selection={effectiveSelection}
+                  onChange={updateContextSelection}
+                >
+                  <button
+                    className="scene-beat-ghost-btn"
+                    title="添加上下文"
+                    type="button"
+                  >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M6 1.5v9M1.5 6h9" strokeLinecap="round" />
                     </svg>
                     Context
-                  </PopoverTrigger>
-                  <PopoverContent align="start" sideOffset={4} className="scene-beat-context-dropdown">
-                    {settings.length === 0 ? (
-                      <div className="scene-beat-context-empty">暂无设定条目</div>
-                    ) : (
-                      Object.entries(settingsByCategory).map(([cat, items]) => (
-                        <div key={cat}>
-                          <div className="scene-beat-context-group-label">
-                            {CATEGORY_LABELS[cat] ?? cat}
-                          </div>
-                          {items.map((s) => (
-                            <button
-                              key={s.id}
-                              onClick={() => toggleContext(s.id)}
-                              className={`scene-beat-context-item ${selectedContextIds.includes(s.id) ? "selected" : ""}`}
-                            >
-                              <span className="scene-beat-context-name">{s.name}</span>
-                              {selectedContextIds.includes(s.id) && (
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                  <path d="M2.5 6.5L5 9L9.5 3.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      ))
-                    )}
-                  </PopoverContent>
-                </Popover>
+                  </button>
+                </BeatContextMenu>
               </div>
 
               {/* Selected context tags */}
-              {selectedContexts.length > 0 && (
-                <div className="scene-beat-context-tags">
-                  {selectedContexts.map((ctx) => (
-                    <span key={ctx.id} className="scene-beat-context-tag">
-                      {ctx.name}
-                      <button onClick={() => removeContext(ctx.id)}>×</button>
-                    </span>
-                  ))}
-                </div>
-              )}
+              <ContextSelectionTags
+                selection={effectiveSelection}
+                onRemove={removeContextTag}
+              />
             </div>
 
             {/* Footer: generate button group + clear beat */}
@@ -552,7 +527,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         onGenerate={handleGenerate}
         defaultMaxWords={maxWords}
         defaultModelId={modelId}
-        contextIds={selectedContextIds}
+        contextIds={(effectiveSelection.codexEntries as string[]) ?? []}
         chapterContent={activeChapter?.content ?? ""}
         chapterTitle={activeChapter?.title ?? ""}
         beatText={node.textContent.trim()}

@@ -46,7 +46,7 @@ export function PlanSceneRow({ scene }: PlanSceneRowProps) {
     (e: React.FocusEvent<HTMLTextAreaElement>) => {
       const summary = e.currentTarget.value;
       if (summary !== (scene.summary || "")) {
-        useWritingStore.getState().updateSceneAction(scene.id, { summary });
+        useWritingStore.getState().patchScene(scene.id, { summary });
       }
     },
     [scene.id, scene.summary],

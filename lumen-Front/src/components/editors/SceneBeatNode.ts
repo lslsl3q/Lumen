@@ -76,6 +76,24 @@ export const SceneBeatNode = Node.create({
           return { "data-context-ids": JSON.stringify(attrs.contextIds) };
         },
       },
+      contextSelection: {
+        default: {},
+        parseHTML: (el) => {
+          const raw = el.getAttribute("data-context-selection");
+          if (raw) {
+            try { return JSON.parse(raw); } catch { return {}; }
+          }
+          // migrate legacy contextIds → contextSelection.codexEntries
+          const legacyIds = JSON.parse(el.getAttribute("data-context-ids") ?? "[]");
+          if (legacyIds.length) return { codexEntries: legacyIds };
+          return {};
+        },
+        renderHTML: (attrs) => {
+          const sel = attrs.contextSelection;
+          if (!sel || Object.keys(sel).length === 0) return {};
+          return { "data-context-selection": JSON.stringify(sel) };
+        },
+      },
       excludeFromExport: {
         default: true,
         parseHTML: () => true,

@@ -81,10 +81,10 @@
   --shadow-deep: var(--shadow-deep);
 
   /* === 圆角 === */
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-full: var(--radius-full);
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 7px;
+  --radius-full: 9999px;
 
   /* === 动画时长 === */
   --duration-instant: var(--duration-instant);

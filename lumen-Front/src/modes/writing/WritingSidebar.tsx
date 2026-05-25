@@ -1,4 +1,4 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useState, useCallback } from "react";
 import { cn } from "../../lib/utils";
 import { useModeStore } from "../../stores/useModeStore";
 import { useWritingStore } from "../../stores/useWritingStore";
@@ -21,6 +21,7 @@ import {
   BookMarked,
   FileText,
   FolderTree,
+  Sparkles,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -138,11 +139,23 @@ export const WritingSidebar = forwardRef<HTMLElement>((_props, ref) => {
 
 function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
   const project = useWritingStore((s) => s.getActiveProject());
+  const showSettingsPanel = useWritingStore((s) => s.showSettingsPanel);
+  const switchMode = useModeStore((s) => s.switchMode);
+
+  const handleBack = useCallback(() => {
+    useWritingStore.getState().setShowSettingsPanel(false);
+    switchMode("dashboard");
+  }, [switchMode]);
 
   return (
     <div className="flex-none h-14 flex items-center gap-2 px-3 border-b border-[var(--color-border)]">
-      <SidebarIconButton icon={ArrowLeft} label="返回" />
-      <SidebarIconButton icon={Settings} label="设置" />
+      <SidebarIconButton icon={ArrowLeft} label="返回" onClick={handleBack} />
+      <SidebarIconButton
+        icon={Settings}
+        label="设置"
+        active={showSettingsPanel}
+        onClick={() => useWritingStore.getState().setShowSettingsPanel(!showSettingsPanel)}
+      />
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-[var(--color-text-secondary)] truncate">
           {project?.name || "未选择作品"}
@@ -414,12 +427,23 @@ function EntryRow({
 
 function SidebarFooter() {
   const saveStatus = useWritingStore((s) => s.saveStatus);
+  const setShowPromptManager = useWritingStore((s) => s.setShowPromptManager);
   const savedLabel = saveStatus === "saved" ? "Saved" : saveStatus === "saving" ? "Saving…" : "Unsaved";
 
   return (
     <div className="flex-none h-14 flex items-center gap-2 px-3 border-t border-[var(--color-border)] bg-[var(--color-surface-deep)]">
       <button
-        className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 rounded transition-colors"
+        onClick={() => setShowPromptManager(true)}
+        className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 rounded transition-colors cursor-pointer"
+        type="button"
+        aria-label="Prompt Manager"
+      >
+        <Sparkles className="w-3.5 h-3.5" />
+        <span>Prompts</span>
+      </button>
+      <button
+        onClick={() => useWritingStore.getState().setShowSettingsPanel(true, "export")}
+        className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-white/5 rounded transition-colors cursor-pointer"
         type="button"
         aria-label="导出"
       >

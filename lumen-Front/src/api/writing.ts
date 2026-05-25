@@ -43,6 +43,7 @@ export interface WritingScene {
   content: string;
   summary: string;
   subtitle: string;
+  codex_ids: string[];
   scene_number: number;
   sort_order: number;
   created_at: number;
@@ -80,6 +81,7 @@ export interface CodexEntry {
   description: Record<string, unknown>;
   aliases: string[];
   tags: string[];
+  category: string | null;
   custom_fields: Record<string, unknown>;
   relations: { target_id: string; type: string }[];
   graph_entity_id: string | null;
@@ -126,6 +128,18 @@ export async function updateProject(id: string, data: Partial<WritingProject>): 
 export async function deleteProject(id: string): Promise<void> {
   const res = await fetch(`${BASE}/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
+}
+
+export function getCoverUrl(projectId: string): string {
+  return `${BASE}/projects/${encodeURIComponent(projectId)}/cover`;
+}
+
+export async function uploadCover(projectId: string, file: File): Promise<{ cover: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/cover`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }
 
 // ── 章节 ──
@@ -425,12 +439,63 @@ export async function deleteSnippet(id: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+// ── Labels (标签) ──
+
+export interface WritingLabel {
+  id: string;
+  project_id: string;
+  name: string;
+  color: string;
+  sort_order: number;
+}
+
+export async function listLabels(projectId: string): Promise<WritingLabel[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/labels`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createLabel(projectId: string, name = "", color = "Gray"): Promise<WritingLabel> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/labels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateLabel(id: string, data: Partial<Pick<WritingLabel, "name" | "color">>): Promise<WritingLabel> {
+  const res = await fetch(`${BASE}/labels/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteLabel(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/labels/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function reorderLabels(projectId: string, orderedIds: string[]): Promise<void> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/labels/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ordered_ids: orderedIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 // ── Threads (叙事线) ──
 
 export interface WritingThread {
   id: string;
   project_id: string;
   type: "main" | "subplot" | "dark";
+  tags: string[];
   name: string;
   description: Record<string, unknown>;
   color: string;
@@ -445,11 +510,13 @@ export interface WritingThread {
 export interface WritingThreadNode {
   id: string;
   thread_id: string;
-  type: "event" | "emergence" | "crossing" | "resolution" | "seed";
+  type: "advance" | "surface" | "resolve" | "background";
   scene_id: string | null;
   title: string;
   note: string;
   story_time: string;
+  goal: boolean;
+  satisfaction: { type: string; intensity: number } | null;
   sort_order: number;
   metadata: Record<string, unknown>;
   created_at: number;
@@ -472,12 +539,12 @@ export async function listThreads(projectId: string): Promise<WritingThread[]> {
 export async function createThread(
   projectId: string, type: WritingThread["type"] = "dark", name = "",
   color = "#6b7280", description: Record<string, unknown> = {},
-  linkedCodexIds: string[] = [],
+  linkedCodexIds: string[] = [], tags: string[] = [],
 ): Promise<WritingThread> {
   const res = await fetch(`${BASE}/threads`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, type, name, color, description, linked_codex_ids: linkedCodexIds }),
+    body: JSON.stringify({ project_id: projectId, type, name, color, description, linked_codex_ids: linkedCodexIds, tags }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -522,13 +589,14 @@ export async function listThreadNodes(threadId: string): Promise<WritingThreadNo
 }
 
 export async function createThreadNode(
-  threadId: string, type: WritingThreadNode["type"] = "event", title = "",
+  threadId: string, type: WritingThreadNode["type"] = "advance", title = "",
   note = "", sceneId: string | null = null, storyTime = "",
+  goal = false, satisfaction: WritingThreadNode["satisfaction"] = null,
 ): Promise<WritingThreadNode> {
   const res = await fetch(`${BASE}/thread-nodes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ thread_id: threadId, type, title, note, scene_id: sceneId, story_time: storyTime }),
+    body: JSON.stringify({ thread_id: threadId, type, title, note, scene_id: sceneId, story_time: storyTime, goal, satisfaction }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
