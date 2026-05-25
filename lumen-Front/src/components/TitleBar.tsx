@@ -1,23 +1,12 @@
 /**
- * TitleBar — 自定义标题栏（面包屑导航）
+ * TitleBar — 统一的窗口标题栏
  *
- * 三段式：左侧品牌+面包屑 | 中间拖拽区 | 右侧功能+窗口控制
- * 不在 Dashboard 时显示（Dashboard 有自己的顶栏）
+ * 所有模式共用。三段式：左侧 Logo | 中间拖拽区 | 右侧窗口控制
  */
 import { useState, useEffect, useMemo } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useModeStore } from '../stores/useModeStore';
-import { useWritingStore } from '../stores/useWritingStore';
 import { useTheme } from '../lib/theme/context';
-import type { AppMode } from '../stores/useModeStore';
-
-const MODE_LABELS: Record<AppMode, string> = {
-  dashboard: '',
-  chat: '聊天',
-  base: '暗影之城',
-  rpg: '暗影之城',
-  writing: '',
-};
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -38,44 +27,12 @@ function MaximizeIcon() {
   );
 }
 
-function Breadcrumb({ items }: { items: { label: string; onClick?: () => void }[] }) {
-  return (
-    <nav className="flex items-center gap-1.5 text-xs">
-      {items.map((item, i) => (
-        <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <span className="text-text-dim">/</span>}
-          <button
-            onClick={item.onClick}
-            className={`truncate max-w-[200px] ${item.onClick
-              ? 'text-text-muted hover:text-text-secondary transition-colors duration-150 cursor-pointer'
-              : 'text-text-secondary'
-            }`}
-          >
-            {item.label}
-          </button>
-        </span>
-      ))}
-    </nav>
-  );
-}
-
 function TitleBar() {
   const appWindow = useMemo(() => isTauri ? getCurrentWindow() : null, []);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
-  const { activeMode, switchMode } = useModeStore();
+  const { switchMode } = useModeStore();
   const { theme, themes, setTheme, isDark } = useTheme();
-
-  // Writing mode context — direct selectors for proper reactivity
-  const activeProjectId = useWritingStore((s) => s.activeProjectId);
-  const projects = useWritingStore((s) => s.projects);
-  const activeProject = projects.find((p) => p.id === activeProjectId);
-  const activeSceneId = useWritingStore((s) => s.activeSceneId);
-  const acts = useWritingStore((s) => s.acts);
-  // Flatten to find active scene's chapter title
-  const activeSceneChapter = acts.flatMap((a: any) => (a.chapters || [])).find((ch: any) =>
-    (ch.scenes || []).some((sc: any) => sc.id === activeSceneId)
-  );
 
   useEffect(() => {
     if (!appWindow) return;
@@ -104,35 +61,17 @@ function TitleBar() {
     setIsPinned(next);
   };
 
-  // Build breadcrumb items
-  const breadcrumbItems = useMemo(() => {
-    const items: { label: string; onClick?: () => void }[] = [];
-
-    if (activeMode === 'writing' && activeProject) {
-      items.push({ label: activeProject.name });
-      if (activeSceneChapter) {
-        items.push({ label: activeSceneChapter.title });
-      }
-    } else {
-      const label = MODE_LABELS[activeMode];
-      if (label) items.push({ label });
-    }
-
-    return items;
-  }, [activeMode, activeProject, activeSceneChapter]);
-
   return (
     <div className="h-9 flex items-center bg-surface-rail/80 border-b border-border-default select-none relative">
-      {/* 左侧：Logo + 面包屑 */}
-      <div className="flex items-center gap-2 pl-4 h-full shrink-0">
+      {/* 左侧：Logo */}
+      <div className="flex items-center pl-2 h-full shrink-0">
         <button
           onClick={() => switchMode('dashboard')}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity duration-150 cursor-pointer"
+          className="flex items-center justify-center w-7 h-7 rounded-md hover:bg-slate-700/40 transition-colors cursor-pointer"
           title="回到大堂"
         >
-          <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
+          <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(204,124,94,0.6)]" />
         </button>
-        {breadcrumbItems.length > 0 && <Breadcrumb items={breadcrumbItems} />}
       </div>
 
       {/* 中间填充 — 拖拽区 */}

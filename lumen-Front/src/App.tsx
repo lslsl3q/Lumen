@@ -114,27 +114,25 @@ function MainLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-950">
+      <ErrorBoundary><TitleBar /></ErrorBoundary>
       {isDashboard ? (
         <DashboardMode />
       ) : (
-        <>
-          <ErrorBoundary><TitleBar /></ErrorBoundary>
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {isSettingsRoute ? (
-              <Routes>
-                <Route path="/settings/worldbooks" element={<WorldBookList />} />
-                <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
-                <Route path="/settings/skills" element={<SkillList />} />
-                <Route path="/settings/skills/:id" element={<SkillEditor />} />
-                <Route path="/settings/config" element={<ConfigList />} />
-                <Route path="/settings/config/:resource" element={<ConfigEditor />} />
-                <Route path="/settings/permissions" element={<PermissionPage />} />
-              </Routes>
-            ) : (
-              <ModeContainer floating={floating} debug={debug} />
-            )}
-          </div>
-        </>
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {isSettingsRoute ? (
+            <Routes>
+              <Route path="/settings/worldbooks" element={<WorldBookList />} />
+              <Route path="/settings/worldbooks/:id" element={<WorldBookEditor />} />
+              <Route path="/settings/skills" element={<SkillList />} />
+              <Route path="/settings/skills/:id" element={<SkillEditor />} />
+              <Route path="/settings/config" element={<ConfigList />} />
+              <Route path="/settings/config/:resource" element={<ConfigEditor />} />
+              <Route path="/settings/permissions" element={<PermissionPage />} />
+            </Routes>
+          ) : (
+            <ModeContainer floating={floating} debug={debug} />
+          )}
+        </div>
       )}
 
       <div id="overlay-root" />
