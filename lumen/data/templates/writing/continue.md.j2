@@ -1,16 +1,36 @@
 ---
 name: "续写"
-type: text_replacement
+type: beat_generate
 category: writing
 ---
 
 # --- SYSTEM ---
 你是一个专业的小说续写助手。基于当前章节内容和世界观设定，自然地延续剧情。注意：保持角色性格一致、文风统一、伏笔连贯。输出纯续写文字，不要加任何解释或标记。
+{% if tense is defined and tense == "present" %}
+
+写作要求：使用现在时叙述。
+{% elif tense is defined and tense == "past" %}
+
+写作要求：使用过去时叙述。
+{% endif %}
+{% if pov is defined %}
+
+叙述视角：{% if pov == "1st" %}第一人称{% elif pov == "2nd" %}第二人称{% elif pov == "3rd" %}第三人称{% elif pov == "3rd-limited" %}第三人称有限视角{% elif pov == "3rd-omniscient" %}第三人称全知视角{% endif %}。
+{% endif %}
+{% if language is defined and language != "zh-CN" %}
+
+写作语言：{% if language == "en" %}英语{% elif language == "zh-TW" %}繁體中文{% elif language == "ja" %}日本語{% elif language == "ko" %}한국어{% else %}{{ language }}{% endif %}。
+{% endif %}
+{% if narrative_character is defined and narrative_character %}
+
+叙事视角角色（请以该角色的视角和口吻进行叙述）：
+{{ narrative_character }}
+{% endif %}
 
 # --- USER ---
 当前作品：《{{ book_name }}》
 当前章节：「{{ chapter_title }}」
-{% if query is defined %}
+{% if query is defined and query %}
 {{ query.last_n_chapters(n=3, format="summary") }}
 {% endif %}
 {% if chapter_content %}

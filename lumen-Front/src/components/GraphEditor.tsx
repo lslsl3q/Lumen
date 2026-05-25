@@ -16,6 +16,7 @@ import type { TdbFileFolder } from '../api/tdb';
 import TdbFileTree from './TdbFileTree';
 import ResizablePanel from './ResizablePanel';
 import { toast } from '../utils/toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 /* ── 颜色映射（暖灰色调，适配暗色背景）── */
 
@@ -451,17 +452,16 @@ function GraphEditor({ tdb }: GraphEditorProps) {
 
         {/* 布局切换 */}
         <div className="px-3 py-1.5 border-b border-border-default flex gap-1.5">
-          <select
-            value={layoutType}
-            onChange={e => setLayoutType(e.target.value)}
-            className="flex-1 text-[10px] bg-surface-elevated border border-border-default rounded
-              px-2 py-1 text-text-muted outline-none cursor-pointer
-              hover:border-primary/20 focus:border-primary/30"
-          >
-            {Object.entries(LAYOUTS).map(([key, { label }]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+          <Select value={layoutType} onValueChange={setLayoutType}>
+            <SelectTrigger className="flex-1" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(LAYOUTS).map(([key, { label }]) => (
+                <SelectItem key={key} value={key}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* 源文件树（可折叠） */}
@@ -625,16 +625,16 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                 outline-none focus:border-primary/30"
               autoFocus
             />
-            <select
-              value={newEntityType}
-              onChange={e => setNewEntityType(e.target.value)}
-              className="w-full text-xs bg-surface-elevated border border-border-default rounded
-                px-2 py-1 text-text-secondary outline-none cursor-pointer"
-            >
-              {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+            <Select value={newEntityType} onValueChange={setNewEntityType}>
+              <SelectTrigger className="w-full" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex gap-1">
               <button onClick={handleCreateEntity} className="flex-1 text-[10px] text-primary hover:text-primary cursor-pointer">创建</button>
               <button onClick={() => setIsCreating(false)} className="flex-1 text-[10px] text-text-muted hover:text-text-secondary cursor-pointer">取消</button>
@@ -729,16 +729,16 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   px-2 py-1 text-text-primary outline-none focus:border-primary/30"
                 placeholder="名称"
               />
-              <select
-                value={editType}
-                onChange={e => setEditType(e.target.value)}
-                className="w-full text-xs bg-surface-elevated border border-border-default rounded
-                  px-2 py-1 text-text-secondary outline-none cursor-pointer"
-              >
-                {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+              <Select value={editType} onValueChange={setEditType}>
+                <SelectTrigger className="w-full" size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['entity', 'person', 'character', 'location', 'event', 'org'].map(t => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <button
                 onClick={handleUpdateEntity}
                 className="w-full py-1 rounded text-[10px] cursor-pointer

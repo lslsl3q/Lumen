@@ -17,6 +17,7 @@ import TdbFileTree from './TdbFileTree';
 import ResizablePanel from './ResizablePanel';
 import { toast } from '../utils/toast';
 import { RefreshCw } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 /* ── 常量 ── */
 
@@ -634,19 +635,19 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                 <>
                   <span className="text-[10px] text-text-muted">{tdbTotal} 条</span>
                   {activeTdb === 'knowledge' && (
-                    <select
-                      value={tdbSourceFilter}
-                      onChange={e => setTdbSourceFilter(e.target.value)}
-                      className="ml-auto text-[10px] bg-surface-elevated border border-border-default rounded px-1.5 py-0.5
-                        text-text-secondary outline-none cursor-pointer"
-                    >
-                      <option value="">全部来源</option>
-                      {tdbStats && Object.keys(tdbStats.sources).map(src => (
-                        <option key={src} value={src}>
-                          {src === 'daily_note' ? '日记' : src === 'chat' ? '聊天' : src === 'upload' ? '上传' : src === 'manual' ? '手动导入' : src}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={tdbSourceFilter} onValueChange={setTdbSourceFilter}>
+                      <SelectTrigger className="ml-auto" size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">全部来源</SelectItem>
+                        {tdbStats && Object.keys(tdbStats.sources).map(src => (
+                          <SelectItem key={src} value={src}>
+                            {src === 'daily_note' ? '日记' : src === 'chat' ? '聊天' : src === 'upload' ? '上传' : src === 'manual' ? '手动导入' : src}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </>
               )}

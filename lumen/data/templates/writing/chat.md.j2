@@ -10,7 +10,7 @@ category: writing
 # --- USER ---
 当前作品：《{{ book_name }}》
 当前章节：「{{ chapter_title }}」
-{% if query is defined %}
+{% if query is defined and query %}
 {{ query.last_n_chapters(n=5, format="summary") }}
 {% endif %}
 {% if chapter_content %}

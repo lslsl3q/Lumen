@@ -17,7 +17,7 @@ category: writing
 # --- USER ---
 当前作品：《{{ book_name }}》
 当前章节：「{{ chapter_title }}」
-{% if query is defined %}
+{% if query is defined and query %}
 {{ query.last_n_chapters(n=3, format="summary") }}
 {% endif %}
 {% if chapter_content %}
@@ -33,6 +33,11 @@ category: writing
 ---
 {% endif %}
 {% include "components/codex.md.j2" %}
+{% if query is defined and query.resolved_context() %}
+
+## 用户选择的上下文：
+{{ query.resolved_context() }}
+{% endif %}
 
 ## 作者指令（最高优先级）：
 {{ beat_text }}

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import * as api from '../api/worldbook';
 import { SettingsPageProps } from '../types/settings';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 interface WorldBookEditorProps extends SettingsPageProps {
   worldBookId?: string;
@@ -190,11 +191,15 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
               {form.selective && (
                 <div className="space-y-3 pl-1 border-l-2 border-slate-800 ml-1">
                   <div>
-                    <select value={form.selective_logic} onChange={e => setForm({ ...form, selective_logic: e.target.value as any })}
-                      className="w-full px-3 py-2 rounded-lg text-sm bg-border-subtle border border-border-subtle text-text-primary focus:outline-hidden focus:border-primary/40 transition-all">
-                      <option value="and">AND — 次关键词也必须命中才触发</option>
-                      <option value="not">NOT — 次关键词命中时不触发</option>
-                    </select>
+                    <Select value={form.selective_logic} onValueChange={(v) => setForm({ ...form, selective_logic: v as any })}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="and">AND — 次关键词也必须命中才触发</SelectItem>
+                        <SelectItem value="not">NOT — 次关键词命中时不触发</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <div className="flex flex-wrap gap-1.5 mb-2 min-h-[24px]">
@@ -241,13 +246,17 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
 
             <div>
               <label className="block text-xs text-text-muted mb-1">注入位置</label>
-              <select value={form.position} onChange={e => setForm({ ...form, position: e.target.value as any })}
-                className="w-full px-4 py-2.5 rounded-lg text-sm bg-border-subtle border border-border-subtle text-text-primary focus:outline-hidden focus:border-primary/40 transition-all">
-                <option value="before_sys">系统提示词之前</option>
-                <option value="after_sys">系统提示词之后</option>
-                <option value="before_user">用户消息之前</option>
-                <option value="after_user">用户消息之后</option>
-              </select>
+              <Select value={form.position} onValueChange={(v) => setForm({ ...form, position: v as any })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="before_sys">系统提示词之前</SelectItem>
+                  <SelectItem value="after_sys">系统提示词之后</SelectItem>
+                  <SelectItem value="before_user">用户消息之前</SelectItem>
+                  <SelectItem value="after_user">用户消息之后</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
