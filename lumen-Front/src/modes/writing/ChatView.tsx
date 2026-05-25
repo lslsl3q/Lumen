@@ -1,8 +1,9 @@
 /**
  * ChatView — NC-style full-screen chat workspace
  *
- * Layout: Thread name | Messages | Bottom bar (Context + Switch prompt + Input + Send)
- * Two states: no messages → empty prompt; has messages → conversation view
+ * Layout inspired by NovelCrafter:
+ * - Header + Messages + Bottom bar all constrained to max-w-3xl, centered
+ * - NC dark theme (#18181b bg, zinc text hierarchy)
  */
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useWritingChat } from "../../hooks/useWritingChat";
@@ -114,10 +115,10 @@ function MessageActions({
   };
 
   return (
-    <div className="flex items-center gap-1 mt-1.5">
+    <div className="flex items-center gap-0.5 mt-1.5">
       <button
         onClick={handleCopy}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors cursor-pointer"
       >
         <Copy className="w-3 h-3" />
         {copied ? "已复制" : "复制"}
@@ -126,7 +127,7 @@ function MessageActions({
       {role === "assistant" && onSnippet && (
         <button
           onClick={onSnippet}
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors cursor-pointer"
         >
           <StickyNote className="w-3 h-3" />
           保存为片段
@@ -136,7 +137,7 @@ function MessageActions({
       {role === "assistant" && onRetry && (
         <button
           onClick={onRetry}
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors cursor-pointer"
         >
           <RotateCcw className="w-3 h-3" />
           重新生成
@@ -179,12 +180,10 @@ export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (el) {
@@ -225,7 +224,6 @@ export function ChatView() {
     [activeProjectId, createSnippetAction, loadSnippets, threadName],
   );
 
-  // Retry last message
   const handleRetry = useCallback(() => {
     if (messages.length < 2) return;
     const lastUser = [...messages].reverse().find((m) => m.role === "user");
@@ -234,18 +232,14 @@ export function ChatView() {
     }
   }, [messages, sendMessage]);
 
-  const toggleTemplate = (key: string) => {
-    setTemplateKey(key);
-  };
-
   const hasMessages = messages.length > 0;
 
   return (
     <div className="h-full flex flex-col bg-[#18181b]">
       {/* ── Header: Thread name ── */}
-      <div className="flex-none px-4 pt-4 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wide">
+      <div className="flex-none flex justify-center pt-4 pb-2 px-4 md:px-6">
+        <div className="w-full max-w-3xl flex items-center gap-2">
+          <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wide shrink-0">
             Name:
           </span>
           <input
@@ -257,12 +251,12 @@ export function ChatView() {
         </div>
       </div>
 
-      {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto px-4">
+      {/* ── Messages (centered) ── */}
+      <div className="flex-1 overflow-y-auto flex justify-center">
         {!hasMessages ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+          <div className="flex flex-col items-center justify-center h-full text-center max-w-lg px-3 py-[6vh]">
             <FileText className="w-8 h-8 text-zinc-700 mb-3" />
-            <p className="text-sm text-zinc-500 max-w-md">
+            <p className="text-sm text-zinc-500">
               开始一个新的聊天线程。
               <br />
               输入话题、大纲或任何想讨论的内容，AI 会基于你的世界观设定进行回复。
@@ -272,7 +266,7 @@ export function ChatView() {
             </p>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto py-4 space-y-6">
+          <div className="w-full max-w-3xl py-2 md:pt-6 px-2 md:px-3 flex flex-col gap-3 md:gap-6">
             {messages.map((msg) => (
               <MessageCard
                 key={msg.id}
@@ -292,87 +286,83 @@ export function ChatView() {
         )}
       </div>
 
-      {/* ── Bottom Bar ── */}
-      <div className="flex-none border-t border-zinc-800">
-        {/* Options toggle */}
-        <div className="px-4 pt-2">
-          <button
-            onClick={() => setShowOptions(!showOptions)}
-            className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer uppercase tracking-wide"
-          >
-            {showOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {showOptions ? "HIDE" : "SHOW"}
-          </button>
-        </div>
-
-        {showOptions && (
-          <div className="px-4 pb-2 flex items-center gap-2">
-            {/* Context button */}
+      {/* ── Bottom Bar (centered + sticky) ── */}
+      <div className="flex-none flex justify-center border-t border-zinc-800 bg-[#18181b]">
+        <div className="w-full max-w-3xl px-2 md:px-3 flex flex-col gap-1.5">
+          {/* Options toggle */}
+          <div className="pt-2">
             <button
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer"
-              title="选择上下文"
+              onClick={() => setShowOptions(!showOptions)}
+              className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer uppercase tracking-wide"
             >
-              <FileText className="w-3 h-3" />
-              Context
+              {showOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showOptions ? "HIDE" : "SHOW"}
             </button>
+          </div>
 
-            {/* Template switcher */}
-            <div className="relative group">
+          {showOptions && (
+            <div className="flex items-center gap-2 pb-1.5">
               <button className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer">
-                Switch prompt
+                <FileText className="w-3 h-3" />
+                Context
               </button>
-              <div className="absolute bottom-full left-0 mb-1 w-56 hidden group-hover:block z-50">
-                <div className="bg-[#18181b] border border-zinc-700 rounded-md p-1 shadow-lg">
-                  {WORKSHOP_TEMPLATES.map((t) => (
-                    <button
-                      key={t.key}
-                      onClick={() => toggleTemplate(t.key)}
-                      className={cn(
-                        "w-full text-left px-2 py-1.5 rounded-sm text-[12px] transition-colors cursor-pointer",
-                        templateKey === t.key
-                          ? "text-zinc-100 bg-zinc-800"
-                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50",
-                      )}
-                    >
-                      <div>{t.label}</div>
-                      <div className="text-[10px] text-zinc-500">{t.desc}</div>
-                    </button>
-                  ))}
+
+              <div className="relative group">
+                <button className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer">
+                  Switch prompt
+                </button>
+                <div className="absolute bottom-full left-0 mb-1 w-56 hidden group-hover:block z-50">
+                  <div className="bg-[#18181b] border border-zinc-700 rounded-md p-1 shadow-lg">
+                    {WORKSHOP_TEMPLATES.map((t) => (
+                      <button
+                        key={t.key}
+                        onClick={() => setTemplateKey(t.key)}
+                        className={cn(
+                          "w-full text-left px-2 py-1.5 rounded-sm text-[12px] transition-colors cursor-pointer",
+                          templateKey === t.key
+                            ? "text-zinc-100 bg-zinc-800"
+                            : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50",
+                        )}
+                      >
+                        <div>{t.label}</div>
+                        <div className="text-[10px] text-zinc-500">{t.desc}</div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
+              <span className="text-[10px] text-zinc-600 ml-auto">
+                AI: {WORKSHOP_TEMPLATES.find((t) => t.key === templateKey)?.label || "General Chat"}
+              </span>
             </div>
+          )}
 
-            {/* AI prompt label */}
-            <span className="text-[10px] text-zinc-600 ml-auto">
-              AI: {WORKSHOP_TEMPLATES.find((t) => t.key === templateKey)?.label || "General Chat"}
-            </span>
+          {/* Input row */}
+          <div className="flex items-end gap-2 pb-3">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+              rows={1}
+              disabled={isLoading}
+              className="flex-1 bg-transparent border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-300 outline-none resize-none placeholder:text-zinc-600 focus:border-zinc-500 transition-colors disabled:opacity-50"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              className={cn(
+                "shrink-0 w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer",
+                input.trim() && !isLoading
+                  ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
+                  : "bg-zinc-800 text-zinc-600 cursor-not-allowed",
+              )}
+            >
+              <Send className="w-3.5 h-3.5" />
+            </button>
           </div>
-        )}
-
-        {/* Input row */}
-        <div className="flex items-end gap-2 px-4 pb-3">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
-            rows={1}
-            disabled={isLoading}
-            className="flex-1 bg-transparent border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-300 outline-none resize-none placeholder:text-zinc-600 focus:border-zinc-500 transition-colors disabled:opacity-50"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className={cn(
-              "shrink-0 w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer",
-              input.trim() && !isLoading
-                ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
-                : "bg-zinc-800 text-zinc-600 cursor-not-allowed",
-            )}
-          >
-            <Send className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
     </div>
@@ -395,13 +385,10 @@ function MessageCard({
   const isUser = message.role === "user";
   const text = isUser ? message.content : extractText(message.steps);
   const wc = isUser ? undefined : countWords(text);
-
-  // Render think/tool steps then text
   const steps = message.steps || [];
 
   return (
-    <div className={cn("group", isUser ? "" : "")}>
-      {/* User message */}
+    <div className="group">
       {isUser && (
         <div>
           <div className="flex justify-end">
@@ -415,24 +402,20 @@ function MessageCard({
         </div>
       )}
 
-      {/* Assistant message */}
       {!isUser && (
         <div>
-          {/* Thinking + Tool steps */}
           {steps.filter((s) => s.type !== "text").map((step) => {
             if (step.type === "think") return <ThinkingBubble key={step.id} step={step} />;
             if (step.type === "tool") return <ToolCallBubble key={step.id} step={step} />;
             return null;
           })}
 
-          {/* Text content */}
           {text && (
             <div className="prose prose-invert prose-sm max-w-none text-sm text-zinc-200 leading-relaxed">
               <MarkdownContent content={text} />
             </div>
           )}
 
-          {/* Streaming indicator */}
           {message.isStreaming && !text && (
             <div className="flex items-center gap-2 text-sm text-zinc-500">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -440,7 +423,6 @@ function MessageCard({
             </div>
           )}
 
-          {/* Actions + word count */}
           {!message.isStreaming && text && (
             <MessageActions
               role="assistant"
