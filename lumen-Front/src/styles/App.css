@@ -1,9 +1,9 @@
-/* === Lumen 暗色主题基础 — 暖灰配色 === */
+/* === Lumen 暗色主题基础 — 冷灰配色 === */
 
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: #1C1B19;
+  background: #09090b;
 }
 
 /* === 流式光标闪烁 === */
@@ -44,17 +44,17 @@ html, body, #root {
 
 /* hover 时显示淡淡的胶囊滚动条 */
 .scrollbar-lumen:hover::-webkit-scrollbar-thumb {
-  background: rgba(138, 132, 120, 0.2);
+  background: rgba(161, 161, 170, 0.2);
 }
 
 /* 悬停在滚动条上时稍微加深 */
 .scrollbar-lumen:hover::-webkit-scrollbar-thumb:hover {
-  background: rgba(138, 132, 120, 0.35);
+  background: rgba(161, 161, 170, 0.35);
 }
 
 /* 拖拽/滚动中时显示更明显的反馈 */
 .scrollbar-lumen::-webkit-scrollbar-thumb:active {
-  background: rgba(138, 132, 120, 0.4);
+  background: rgba(161, 161, 170, 0.4);
 }
 
 /* 编辑框/textarea 内滚动条（更窄更淡） */
@@ -75,16 +75,16 @@ textarea::-webkit-scrollbar-thumb {
 
 /* hover 时显示淡淡的滚动条 */
 textarea:hover::-webkit-scrollbar-thumb {
-  background: rgba(138, 132, 120, 0.15);
+  background: rgba(161, 161, 170, 0.15);
 }
 
 textarea::-webkit-scrollbar-thumb:hover {
-  background: rgba(138, 132, 120, 0.25);
+  background: rgba(161, 161, 170, 0.25);
 }
 
 /* 拖拽/滚动中反馈 */
 textarea::-webkit-scrollbar-thumb:active {
-  background: rgba(138, 132, 120, 0.3);
+  background: rgba(161, 161, 170, 0.3);
 }
 
 /* === 工具旋转动画 === */

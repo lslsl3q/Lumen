@@ -25,7 +25,7 @@
   --color-zinc-900: #18181b;
   --color-zinc-950: #09090b;
 
-  /* Stone — NC 暖文字灰 */
+  /* Stone — NC NC 文字灰 */
   --color-stone-300: #d6d3d1;
   --color-stone-400: #a8a29e;
   --color-stone-500: #78716c;
@@ -33,7 +33,7 @@
   /* Slate — NC 气泡蓝灰 */
   --color-slate-800: #1e293b;
 
-  /* Amber — Lumen 品牌暖橙（保留） */
+  /* Amber — Lumen 品牌橙（保留） */
   --color-amber-400: #CC7C5E;
   --color-amber-500: #B86A4A;
   --color-amber-950: #331610;
@@ -154,14 +154,14 @@
 /* === 硅胶质感工具类（Soft UI / Neumorphism） ===
  *
  * 原理：双层阴影（暗影 + 亮边）+ 顶部高光 + 按压内凹
- * 在暖灰底色上产生类似磨砂硅胶的立体感
+ * 在冷灰底色上产生类似磨砂硅胶的立体感
  */
 
 /* 面板级质感 — 用于侧边栏、卡片容器 */
 .soft-panel {
   box-shadow:
     6px 6px 12px rgba(0, 0, 0, 0.35),
-    -3px -3px 8px rgba(60, 58, 55, 0.18);
+    -3px -3px 8px rgba(63, 63, 70, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -169,7 +169,7 @@
 .soft-item {
   box-shadow:
     3px 3px 6px rgba(0, 0, 0, 0.25),
-    -2px -2px 4px rgba(55, 53, 50, 0.12);
+    -2px -2px 4px rgba(63, 63, 70, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.02);
   border-radius: 10px;
 }
@@ -178,7 +178,7 @@
 .soft-btn {
   box-shadow:
     2px 2px 5px rgba(0, 0, 0, 0.3),
-    -1px -1px 3px rgba(55, 53, 50, 0.15);
+    -1px -1px 3px rgba(63, 63, 70, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.03);
   transition: box-shadow 0.15s ease, transform 0.1s ease;
 }
@@ -187,7 +187,7 @@
 .soft-pressed {
   box-shadow:
     inset 2px 2px 5px rgba(0, 0, 0, 0.3),
-    inset -1px -1px 3px rgba(55, 53, 50, 0.12);
+    inset -1px -1px 3px rgba(63, 63, 70, 0.12);
   transform: translateY(1px);
   border-color: rgba(0, 0, 0, 0.15);
 }
@@ -198,7 +198,7 @@
     @apply border-border-default;
     /* 全局滚动条：细圆条，无箭头 */
     scrollbar-width: thin;
-    scrollbar-color: rgba(138, 132, 120, 0.2) transparent;
+    scrollbar-color: rgba(161, 161, 170, 0.2) transparent;
   }
   body {
     @apply bg-surface-canvas text-text-primary;
@@ -215,14 +215,14 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: rgba(138, 132, 120, 0.15);
+    background: rgba(161, 161, 170, 0.15);
     border-radius: 3px;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(138, 132, 120, 0.3);
+    background: rgba(161, 161, 170, 0.3);
   }
   *::-webkit-scrollbar-thumb:active {
-    background: rgba(138, 132, 120, 0.4);
+    background: rgba(161, 161, 170, 0.4);
   }
   *::-webkit-scrollbar-corner {
     background: transparent;

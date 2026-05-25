@@ -18,7 +18,7 @@ import ResizablePanel from './ResizablePanel';
 import { toast } from '../utils/toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
-/* ── 颜色映射（暖灰色调，适配暗色背景）── */
+/* ── 颜色映射（冷灰色调，适配暗色背景）── */
 
 const TYPE_COLORS: Record<string, string> = {
   person: '#CC7C5E',
@@ -255,7 +255,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
         },
       ],
       animation: true,
-      background: '#1C1B19',
+      background: '#09090b',
     });
 
     // 节点点击 → 选中

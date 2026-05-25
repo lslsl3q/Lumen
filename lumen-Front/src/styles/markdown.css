@@ -1,4 +1,4 @@
-/* === Lumen Markdown 暗色主题 — 暖灰配色 === */
+/* === Lumen Markdown 暗色主题 — 冷灰配色 === */
 
 .markdown-body {
   line-height: 1.7;
@@ -107,7 +107,7 @@
   transform: scale(1.1);
 }
 
-/* 引用 — 暖棕背景替代左边框 */
+/* 引用 — 暗色背景替代左边框 */
 .markdown-body blockquote {
   margin: 0.5em 0;
   padding: 0.6em 1em;

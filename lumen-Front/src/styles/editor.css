@@ -11,7 +11,7 @@
   background: rgba(161, 161, 170, 0.4) !important;
 }
 
-/* ── 富文本编辑器暖灰主题 ── */
+/* ── 富文本编辑器冷灰主题 ── */
 
 /* ── 新编辑器容器（去纸张隐喻）── */
 
@@ -220,7 +220,7 @@
   height: 14px;
   border: 1.5px solid #4a4540;
   border-radius: 3px;
-  background: #1C1B19;
+  background: #09090b;
   cursor: pointer;
   position: relative;
 }
@@ -237,7 +237,7 @@
   top: 0.5px;
   width: 5px;
   height: 8px;
-  border: solid #1C1B19;
+  border: solid #09090b;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
