@@ -261,9 +261,6 @@ export function ChatView() {
               <br />
               输入话题、大纲或任何想讨论的内容，AI 会基于你的世界观设定进行回复。
             </p>
-            <p className="text-[11px] text-zinc-600 mt-2">
-              AI 可能产生幻觉或错误信息。重要内容请核实。
-            </p>
           </div>
         ) : (
           <div className="w-full max-w-3xl py-2 md:pt-6 px-2 md:px-3 flex flex-col gap-3 md:gap-6">
@@ -286,83 +283,104 @@ export function ChatView() {
         )}
       </div>
 
-      {/* ── Bottom Bar (centered + sticky) ── */}
-      <div className="flex-none flex justify-center border-t border-zinc-800 bg-[#18181b]">
-        <div className="w-full max-w-3xl px-2 md:px-3 flex flex-col gap-1.5">
+      {/* ── Bottom Bar (centered) ── */}
+      <div className="flex-none flex justify-center bg-[#18181b]">
+        <div className="w-full max-w-3xl px-2 md:px-3 flex flex-col">
           {/* Options toggle */}
-          <div className="pt-2">
-            <button
-              onClick={() => setShowOptions(!showOptions)}
-              className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer uppercase tracking-wide"
-            >
-              {showOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              {showOptions ? "HIDE" : "SHOW"}
-            </button>
-          </div>
-
-          {showOptions && (
-            <div className="flex items-center gap-2 pb-1.5">
-              <button className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer">
-                <FileText className="w-3 h-3" />
-                Context
+          {hasMessages && (
+            <div className="flex items-center gap-2 pt-2 pb-1">
+              <button
+                onClick={() => setShowOptions(!showOptions)}
+                className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer uppercase tracking-wide"
+              >
+                {showOptions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {showOptions ? "HIDE" : "SHOW"}
               </button>
 
-              <div className="relative group">
-                <button className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer">
-                  Switch prompt
-                </button>
-                <div className="absolute bottom-full left-0 mb-1 w-56 hidden group-hover:block z-50">
-                  <div className="bg-[#18181b] border border-zinc-700 rounded-md p-1 shadow-lg">
-                    {WORKSHOP_TEMPLATES.map((t) => (
-                      <button
-                        key={t.key}
-                        onClick={() => setTemplateKey(t.key)}
-                        className={cn(
-                          "w-full text-left px-2 py-1.5 rounded-sm text-[12px] transition-colors cursor-pointer",
-                          templateKey === t.key
-                            ? "text-zinc-100 bg-zinc-800"
-                            : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50",
-                        )}
-                      >
-                        <div>{t.label}</div>
-                        <div className="text-[10px] text-zinc-500">{t.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              {showOptions && (
+                <>
+                  <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer">
+                    <FileText className="w-3 h-3" />
+                    Context
+                  </button>
 
-              <span className="text-[10px] text-zinc-600 ml-auto">
-                AI: {WORKSHOP_TEMPLATES.find((t) => t.key === templateKey)?.label || "General Chat"}
-              </span>
+                  <div className="relative group">
+                    <button className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-zinc-400 border border-zinc-700 hover:border-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer">
+                      Switch prompt
+                    </button>
+                    <div className="absolute bottom-full left-0 mb-1 w-56 hidden group-hover:block z-50">
+                      <div className="bg-[#18181b] border border-zinc-700 rounded-md p-1 shadow-lg">
+                        {WORKSHOP_TEMPLATES.map((t) => (
+                          <button
+                            key={t.key}
+                            onClick={() => setTemplateKey(t.key)}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded-sm text-[12px] transition-colors cursor-pointer",
+                              templateKey === t.key
+                                ? "text-zinc-100 bg-zinc-800"
+                                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50",
+                            )}
+                          >
+                            <div>{t.label}</div>
+                            <div className="text-[10px] text-zinc-500">{t.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="text-[10px] text-zinc-600 ml-auto">
+                    AI: {WORKSHOP_TEMPLATES.find((t) => t.key === templateKey)?.label || "General Chat"}
+                  </span>
+                </>
+              )}
             </div>
           )}
 
-          {/* Input row */}
-          <div className="flex items-end gap-2 pb-3">
+          {/* Input container — NC-style: subtle bg, top-rounded, no visible border */}
+          <div className={cn(
+            "border border-zinc-800 rounded-t-md shadow-sm flex flex-col",
+            "bg-zinc-800/30",
+            "focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-600",
+            isLoading && "opacity-50",
+          )}>
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
-              rows={1}
+              placeholder={hasMessages ? "输入消息... (Enter 发送, Shift+Enter 换行)" : "输入话题、大纲或任何想讨论的内容..."}
+              rows={hasMessages ? 1 : 3}
               disabled={isLoading}
-              className="flex-1 bg-transparent border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-300 outline-none resize-none placeholder:text-zinc-600 focus:border-zinc-500 transition-colors disabled:opacity-50"
+              className="w-full bg-transparent text-sm text-stone-200 outline-none resize-none placeholder:text-zinc-600 px-3 py-2.5 disabled:opacity-50"
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className={cn(
-                "shrink-0 w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer",
-                input.trim() && !isLoading
-                  ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
-                  : "bg-zinc-800 text-zinc-600 cursor-not-allowed",
-              )}
-            >
-              <Send className="w-3.5 h-3.5" />
-            </button>
+            {/* Send button row */}
+            <div className="flex items-center justify-between px-2 pb-2">
+              <span className="text-[10px] text-zinc-600 ml-1">
+                {WORKSHOP_TEMPLATES.find((t) => t.key === templateKey)?.label || "General Chat"}
+              </span>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || isLoading}
+                className={cn(
+                  "shrink-0 flex items-center gap-1 px-3 py-1 rounded text-[12px] font-medium transition-colors cursor-pointer",
+                  input.trim() && !isLoading
+                    ? "bg-zinc-700 text-zinc-200 hover:bg-zinc-600"
+                    : "bg-zinc-800 text-zinc-600 cursor-not-allowed",
+                )}
+              >
+                <Send className="w-3 h-3" />
+                发送
+              </button>
+            </div>
           </div>
+
+          {/* AI disclaimer */}
+          {!hasMessages && (
+            <p className="text-center text-[10px] text-zinc-600 py-3">
+              AI 可能产生幻觉或错误信息。重要内容请核实。
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -388,22 +406,24 @@ function MessageCard({
   const steps = message.steps || [];
 
   return (
-    <div className="group">
+    <div className="group/message [contain:content_inline-size] flex flex-col gap-2">
       {isUser && (
-        <div>
+        <>
           <div className="flex justify-end">
-            <div className="max-w-[85%] rounded-lg px-3.5 py-2.5 bg-amber-950/20 border border-amber-800/20 text-sm text-amber-100/90 leading-relaxed">
-              {message.content}
+            <div className="max-w-[85%] rounded-[16px_4px_16px_16px] bg-[#1e293b] text-sm text-stone-200 leading-relaxed">
+              <div className="m-3 md:m-4">
+                {message.content}
+              </div>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end opacity-50 group-hover/message:opacity-100 transition-opacity">
             <MessageActions role="user" onCopy={() => onCopy(message.content)} />
           </div>
-        </div>
+        </>
       )}
 
       {!isUser && (
-        <div>
+        <>
           {steps.filter((s) => s.type !== "text").map((step) => {
             if (step.type === "think") return <ThinkingBubble key={step.id} step={step} />;
             if (step.type === "tool") return <ToolCallBubble key={step.id} step={step} />;
@@ -411,8 +431,10 @@ function MessageCard({
           })}
 
           {text && (
-            <div className="prose prose-invert prose-sm max-w-none text-sm text-zinc-200 leading-relaxed">
-              <MarkdownContent content={text} />
+            <div className="rounded-[4px_16px_16px_16px] bg-[#27272a] overflow-hidden">
+              <div className="m-3 md:m-4 prose prose-sm md:prose-base prose-invert prose-stone max-w-none">
+                <MarkdownContent content={text} />
+              </div>
             </div>
           )}
 
@@ -424,15 +446,17 @@ function MessageCard({
           )}
 
           {!message.isStreaming && text && (
-            <MessageActions
-              role="assistant"
-              onCopy={() => onCopy(text)}
-              onSnippet={() => onSnippet(text)}
-              onRetry={onRetry}
-              wordCount={wc}
-            />
+            <div className="opacity-50 group-hover/message:opacity-100 transition-opacity">
+              <MessageActions
+                role="assistant"
+                onCopy={() => onCopy(text)}
+                onSnippet={() => onSnippet(text)}
+                onRetry={onRetry}
+                wordCount={wc}
+              />
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
