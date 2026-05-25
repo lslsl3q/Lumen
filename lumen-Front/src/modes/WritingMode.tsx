@@ -3,6 +3,7 @@ import { WritingSidebar } from "./writing/WritingSidebar";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
 import { ReviewView } from "./writing/ReviewView";
+import { ChatView } from "./writing/ChatView";
 import { CodexDetailPanel } from "./writing/CodexDetailPanel";
 import { PromptManagerView } from "./writing/prompt-manager/PromptManagerView";
 import { ProjectSettingsPanel } from "./writing/ProjectSettingsPanel";
@@ -26,7 +27,7 @@ import * as writingApi from "../api/writing";
 const writingViewTabs = [
   { key: "plan" as const, icon: LayoutList, label: "计划", disabled: false },
   { key: "write" as const, icon: PenLine, label: "写", disabled: false },
-  { key: "chat" as const, icon: MessageCircle, label: "聊天", disabled: true },
+  { key: "chat" as const, icon: MessageCircle, label: "聊天", disabled: false },
   { key: "review" as const, icon: FileCheck, label: "统计", disabled: false },
 ];
 
@@ -275,6 +276,8 @@ export default function WritingMode() {
                 </div>
               )}
             </WritingEditor>
+          ) : writingViewTab === "chat" ? (
+            <ChatView />
           ) : writingViewTab === "review" ? (
             <ReviewView />
           ) : (

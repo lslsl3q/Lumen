@@ -177,12 +177,20 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
         activeProjectId,
         activeChapterId,
         projects,
-        chapters,
+        acts,
       } = useWritingStore.getState();
       const activeProject = projects.find((p) => p.id === activeProjectId);
-      const activeChapter = chapters.find(
-        (c) => c.id === activeChapterId,
-      );
+
+      // Find active chapter + derive content from nested acts
+      let activeChapter: { id: string; title: string; content: string } | undefined;
+      for (const act of acts) {
+        const ch = act.chapters.find((c) => c.id === activeChapterId);
+        if (ch) {
+          const content = ch.scenes.map((s) => s.content ?? "").join("\n\n");
+          activeChapter = { id: ch.id, title: ch.title, content };
+          break;
+        }
+      }
 
       if (!activeProject || !activeChapter) return;
 
