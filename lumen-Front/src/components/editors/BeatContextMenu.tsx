@@ -48,8 +48,8 @@ function hasContent(str: string | undefined | null): boolean {
 }
 
 /** NC-aligned dark theme classes */
-const menuContentCls = "!bg-[#18181b] !text-[#d6d3d1] !border-[#3a3a4a] !rounded-lg !p-0 shadow-[0_0_0_1px_#3f3f46,0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)]";
-const subContentCls = "!bg-[#18181b] !text-[#d6d3d1] !border-[#3a3a4a] !rounded-lg !p-0";
+const menuContentCls = "!bg-[#18181b] !text-[#d6d3d1] !border-[#3a3a4a] !rounded-md !p-0 shadow-[0_0_0_1px_#3f3f46,0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)]";
+const subContentCls = "!bg-[#18181b] !text-[#d6d3d1] !border-[#3a3a4a] !rounded-md !p-0";
 const separatorCls = "!bg-[#27272a]";
 const itemCls = "!px-4 !py-1.5 !text-[14px] !gap-3";
 const groupLabelCls = "!text-xs tracking-wide font-semibold !text-[#a8a29e] !px-3 !py-1";
@@ -174,7 +174,7 @@ export function BeatContextMenu({
     <DropdownMenu>
       <DropdownMenuTrigger>{children}</DropdownMenuTrigger>
 
-      <DropdownMenuContent className={`min-w-[224px] p-0 ${menuContentCls}`} style={{ borderRadius: '8px' }}>
+      <DropdownMenuContent className={`min-w-[224px] p-0 ${menuContentCls}`}>
         {/* ── Group 1: Toggles ── */}
         <DropdownMenuGroup>
           <DropdownMenuCheckboxItem
