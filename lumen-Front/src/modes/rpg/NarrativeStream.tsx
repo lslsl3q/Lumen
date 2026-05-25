@@ -41,7 +41,7 @@ function NarrativeStream({ messages, isLoading }: NarrativeStreamProps) {
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-3">
               <div className="text-3xl opacity-30">⚔</div>
-              <p className="text-sm text-slate-600">冒险即将开始...</p>
+              <p className="text-sm text-text-dim">冒险即将开始...</p>
               <p className="text-xs text-slate-700">在下方输入你的行动</p>
             </div>
           </div>

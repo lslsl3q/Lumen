@@ -167,7 +167,7 @@ export default function PermissionPage() {
                   onClick={() => setSelectedCharId(char.id)}
                   className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
                     selectedCharId === char.id
-                      ? 'bg-slate-800/80 text-primary'
+                      ? 'bg-surface-elevated/80 text-primary'
                       : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
                   }`}
                 >
@@ -212,17 +212,17 @@ export default function PermissionPage() {
                     <div className="relative">
                       <button
                         onClick={() => setShowAddMenu(!showAddMenu)}
-                        className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-text-primary rounded transition-colors"
+                        className="px-2.5 py-1 text-xs bg-surface-elevated hover:bg-zinc-700 text-text-primary rounded transition-colors"
                       >
                         + 添加
                       </button>
                       {showAddMenu && availableList.length > 0 && (
-                        <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded shadow-lg z-10 max-h-60 overflow-y-auto">
+                        <div className="absolute right-0 top-full mt-1 w-48 bg-surface-elevated border border-border-default rounded shadow-lg z-10 max-h-60 overflow-y-auto">
                           {availableList.map(char => (
                             <button
                               key={char.id}
                               onClick={() => handleGrant(char.id)}
-                              className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-slate-700 transition-colors"
+                              className="w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-zinc-700 transition-colors"
                             >
                               {char.name}
                             </button>
@@ -236,7 +236,7 @@ export default function PermissionPage() {
                   ) : (
                     <>
                       {allowedList.map(char => (
-                        <div key={char.id} className="flex items-center justify-between py-2 px-3 rounded hover:bg-slate-800/50">
+                        <div key={char.id} className="flex items-center justify-between py-2 px-3 rounded hover:bg-surface-elevated/50">
                           <div className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                             <span className="text-sm text-text-primary">{char.name}</span>

@@ -227,7 +227,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
             <h2 className="text-sm font-medium text-text-primary">思维簇</h2>
             <button
               onClick={handleReindex}
-              className="text-[10px] text-text-muted hover:text-slate-400 cursor-pointer transition-colors"
+              className="text-[10px] text-text-muted hover:text-text-secondary cursor-pointer transition-colors"
               title="重建向量索引"
             >
               重建索引
@@ -276,14 +276,14 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
           <button
             onClick={() => setTab('modules')}
             className={`flex-1 py-2 text-[10px] cursor-pointer transition-colors
-              ${tab === 'modules' ? 'text-text-primary bg-surface-elevated' : 'text-text-muted hover:text-slate-400'}`}
+              ${tab === 'modules' ? 'text-text-primary bg-surface-elevated' : 'text-text-muted hover:text-text-secondary'}`}
           >
             模块
           </button>
           <button
             onClick={() => setTab('chains')}
             className={`flex-1 py-2 text-[10px] cursor-pointer transition-colors
-              ${tab === 'chains' ? 'text-text-primary bg-surface-elevated' : 'text-text-muted hover:text-slate-400'}`}
+              ${tab === 'chains' ? 'text-text-primary bg-surface-elevated' : 'text-text-muted hover:text-text-secondary'}`}
           >
             链配置
           </button>
@@ -347,7 +347,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                     <button
                       onClick={() => setEditContent(originalContent)}
                       className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                        text-text-muted hover:text-slate-400 transition-colors"
+                        text-text-muted hover:text-text-secondary transition-colors"
                     >
                       恢复
                     </button>
@@ -407,7 +407,7 @@ function ThinkingClustersPage(_props: ThinkingClustersPageProps) {
                   <button
                     onClick={() => setChainsContent(originalChains)}
                     className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                      text-text-muted hover:text-slate-400 transition-colors"
+                      text-text-muted hover:text-text-secondary transition-colors"
                   >
                     恢复
                   </button>

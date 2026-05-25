@@ -231,7 +231,7 @@ function ToolTipsPage(_props: ToolTipsPageProps) {
                   <button
                     onClick={handleReset}
                     className="px-3 py-1.5 rounded-lg text-xs cursor-pointer
-                      text-text-muted hover:text-slate-400 transition-colors"
+                      text-text-muted hover:text-text-secondary transition-colors"
                   >
                     恢复
                   </button>

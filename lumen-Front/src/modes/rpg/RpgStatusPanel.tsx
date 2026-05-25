@@ -26,7 +26,7 @@ function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[11px] text-slate-500 tabular-nums w-14 text-right">
+      <span className="text-[11px] text-text-muted tabular-nums w-14 text-right">
         {hp}/{maxHp}
       </span>
     </div>
@@ -48,13 +48,13 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
         onClick={() => setExpanded(!expanded)}
       >
         <div className={`w-1.5 h-1.5 rounded-full ${statusColor} flex-shrink-0`} />
-        <span className="text-sm text-slate-300 font-medium flex-1 truncate">
+        <span className="text-sm text-text-primary font-medium flex-1 truncate">
           {entity.name}
         </span>
         {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-slate-600" />
+          <ChevronUp className="w-3.5 h-3.5 text-text-dim" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+          <ChevronDown className="w-3.5 h-3.5 text-text-dim" />
         )}
       </button>
       <div className="px-3 pb-2">
@@ -62,10 +62,10 @@ function EntityCard({ entity }: { entity: RpgEntity }) {
       </div>
       {expanded && (
         <div className="px-3 pb-2.5 space-y-1 border-t border-surface-elevated pt-2">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+          <div className="flex items-center gap-2 text-xs text-text-muted">
             <Heart className="w-3 h-3 text-red-400" />
             <span>生命值</span>
-            <span className="text-slate-300 ml-auto">{entity.hp} / {entity.max_hp}</span>
+            <span className="text-text-primary ml-auto">{entity.hp} / {entity.max_hp}</span>
           </div>
         </div>
       )}
@@ -109,7 +109,7 @@ function EmotionBar({ name, value }: { name: string; value: number }) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-slate-400 w-10 text-right flex-shrink-0">{label}</span>
+      <span className="text-[11px] text-text-secondary w-10 text-right flex-shrink-0">{label}</span>
       <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
         <div
           className="h-full rounded-full transition-all duration-700 ease-out"
@@ -152,14 +152,14 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
         onClick={() => setExpanded(!expanded)}
       >
         <Brain className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-        <span className="text-xs font-medium text-slate-400">认知状态</span>
-        <span className="text-[10px] text-slate-600 ml-auto">
+        <span className="text-xs font-medium text-text-secondary">认知状态</span>
+        <span className="text-[10px] text-text-dim ml-auto">
           {emotions.length > 0 ? `${emotions.length} 维` : ''}
         </span>
         {expanded ? (
-          <ChevronUp className="w-3 h-3 text-slate-600" />
+          <ChevronUp className="w-3 h-3 text-text-dim" />
         ) : (
-          <ChevronDown className="w-3 h-3 text-slate-600" />
+          <ChevronDown className="w-3 h-3 text-text-dim" />
         )}
       </button>
 
@@ -169,7 +169,7 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
           {attention && (
             <div className="flex items-start gap-1.5">
               <Eye className="w-3 h-3 text-cyan-400 mt-0.5 flex-shrink-0" />
-              <span className="text-[11px] text-slate-300 leading-tight">{attention}</span>
+              <span className="text-[11px] text-text-primary leading-tight">{attention}</span>
             </div>
           )}
 
@@ -198,7 +198,7 @@ const CognitiveSection = ({ cognitiveState }: CognitiveSectionProps) => {
 
           {/* 最近印象 */}
           {context_summary && (
-            <p className="text-[10px] text-slate-500 italic leading-tight">
+            <p className="text-[10px] text-text-muted italic leading-tight">
               {context_summary}
             </p>
           )}
@@ -227,11 +227,11 @@ function RpgStatusPanel({ roomState, playerId }: RpgStatusPanelProps) {
       {/* 面板头部 */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-default">
         <Swords className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-        <span className="text-sm font-medium text-slate-300 truncate">
+        <span className="text-sm font-medium text-text-primary truncate">
           {roomState.roomName || '等待进入...'}
         </span>
         {roomState.entities.length > 0 && (
-          <span className="text-[11px] text-slate-600 ml-auto">
+          <span className="text-[11px] text-text-dim ml-auto">
             {roomState.entities.length}
           </span>
         )}
@@ -240,14 +240,14 @@ function RpgStatusPanel({ roomState, playerId }: RpgStatusPanelProps) {
       {/* 房间信息 */}
       {!roomState.roomId ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-xs text-slate-600">尚未进入冒险</p>
+          <p className="text-xs text-text-dim">尚未进入冒险</p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
           {/* 实体列表 */}
           <div className="p-2 space-y-1.5">
             {sorted.length === 0 ? (
-              <p className="text-xs text-slate-600 text-center py-4">房间内暂无实体</p>
+              <p className="text-xs text-text-dim text-center py-4">房间内暂无实体</p>
             ) : (
               sorted.map(entity => (
                 <EntityCard key={entity.id} entity={entity} />

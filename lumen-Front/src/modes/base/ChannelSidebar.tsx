@@ -39,19 +39,19 @@ function ChannelSidebar() {
     >
       {/* 顶部工具栏 */}
       <div className="h-10 flex items-center justify-between px-3 border-b border-border-default">
-        <span className="text-xs font-medium text-[#888] tracking-wide">基地</span>
+        <span className="text-xs font-medium text-text-muted tracking-wide">基地</span>
         <div className="flex gap-1">
           <button
             onClick={() => setShowCreate(true)}
             className="w-6 h-6 flex items-center justify-center rounded
-              text-[#666] hover:text-primary hover:bg-primary/8 transition-colors cursor-pointer"
+              text-text-dim hover:text-primary hover:bg-primary/8 transition-colors cursor-pointer"
             title="创建频道"
           >
             <Plus size={14} />
           </button>
           <button
             className="w-6 h-6 flex items-center justify-center rounded
-              text-[#666] hover:text-[#888] hover:bg-[#ffffff08] transition-colors cursor-pointer"
+              text-text-dim hover:text-text-muted hover:bg-hover-surface transition-colors cursor-pointer"
             title="设置"
           >
             <Settings size={13} />
@@ -64,7 +64,7 @@ function ChannelSidebar() {
         {Object.entries(groups).map(([group, items]) => (
           <div key={group}>
             <div className="px-2 mb-1">
-              <span className="text-[9px] font-semibold text-[#555] uppercase tracking-widest">
+              <span className="text-[9px] font-semibold text-text-dim uppercase tracking-widest">
                 {GROUP_LABELS[group] || group}
               </span>
             </div>
@@ -82,7 +82,7 @@ function ChannelSidebar() {
                   transition-colors duration-150 group
                   ${activeChannelId === channel.id
                     ? 'bg-primary/9 text-primary'
-                    : 'text-[#888] hover:bg-[#ffffff06] hover:text-[#bbb]'
+                    : 'text-text-muted hover:bg-hover-surface hover:text-text-secondary'
                   }`}
               >
                 <span className="text-xs w-4 text-center flex-shrink-0">
@@ -117,8 +117,8 @@ function ChannelSidebar() {
               disabled={channels.length <= 1}
               className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors
                 ${channels.length <= 1
-                  ? 'text-[#555] cursor-not-allowed'
-                  : 'text-[#888] hover:bg-[#ffffff08] hover:text-[#ef4444] cursor-pointer'
+                  ? 'text-text-dim cursor-not-allowed'
+                  : 'text-text-muted hover:bg-hover-surface hover:text-[#ef4444] cursor-pointer'
                 }`}
             >
               <Trash2 size={12} />

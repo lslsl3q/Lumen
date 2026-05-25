@@ -489,7 +489,7 @@ export default function CharacterPanel({
                         return (
                           <button key={n} onClick={() => updateForm({ thinking: { ...form.thinking!, budget_tokens: n } })}
                             className={`text-[9px] px-1.5 py-0.5 rounded border cursor-pointer transition-colors
-                              ${form.thinking?.budget_tokens === n ? 'bg-slate-700/40' : 'bg-transparent'} ${color}`}>
+                              ${form.thinking?.budget_tokens === n ? 'bg-zinc-700/40' : 'bg-transparent'} ${color}`}>
                             {label}
                           </button>
                         );

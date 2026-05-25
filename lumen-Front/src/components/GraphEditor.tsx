@@ -440,7 +440,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
           <button
             onClick={() => setIsCreating(true)}
             className="w-4 h-4 flex items-center justify-center rounded
-              text-slate-700 hover:text-text-secondary hover:bg-slate-700/40
+              text-slate-700 hover:text-text-secondary hover:bg-zinc-700/40
               transition-all duration-150 cursor-pointer"
             title="新建实体"
           >
@@ -690,7 +690,7 @@ function GraphEditor({ tdb }: GraphEditorProps) {
                   } catch { /* */ }
                 }}
                 className="text-[10px] px-2 py-1 rounded text-text-muted
-                  hover:text-text-secondary hover:bg-slate-700/40 transition-colors cursor-pointer"
+                  hover:text-text-secondary hover:bg-zinc-700/40 transition-colors cursor-pointer"
               >
                 重载
               </button>

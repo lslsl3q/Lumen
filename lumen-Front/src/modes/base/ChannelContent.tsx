@@ -36,12 +36,12 @@ function ChannelContent() {
     <div className="flex-1 flex flex-col min-w-0">
       {/* 频道标题栏 */}
       <div className="h-10 flex items-center gap-2 px-4 border-b border-border-default flex-shrink-0">
-        <Hash size={14} className="text-[#555]" />
-        <span className="text-sm font-medium text-[#ccc]">{activeChannel?.name}</span>
+        <Hash size={14} className="text-text-dim" />
+        <span className="text-sm font-medium text-text-primary">{activeChannel?.name}</span>
         {activeChannel?.description && (
           <>
             <span className="text-[#333]">·</span>
-            <span className="text-xs text-[#666]">{activeChannel.description}</span>
+            <span className="text-xs text-text-dim">{activeChannel.description}</span>
           </>
         )}
       </div>
@@ -50,7 +50,7 @@ function ChannelContent() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-3 space-y-0.5">
         {channelMessages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-xs text-[#555]">还没有消息，说点什么吧</p>
+            <p className="text-xs text-text-dim">还没有消息，说点什么吧</p>
           </div>
         ) : (
           channelMessages.map((msg) => <ChannelMessage key={msg.id} message={msg} />)
@@ -65,12 +65,12 @@ function ChannelContent() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={`发消息到 #${activeChannel?.name || ''}...`}
-            className="flex-1 bg-transparent text-sm text-[#ccc] placeholder-[#555] outline-none"
+            className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-dim outline-none"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="text-[#555] hover:text-primary disabled:opacity-30
+            className="text-text-dim hover:text-primary disabled:opacity-30
               transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             <Send size={14} />

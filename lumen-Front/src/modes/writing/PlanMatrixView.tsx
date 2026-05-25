@@ -278,13 +278,13 @@ export function PlanMatrixView() {
           <thead>
             <tr>
               <th
-                className="sticky top-0 z-20 bg-[#18181b] border border-zinc-700/50 text-left align-bottom px-3 py-2"
+                className="sticky top-0 z-20 bg-surface-deep border border-zinc-700/50 text-left align-bottom px-3 py-2"
                 style={{ width: labelWidth, minWidth: labelWidth }}
               />
               {columns.map((col) => (
                 <th
                   key={col.id}
-                  className="sticky top-0 z-20 bg-[#18181b] border border-zinc-700/50 text-left align-bottom px-3 py-2"
+                  className="sticky top-0 z-20 bg-surface-deep border border-zinc-700/50 text-left align-bottom px-3 py-2"
                   style={{ width: colWidth, minWidth: colWidth }}
                 >
                   <span className="text-[13px] font-medium text-zinc-300 truncate block" style={{ color: col.color }}>
@@ -306,7 +306,7 @@ export function PlanMatrixView() {
                 <tr key={fs.id} className="group">
                   {/* ── Left Label Column ── */}
                   <td
-                    className="border border-zinc-700/50 px-3 py-2 align-top bg-[#141418]"
+                    className="border border-zinc-700/50 px-3 py-2 align-top bg-surface-deep"
                     style={{ width: labelWidth, minWidth: labelWidth }}
                   >
                     {fs.isNewAct && (
@@ -513,7 +513,7 @@ function MatrixCodexCell({
   // Empty cell: no codex association
   if (!hasAssociation) {
     return (
-      <td className="border border-zinc-700/50 px-1 py-1 bg-[#141418]">
+      <td className="border border-zinc-700/50 px-1 py-1 bg-surface-deep">
         <button
           onClick={() => {
             const codexIds: string[] = (() => {
@@ -535,7 +535,7 @@ function MatrixCodexCell({
 
   // Associated cell: same card wrapper as Grid, with SceneEditor compact inside
   return (
-    <td className="border border-zinc-700/50 p-1 align-top bg-[#141418]" style={{ minWidth: 280 }}>
+    <td className="border border-zinc-700/50 p-1 align-top bg-surface-deep" style={{ minWidth: 280 }}>
       <div className="rounded bg-zinc-900 border border-zinc-600/50 shadow-sm flex min-w-0">
         <div className="grow flex flex-col overflow-hidden">
           <div className="flex items-center gap-1 px-2 py-1 border-b border-zinc-700/50 shrink-0">

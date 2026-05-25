@@ -173,7 +173,7 @@ function RecallTab({ recallLog }: { recallLog: RecallLogEntry[] | null }) {
                       >
                         <div className="flex items-center gap-2 text-xs">
                           <span className={`px-1 py-0.5 rounded text-[10px] ${
-                            msg.role === 'user' ? 'bg-slate-700 text-text-primary' : 'bg-indigo-500/10 text-indigo-400'
+                            msg.role === 'user' ? 'bg-zinc-700 text-text-primary' : 'bg-indigo-500/10 text-indigo-400'
                           }`}>
                             {msg.role === 'user' ? '用户' : 'AI'}
                           </span>

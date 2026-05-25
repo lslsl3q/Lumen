@@ -78,7 +78,7 @@ function TokenRing({ percent, current, total, onCompact, onOpenMonitor }: TokenR
       </ContextMenuTrigger>
       <ContextMenuContent className="w-44">
         {/* Token 信息头 */}
-        <div className="px-2 py-1.5 text-[10px] text-slate-500 border-b border-border/40 mb-0.5">
+        <div className="px-2 py-1.5 text-[10px] text-text-muted border-b border-border/40 mb-0.5">
           <span style={{ color }} className="font-mono">{percent.toFixed(0)}%</span>
           <span className="mx-1">|</span>
           <span className="font-mono">{current.toLocaleString()} / {total.toLocaleString()}</span>

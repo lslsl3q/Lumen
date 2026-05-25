@@ -86,7 +86,7 @@ export default function DashboardMode() {
   }, [switchMode]);
 
   return (
-    <div className="h-full flex flex-col bg-slate-950">
+    <div className="h-full flex flex-col bg-surface-canvas">
       {/* Hidden file input for cover upload */}
       <input
         ref={fileInputRef}
@@ -170,7 +170,7 @@ export default function DashboardMode() {
             onClick={handleOpenBase}
             className="w-full rounded-xl border border-border-default hover:border-primary/50 p-5 flex items-center gap-4 cursor-pointer transition-all duration-200 text-left group"
           >
-            <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-xl shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-surface-elevated flex items-center justify-center text-xl shrink-0">
               🌑
             </div>
             <div className="flex-1 min-w-0">

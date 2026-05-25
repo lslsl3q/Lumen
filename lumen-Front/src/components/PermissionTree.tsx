@@ -92,13 +92,13 @@ function TreeNode({
   return (
     <div>
       <div
-        className="flex items-center gap-1 py-1 px-2 rounded hover:bg-slate-800/50 cursor-pointer group"
+        className="flex items-center gap-1 py-1 px-2 rounded hover:bg-surface-elevated/50 cursor-pointer group"
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {hasChildren ? (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-4 h-4 flex items-center justify-center text-slate-500 hover:text-slate-300"
+            className="w-4 h-4 flex items-center justify-center text-text-muted hover:text-text-primary"
           >
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </button>
@@ -132,10 +132,10 @@ function TreeNode({
         {hasChildren ? (
           expanded ? <FolderOpen size={14} className="text-primary/70" /> : <Folder size={14} className="text-primary/70" />
         ) : (
-          <Folder size={14} className="text-slate-500" />
+          <Folder size={14} className="text-text-muted" />
         )}
         <span
-          className="text-sm text-slate-300 group-hover:text-slate-100 select-none"
+          className="text-sm text-text-primary group-hover:text-slate-100 select-none"
           onClick={() => onSelect?.(node.path)}
         >
           {node.name}
@@ -178,7 +178,7 @@ export default function PermissionTree({ folders, rules, onChange, onSelect, sho
         />
       ))}
       {folders.length === 0 && (
-        <div className="text-sm text-slate-500 text-center py-8">暂无文件夹</div>
+        <div className="text-sm text-text-muted text-center py-8">暂无文件夹</div>
       )}
     </div>
   );

@@ -75,8 +75,8 @@ function SessionItem({
         group relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer
         mx-2 rounded-full my-px ${navItemClass}
         ${isActive
-          ? 'bg-primary/10 text-slate-200'
-          : 'text-slate-400'
+          ? 'bg-primary/10 text-text-primary'
+          : 'text-text-secondary'
         }
       `}
     >
@@ -88,8 +88,8 @@ function SessionItem({
           onBlur={handleSubmit}
           onKeyDown={handleKeyDown}
           onClick={e => e.stopPropagation()}
-          className="flex-1 text-sm bg-slate-800/50 rounded px-2 py-0.5
-            text-slate-200 outline-none border border-primary/30"
+          className="flex-1 text-sm bg-surface-elevated/50 rounded px-2 py-0.5
+            text-text-primary outline-none border border-primary/30"
           autoFocus
         />
       ) : (
@@ -97,13 +97,13 @@ function SessionItem({
       )}
       {!isEditing && (
         <>
-          <span className="text-[10px] text-slate-600 truncate max-w-14">
+          <span className="text-[10px] text-text-dim truncate max-w-14">
             {characterName}
           </span>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0
-              text-slate-600 hover:text-red-400
+              text-text-dim hover:text-red-400
               opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[10px]"
             title="删除会话"
           >
@@ -130,11 +130,11 @@ function SessionPanel({
     <div className="flex flex-col h-full">
       {/* 头部 */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
-        <span className="text-[10px] text-slate-600 font-medium tracking-wider uppercase">Sessions</span>
+        <span className="text-[10px] text-text-dim font-medium tracking-wider uppercase">Sessions</span>
         <button
           onClick={onNewSession}
           className="w-6 h-6 rounded-md flex items-center justify-center
-            text-slate-500 hover:text-slate-300 hover:bg-slate-800/40
+            text-text-muted hover:text-text-primary hover:bg-surface-elevated/40
             transition-colors duration-150 cursor-pointer"
           title="新建会话"
         >
@@ -147,9 +147,9 @@ function SessionPanel({
       {/* 会话列表 */}
       <div className="flex-1 overflow-y-auto scrollbar-lumen" onKeyDown={handleListKeyDown}>
         {isLoading ? (
-          <div className="px-4 py-8 text-center text-xs text-slate-600">加载中...</div>
+          <div className="px-4 py-8 text-center text-xs text-text-dim">加载中...</div>
         ) : sessions.length === 0 ? (
-          <div className="px-4 py-8 text-center text-xs text-slate-600">暂无会话</div>
+          <div className="px-4 py-8 text-center text-xs text-text-dim">暂无会话</div>
         ) : (
           sessions.map((session) => {
             const char = characters.find(c => c.id === session.character_id);

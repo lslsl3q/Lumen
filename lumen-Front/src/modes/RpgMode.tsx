@@ -86,7 +86,7 @@ function RpgMode() {
               onKeyDown={handleKeyDown}
               placeholder="输入你的行动..."
               disabled={chat.isLoading}
-              className="flex-1 bg-transparent text-sm text-[#ccc] placeholder-[#555] outline-none
+              className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-dim outline-none
                 disabled:opacity-50"
             />
             {chat.isLoading ? (
@@ -101,7 +101,7 @@ function RpgMode() {
               <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="text-[#555] hover:text-primary disabled:opacity-30
+                className="text-text-dim hover:text-primary disabled:opacity-30
                   transition-colors cursor-pointer disabled:cursor-not-allowed"
               >
                 <Send size={14} />

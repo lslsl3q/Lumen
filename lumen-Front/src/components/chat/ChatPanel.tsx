@@ -1028,13 +1028,13 @@ function SharedChatPanel(props: SharedChatPanelProps) {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onMouseDown={e => e.stopPropagation()}>
           <button onClick={() => { handleStartEdit(); setContextMenu(null); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-slate-700/40 cursor-pointer transition-colors">编辑消息</button>
+            className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-zinc-700/40 cursor-pointer transition-colors">编辑消息</button>
           {contextMenu.messageId && messages.find(m => m.id === contextMenu.messageId)?.role === 'assistant' && (
             <button onClick={handleRegenerate}
-              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-primary hover:bg-slate-700/40 cursor-pointer transition-colors">重新回复</button>
+              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-primary hover:bg-zinc-700/40 cursor-pointer transition-colors">重新回复</button>
           )}
           <button onClick={handleBranch}
-            className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-primary hover:bg-slate-700/40 cursor-pointer transition-colors">创建分支</button>
+            className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-primary hover:bg-zinc-700/40 cursor-pointer transition-colors">创建分支</button>
           <button onClick={handleDeleteMessage}
             className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-red-400 hover:bg-red-400/08 cursor-pointer transition-colors">删除此条消息</button>
         </div>,

@@ -29,7 +29,7 @@ export default function FloatingLayerHost({ floating }: FloatingLayerHostProps) 
       >
         {/* Phase B: FloatingWindow 内容通过 contentKey 预留 */}
         {state.floatingWindow.contentKey === 'placeholder' && (
-          <div className="text-sm text-slate-500">预留内容区域</div>
+          <div className="text-sm text-text-muted">预留内容区域</div>
         )}
       </FloatingWindow>
     </>

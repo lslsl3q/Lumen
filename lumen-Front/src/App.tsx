@@ -30,10 +30,10 @@ class ErrorBoundary extends Component<EBProps, EBState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="h-full flex items-center justify-center bg-slate-950 text-slate-400 text-sm">
+        <div className="h-full flex items-center justify-center bg-surface-canvas text-text-secondary text-sm">
           <div className="text-center space-y-2">
             <p>组件加载失败</p>
-            <p className="text-xs text-slate-600 font-mono">{this.state.error?.message}</p>
+            <p className="text-xs text-text-dim font-mono">{this.state.error?.message}</p>
           </div>
         </div>
       );
@@ -54,7 +54,7 @@ function App() {
 
 function DebugLayout() {
   return (
-    <div className="h-screen bg-slate-950">
+    <div className="h-screen bg-surface-canvas">
       <Routes>
         <Route path="/debug" element={<DebugWindowPage />} />
       </Routes>
@@ -113,7 +113,7 @@ function MainLayout() {
   }, [floating]);
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950">
+    <div className="h-screen flex flex-col bg-surface-canvas">
       <ErrorBoundary><TitleBar /></ErrorBoundary>
       {isDashboard ? (
         <DashboardMode />

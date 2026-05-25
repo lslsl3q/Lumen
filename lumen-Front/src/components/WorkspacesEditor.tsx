@@ -132,7 +132,7 @@ function WorkspacesEditor({ data, onSave, isSaving }: WorkspacesEditorProps) {
             onClick={() => setReadonlyMode(!readonlyMode)}
             className={`
               relative w-10 h-5 rounded-full transition-colors duration-200
-              ${readonlyMode ? 'bg-primary/30' : 'bg-slate-700'}
+              ${readonlyMode ? 'bg-primary/30' : 'bg-zinc-700'}
             `}
           >
             <span

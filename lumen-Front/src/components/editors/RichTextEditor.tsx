@@ -30,7 +30,7 @@ function BubbleBar({ editor }: { editor: any }) {
           className={`px-1.5 py-0.5 rounded text-[11px] transition-colors duration-100 cursor-pointer
             ${editor.isActive(item.active)
               ? "text-primary bg-primary/10"
-              : "text-text-secondary hover:text-text-primary hover:bg-slate-700/40"
+              : "text-text-secondary hover:text-text-primary hover:bg-zinc-700/40"
             }`}
         >
           {item.label}

@@ -189,7 +189,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
               </label>
 
               {form.selective && (
-                <div className="space-y-3 pl-1 border-l-2 border-slate-800 ml-1">
+                <div className="space-y-3 pl-1 border-l-2 border-border-subtle ml-1">
                   <div>
                     <Select value={form.selective_logic} onValueChange={(v) => setForm({ ...form, selective_logic: v as any })}>
                       <SelectTrigger className="w-full">
@@ -276,7 +276,7 @@ function WorldBookEditor({ worldBookId, onBack }: WorldBookEditorProps) {
                 <div className="text-xs text-text-muted">禁用后不会触发注入</div>
               </div>
               <button type="button" onClick={() => setForm({ ...form, enabled: !form.enabled })}
-                className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${form.enabled ? 'bg-primary/30' : 'bg-slate-700'}`}>
+                className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${form.enabled ? 'bg-primary/30' : 'bg-zinc-700'}`}>
                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-slate-300 transition-transform duration-200 ${form.enabled ? 'translate-x-[20px]' : ''}`} />
               </button>
             </label>

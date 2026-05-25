@@ -17,7 +17,7 @@ interface ModeSwitchProps<T extends string = string> {
 
 function ModeSwitch<T extends string = string>({ modes, activeMode, onSwitch }: ModeSwitchProps<T>) {
   return (
-    <div className="inline-flex rounded-full bg-slate-800/50 p-0.5 gap-0.5">
+    <div className="inline-flex rounded-full bg-surface-elevated/50 p-0.5 gap-0.5">
       {modes.map(mode => {
         const isActive = mode.key === activeMode;
         const isAvailable = mode.available !== false;
@@ -35,7 +35,7 @@ function ModeSwitch<T extends string = string>({ modes, activeMode, onSwitch }: 
               ${isActive
                 ? 'text-primary bg-primary/10'
                 : isAvailable
-                  ? 'text-slate-500 hover:text-slate-300'
+                  ? 'text-text-muted hover:text-text-primary'
                   : 'text-slate-700 cursor-default'
               }`}
             title={!isAvailable ? `${mode.label}（即将推出）` : undefined}

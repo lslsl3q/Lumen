@@ -14,7 +14,7 @@ export function BackButton({ label, onClick }: BackButtonProps) {
       variant="ghost"
       size="xs"
       onClick={onClick}
-      className="w-full justify-start text-slate-500 hover:text-slate-300"
+      className="w-full justify-start text-text-muted hover:text-text-primary"
     >
       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

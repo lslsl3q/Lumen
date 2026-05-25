@@ -40,8 +40,8 @@ function CockpitModelSelect({ value, onChange }: CockpitModelSelectProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         className="inline-flex h-5 items-center gap-0.5 rounded px-1 text-[10px] font-mono
-          text-slate-500 hover:text-slate-300 transition-colors cursor-pointer outline-none
-          data-[state=open]:text-slate-300"
+          text-text-muted hover:text-text-primary transition-colors cursor-pointer outline-none
+          data-[state=open]:text-text-primary"
       >
         {value ? displayName(value) : '模型'}
         <ChevronsUpDownIcon className="size-2.5 opacity-50" />

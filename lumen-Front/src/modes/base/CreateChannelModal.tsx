@@ -36,28 +36,28 @@ function CreateChannelModal({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-medium text-[#ccc]">创建频道</h3>
-          <button onClick={onClose} className="text-[#666] hover:text-[#999] cursor-pointer">
+          <h3 className="text-sm font-medium text-text-primary">创建频道</h3>
+          <button onClick={onClose} className="text-text-dim hover:text-text-muted cursor-pointer">
             <X size={16} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-[10px] text-[#888] uppercase tracking-wider mb-1">频道名称</label>
+            <label className="block text-[10px] text-text-muted uppercase tracking-wider mb-1">频道名称</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="新频道"
               autoFocus
               className="w-full bg-surface-deep border border-border-default rounded-md px-3 py-2
-                text-sm text-[#ccc] placeholder-[#555] outline-none
+                text-sm text-text-primary placeholder:text-text-dim outline-none
                 focus:border-primary/33 transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] text-[#888] uppercase tracking-wider mb-1">频道类型</label>
+            <label className="block text-[10px] text-text-muted uppercase tracking-wider mb-1">频道类型</label>
             <div className="grid grid-cols-2 gap-2">
               {CHANNEL_TYPES.map((ct) => (
                 <button
@@ -67,7 +67,7 @@ function CreateChannelModal({ onClose }: Props) {
                   className={`px-3 py-2 rounded-md border text-left transition-colors cursor-pointer
                     ${type === ct.value
                       ? 'border-primary/33 bg-primary/8 text-primary'
-                      : 'border-border-default text-[#888] hover:border-[#3a3a38]'
+                      : 'border-border-default text-text-muted hover:border-border-default'
                     }`}
                 >
                   <div className="text-xs font-medium">{ct.label}</div>
@@ -78,13 +78,13 @@ function CreateChannelModal({ onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-[10px] text-[#888] uppercase tracking-wider mb-1">描述（选填）</label>
+            <label className="block text-[10px] text-text-muted uppercase tracking-wider mb-1">描述（选填）</label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="频道用途..."
               className="w-full bg-surface-deep border border-border-default rounded-md px-3 py-2
-                text-sm text-[#ccc] placeholder-[#555] outline-none
+                text-sm text-text-primary placeholder:text-text-dim outline-none
                 focus:border-primary/33 transition-colors"
             />
           </div>

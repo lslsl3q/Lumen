@@ -73,10 +73,10 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
   render() {
     if (this.state.error) {
       return (
-        <div className="flex items-center justify-center h-full bg-surface-deep text-slate-400">
+        <div className="flex items-center justify-center h-full bg-surface-deep text-text-secondary">
           <div className="text-center max-w-md">
             <p className="text-red-400 text-sm mb-2">写作模式渲染错误</p>
-            <pre className="text-[11px] text-slate-600 whitespace-pre-wrap break-all">{this.state.error.message}</pre>
+            <pre className="text-[11px] text-text-dim whitespace-pre-wrap break-all">{this.state.error.message}</pre>
             <button
               onClick={() => this.setState({ error: null })}
               className="mt-3 px-3 py-1 text-[11px] bg-primary/10 text-primary rounded hover:bg-primary/20 cursor-pointer"

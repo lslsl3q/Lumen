@@ -36,7 +36,7 @@ function SystemMessage({ content }: { content: string }) {
         px-4 py-1.5 rounded-full text-xs
         ${isDiceRoll
           ? 'bg-primary/10 text-primary/80 border border-primary/20'
-          : 'bg-slate-800/50 text-slate-500 border border-slate-700/30'
+          : 'bg-surface-elevated/50 text-text-muted border border-border-default/30'
         }
       `}>
         {content}
@@ -51,7 +51,7 @@ function PlayerAction({ content, className }: { content: string; className: stri
     <div className={`px-6 py-3 min-w-0 flex justify-end ${className}`}>
       <div className="max-w-[75%] min-w-0">
         <div className="border-r-2 border-primary/60 pr-4 py-1 bg-primary/3 rounded-l-lg">
-          <p className="text-[14px] text-slate-300 leading-relaxed italic break-words">
+          <p className="text-[14px] text-text-primary leading-relaxed italic break-words">
             {content}
           </p>
         </div>
@@ -71,7 +71,7 @@ function GmNarrative({ content, isStreaming, className }: {
   return (
     <div className={`px-6 py-4 min-w-0 ${className}`}>
       <div className="max-w-2xl mx-auto">
-        <div className="text-[15px] text-slate-200/95 leading-[1.85] tracking-wide font-serif
+        <div className="text-[15px] text-text-primary/95 leading-[1.85] tracking-wide font-serif
           break-words overflow-wrap-anywhere">
           <MarkdownContent content={content} isStreaming={isStreaming} />
         </div>

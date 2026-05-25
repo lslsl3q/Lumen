@@ -7,7 +7,7 @@ import { useWritingStore } from "../../stores/useWritingStore";
 import type { WritingSnapshot } from "../../api/writing";
 
 const TYPE_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  auto: { label: "自动", color: "text-slate-400", icon: Clock },
+  auto: { label: "自动", color: "text-text-secondary", icon: Clock },
   manual: { label: "手动", color: "text-primary", icon: Star },
   pre_restore: { label: "备份", color: "text-amber-400", icon: Shield },
 };
@@ -55,7 +55,7 @@ export function SnapshotPanel({ onClose }: { onClose: () => void }) {
       >
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-          <span className="text-sm font-medium text-slate-200">快照管理</span>
+          <span className="text-sm font-medium text-text-primary">快照管理</span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCreate(!showCreate)}
@@ -64,7 +64,7 @@ export function SnapshotPanel({ onClose }: { onClose: () => void }) {
               <Plus className="w-3.5 h-3.5" />
               创建快照
             </button>
-            <button onClick={onClose} className="p-1 rounded text-slate-600 hover:text-slate-400 cursor-pointer">
+            <button onClick={onClose} className="p-1 rounded text-text-dim hover:text-text-secondary cursor-pointer">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -101,7 +101,7 @@ export function SnapshotPanel({ onClose }: { onClose: () => void }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${cfg.color} bg-surface-elevated`}>{cfg.label}</span>
-                    <span className="text-[12px] text-slate-300 truncate">{snap.label}</span>
+                    <span className="text-[12px] text-text-primary truncate">{snap.label}</span>
                   </div>
                   <div className="text-[10px] text-text-muted mt-0.5">
                     {new Date(snap.created_at * 1000).toLocaleString()} · {formatSize(snap.size_bytes)}
@@ -109,10 +109,10 @@ export function SnapshotPanel({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button onClick={() => handleRestore(snap)} title="恢复" className="p-1.5 rounded text-slate-600 hover:text-red-400 hover:bg-red-400/10 cursor-pointer">
+                  <button onClick={() => handleRestore(snap)} title="恢复" className="p-1.5 rounded text-text-dim hover:text-red-400 hover:bg-red-400/10 cursor-pointer">
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={() => handleDelete(snap.id)} title="删除" className="p-1.5 rounded text-slate-600 hover:text-red-400 hover:bg-red-400/10 cursor-pointer">
+                  <button onClick={() => handleDelete(snap.id)} title="删除" className="p-1.5 rounded text-text-dim hover:text-red-400 hover:bg-red-400/10 cursor-pointer">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

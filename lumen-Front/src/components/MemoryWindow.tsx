@@ -116,7 +116,7 @@ function FolderTree({
                 className={`w-full flex items-center gap-1.5 pl-8 pr-3 py-1 cursor-pointer transition-colors duration-100
                   ${isActive
                     ? 'bg-primary/8 text-text-primary'
-                    : 'text-text-muted hover:text-text-primary hover:bg-slate-800/30'
+                    : 'text-text-muted hover:text-text-primary hover:bg-surface-elevated/30'
                   }`}
               >
                 <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -139,7 +139,7 @@ function FolderTree({
           <button
             onClick={() => { onOpenInExplorer(ctxMenu.name); setCtxMenu(null); }}
             className="w-full text-left px-3 py-1.5 text-xs text-text-secondary
-              hover:text-text-primary hover:bg-slate-700/40 cursor-pointer transition-colors"
+              hover:text-text-primary hover:bg-zinc-700/40 cursor-pointer transition-colors"
           >
             在资源管理器中打开
           </button>
@@ -170,7 +170,7 @@ function SearchResult({
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="group flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-slate-800/30 transition-colors">
+    <div className="group flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-surface-elevated/30 transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className={`text-[10px] uppercase tracking-wider ${CATEGORY_COLORS[item.category] || 'text-text-muted'}`}>
@@ -520,7 +520,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
             <button
               onClick={() => setIsCreatingFolder(true)}
               className="ml-auto w-4 h-4 flex items-center justify-center rounded
-                text-slate-700 hover:text-text-secondary hover:bg-slate-700/40
+                text-slate-700 hover:text-text-secondary hover:bg-zinc-700/40
                 transition-all duration-150 cursor-pointer"
               title="新建文件夹"
             >
@@ -811,7 +811,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                       className={`w-full flex flex-col gap-0.5 px-3 py-2 cursor-pointer transition-colors duration-100 text-left
                         ${isActive
                           ? 'bg-primary/8 text-text-primary'
-                          : 'text-text-muted hover:text-text-primary hover:bg-slate-800/30'
+                          : 'text-text-muted hover:text-text-primary hover:bg-surface-elevated/30'
                         }`}
                     >
                       <div className="flex items-center gap-1.5">
@@ -941,7 +941,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                           </summary>
                           <div className="pb-1">
                             {orphans.map(file => (
-                              <div key={file.id} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800/20">
+                              <div key={file.id} className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-surface-elevated/20">
                                 <span className="text-[10px] text-text-muted truncate flex-1">{file.filename}</span>
                                 <span className="text-[9px] text-text-muted">{file.chunk_count}段</span>
                                 <button
@@ -1001,7 +1001,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                         key={chunk.id}
                         onClick={() => setSelectedEntryId(chunk.id)}
                         className={`w-full text-left px-4 py-2 border-b border-border-default/50
-                          text-xs hover:text-text-primary hover:bg-slate-800/30
+                          text-xs hover:text-text-primary hover:bg-surface-elevated/30
                           cursor-pointer transition-colors
                           ${chunk.id === selectedEntryId ? 'bg-primary/8 text-text-primary' : 'text-text-muted'}
                         `}
@@ -1061,7 +1061,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
                   {displayEntry.keywords?.length > 0 ? (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {displayEntry.keywords.map((kw, i) => (
-                        <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800/40 text-text-muted">{kw}</span>
+                        <span key={i} className="px-1.5 py-0.5 rounded bg-surface-elevated/40 text-text-muted">{kw}</span>
                       ))}
                     </div>
                   ) : null}
@@ -1213,7 +1213,7 @@ function MemoryWindow({ open, onClose }: MemoryWindowProps) {
               <button
                 onClick={() => setConfirmDialog(null)}
                 className="px-4 py-1.5 rounded-lg text-xs cursor-pointer
-                  text-text-muted hover:text-text-primary hover:bg-slate-700/40 transition-colors"
+                  text-text-muted hover:text-text-primary hover:bg-zinc-700/40 transition-colors"
               >
                 取消
               </button>

@@ -48,18 +48,18 @@ function hasContent(str: string | undefined | null): boolean {
 }
 
 /** NC-aligned dark theme classes */
-const menuContentCls = "!bg-[#18181b] !text-[#d6d3d1] !border-[#3a3a4a] !rounded-md !p-0 shadow-[0_0_0_1px_#3f3f46,0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)]";
-const subContentCls = "!bg-[#18181b] !text-[#d6d3d1] !border-[#3a3a4a] !rounded-md !p-0";
-const separatorCls = "!bg-[#27272a]";
+const menuContentCls = "!bg-surface-deep !text-text-primary !border-border-default !rounded-md !p-0 shadow-[0_0_0_1px_#3f3f46,0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)]";
+const subContentCls = "!bg-surface-deep !text-text-primary !border-border-default !rounded-md !p-0";
+const separatorCls = "!bg-surface-elevated";
 const itemCls = "!px-4 !py-1.5 !text-[14px] !gap-3";
-const groupLabelCls = "!text-xs tracking-wide font-semibold !text-[#a8a29e] !px-3 !py-1";
+const groupLabelCls = "!text-xs tracking-wide font-semibold !text-text-secondary !px-3 !py-1";
 
 // ── Dot Indicator ──
 
 function DotIndicator({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
-    <svg className="flex-none text-[#78716c] size-2.5" viewBox="0 0 320 512" fill="currentColor" aria-hidden="true">
+    <svg className="flex-none text-text-dim size-2.5" viewBox="0 0 320 512" fill="currentColor" aria-hidden="true">
       <circle cx="160" cy="256" r="100" />
     </svg>
   );
@@ -319,7 +319,7 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {e.name || "(未命名)"}
-                    <span className="ml-auto text-xs text-[#78716c]">{e.type}</span>
+                    <span className="ml-auto text-xs text-text-dim">{e.type}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -341,7 +341,7 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {t}
-                    <span className="ml-auto text-xs text-[#78716c]">{codexEntries.filter(e => e.type === t).length}</span>
+                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.type === t).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -363,7 +363,7 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {key}
-                    <span className="ml-auto text-xs text-[#78716c]">{codexEntries.filter(e => e.custom_fields && key in e.custom_fields).length}</span>
+                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.custom_fields && key in e.custom_fields).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -385,7 +385,7 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {cat}
-                    <span className="ml-auto text-xs text-[#78716c]">{codexEntries.filter(e => e.category === cat).length}</span>
+                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.category === cat).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -407,7 +407,7 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {t}
-                    <span className="ml-auto text-xs text-[#78716c]">{codexEntries.filter(e => e.tags?.includes(t)).length}</span>
+                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.tags?.includes(t)).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>

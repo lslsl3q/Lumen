@@ -86,12 +86,12 @@ export default function DebugWindowPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 text-slate-200 select-none">
+    <div className="h-screen flex flex-col bg-slate-950 text-text-primary select-none">
       {/* 自定义标题栏 */}
       <div className="flex items-center h-8 shrink-0" data-tauri-drag-region>
         {/* 左：标题 */}
         <div className="flex items-center gap-1.5 pl-3" data-tauri-drag-region>
-          <span className="text-[10px] text-slate-600 uppercase tracking-wider font-medium">
+          <span className="text-[10px] text-text-dim uppercase tracking-wider font-medium">
             Debug Monitor
           </span>
         </div>
@@ -107,7 +107,7 @@ export default function DebugWindowPage() {
             className={`h-8 px-2 flex items-center justify-center text-[10px] transition-colors cursor-pointer
               ${alwaysOnTop
                 ? 'text-primary bg-primary/10'
-                : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/40'
+                : 'text-text-dim hover:text-text-secondary hover:bg-surface-elevated/40'
               }`}
             title={alwaysOnTop ? '取消置顶' : '始终置顶'}
           >
@@ -117,7 +117,7 @@ export default function DebugWindowPage() {
           {/* 最小化 */}
           <button
             onClick={() => win.minimize()}
-            className="h-8 w-10 flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors cursor-pointer"
+            className="h-8 w-10 flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-elevated/60 transition-colors cursor-pointer"
           >
             <svg className="w-3.5" viewBox="0 0 12 12"><rect y="5" width="12" height="1.2" fill="currentColor" /></svg>
           </button>
@@ -125,7 +125,7 @@ export default function DebugWindowPage() {
           {/* 最大化/还原 */}
           <button
             onClick={() => win.toggleMaximize()}
-            className="h-8 w-10 flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors cursor-pointer"
+            className="h-8 w-10 flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-elevated/60 transition-colors cursor-pointer"
           >
             {maximized ? (
               <svg className="w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
@@ -145,7 +145,7 @@ export default function DebugWindowPage() {
               await emit('debug-closed');
               await win.destroy();
             }}
-            className="h-8 w-10 flex items-center justify-center text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer rounded-tr-sm"
+            className="h-8 w-10 flex items-center justify-center text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer rounded-tr-sm"
           >
             <svg className="w-3.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
               <path d="M2 2l8 8M10 2l-8 8" />
@@ -159,7 +159,7 @@ export default function DebugWindowPage() {
         {data.layers.length === 0 && data.reactTrace.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center space-y-2">
-              <div className="text-xs text-slate-600">等待调试数据...</div>
+              <div className="text-xs text-text-dim">等待调试数据...</div>
               <div className="text-[10px] text-slate-700">发送消息后自动显示</div>
             </div>
           </div>

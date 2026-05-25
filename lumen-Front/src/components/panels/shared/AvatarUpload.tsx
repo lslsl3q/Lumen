@@ -21,11 +21,11 @@ export function AvatarUpload({ preview, fallback, onChange, size = 'default' }: 
 
   return (
     <label className="cursor-pointer group">
-      <Avatar size={size} className="border border-dashed border-slate-700 group-hover:border-primary/40 transition-colors">
+      <Avatar size={size} className="border border-dashed border-border-default group-hover:border-primary/40 transition-colors">
         {preview ? (
           <AvatarImage src={preview} alt="" />
         ) : (
-          <AvatarFallback className="bg-slate-800 text-[10px] text-slate-500 group-hover:text-slate-400">
+          <AvatarFallback className="bg-surface-elevated text-[10px] text-text-muted group-hover:text-text-secondary">
             {fallback[0] || '?'}
           </AvatarFallback>
         )}

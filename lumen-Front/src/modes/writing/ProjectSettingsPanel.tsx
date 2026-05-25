@@ -65,9 +65,9 @@ export function ProjectSettingsPanel() {
 
 // NC-aligned section card styles
 const sectionCls = "rounded-lg bg-zinc-800/25 p-6 mb-6";
-const headingCls = "text-[14px] font-semibold text-[#d6d3d1] mb-2";
-const descCls = "text-[14px] text-[#a8a29e] mb-4 leading-relaxed";
-const labelCls = "block text-[14px] font-medium text-[#d6d3d1] mb-1.5";
+const headingCls = "text-[14px] font-semibold text-text-primary mb-2";
+const descCls = "text-[14px] text-text-secondary mb-4 leading-relaxed";
+const labelCls = "block text-[14px] font-medium text-text-primary mb-1.5";
 const inputCls = "!h-[37px] !bg-[rgba(63,63,70,0.25)] !border-zinc-600 !rounded-sm !text-[14px] !text-zinc-300 placeholder:!text-zinc-600 focus:!border-zinc-500 focus:!ring-0";
 
 // ── Metadata Tab ──
@@ -170,7 +170,7 @@ function MetadataTab() {
 
         {/* DANGER ZONE section card */}
         <div className="rounded-lg border border-red-900/30 bg-zinc-800/25 p-6">
-          <h3 className="flex items-center gap-1.5 text-[14px] font-semibold text-[#d6d3d1] mb-2">
+          <h3 className="flex items-center gap-1.5 text-[14px] font-semibold text-text-primary mb-2">
             <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
             危险操作
           </h3>
@@ -368,7 +368,7 @@ function WritingTab() {
         </Button>
 
         <div className="mt-4 pt-3 border-t border-zinc-700/50">
-          <p className="text-[14px] font-medium text-[#d6d3d1] mb-2">Presets</p>
+          <p className="text-[14px] font-medium text-text-primary mb-2">Presets</p>
           <p className="text-[13px] text-zinc-500 mb-3">快速添加一组预设标签：</p>
           <div className="flex gap-2">
             <Button
@@ -590,7 +590,7 @@ function ExportTab() {
       </p>
 
       {/* Scene tree preview */}
-      <div className="mb-6 max-h-[300px] overflow-y-auto rounded border border-zinc-700/50 bg-[#141418] p-3">
+      <div className="mb-6 max-h-[300px] overflow-y-auto rounded border border-zinc-700/50 bg-surface-deep p-3">
         {acts.length === 0 && (
           <div className="text-[12px] text-zinc-600 text-center py-4">No scenes to export</div>
         )}
