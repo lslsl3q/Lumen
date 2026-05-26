@@ -4,8 +4,9 @@
  *
  * 实现 UseChatReturn 接口，通过 WebSocket 与 WritingAgent 通信。
  * 复用 useChat 的 Steps 结构（think/tool/text），支持思维链和工具调用渲染。
+ * 支持线程历史加载 + 流结束后持久化消息（触发后端向量化）。
  */
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useWebSocket } from "./useWebSocket";
 import type { StreamEvent } from "../api/chat";
 import type {
@@ -22,6 +23,7 @@ import {
   nextStepId,
 } from "../types/chat";
 import { useWritingStore } from "../stores/useWritingStore";
+import * as writingApi from "../api/writing";
 
 export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -31,6 +33,30 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
 
   const streamingMsgIdRef = useRef<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
+  const lastUserInputRef = useRef<string>("");
+
+  // 加载线程历史消息
+  const activeThreadId = useWritingStore((s) => s.activeThreadId);
+  useEffect(() => {
+    if (!activeThreadId) {
+      setMessages([]);
+      return;
+    }
+    const currentThread = activeThreadId;
+    writingApi.listChatMessages(activeThreadId).then((dbMsgs) => {
+      // 防止线程切换后的过期响应
+      if (useWritingStore.getState().activeThreadId !== currentThread) return;
+      if (dbMsgs.length === 0) return;
+      const loaded: Message[] = dbMsgs.map((m, i) => ({
+        id: m.id,
+        role: m.role as "user" | "assistant",
+        content: m.content,
+        steps: m.role === "assistant" ? [{ type: "text" as const, id: `step_${i}`, content: m.content }] : undefined,
+        isStreaming: false,
+      }));
+      setMessages(loaded);
+    }).catch(() => {});
+  }, [activeThreadId]);
 
   const { sendMessage: wsSend, isConnected } = useWebSocket(
     (event: StreamEvent) => {
@@ -155,6 +181,26 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
             streamingMsgIdRef.current = null;
             requestIdRef.current = null;
             setIsLoading(false);
+
+            // 流结束后持久化消息到后端（触发向量化）
+            const threadId = useWritingStore.getState().activeThreadId;
+            if (threadId) {
+              const userInput = lastUserInputRef.current;
+              const assistantText = safeSteps
+                .filter((s: any) => s.type === "text")
+                .map((s: any) => s.content)
+                .join("");
+              // 保存 user 消息
+              if (userInput) {
+                writingApi.createChatMessage(threadId, "user", userInput).catch(() => {});
+              }
+              // 保存 assistant 消息
+              if (assistantText) {
+                writingApi.createChatMessage(threadId, "assistant", assistantText).catch(() => {});
+              }
+              lastUserInputRef.current = "";
+            }
+
             return [
               ...updated.slice(0, -1),
               { ...last, steps: safeSteps, isStreaming: false },
@@ -175,20 +221,26 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
 
       const {
         activeProjectId,
-        activeChapterId,
+        activeSceneId,
         projects,
         acts,
+        activeThreadId,
       } = useWritingStore.getState();
       const activeProject = projects.find((p) => p.id === activeProjectId);
 
-      // Find active chapter + derive content from nested acts
+      // Derive chapter from activeSceneId by traversing acts → chapters → scenes
       let activeChapter: { id: string; title: string; content: string } | undefined;
-      for (const act of acts) {
-        const ch = act.chapters.find((c) => c.id === activeChapterId);
-        if (ch) {
-          const content = ch.scenes.map((s) => s.content ?? "").join("\n\n");
-          activeChapter = { id: ch.id, title: ch.title, content };
-          break;
+      if (activeSceneId) {
+        for (const act of acts) {
+          for (const ch of act.chapters) {
+            const scene = ch.scenes.find((s) => s.id === activeSceneId);
+            if (scene) {
+              const chapterText = ch.scenes.map((s) => s.content ?? "").join("\n\n");
+              activeChapter = { id: ch.id, title: ch.title, content: chapterText };
+              break;
+            }
+          }
+          if (activeChapter) break;
         }
       }
 
@@ -196,6 +248,7 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
 
       const chapterTitle = activeChapter?.title ?? "";
       const chapterContent = activeChapter?.content ?? "";
+      const chapterId = activeChapter?.id ?? "";
 
       const requestId = crypto.randomUUID();
       requestIdRef.current = requestId;
@@ -218,6 +271,7 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput("");
       setIsLoading(true);
+      lastUserInputRef.current = content;
       setError(null);
       streamingMsgIdRef.current = assistantId;
 
@@ -230,13 +284,14 @@ export function useWritingChat(): UseChatReturn & { isConnected: boolean } {
         type: "writing",
         ai_mode: "chat",
         book_id: activeProjectId,
-        chapter_id: activeChapterId ?? "",
+        chapter_id: chapterId,
         chapter_title: chapterTitle,
         chapter_content: trimmedContent,
         book_name: activeProject.name,
         selected_text: "",
         content,
         request_id: requestId,
+        thread_id: activeThreadId ?? "",
       });
     },
     [wsSend],

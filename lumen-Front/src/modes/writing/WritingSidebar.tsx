@@ -2,7 +2,7 @@ import { forwardRef, useState, useCallback } from "react";
 import { cn } from "../../lib/utils";
 import { useModeStore } from "../../stores/useModeStore";
 import { useWritingStore } from "../../stores/useWritingStore";
-import type { CodexEntry } from "../../api/writing";
+import type { CodexEntry, WritingChatThread } from "../../api/writing";
 import {
   BookOpen,
   StickyNote,
@@ -22,6 +22,10 @@ import {
   FileText,
   FolderTree,
   Sparkles,
+  Search,
+  Pin,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -213,9 +217,7 @@ function SidebarContent({ tab }: { tab: SidebarTab }) {
     case "snippets":
       return <SnippetsPanel />;
     case "chat":
-      return (
-        <div className="p-3 text-sm text-[var(--color-text-dim)]">Chat 面板（待实现）</div>
-      );
+      return <ChatThreadsPanel />;
   }
 }
 
@@ -420,6 +422,208 @@ function EntryRow({
         )}
       </div>
     </button>
+  );
+}
+
+/* ── ChatThreadsPanel ── */
+
+function ChatThreadsPanel() {
+  const chatThreads = useWritingStore((s) => s.chatThreads);
+  const activeThreadId = useWritingStore((s) => s.activeThreadId);
+  const activeProjectId = useWritingStore((s) => s.activeProjectId);
+  const writingViewTab = useWritingStore((s) => s.writingViewTab);
+  const [search, setSearch] = useState("");
+
+  const filtered = search
+    ? chatThreads.filter((t) => t.name.toLowerCase().includes(search.toLowerCase()) || t.ai_mode.toLowerCase().includes(search.toLowerCase()))
+    : chatThreads;
+
+  const pinned = filtered.filter((t) => t.pinned);
+  const unpinned = filtered.filter((t) => !t.pinned);
+
+  const handleThreadClick = useCallback((thread: WritingChatThread) => {
+    const store = useWritingStore.getState();
+    store.setActiveThread(thread.id);
+
+    if (writingViewTab === "write") {
+      // In Write tab: open floating panel
+      store.setChatPanelMode("floating");
+    } else {
+      // Switch to Chat tab for full view
+      store.setWritingViewTab("chat");
+    }
+  }, [writingViewTab]);
+
+  const handleNewThread = useCallback(async () => {
+    if (!activeProjectId) return;
+    await useWritingStore.getState().createChatThreadAction();
+    // Auto-switch to chat or open floating
+    const store = useWritingStore.getState();
+    if (writingViewTab === "write") {
+      store.setChatPanelMode("floating");
+    } else {
+      store.setWritingViewTab("chat");
+    }
+  }, [activeProjectId, writingViewTab]);
+
+  const handleDeleteThread = useCallback(async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await useWritingStore.getState().deleteChatThreadAction(id);
+  }, []);
+
+  const handleTogglePin = useCallback(async (thread: WritingChatThread, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await useWritingStore.getState().updateChatThreadAction(thread.id, {
+      pinned: thread.pinned ? 0 : 1,
+    });
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="flex-none flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--color-border)]">
+        <div className="flex-1 flex items-center gap-1.5 px-2 py-1 rounded bg-white/5 border border-[var(--color-border)]">
+          <Search className="w-3 h-3 text-[var(--color-text-dim)] flex-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索线程…"
+            className="flex-1 bg-transparent text-[12px] text-[var(--color-text-secondary)] placeholder:text-[var(--color-text-dim)] outline-none"
+          />
+        </div>
+        <button
+          onClick={handleNewThread}
+          className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-white/5 transition-colors cursor-pointer"
+          type="button"
+        >
+          <Plus className="w-3 h-3" />
+          新线程
+        </button>
+      </div>
+
+      {/* Thread list */}
+      <div className="flex-1 overflow-y-auto">
+        {pinned.length > 0 && (
+          <ThreadGroup label={`已固定 ${pinned.length} 条`} threads={pinned} activeThreadId={activeThreadId} onClick={handleThreadClick} onTogglePin={handleTogglePin} onDelete={handleDeleteThread} />
+        )}
+        {unpinned.length > 0 && (
+          <ThreadGroup label={`未固定 ${unpinned.length} 条`} threads={unpinned} activeThreadId={activeThreadId} onClick={handleThreadClick} onTogglePin={handleTogglePin} onDelete={handleDeleteThread} />
+        )}
+        {filtered.length === 0 && (
+          <div className="px-3 py-8 text-center text-[12px] text-[var(--color-text-dim)]">
+            {search ? "没有匹配的线程" : "还没有线程，点击上方「新线程」开始"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ThreadGroup({
+  label,
+  threads,
+  activeThreadId,
+  onClick,
+  onTogglePin,
+  onDelete,
+}: {
+  label: string;
+  threads: WritingChatThread[];
+  activeThreadId: string | null;
+  onClick: (t: WritingChatThread) => void;
+  onTogglePin: (t: WritingChatThread, e: React.MouseEvent) => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <CollapsibleTrigger className="flex items-center gap-2 flex-1 min-w-0 hover:bg-white/5 rounded transition-colors text-left cursor-pointer">
+          {open ? <ChevronDown className="w-3 h-3 text-[var(--color-text-dim)]" /> : <ChevronRight className="w-3 h-3 text-[var(--color-text-dim)]" />}
+          <span className="text-[11px] font-semibold text-[var(--color-text-dim)] uppercase tracking-wide">{label}</span>
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent>
+        {threads.map((thread) => (
+          <ThreadItem key={thread.id} thread={thread} isActive={activeThreadId === thread.id} onClick={onClick} onTogglePin={onTogglePin} onDelete={onDelete} />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function ThreadItem({
+  thread,
+  isActive,
+  onClick,
+  onTogglePin,
+  onDelete,
+}: {
+  thread: WritingChatThread;
+  isActive: boolean;
+  onClick: (t: WritingChatThread) => void;
+  onTogglePin: (t: WritingChatThread, e: React.MouseEvent) => void;
+  onDelete: (id: string, e: React.MouseEvent) => void;
+}) {
+  const date = new Date(thread.updated_at * 1000);
+  const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors cursor-pointer",
+        isActive ? "bg-white/8" : "hover:bg-white/5"
+      )}
+      onClick={() => onClick(thread)}
+    >
+      <div className="flex-1 min-w-0">
+        <p className={cn(
+          "text-[14px] truncate",
+          isActive ? "text-stone-200" : "text-stone-400"
+        )}>
+          {thread.name || "Unnamed thread"}
+        </p>
+        <p className="text-[11px] text-stone-500 flex items-center gap-1">
+          <span>{dateStr}</span>
+          {thread.message_count != null && (
+            <>
+              <span> &ndash; </span>
+              <span>{thread.message_count}</span>
+            </>
+          )}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={(e) => onTogglePin(thread, e)}
+          className={cn(
+            "w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors",
+            thread.pinned && "text-amber-400"
+          )}
+          title={thread.pinned ? "Unpin" : "Pin"}
+          type="button"
+        >
+          <Pin className="w-3 h-3" />
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-[var(--color-text-dim)]"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <MoreHorizontal className="w-3 h-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(thread.id, e); }}>
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
   );
 }
 

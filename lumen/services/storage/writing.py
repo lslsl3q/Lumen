@@ -187,6 +187,32 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_wtn_thread ON writing_thread_nodes(thread_id);
         CREATE INDEX IF NOT EXISTS idx_wtn_scene ON writing_thread_nodes(scene_id);
+
+        -- Chat 线程（写作模式对话持久化）
+        CREATE TABLE IF NOT EXISTS writing_chat_threads (
+            id          TEXT PRIMARY KEY,
+            book_id     TEXT NOT NULL,
+            name        TEXT NOT NULL DEFAULT '',
+            ai_mode     TEXT NOT NULL DEFAULT 'chat',
+            pinned      INTEGER NOT NULL DEFAULT 0,
+            pinned_side TEXT NOT NULL DEFAULT 'right',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (book_id) REFERENCES writing_projects(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wct_book ON writing_chat_threads(book_id);
+
+        -- Chat 消息
+        CREATE TABLE IF NOT EXISTS writing_chat_messages (
+            id          TEXT PRIMARY KEY,
+            thread_id   TEXT NOT NULL,
+            role        TEXT NOT NULL,
+            content     TEXT NOT NULL DEFAULT '',
+            metadata    TEXT DEFAULT NULL,
+            created_at  REAL NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES writing_chat_threads(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wcm_thread ON writing_chat_messages(thread_id, created_at);
     """)
 
     # 删旧表（测试数据，无需迁移）
@@ -1091,3 +1117,102 @@ def delete_snippet(snippet_id: str) -> None:
         for i, r in enumerate(remaining):
             conn.execute("UPDATE writing_snippets SET sort_order = ? WHERE id = ?", (i, r["id"]))
         conn.commit()
+
+
+# ── Chat Thread / Message CRUD ──
+
+
+def create_chat_thread(book_id: str, name: str = "", ai_mode: str = "chat") -> dict:
+    tid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO writing_chat_threads (id, book_id, name, ai_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (tid, book_id, name, ai_mode, now, now),
+        )
+        conn.commit()
+    return {"id": tid, "book_id": book_id, "name": name, "ai_mode": ai_mode,
+            "pinned": 0, "pinned_side": "right", "created_at": now, "updated_at": now}
+
+
+def list_chat_threads(book_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT t.*,
+                  (SELECT COUNT(*) FROM writing_chat_messages m WHERE m.thread_id = t.id) AS message_count
+           FROM writing_chat_threads t
+           WHERE t.book_id = ?
+           ORDER BY t.pinned DESC, t.updated_at DESC""",
+        (book_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_chat_thread(thread_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute(
+        """SELECT t.*,
+                  (SELECT COUNT(*) FROM writing_chat_messages m WHERE m.thread_id = t.id) AS message_count
+           FROM writing_chat_threads t WHERE t.id = ?""",
+        (thread_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def update_chat_thread(thread_id: str, **fields) -> dict | None:
+    allowed = {"name", "ai_mode", "pinned", "pinned_side"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return get_chat_thread(thread_id)
+    updates["updated_at"] = time.time()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    with write_lock:
+        conn = get_conn()
+        conn.execute(
+            f"UPDATE writing_chat_threads SET {set_clause} WHERE id = ?",
+            (*updates.values(), thread_id),
+        )
+        conn.commit()
+    return get_chat_thread(thread_id)
+
+
+def delete_chat_thread(thread_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM writing_chat_threads WHERE id = ?", (thread_id,))
+        conn.commit()
+
+
+def create_chat_message(thread_id: str, role: str, content: str, metadata: str | None = None,
+                        book_id: str = "") -> dict:
+    mid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO writing_chat_messages (id, thread_id, role, content, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (mid, thread_id, role, content, metadata, now),
+        )
+        conn.execute(
+            "UPDATE writing_chat_threads SET updated_at = ? WHERE id = ?",
+            (now, thread_id),
+        )
+        conn.commit()
+    return {"id": mid, "thread_id": thread_id, "role": role, "content": content,
+            "metadata": metadata, "created_at": now, "book_id": book_id}
+
+
+def list_chat_messages(thread_id: str, limit: int = 100, before: float | None = None) -> list[dict]:
+    conn = get_conn()
+    if before:
+        rows = conn.execute(
+            "SELECT * FROM writing_chat_messages WHERE thread_id = ? AND created_at < ? ORDER BY created_at ASC LIMIT ?",
+            (thread_id, before, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM writing_chat_messages WHERE thread_id = ? ORDER BY created_at ASC LIMIT ?",
+            (thread_id, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]

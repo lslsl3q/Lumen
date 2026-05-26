@@ -239,14 +239,14 @@ export function ChatView() {
       {/* ── Header: Thread name ── */}
       <div className="flex-none flex justify-center pt-4 pb-2 px-4 md:px-6">
         <div className="w-full max-w-3xl flex items-center gap-2">
-          <span className="text-xs font-medium text-text-dim uppercase tracking-wide shrink-0">
+          <span className="text-sm font-medium text-[var(--color-text-secondary)] shrink-0">
             Name:
           </span>
           <input
             value={threadName}
             onChange={(e) => setThreadName(e.target.value)}
             placeholder="Name your thread..."
-            className="flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-dim border-b border-transparent hover:border-border-default focus:border-border-default transition-colors pb-0.5"
+            className="flex-1 h-9 text-sm bg-transparent text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-dim)] border-b border-transparent hover:border-[var(--color-border)] focus:border-[var(--color-border)] transition-colors"
           />
         </div>
       </div>

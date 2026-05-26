@@ -151,7 +151,7 @@ app.add_middleware(
 )
 
 # 导入路由
-from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, permissions, rerank, theme, templates, chrome_bridge
+from api.routes import chat, session, character, config, ws, persona, authors_note, models, worldbook, skills, knowledge, memories, thinking_clusters, graph, tdb, system, rpg, channel, semantic_group, writing, writing_chat, permissions, rerank, theme, templates, chrome_bridge
 
 # 注册路由
 app.include_router(chat.router, prefix="/chat", tags=["聊天"])
@@ -174,6 +174,7 @@ app.include_router(rpg.router, prefix="/rpg", tags=["RPG世界状态"])
 app.include_router(channel.router, tags=["频道管理"])
 app.include_router(semantic_group.router, tags=["语义组"])
 app.include_router(writing.router, prefix="/writing", tags=["写作模式"])
+app.include_router(writing_chat.router, prefix="/writing/chat", tags=["写作Chat"])
 app.include_router(permissions.router, prefix="/permissions", tags=["权限管理"])
 app.include_router(rerank.router, tags=["Rerank"])
 app.include_router(theme.router, prefix="/api/theme", tags=["Theme Management"])

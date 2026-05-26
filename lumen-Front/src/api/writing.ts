@@ -635,3 +635,77 @@ export async function getThreadsForScene(sceneId: string): Promise<ThreadNodeWit
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+
+// ── Chat Thread / Message ──
+
+const CHAT_BASE = `${API_BASE_URL}/writing/chat`;
+
+export interface WritingChatThread {
+  id: string;
+  book_id: string;
+  name: string;
+  ai_mode: string;
+  pinned: number;
+  pinned_side: "left" | "right";
+  created_at: number;
+  updated_at: number;
+  message_count?: number;
+}
+
+export interface WritingChatMessage {
+  id: string;
+  thread_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  metadata: string | null;
+  created_at: number;
+}
+
+export async function listChatThreads(bookId: string): Promise<WritingChatThread[]> {
+  const res = await fetch(`${CHAT_BASE}/threads?book_id=${encodeURIComponent(bookId)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createChatThread(bookId: string, name?: string, aiMode?: string): Promise<WritingChatThread> {
+  const res = await fetch(`${CHAT_BASE}/threads`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ book_id: bookId, name: name || "", ai_mode: aiMode || "chat" }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateChatThread(id: string, data: Partial<Pick<WritingChatThread, "name" | "ai_mode" | "pinned" | "pinned_side">>): Promise<WritingChatThread> {
+  const res = await fetch(`${CHAT_BASE}/threads/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteChatThread(id: string): Promise<void> {
+  const res = await fetch(`${CHAT_BASE}/threads/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function listChatMessages(threadId: string, limit?: number): Promise<WritingChatMessage[]> {
+  const params = limit ? `?limit=${limit}` : "";
+  const res = await fetch(`${CHAT_BASE}/threads/${encodeURIComponent(threadId)}/messages${params}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createChatMessage(threadId: string, role: string, content: string, metadata?: string): Promise<WritingChatMessage> {
+  const res = await fetch(`${CHAT_BASE}/threads/${encodeURIComponent(threadId)}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role, content, metadata: metadata || null }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

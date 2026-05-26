@@ -4,6 +4,7 @@ import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
 import { ReviewView } from "./writing/ReviewView";
 import { ChatView } from "./writing/ChatView";
+import { FloatingChatPanel } from "./writing/FloatingChatPanel";
 import { CodexDetailPanel } from "./writing/CodexDetailPanel";
 import { PromptManagerView } from "./writing/prompt-manager/PromptManagerView";
 import { ProjectSettingsPanel } from "./writing/ProjectSettingsPanel";
@@ -92,8 +93,10 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { error: Er
 }
 
 export default function WritingMode() {
-  const { isChatPanelOpen, activeProjectId } = useWritingStore();
+  const { activeProjectId } = useWritingStore();
   const activeCodexEntryId = useWritingStore((s) => s.activeCodexEntryId);
+  const chatPanelMode = useWritingStore((s) => s.chatPanelMode);
+  const activeThreadId = useWritingStore((s) => s.activeThreadId);
   const [planSearch, setPlanSearch] = useState("");
   const saveStatus = useWritingStore((s) => s.saveStatus);
   const focusMode = useWritingStore((s) => s.focusMode);
@@ -270,10 +273,8 @@ export default function WritingMode() {
             <PromptManagerView />
           ) : writingViewTab === "write" ? (
             <WritingEditor>
-              {isChatPanelOpen && (
-                <div className="w-[380px] flex-shrink-0 border-l border-border-default flex items-center justify-center text-text-muted text-sm">
-                  AI 面板（待重写）
-                </div>
+              {chatPanelMode === "pinned" && activeThreadId && (
+                <FloatingChatPanel />
               )}
             </WritingEditor>
           ) : writingViewTab === "chat" ? (
@@ -287,6 +288,11 @@ export default function WritingMode() {
       </div>
 
       {activeCodexEntryId && <CodexDetailPanel />}
+
+      {/* Floating chat panel (only in write tab, floating mode) */}
+      {writingViewTab === "write" && chatPanelMode === "floating" && activeThreadId && (
+        <FloatingChatPanel />
+      )}
     </ErrorBoundary>
   );
 }

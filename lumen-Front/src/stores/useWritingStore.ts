@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode } from "../api/writing";
+import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode, WritingChatThread } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -34,8 +34,19 @@ interface WritingState {
   // UI
   aiMode: AiMode;
   sidebarWidth: number;
-  isChatPanelOpen: boolean;
   isLoaded: boolean;
+  chatThreads: WritingChatThread[];
+  activeThreadId: string | null;
+  chatPanelMode: "none" | "floating" | "pinned";
+  chatPanelSide: "left" | "right";
+  setChatPanelMode: (mode: "none" | "floating" | "pinned") => void;
+  toggleChatPanelPin: () => void;
+  loadChatThreads: (bookId: string) => Promise<void>;
+  createChatThreadAction: (name?: string) => Promise<WritingChatThread | null>;
+  deleteChatThreadAction: (id: string) => Promise<void>;
+  updateChatThreadAction: (id: string, data: Partial<Pick<WritingChatThread, "name" | "ai_mode" | "pinned" | "pinned_side">>) => Promise<void>;
+  setActiveThread: (id: string | null) => void;
+  closeChatPanel: () => void;
   focusMode: boolean;
   typewriterMode: boolean;
   toggleFocusMode: () => void;
@@ -114,8 +125,6 @@ interface WritingState {
   // UI
   setAiMode: (mode: AiMode) => void;
   setSidebarWidth: (w: number) => void;
-  toggleChatPanel: () => void;
-
   // Threads
   loadThreads: (projectId: string) => Promise<void>;
   createThread: (type?: WritingThread["type"], name?: string, color?: string) => Promise<WritingThread>;
@@ -138,8 +147,11 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   activeCodexEntryId: null,
   aiMode: "chat",
   sidebarWidth: 280,
-  isChatPanelOpen: false,
   isLoaded: false,
+  chatThreads: [],
+  activeThreadId: null,
+  chatPanelMode: "none",
+  chatPanelSide: "right",
   focusMode: false,
   typewriterMode: false,
   saveStatus: "saved",
@@ -166,7 +178,44 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   clearGhostText: () => set({ ghostTextContent: "", ghostRequestId: null }),
   setAiMode: (mode) => set({ aiMode: mode }),
   setSidebarWidth: (w) => set({ sidebarWidth: Math.max(200, Math.min(500, w)) }),
-  toggleChatPanel: () => set((s) => ({ isChatPanelOpen: !s.isChatPanelOpen })),
+  setChatPanelMode: (mode) => set({ chatPanelMode: mode }),
+  toggleChatPanelPin: () => set((s) => {
+    if (s.chatPanelMode === "floating") return { chatPanelMode: "pinned" as const };
+    if (s.chatPanelMode === "pinned") return { chatPanelMode: "floating" as const };
+    return {};
+  }),
+  setActiveThread: (id) => set({ activeThreadId: id }),
+  closeChatPanel: () => set({ chatPanelMode: "none", activeThreadId: null }),
+  loadChatThreads: async (bookId) => {
+    const threads = await writingApi.listChatThreads(bookId);
+    const s = get();
+    // 如果当前没有活跃线程且有线程可选，自动选最新的
+    const autoId = (!s.activeThreadId || !threads.find(t => t.id === s.activeThreadId)) && threads.length > 0
+      ? threads[0].id
+      : s.activeThreadId;
+    set({ chatThreads: threads, activeThreadId: autoId });
+  },
+  createChatThreadAction: async (name) => {
+    const { activeProjectId } = get();
+    if (!activeProjectId) return null;
+    const thread = await writingApi.createChatThread(activeProjectId, name);
+    set((s) => ({ chatThreads: [thread, ...s.chatThreads], activeThreadId: thread.id }));
+    return thread;
+  },
+  deleteChatThreadAction: async (id) => {
+    await writingApi.deleteChatThread(id);
+    set((s) => ({
+      chatThreads: s.chatThreads.filter((t) => t.id !== id),
+      activeThreadId: s.activeThreadId === id ? null : s.activeThreadId,
+      chatPanelMode: s.activeThreadId === id ? "none" : s.chatPanelMode,
+    }));
+  },
+  updateChatThreadAction: async (id, data) => {
+    const updated = await writingApi.updateChatThread(id, data);
+    set((s) => ({
+      chatThreads: s.chatThreads.map((t) => (t.id === id ? updated : t)),
+    }));
+  },
 
   loadProjects: async () => {
     const projects = await writingApi.listProjects();
@@ -196,11 +245,12 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveProject: async (id) => {
-    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], threads: [], threadNodes: {} });
+    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], threads: [], threadNodes: {}, chatThreads: [], activeThreadId: null, chatPanelMode: "none" });
     if (id) {
       await get().loadManuscript(id);
       await get().loadCodex(id);
       await get().loadThreads(id);
+      await get().loadChatThreads(id);
     }
   },
 

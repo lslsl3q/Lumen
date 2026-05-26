@@ -140,7 +140,6 @@ async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
     selected_text = msg.get("selected_text", "")
     user_input = msg.get("content", "")
     request_id = msg.get("request_id", "")
-
     if not book_id:
         await ws.send_json({"type": "error", "message": "未指定作品", "request_id": request_id})
         return
