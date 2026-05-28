@@ -13,6 +13,7 @@ import FontFamily from "@tiptap/extension-font-family";
 import { GhostTextExtension } from "../../components/editors/GhostTextExtension";
 import { SlashCommandExtension } from "../../components/editors/SlashCommandExtension";
 import { SceneBeatNode } from "../../components/editors/SceneBeatNode";
+import { CodexHighlightExtension, codexPluginKey, invalidateCodexTerms } from "../../components/editors/CodexHighlightExtension";
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -58,7 +59,21 @@ const sceneExtensions = [
   GhostTextExtension,
   SlashCommandExtension,
   SceneBeatNode,
+  CodexHighlightExtension,
 ];
+
+const summaryExtensions = [
+  StarterKit.configure({
+    heading: false, codeBlock: false, blockquote: false,
+    bulletList: false, orderedList: false,
+    horizontalRule: false, code: false, strike: false,
+    dropcursor: false, gapcursor: false,
+  }),
+  Placeholder.configure({ placeholder: "场景摘要…" }),
+  CodexHighlightExtension,
+];
+
+export const sceneEditorRegistry = new Map<string, any>();
 
 function parseContent(raw: string): object {
   try {
@@ -74,12 +89,34 @@ function parseContent(raw: string): object {
   return { type: "doc", content: [{ type: "paragraph" }] };
 }
 
+function parseSummary(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.type === "doc") return parsed as Record<string, unknown>;
+  } catch {}
+  // Legacy plain text — discard per user request, start fresh
+  return { type: "doc", content: [{ type: "paragraph" }] } as unknown as Record<string, unknown>;
+}
+
+function extractSummaryText(doc: Record<string, unknown>): string {
+  try {
+    const texts: string[] = [];
+    const walk = (n: any) => { if (n.text) texts.push(n.text); if (n.content) n.content.forEach(walk); };
+    if ((doc as any).content) (doc as any).content.forEach(walk);
+    return texts.join("").toLowerCase();
+  } catch { return ""; }
+}
+
 export function SceneEditor({ scene, compact = false }: { scene: WritingScene; compact?: boolean }) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summarySaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInternalUpdate = useRef(false);
   const prevSceneId = useRef<string | null>(null);
   const [summaryEditing, setSummaryEditing] = useState(false);
-  const [summaryText, setSummaryText] = useState(scene.summary || "");
+  const [summaryText, setSummaryText] = useState(() => {
+    const doc = parseSummary(scene.summary || "");
+    return extractSummaryText(doc);
+  });
 
   const editor = useEditor({
     extensions: sceneExtensions,
@@ -101,40 +138,82 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
     },
   });
 
+  const summaryEditor = useEditor({
+    extensions: summaryExtensions,
+    content: parseSummary(scene.summary || ""),
+    editable: !compact,
+    editorProps: {
+      attributes: {
+        class: "summary-editor outline-none",
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      if (summarySaveTimerRef.current) clearTimeout(summarySaveTimerRef.current);
+      summarySaveTimerRef.current = setTimeout(() => {
+        const json = ed.getJSON();
+        useWritingStore.getState().patchScene(scene.id, { summary: JSON.stringify(json) });
+      }, 500);
+    },
+  });
+
   useEffect(() => {
     if (!editor || scene.id === prevSceneId.current) return;
     prevSceneId.current = scene.id;
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    if (summarySaveTimerRef.current) { clearTimeout(summarySaveTimerRef.current); summarySaveTimerRef.current = null; }
     isInternalUpdate.current = true;
     editor.commands.setContent(parseContent(scene.content));
     requestAnimationFrame(() => { isInternalUpdate.current = false; });
   }, [scene.id, scene.content, editor]);
 
-  // Sync summary text when scene changes externally
+  // Sync summary editor (TipTap) when scene changes externally
   useEffect(() => {
-    if (!summaryEditing) setSummaryText(scene.summary || "");
+    if (!summaryEditor || scene.id !== prevSceneId.current) return;
+    summaryEditor.commands.setContent(parseSummary(scene.summary || ""));
+  }, [scene.summary, scene.id, summaryEditor]);
+
+  // Sync summary text (compact textarea) — extract plain text from PM JSON
+  useEffect(() => {
+    if (!summaryEditing) {
+      const doc = parseSummary(scene.summary || "");
+      setSummaryText(extractSummaryText(doc) || "");
+    }
   }, [scene.summary, scene.id, summaryEditing]);
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (summarySaveTimerRef.current) clearTimeout(summarySaveTimerRef.current);
     };
   }, []);
 
-  if (!editor && !compact) return null;
+  useEffect(() => {
+    if (editor) {
+      sceneEditorRegistry.set(scene.id, editor);
+      return () => { sceneEditorRegistry.delete(scene.id); };
+    }
+  }, [editor, scene.id]);
 
   const codexEntries = useWritingStore((s) => s.codexEntries);
   const allThreads = useWritingStore((s) => s.threads);
   const allThreadNodes = useWritingStore((s) => s.threadNodes);
 
+  // Force codex terms rebuild + decoration recalculation when entries change
+  useEffect(() => {
+    invalidateCodexTerms();
+    if (!editor) return;
+    const { tr } = editor.state;
+    tr.setMeta(codexPluginKey, { updated: true });
+    editor.view.dispatch(tr);
+  }, [editor, codexEntries]);
+
+  if (!editor && !compact) return null;
+
   const associatedCodex = useMemo(() => {
     const explicitIds = new Set(
       Array.isArray(scene.codex_ids) ? scene.codex_ids : (() => { try { return JSON.parse(scene.codex_ids || "[]"); } catch { return []; } })(),
     );
-    const summary = (scene.summary || "").toLowerCase();
+    const summary = extractSummaryText(parseSummary(scene.summary || ""));
     let contentText = "";
     try {
       const doc = JSON.parse(scene.content);
@@ -199,9 +278,8 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
 
   const handleSummaryBlur = async () => {
     setSummaryEditing(false);
-    if (summaryText !== (scene.summary || "")) {
-      useWritingStore.getState().patchScene(scene.id, { summary: summaryText });
-    }
+    const doc = { type: "doc", content: [{ type: "paragraph", content: summaryText ? [{ type: "text", text: summaryText }] : [] }] };
+    useWritingStore.getState().patchScene(scene.id, { summary: JSON.stringify(doc) });
   };
 
   const handleDelete = async () => {
@@ -256,9 +334,9 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
           {associatedCodex.map(entry => (
             <button
               key={entry.id}
-              onClick={() => toggleCodex(entry.id)}
+              data-codex-entry-id={entry.id}
               className="inline-flex items-center px-1.5 py-0.5 rounded bg-zinc-800/80 text-[10px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors cursor-pointer max-w-[72px] truncate"
-              title={`${entry.name}（点击移除）`}
+              title={entry.name}
               type="button"
             >
               <span className="truncate">{entry.name}</span>
@@ -336,7 +414,7 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
   }
 
   return (
-    <section className="scene-section">
+    <section className="scene-section" data-scene-id={scene.id}>
       <div className="manuscript-inner flex flex-col lg:flex-row lg:gap-[var(--gap)]">
       <div className="manuscript-content">
         <EditorContent editor={editor} />
@@ -361,33 +439,49 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
             </div>
           )}
 
-          <div className="mt-1">
-            <textarea
-              readOnly={!summaryEditing}
-              className="w-full min-h-[24px] text-[var(--color-text-dim)] text-sm leading-relaxed resize-none outline-none cursor-text transition-colors"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
-                color: summaryEditing ? 'var(--color-text-secondary)' : undefined,
-              }}
-              placeholder="场景摘要…"
-              value={summaryText}
-              onFocus={(e) => {
-                setSummaryEditing(true);
-                autoResize(e.currentTarget);
-              }}
-              onChange={(e) => {
-                setSummaryText(e.target.value);
-                autoResize(e.currentTarget);
-              }}
-              onBlur={handleSummaryBlur}
-              onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
-              rows={1}
-            />
+          <div className="mt-1 summary-editor-wrapper text-sm leading-relaxed text-[var(--color-text-dim)]">
+            <EditorContent editor={summaryEditor} />
           </div>
 
-          <div className="flex gap-2.5 pt-1 flex-wrap">
+          {/* Tags area — separate from action buttons */}
+          <div className="flex flex-wrap gap-0.5 pt-1 empty:hidden">
+            <SceneLabelTags scene={scene} onRemove={toggleLabel} />
+            {associatedCodex.map(entry => (
+              <span
+                key={entry.id}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-zinc-800/80 text-[11px] text-zinc-400 truncate max-w-[80px] group"
+              >
+                <button
+                  data-codex-entry-id={entry.id}
+                  className="truncate cursor-pointer hover:text-zinc-200 transition-colors"
+                  title={entry.name}
+                  type="button"
+                >
+                  {entry.name}
+                </button>
+                <button
+                  className="shrink-0 cursor-pointer text-zinc-500 hover:text-zinc-200 transition-colors opacity-0 group-hover:opacity-100 leading-none"
+                  onClick={(e) => { e.stopPropagation(); toggleCodex(entry.id); }}
+                  title="移除"
+                  type="button"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            {sceneThreadNodes.map(node => (
+              <span key={node.id}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[80px]"
+                style={{ color: node.threadColor, background: node.threadColor + "15" }}
+                title={`${node.threadName} — ${node.title || node.type}`}>
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: node.threadColor }} />
+                <span className="truncate">{node.threadName || "未命名"}</span>
+              </span>
+            ))}
+          </div>
+
+          {/* Action buttons row */}
+          <div className="flex gap-0.5 pt-1">
             <ActionsMenu iconSize="w-3 h-3" className="flex items-center gap-1 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors cursor-pointer">
               <DropdownMenuItem>与场景对话</DropdownMenuItem>
               <DropdownMenuItem>AI 摘要</DropdownMenuItem>
@@ -413,21 +507,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
             </PopoverContent>
           </Popover>
 
-            {/* Label tags */}
-            <SceneLabelTags scene={scene} />
-
-            {/* Codex tags */}
-            {associatedCodex.map(entry => (
-              <button
-                key={entry.id}
-                onClick={() => toggleCodex(entry.id)}
-                className="inline-flex items-center px-1.5 py-0.5 rounded bg-zinc-800/80 text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors cursor-pointer truncate max-w-[80px]"
-                title={`${entry.name}（点击移除）`}
-                type="button"
-              >
-                {entry.name}
-              </button>
-            ))}
             <Popover>
               <PopoverTrigger
                 className="flex items-center gap-1 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors cursor-pointer"
@@ -448,16 +527,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
               </PopoverContent>
             </Popover>
 
-            {/* Thread tags */}
-            {sceneThreadNodes.map(node => (
-              <span key={node.id}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[80px]"
-                style={{ color: node.threadColor, background: node.threadColor + "15" }}
-                title={`${node.threadName} — ${node.title || node.type}`}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: node.threadColor }} />
-                <span className="truncate">{node.threadName || "未命名"}</span>
-              </span>
-            ))}
             {allThreads.length > 0 && (
               <Popover>
                 <PopoverTrigger
@@ -541,7 +610,7 @@ function LabelPickerContent({
   );
 }
 
-function SceneLabelTags({ scene, compact = false }: { scene: WritingScene; compact?: boolean }) {
+function SceneLabelTags({ scene, compact = false, onRemove }: { scene: WritingScene; compact?: boolean; onRemove?: (labelId: string) => void }) {
   const labels = useWritingStore((s) => s.labels);
   const ids: string[] = useMemo(() => {
     if (Array.isArray((scene as any).label_ids)) return (scene as any).label_ids;
@@ -559,7 +628,7 @@ function SceneLabelTags({ scene, compact = false }: { scene: WritingScene; compa
       {shown.map(label => (
         <span
           key={label.id}
-          className="inline-flex items-center gap-1 rounded-sm text-[10px] truncate"
+          className="inline-flex items-center gap-0.5 rounded-sm text-[10px] truncate group"
           style={{
             color: LABEL_COLOR_MAP[label.color] || "#6b7280",
             background: (LABEL_COLOR_MAP[label.color] || "#6b7280") + "20",
@@ -570,6 +639,17 @@ function SceneLabelTags({ scene, compact = false }: { scene: WritingScene; compa
         >
           <span className="w-1.5 h-1.5 rounded-sm shrink-0" style={{ background: LABEL_COLOR_MAP[label.color] || "#6b7280" }} />
           <span className="truncate">{label.name}</span>
+          {onRemove && (
+            <button
+              className="shrink-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity ml-0.5 leading-none"
+              style={{ color: "inherit" }}
+              onClick={(e) => { e.stopPropagation(); onRemove(label.id); }}
+              title="移除"
+              type="button"
+            >
+              ×
+            </button>
+          )}
         </span>
       ))}
       {active.length > maxShow && (

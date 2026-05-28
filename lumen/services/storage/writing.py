@@ -213,6 +213,112 @@ def _init_tables(conn: sqlite3.Connection):
             FOREIGN KEY (thread_id) REFERENCES writing_chat_threads(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_wcm_thread ON writing_chat_messages(thread_id, created_at);
+
+        -- ── Plot System (5-level structural planning) ──
+
+        -- L1: Plot — 作品级（一本书一个）
+        CREATE TABLE IF NOT EXISTS plot (
+            id          TEXT PRIMARY KEY,
+            project_id  TEXT NOT NULL UNIQUE,
+            title       TEXT NOT NULL DEFAULT '',
+            summary     TEXT NOT NULL DEFAULT '',
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
+        );
+
+        -- L2: PlotArc — 大卷/大阶段
+        CREATE TABLE IF NOT EXISTS plot_arcs (
+            id          TEXT PRIMARY KEY,
+            plot_id     TEXT NOT NULL,
+            title       TEXT NOT NULL DEFAULT '',
+            summary     TEXT NOT NULL DEFAULT '',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (plot_id) REFERENCES plot(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_pa_plot ON plot_arcs(plot_id);
+
+        -- L3: PlotLine — 剧情线（主线/支线/暗线）
+        CREATE TABLE IF NOT EXISTS plot_lines (
+            id          TEXT PRIMARY KEY,
+            arc_id      TEXT NOT NULL,
+            name        TEXT NOT NULL DEFAULT '',
+            title       TEXT NOT NULL DEFAULT '',
+            type        TEXT NOT NULL DEFAULT 'subplot',
+            color       TEXT NOT NULL DEFAULT '#6b7280',
+            status      TEXT NOT NULL DEFAULT 'active',
+            summary     TEXT NOT NULL DEFAULT '',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (arc_id) REFERENCES plot_arcs(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_pl_arc ON plot_lines(arc_id);
+
+        -- L4: PlotNode — 剧情节点（一个完整事件，可关联多个 Scene）
+        CREATE TABLE IF NOT EXISTS plot_nodes (
+            id          TEXT PRIMARY KEY,
+            line_id     TEXT NOT NULL,
+            title       TEXT NOT NULL DEFAULT '',
+            summary     TEXT NOT NULL DEFAULT '',
+            purpose     TEXT NOT NULL DEFAULT '',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (line_id) REFERENCES plot_lines(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_pn_line ON plot_nodes(line_id);
+
+        -- L5: PlotBeat — 情节节拍（最小叙事单元）
+        CREATE TABLE IF NOT EXISTS plot_beats (
+            id          TEXT PRIMARY KEY,
+            node_id     TEXT NOT NULL,
+            kind        TEXT NOT NULL DEFAULT 'setup',
+            summary     TEXT NOT NULL DEFAULT '',
+            effect      TEXT NOT NULL DEFAULT '',
+            status      TEXT NOT NULL DEFAULT 'planted',
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            metadata    TEXT NOT NULL DEFAULT '{}',
+            created_at  REAL NOT NULL,
+            updated_at  REAL NOT NULL,
+            FOREIGN KEY (node_id) REFERENCES plot_nodes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_pb_node ON plot_beats(node_id);
+
+        -- PlotLink — 跨线交叉引用（伏笔/呼应/冲突/并行）
+        CREATE TABLE IF NOT EXISTS plot_links (
+            id              TEXT PRIMARY KEY,
+            source_beat_id  TEXT NOT NULL,
+            target_beat_id  TEXT NOT NULL,
+            relation        TEXT NOT NULL DEFAULT 'foreshadow',
+            note            TEXT NOT NULL DEFAULT '',
+            sort_order      INTEGER NOT NULL DEFAULT 0,
+            created_at      REAL NOT NULL,
+            updated_at      REAL NOT NULL,
+            FOREIGN KEY (source_beat_id) REFERENCES plot_beats(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_beat_id) REFERENCES plot_beats(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_plk_source ON plot_links(source_beat_id);
+        CREATE INDEX IF NOT EXISTS idx_plk_target ON plot_links(target_beat_id);
+
+        -- PlotNode ↔ Scene 关联（M:N）
+        CREATE TABLE IF NOT EXISTS plot_node_scenes (
+            id          TEXT PRIMARY KEY,
+            node_id     TEXT NOT NULL,
+            scene_id    TEXT NOT NULL,
+            sort_order  INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (node_id) REFERENCES plot_nodes(id) ON DELETE CASCADE,
+            FOREIGN KEY (scene_id) REFERENCES writing_scenes(id) ON DELETE CASCADE,
+            UNIQUE(node_id, scene_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_pns_node ON plot_node_scenes(node_id);
+        CREATE INDEX IF NOT EXISTS idx_pns_scene ON plot_node_scenes(scene_id);
     """)
 
     # 删旧表（测试数据，无需迁移）
@@ -1216,3 +1322,400 @@ def list_chat_messages(thread_id: str, limit: int = 100, before: float | None = 
             (thread_id, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Plot System CRUD ──
+
+# L1: Plot
+
+def get_or_create_plot(project_id: str) -> dict:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM plot WHERE project_id = ?", (project_id,)).fetchone()
+    if row:
+        return dict(row)
+    pid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO plot (id, project_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (pid, project_id, now, now),
+        )
+        conn.commit()
+    return {"id": pid, "project_id": project_id, "title": "", "summary": "",
+            "metadata": "{}", "created_at": now, "updated_at": now}
+
+
+def update_plot(plot_id: str, **kwargs) -> dict | None:
+    allowed = {"title", "summary", "metadata"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if not fields:
+        raise ValueError("No valid fields to update")
+    now = time.time()
+    fields["updated_at"] = now
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [plot_id]
+    with write_lock:
+        conn = get_conn()
+        conn.execute(f"UPDATE plot SET {sets} WHERE id = ?", vals)
+        conn.commit()
+    row = conn.execute("SELECT * FROM plot WHERE id = ?", (plot_id,)).fetchone()
+    return dict(row) if row else None
+
+
+# L2: PlotArc
+
+def create_arc(plot_id: str, title: str = "", summary: str = "") -> dict:
+    aid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        mx = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM plot_arcs WHERE plot_id = ?", (plot_id,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO plot_arcs (id, plot_id, title, summary, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (aid, plot_id, title, summary, mx + 1, now, now),
+        )
+        conn.commit()
+    return {"id": aid, "plot_id": plot_id, "title": title, "summary": summary,
+            "sort_order": mx + 1, "metadata": "{}", "created_at": now, "updated_at": now}
+
+
+def list_arcs(plot_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM plot_arcs WHERE plot_id = ? ORDER BY sort_order", (plot_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_arc(arc_id: str, **kwargs) -> dict | None:
+    allowed = {"title", "summary", "sort_order", "metadata"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if not fields:
+        raise ValueError("No valid fields to update")
+    now = time.time()
+    fields["updated_at"] = now
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [arc_id]
+    with write_lock:
+        conn = get_conn()
+        conn.execute(f"UPDATE plot_arcs SET {sets} WHERE id = ?", vals)
+        conn.commit()
+    row = conn.execute("SELECT * FROM plot_arcs WHERE id = ?", (arc_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def delete_arc(arc_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM plot_arcs WHERE id = ?", (arc_id,))
+        conn.commit()
+
+
+def reorder_arcs(plot_id: str, ordered_ids: list[str]) -> None:
+    with write_lock:
+        conn = get_conn()
+        for i, aid in enumerate(ordered_ids):
+            conn.execute("UPDATE plot_arcs SET sort_order = ? WHERE id = ? AND plot_id = ?", (i, aid, plot_id))
+        conn.commit()
+
+
+# L3: PlotLine
+
+VALID_LINE_TYPES = {"main", "subplot", "dark"}
+VALID_LINE_STATUSES = {"active", "dormant", "surfaced", "resolved"}
+
+
+def create_line(arc_id: str, name: str = "", title: str = "",
+                type: str = "subplot", color: str = "#6b7280") -> dict:
+    if type not in VALID_LINE_TYPES:
+        type = "subplot"
+    lid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        mx = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM plot_lines WHERE arc_id = ?", (arc_id,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO plot_lines (id, arc_id, name, title, type, color, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (lid, arc_id, name, title, type, color, mx + 1, now, now),
+        )
+        conn.commit()
+    return {"id": lid, "arc_id": arc_id, "name": name, "title": title, "type": type,
+            "color": color, "status": "active", "summary": "", "sort_order": mx + 1,
+            "metadata": "{}", "created_at": now, "updated_at": now}
+
+
+def list_lines(arc_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM plot_lines WHERE arc_id = ? ORDER BY sort_order", (arc_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_line(line_id: str, **kwargs) -> dict | None:
+    allowed = {"name", "title", "type", "color", "status", "summary", "sort_order", "metadata"}
+    if "type" in kwargs and kwargs["type"] not in VALID_LINE_TYPES:
+        del kwargs["type"]
+    if "status" in kwargs and kwargs["status"] not in VALID_LINE_STATUSES:
+        del kwargs["status"]
+    fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if not fields:
+        raise ValueError("No valid fields to update")
+    now = time.time()
+    fields["updated_at"] = now
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [line_id]
+    with write_lock:
+        conn = get_conn()
+        conn.execute(f"UPDATE plot_lines SET {sets} WHERE id = ?", vals)
+        conn.commit()
+    row = conn.execute("SELECT * FROM plot_lines WHERE id = ?", (line_id,)).fetchone()
+    return dict(row)
+
+
+def delete_line(line_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM plot_lines WHERE id = ?", (line_id,))
+        conn.commit()
+
+
+def reorder_lines(arc_id: str, ordered_ids: list[str]) -> None:
+    with write_lock:
+        conn = get_conn()
+        for i, lid in enumerate(ordered_ids):
+            conn.execute("UPDATE plot_lines SET sort_order = ? WHERE id = ? AND arc_id = ?", (i, lid, arc_id))
+        conn.commit()
+
+
+# L4: PlotNode
+
+def create_node(line_id: str, title: str = "", summary: str = "", purpose: str = "",
+                scene_ids: list[str] | None = None) -> dict:
+    nid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        mx = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM plot_nodes WHERE line_id = ?", (line_id,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO plot_nodes (id, line_id, title, summary, purpose, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (nid, line_id, title, summary, purpose, mx + 1, now, now),
+        )
+        if scene_ids:
+            for si, sid in enumerate(scene_ids):
+                pns_id = str(uuid.uuid4())
+                conn.execute(
+                    "INSERT INTO plot_node_scenes (id, node_id, scene_id, sort_order) VALUES (?, ?, ?, ?)",
+                    (pns_id, nid, sid, si),
+                )
+        conn.commit()
+    return {"id": nid, "line_id": line_id, "title": title, "summary": summary,
+            "purpose": purpose, "sort_order": mx + 1, "metadata": "{}",
+            "scene_ids": scene_ids or [], "created_at": now, "updated_at": now}
+
+
+def list_nodes(line_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM plot_nodes WHERE line_id = ? ORDER BY sort_order", (line_id,)).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        scenes = conn.execute(
+            "SELECT scene_id FROM plot_node_scenes WHERE node_id = ? ORDER BY sort_order",
+            (d["id"],),
+        ).fetchall()
+        d["scene_ids"] = [s["scene_id"] for s in scenes]
+        result.append(d)
+    return result
+
+
+def update_node(node_id: str, **kwargs) -> dict:
+    allowed = {"title", "summary", "purpose", "sort_order", "metadata"}
+    fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    has_scene_update = "scene_ids" in kwargs and kwargs["scene_ids"] is not None
+    if not fields and not has_scene_update:
+        raise ValueError("No valid fields to update")
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        if fields:
+            fields["updated_at"] = now
+            sets = ", ".join(f"{k} = ?" for k in fields)
+            vals = list(fields.values()) + [node_id]
+            conn.execute(f"UPDATE plot_nodes SET {sets} WHERE id = ?", vals)
+        if has_scene_update:
+            conn.execute("DELETE FROM plot_node_scenes WHERE node_id = ?", (node_id,))
+            for i, sid in enumerate(kwargs["scene_ids"]):
+                pns_id = str(uuid.uuid4())
+                conn.execute(
+                    "INSERT INTO plot_node_scenes (id, node_id, scene_id, sort_order) VALUES (?, ?, ?, ?)",
+                    (pns_id, node_id, sid, i),
+                )
+        conn.commit()
+    row = conn.execute("SELECT * FROM plot_nodes WHERE id = ?", (node_id,)).fetchone()
+    d = dict(row)
+    scenes = conn.execute(
+        "SELECT scene_id FROM plot_node_scenes WHERE node_id = ? ORDER BY sort_order",
+        (node_id,),
+    ).fetchall()
+    d["scene_ids"] = [s["scene_id"] for s in scenes]
+    return d
+
+
+def delete_node(node_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM plot_nodes WHERE id = ?", (node_id,))
+        conn.commit()
+
+
+def reorder_nodes(line_id: str, ordered_ids: list[str]) -> None:
+    with write_lock:
+        conn = get_conn()
+        for i, nid in enumerate(ordered_ids):
+            conn.execute("UPDATE plot_nodes SET sort_order = ? WHERE id = ? AND line_id = ?", (i, nid, line_id))
+        conn.commit()
+
+
+# L5: PlotBeat
+
+VALID_BEAT_KINDS = {
+    "setup", "action", "conflict", "despair", "relief", "reward",
+    "mystery", "reveal", "twist", "payoff", "result",
+}
+VALID_BEAT_STATUSES = {"planted", "resolved", "abandoned"}
+
+
+def create_beat(node_id: str, kind: str = "setup", summary: str = "",
+                effect: str = "", status: str = "planted") -> dict:
+    if kind not in VALID_BEAT_KINDS:
+        kind = "setup"
+    if status not in VALID_BEAT_STATUSES:
+        status = "planted"
+    bid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        mx = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM plot_beats WHERE node_id = ?", (node_id,)).fetchone()[0]
+        conn.execute(
+            "INSERT INTO plot_beats (id, node_id, kind, summary, effect, status, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (bid, node_id, kind, summary, effect, status, mx + 1, now, now),
+        )
+        conn.commit()
+    return {"id": bid, "node_id": node_id, "kind": kind, "summary": summary,
+            "effect": effect, "status": status, "sort_order": mx + 1,
+            "metadata": "{}", "created_at": now, "updated_at": now}
+
+
+def list_beats(node_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM plot_beats WHERE node_id = ? ORDER BY sort_order", (node_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def update_beat(beat_id: str, **kwargs) -> dict | None:
+    allowed = {"kind", "summary", "effect", "status", "sort_order", "metadata"}
+    if "kind" in kwargs and kwargs["kind"] not in VALID_BEAT_KINDS:
+        del kwargs["kind"]
+    if "status" in kwargs and kwargs["status"] not in VALID_BEAT_STATUSES:
+        del kwargs["status"]
+    fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if not fields:
+        raise ValueError("No valid fields to update")
+    now = time.time()
+    fields["updated_at"] = now
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    vals = list(fields.values()) + [beat_id]
+    with write_lock:
+        conn = get_conn()
+        conn.execute(f"UPDATE plot_beats SET {sets} WHERE id = ?", vals)
+        conn.commit()
+    row = conn.execute("SELECT * FROM plot_beats WHERE id = ?", (beat_id,)).fetchone()
+    return dict(row)
+
+
+def delete_beat(beat_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM plot_beats WHERE id = ?", (beat_id,))
+        conn.commit()
+
+
+def reorder_beats(node_id: str, ordered_ids: list[str]) -> None:
+    with write_lock:
+        conn = get_conn()
+        for i, bid in enumerate(ordered_ids):
+            conn.execute("UPDATE plot_beats SET sort_order = ? WHERE id = ? AND node_id = ?", (i, bid, node_id))
+        conn.commit()
+
+
+# PlotLink
+
+VALID_LINK_RELATIONS = {"foreshadow", "echo", "conflict", "parallel"}
+
+
+def create_link(source_beat_id: str, target_beat_id: str, relation: str = "foreshadow",
+                note: str = "") -> dict:
+    if relation not in VALID_LINK_RELATIONS:
+        relation = "foreshadow"
+    lid = str(uuid.uuid4())
+    now = time.time()
+    with write_lock:
+        conn = get_conn()
+        conn.execute(
+            "INSERT INTO plot_links (id, source_beat_id, target_beat_id, relation, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (lid, source_beat_id, target_beat_id, relation, note, now, now),
+        )
+        conn.commit()
+    return {"id": lid, "source_beat_id": source_beat_id, "target_beat_id": target_beat_id,
+            "relation": relation, "note": note, "sort_order": 0,
+            "created_at": now, "updated_at": now}
+
+
+def list_links_for_beat(beat_id: str) -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM plot_links WHERE source_beat_id = ? OR target_beat_id = ?",
+        (beat_id, beat_id),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_link(link_id: str) -> None:
+    with write_lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM plot_links WHERE id = ?", (link_id,))
+        conn.commit()
+
+
+# Aggregate: full plot tree for a project
+
+def get_plot_tree(project_id: str) -> dict | None:
+    conn = get_conn()
+    plot_row = conn.execute("SELECT * FROM plot WHERE project_id = ?", (project_id,)).fetchone()
+    if not plot_row:
+        return None
+    plot = dict(plot_row)
+    arcs = conn.execute("SELECT * FROM plot_arcs WHERE plot_id = ? ORDER BY sort_order", (plot["id"],)).fetchall()
+    plot["arcs"] = []
+    for arc_row in arcs:
+        arc = dict(arc_row)
+        lines = conn.execute("SELECT * FROM plot_lines WHERE arc_id = ? ORDER BY sort_order", (arc["id"],)).fetchall()
+        arc["lines"] = []
+        for line_row in lines:
+            line = dict(line_row)
+            nodes = conn.execute("SELECT * FROM plot_nodes WHERE line_id = ? ORDER BY sort_order", (line["id"],)).fetchall()
+            line["nodes"] = []
+            for node_row in nodes:
+                node = dict(node_row)
+                scenes = conn.execute(
+                    "SELECT scene_id FROM plot_node_scenes WHERE node_id = ? ORDER BY sort_order",
+                    (node["id"],),
+                ).fetchall()
+                node["scene_ids"] = [s["scene_id"] for s in scenes]
+                beats = conn.execute(
+                    "SELECT * FROM plot_beats WHERE node_id = ? ORDER BY sort_order",
+                    (node["id"],),
+                ).fetchall()
+                node["beats"] = [dict(b) for b in beats]
+                line["nodes"].append(node)
+            arc["lines"].append(line)
+        plot["arcs"].append(arc)
+    return plot

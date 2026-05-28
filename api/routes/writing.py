@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import PlainTextResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel, Field
 
+from lumen.config import ASSETS_DIR
 from lumen.services.storage.writing import (
     create_project, list_projects, get_project, update_project, delete_project,
     create_chapter, list_chapters, get_chapter, update_chapter, delete_chapter, reorder_chapters,
@@ -28,6 +29,14 @@ from lumen.services.storage.writing import (
     create_thread, list_threads, get_thread, update_thread, delete_thread, reorder_threads,
     create_thread_node, list_thread_nodes, get_thread_node, update_thread_node, delete_thread_node, reorder_thread_nodes,
     get_threads_for_scene,
+    # Plot System
+    get_or_create_plot, update_plot,
+    create_arc, list_arcs, update_arc, delete_arc, reorder_arcs,
+    create_line, list_lines, update_line, delete_line, reorder_lines,
+    create_node, list_nodes, update_node, delete_node, reorder_nodes,
+    create_beat, list_beats, update_beat, delete_beat, reorder_beats,
+    create_link, list_links_for_beat, delete_link,
+    get_plot_tree,
 )
 from lumen.services.storage.writing_snapshot import (
     create_snapshot, list_snapshots, get_snapshot_detail, restore_snapshot, delete_snapshot,
@@ -185,7 +194,7 @@ async def api_delete_project(project_id: str):
 
 # ── 封面 ──
 
-COVERS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "assets", "writing", "covers")
+COVERS_DIR = os.path.join(ASSETS_DIR, "writing", "covers")
 os.makedirs(COVERS_DIR, exist_ok=True)
 
 
@@ -823,3 +832,261 @@ async def api_reorder_thread_nodes(req: ReorderThreadNodesRequest):
 @router.get("/scenes/{scene_id}/thread-nodes")
 async def api_get_threads_for_scene(scene_id: str):
     return await asyncio.to_thread(get_threads_for_scene, scene_id)
+
+
+# ── Plot System ──
+
+class CreateArcRequest(BaseModel):
+    plot_id: str
+    title: str = ""
+    summary: str = ""
+
+
+class UpdateArcRequest(BaseModel):
+    title: str | None = None
+    summary: str | None = None
+
+
+class ReorderArcsRequest(BaseModel):
+    plot_id: str
+    ordered_ids: list[str]
+
+
+class CreateLineRequest(BaseModel):
+    arc_id: str
+    name: str = ""
+    title: str = ""
+    type: str = "subplot"
+    color: str = "#6b7280"
+
+
+class UpdateLineRequest(BaseModel):
+    name: str | None = None
+    title: str | None = None
+    type: str | None = None
+    color: str | None = None
+    status: str | None = None
+    summary: str | None = None
+
+
+class ReorderLinesRequest(BaseModel):
+    arc_id: str
+    ordered_ids: list[str]
+
+
+class CreateNodeRequest(BaseModel):
+    line_id: str
+    title: str = ""
+    summary: str = ""
+    purpose: str = ""
+    scene_ids: list[str] | None = None
+
+
+class UpdateNodeRequest(BaseModel):
+    title: str | None = None
+    summary: str | None = None
+    purpose: str | None = None
+    scene_ids: list[str] | None = None
+
+
+class ReorderNodesRequest(BaseModel):
+    line_id: str
+    ordered_ids: list[str]
+
+
+class CreateBeatRequest(BaseModel):
+    node_id: str
+    kind: str = "setup"
+    summary: str = ""
+    effect: str = ""
+    status: str = "planted"
+
+
+class UpdateBeatRequest(BaseModel):
+    kind: str | None = None
+    summary: str | None = None
+    effect: str | None = None
+    status: str | None = None
+
+
+class ReorderBeatsRequest(BaseModel):
+    node_id: str
+    ordered_ids: list[str]
+
+
+class CreateLinkRequest(BaseModel):
+    source_beat_id: str
+    target_beat_id: str
+    relation: str = "foreshadow"
+    note: str = ""
+
+
+# L1: Plot — get-or-create per project
+
+@router.get("/projects/{project_id}/plot")
+async def api_get_plot(project_id: str):
+    return await asyncio.to_thread(get_or_create_plot, project_id)
+
+
+@router.patch("/plots/{plot_id}")
+async def api_update_plot(plot_id: str, req: UpdateArcRequest):
+    result = await asyncio.to_thread(update_plot, plot_id, **req.model_dump(exclude_none=True))
+    if not result:
+        raise HTTPException(status_code=404, detail="Plot not found")
+    return result
+
+
+@router.get("/projects/{project_id}/plot-tree")
+async def api_get_plot_tree(project_id: str):
+    return await asyncio.to_thread(get_plot_tree, project_id)
+
+
+# L2: Arcs
+
+@router.post("/plots/{plot_id}/arcs")
+async def api_create_arc(plot_id: str, req: CreateArcRequest):
+    req.plot_id = plot_id
+    return await asyncio.to_thread(create_arc, req.plot_id, req.title, req.summary)
+
+
+@router.get("/plots/{plot_id}/arcs")
+async def api_list_arcs(plot_id: str):
+    return await asyncio.to_thread(list_arcs, plot_id)
+
+
+@router.patch("/arcs/{arc_id}")
+async def api_update_arc(arc_id: str, req: UpdateArcRequest):
+    result = await asyncio.to_thread(update_arc, arc_id, **req.model_dump(exclude_none=True))
+    if not result:
+        raise HTTPException(status_code=404, detail="Arc not found")
+    return result
+
+
+@router.delete("/arcs/{arc_id}")
+async def api_delete_arc(arc_id: str):
+    await asyncio.to_thread(delete_arc, arc_id)
+    return {"status": "deleted"}
+
+
+@router.post("/plots/{plot_id}/arcs/reorder")
+async def api_reorder_arcs(req: ReorderArcsRequest):
+    await asyncio.to_thread(reorder_arcs, req.plot_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# L3: Lines
+
+@router.post("/arcs/{arc_id}/lines")
+async def api_create_line(arc_id: str, req: CreateLineRequest):
+    req.arc_id = arc_id
+    return await asyncio.to_thread(create_line, req.arc_id, req.name, req.title, req.type, req.color)
+
+
+@router.get("/arcs/{arc_id}/lines")
+async def api_list_lines(arc_id: str):
+    return await asyncio.to_thread(list_lines, arc_id)
+
+
+@router.patch("/lines/{line_id}")
+async def api_update_line(line_id: str, req: UpdateLineRequest):
+    result = await asyncio.to_thread(update_line, line_id, **req.model_dump(exclude_none=True))
+    if not result:
+        raise HTTPException(status_code=404, detail="Line not found")
+    return result
+
+
+@router.delete("/lines/{line_id}")
+async def api_delete_line(line_id: str):
+    await asyncio.to_thread(delete_line, line_id)
+    return {"status": "deleted"}
+
+
+@router.post("/arcs/{arc_id}/lines/reorder")
+async def api_reorder_lines(req: ReorderLinesRequest):
+    await asyncio.to_thread(reorder_lines, req.arc_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# L4: Nodes
+
+@router.post("/lines/{line_id}/nodes")
+async def api_create_node(line_id: str, req: CreateNodeRequest):
+    req.line_id = line_id
+    return await asyncio.to_thread(create_node, req.line_id, req.title, req.summary, req.purpose, req.scene_ids)
+
+
+@router.get("/lines/{line_id}/nodes")
+async def api_list_nodes(line_id: str):
+    return await asyncio.to_thread(list_nodes, line_id)
+
+
+@router.patch("/nodes/{node_id}")
+async def api_update_node(node_id: str, req: UpdateNodeRequest):
+    updates = req.model_dump(exclude_none=True)
+    result = await asyncio.to_thread(update_node, node_id, **updates)
+    if not result:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return result
+
+
+@router.delete("/nodes/{node_id}")
+async def api_delete_node(node_id: str):
+    await asyncio.to_thread(delete_node, node_id)
+    return {"status": "deleted"}
+
+
+@router.post("/lines/{line_id}/nodes/reorder")
+async def api_reorder_nodes(req: ReorderNodesRequest):
+    await asyncio.to_thread(reorder_nodes, req.line_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# L5: Beats
+
+@router.post("/nodes/{node_id}/beats")
+async def api_create_beat(node_id: str, req: CreateBeatRequest):
+    req.node_id = node_id
+    return await asyncio.to_thread(create_beat, req.node_id, req.kind, req.summary, req.effect, req.status)
+
+
+@router.get("/nodes/{node_id}/beats")
+async def api_list_beats(node_id: str):
+    return await asyncio.to_thread(list_beats, node_id)
+
+
+@router.patch("/beats/{beat_id}")
+async def api_update_beat(beat_id: str, req: UpdateBeatRequest):
+    result = await asyncio.to_thread(update_beat, beat_id, **req.model_dump(exclude_none=True))
+    if not result:
+        raise HTTPException(status_code=404, detail="Beat not found")
+    return result
+
+
+@router.delete("/beats/{beat_id}")
+async def api_delete_beat(beat_id: str):
+    await asyncio.to_thread(delete_beat, beat_id)
+    return {"status": "deleted"}
+
+
+@router.post("/nodes/{node_id}/beats/reorder")
+async def api_reorder_beats(req: ReorderBeatsRequest):
+    await asyncio.to_thread(reorder_beats, req.node_id, req.ordered_ids)
+    return {"status": "reordered"}
+
+
+# PlotLink
+
+@router.post("/plot-links")
+async def api_create_link(req: CreateLinkRequest):
+    return await asyncio.to_thread(create_link, req.source_beat_id, req.target_beat_id, req.relation, req.note)
+
+
+@router.get("/beats/{beat_id}/links")
+async def api_list_links(beat_id: str):
+    return await asyncio.to_thread(list_links_for_beat, beat_id)
+
+
+@router.delete("/plot-links/{link_id}")
+async def api_delete_link(link_id: str):
+    await asyncio.to_thread(delete_link, link_id)
+    return {"status": "deleted"}

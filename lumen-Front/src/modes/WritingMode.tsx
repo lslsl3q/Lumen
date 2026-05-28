@@ -8,10 +8,12 @@ import { FloatingChatPanel } from "./writing/FloatingChatPanel";
 import { CodexDetailPanel } from "./writing/CodexDetailPanel";
 import { PromptManagerView } from "./writing/prompt-manager/PromptManagerView";
 import { ProjectSettingsPanel } from "./writing/ProjectSettingsPanel";
+import { FormatPanel } from "./writing/FormatPanel";
+import { CodexPreviewCard } from "./writing/CodexPreviewCard";
 import { useWritingStore } from "../stores/useWritingStore";
 import type { ManuscriptAct } from "../api/writing";
 import { cn } from "../lib/utils";
-import { Eye, Type, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, FolderTree, ListTree, Table2, Search, LayoutGrid, GitBranch } from "lucide-react";
+import { Eye, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, FolderTree, ListTree, Table2, Search, LayoutGrid, GitBranch, GitMerge } from "lucide-react";
 import { Toggle } from "../components/ui/toggle";
 import { Separator } from "../components/ui/separator";
 import {
@@ -37,6 +39,7 @@ const PLAN_VIEWS = [
   { key: "matrix" as const, label: "矩阵", icon: Table2 },
   { key: "outline" as const, label: "大纲", icon: ListTree },
   { key: "threads" as const, label: "线索", icon: GitBranch },
+  { key: "plot" as const, label: "剧情", icon: GitMerge },
 ];
 
 function filterLabel(
@@ -100,9 +103,7 @@ export default function WritingMode() {
   const [planSearch, setPlanSearch] = useState("");
   const saveStatus = useWritingStore((s) => s.saveStatus);
   const focusMode = useWritingStore((s) => s.focusMode);
-  const typewriterMode = useWritingStore((s) => s.typewriterMode);
   const toggleFocusMode = useWritingStore((s) => s.toggleFocusMode);
-  const toggleTypewriterMode = useWritingStore((s) => s.toggleTypewriterMode);
   const acts = useWritingStore((s) => s.acts);
   const manuscriptFilter = useWritingStore((s) => s.manuscriptFilter);
   const setManuscriptFilter = useWritingStore((s) => s.setManuscriptFilter);
@@ -111,6 +112,9 @@ export default function WritingMode() {
       return cSum + (ch.scenes || []).reduce((sSum: number, sc: any) => sSum + (sc.word_count || 0), 0);
     }, 0);
   }, 0);
+  const formatPrefs = useWritingStore((s) => s.formatPreferences);
+  const readingMinutes = Math.max(1, Math.ceil(totalWords / (formatPrefs.readingSpeed || 200)));
+  const pageCount = Math.max(1, Math.ceil(totalWords / (formatPrefs.wordsPerPage || 250)));
   const writingViewTab = useWritingStore((s) => s.writingViewTab);
   const setWritingViewTab = useWritingStore((s) => s.setWritingViewTab);
   const planViewMode = useWritingStore((s) => s.planViewMode);
@@ -244,8 +248,11 @@ export default function WritingMode() {
               {writingViewTab === "write" && !showPromptManager && !showSettingsPanel && (
                 <>
                   <span className="text-[11px] text-text-muted tabular-nums">{totalWords} 词</span>
+                  <span className="text-[11px] text-text-dim tabular-nums">{readingMinutes} 分钟</span>
+                  <span className="text-[11px] text-text-dim tabular-nums">{pageCount} 页</span>
                   <SaveStatusDot status={saveStatus} />
                   <Separator orientation="vertical" className="h-3 mx-0.5" />
+                  <FormatPanel />
                   <Toggle
                     size="sm"
                     pressed={focusMode}
@@ -253,14 +260,6 @@ export default function WritingMode() {
                     aria-label="专注模式"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                  </Toggle>
-                  <Toggle
-                    size="sm"
-                    pressed={typewriterMode}
-                    onPressedChange={toggleTypewriterMode}
-                    aria-label="打字机模式"
-                  >
-                    <Type className="w-3.5 h-3.5" />
                   </Toggle>
                 </>
               )}
@@ -288,6 +287,7 @@ export default function WritingMode() {
       </div>
 
       {activeCodexEntryId && <CodexDetailPanel />}
+      <CodexPreviewCard />
 
       {/* Floating chat panel (only in write tab, floating mode) */}
       {writingViewTab === "write" && chatPanelMode === "floating" && activeThreadId && (

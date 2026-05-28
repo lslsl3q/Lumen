@@ -2,7 +2,8 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { ActHeader } from "./ActHeader";
 import { ChapterHeader } from "./ChapterHeader";
-import { SceneEditor } from "./SceneEditor";
+import { sceneEditorRegistry } from "./SceneEditor";
+import { LazySceneEditor } from "./LazySceneEditor";
 import { SceneSeparator } from "./SceneSeparator";
 import { InsertButton } from "./InsertButton";
 import { BeatNavigator, type BeatInfo } from "./BeatNavigator";
@@ -74,6 +75,50 @@ export function ManuscriptView({ filter }: { filter?: { type: "all" } | { type: 
     return () => window.removeEventListener("resize", collectBeats);
   }, [acts, collectBeats]);
 
+  const activeSceneId = useWritingStore((s) => s.activeSceneId);
+  const jumpPosition = useWritingStore((s) => s.formatPreferences.jumpPosition);
+
+  useEffect(() => {
+    if (!activeSceneId) return;
+    const el = document.querySelector(`[data-scene-id="${activeSceneId}"]`);
+    if (!el) return;
+
+    const viewport = el.closest("[data-slot=\"scroll-area-viewport\"]") as HTMLElement | null;
+    if (!viewport) return;
+
+    const placeCursor = (attempts = 0) => {
+      const editor = sceneEditorRegistry.get(activeSceneId);
+      if (editor) {
+        editor.commands.focus(jumpPosition === "end" ? "end" : "start");
+        return;
+      }
+      // Editor might still be lazy-loading, retry
+      if (attempts < 20) {
+        setTimeout(() => placeCursor(attempts + 1), 100);
+      }
+    };
+
+    let done = false;
+    const onScrollEnd = () => {
+      if (done) return;
+      done = true;
+      viewport.removeEventListener("scrollend", onScrollEnd);
+      placeCursor();
+    };
+
+    viewport.addEventListener("scrollend", onScrollEnd, { once: false });
+    const fallback = setTimeout(() => { onScrollEnd(); }, 1000);
+
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => {
+      clearTimeout(fallback);
+      viewport.removeEventListener("scrollend", onScrollEnd);
+    };
+  }, [activeSceneId, jumpPosition]);
+
   const totalHeight = scrollRef.current?.scrollHeight || 1;
 
   const handleInsert = async (type: string, parentId?: string) => {
@@ -116,7 +161,7 @@ export function ManuscriptView({ filter }: { filter?: { type: "all" } | { type: 
               );
             }
             case "scene":
-              return <SceneEditor key={item.id} scene={item as any} />;
+              return <LazySceneEditor key={item.id} scene={item as any} />;
             case "separator":
               return <SceneSeparator key={`sep-${i}`} />;
             case "add-scene":

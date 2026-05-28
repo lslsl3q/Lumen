@@ -1,8 +1,48 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode, WritingChatThread } from "../api/writing";
+import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode, WritingChatThread, Plot, PlotArc, PlotLine, PlotNode, PlotBeat } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
+
+export interface FormatPreferences {
+  // Typography
+  fontFamily: string;
+  textSizeMode: 's' | 'm' | 'l' | 'xl';
+  lineHeightMode: 'none' | 's' | 'm' | 'l';
+  textIndentMode: 'none' | 's' | 'm' | 'l';
+  chicagoStyle: boolean;
+  paragraphSpacingMode: 'none' | 's' | 'm' | 'l';
+  pageWidthMode: 's' | 'm' | 'l' | 'xl' | 'full';
+  textAlignMode: 'left' | 'justify';
+  sceneDividerStyle: 'boxes' | 'line' | 'wave' | 'heart' | 'asterisks';
+  // Cursor
+  jumpPosition: 'start' | 'end';
+  typewriterMode: boolean;
+  smoothFollow: boolean;
+  // Page
+  colorizeAnnotations: boolean;
+  // Statistics
+  readingSpeed: number;
+  wordsPerPage: number;
+}
+
+export const DEFAULT_FORMAT_PREFS: FormatPreferences = {
+  fontFamily: 'serif',
+  textSizeMode: 'm',
+  lineHeightMode: 's',
+  textIndentMode: 'none',
+  chicagoStyle: false,
+  paragraphSpacingMode: 's',
+  pageWidthMode: 'l',
+  textAlignMode: 'justify',
+  sceneDividerStyle: 'line',
+  jumpPosition: 'start',
+  typewriterMode: false,
+  smoothFollow: false,
+  colorizeAnnotations: true,
+  readingSpeed: 200,
+  wordsPerPage: 250,
+};
 
 interface WritingState {
   // Data
@@ -20,8 +60,24 @@ interface WritingState {
   manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
   setManuscriptFilter: (filter: WritingState["manuscriptFilter"]) => void;
 
+  // Plot system
+  plotTree: Plot | null;
+  loadPlotTree: (projectId: string) => Promise<void>;
+  createArcAction: (title?: string) => Promise<PlotArc | null>;
+  updateArcAction: (id: string, data: Partial<Pick<PlotArc, "title" | "summary">>) => Promise<void>;
+  deleteArcAction: (id: string) => Promise<void>;
+  createLineAction: (arcId: string, name?: string, title?: string, type?: PlotLine["type"], color?: string) => Promise<PlotLine | null>;
+  updateLineAction: (id: string, data: Partial<Pick<PlotLine, "name" | "title" | "type" | "color" | "status" | "summary">>) => Promise<void>;
+  deleteLineAction: (id: string) => Promise<void>;
+  createNodeAction: (lineId: string, title?: string, summary?: string, purpose?: string) => Promise<PlotNode | null>;
+  updateNodeAction: (id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose">> & { scene_ids?: string[] }) => Promise<void>;
+  deleteNodeAction: (id: string) => Promise<void>;
+  createBeatAction: (nodeId: string, kind?: PlotBeat["kind"], summary?: string) => Promise<PlotBeat | null>;
+  updateBeatAction: (id: string, data: Partial<Pick<PlotBeat, "kind" | "summary" | "effect" | "status">>) => Promise<void>;
+  deleteBeatAction: (id: string) => Promise<void>;
+
   // Plan view state
-  planViewMode: "grid" | "outline" | "matrix" | "threads";
+  planViewMode: "grid" | "outline" | "matrix" | "threads" | "plot";
   setPlanViewMode: (mode: WritingState["planViewMode"]) => void;
   writingViewTab: "plan" | "write" | "chat" | "review";
   setWritingViewTab: (tab: WritingState["writingViewTab"]) => void;
@@ -51,6 +107,8 @@ interface WritingState {
   typewriterMode: boolean;
   toggleFocusMode: () => void;
   toggleTypewriterMode: () => void;
+  formatPreferences: FormatPreferences;
+  updateFormatPreference: <K extends keyof FormatPreferences>(key: K, value: FormatPreferences[K]) => void;
 
   // Ghost Text
   ghostTextContent: string;
@@ -153,7 +211,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   chatPanelMode: "none",
   chatPanelSide: "right",
   focusMode: false,
-  typewriterMode: false,
+  typewriterMode: (() => { try { const s = localStorage.getItem('lumen-format-prefs'); return s ? JSON.parse(s).typewriterMode ?? false : false; } catch { return false; } })(),
   saveStatus: "saved",
   lastSavedAt: null,
   contentDirty: false,
@@ -164,6 +222,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   manuscriptFilter: { type: "all" },
   threads: [],
   threadNodes: {},
+  plotTree: null,
   planViewMode: "outline",
   writingViewTab: "write",
   showPromptManager: false,
@@ -174,6 +233,17 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   toggleFocusMode: () => set((s) => ({ focusMode: !s.focusMode })),
   toggleTypewriterMode: () => set((s) => ({ typewriterMode: !s.typewriterMode })),
+  formatPreferences: (() => {
+    try {
+      const saved = localStorage.getItem('lumen-format-prefs');
+      return saved ? { ...DEFAULT_FORMAT_PREFS, ...JSON.parse(saved) } : DEFAULT_FORMAT_PREFS;
+    } catch { return DEFAULT_FORMAT_PREFS; }
+  })(),
+  updateFormatPreference: (key, value) => set((s) => {
+    const next = { ...s.formatPreferences, [key]: value };
+    try { localStorage.setItem('lumen-format-prefs', JSON.stringify(next)); } catch {}
+    return { formatPreferences: next };
+  }),
   setGhostText: (content, requestId) => set({ ghostTextContent: content, ghostRequestId: requestId }),
   clearGhostText: () => set({ ghostTextContent: "", ghostRequestId: null }),
   setAiMode: (mode) => set({ aiMode: mode }),
@@ -245,12 +315,13 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveProject: async (id) => {
-    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], threads: [], threadNodes: {}, chatThreads: [], activeThreadId: null, chatPanelMode: "none" });
+    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], threads: [], threadNodes: {}, chatThreads: [], activeThreadId: null, chatPanelMode: "none", plotTree: null });
     if (id) {
       await get().loadManuscript(id);
       await get().loadCodex(id);
       await get().loadThreads(id);
       await get().loadChatThreads(id);
+      await get().loadPlotTree(id);
     }
   },
 
@@ -621,6 +692,192 @@ export const useWritingStore = create<WritingState>((set, get) => ({
         },
       }));
     }
+  },
+
+  // ── Plot System ──
+
+  loadPlotTree: async (projectId) => {
+    try {
+      await writingApi.getPlot(projectId); // get-or-create，确保 plot 记录存在
+      const tree = await writingApi.getPlotTree(projectId);
+      set({ plotTree: tree });
+    } catch {
+      set({ plotTree: null });
+    }
+  },
+
+  createArcAction: async (title = "") => {
+    const { plotTree } = get();
+    if (!plotTree) return null;
+    const arc = await writingApi.createArc(plotTree.id, title);
+    set((s) => ({
+      plotTree: s.plotTree ? { ...s.plotTree, arcs: [...(s.plotTree.arcs || []), arc] } : null,
+    }));
+    return arc;
+  },
+
+  updateArcAction: async (id, data) => {
+    const updated = await writingApi.updateArc(id, data);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => a.id === id ? { ...a, ...updated } : a),
+      } : null,
+    }));
+  },
+
+  deleteArcAction: async (id) => {
+    await writingApi.deleteArc(id);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).filter((a) => a.id !== id),
+      } : null,
+    }));
+  },
+
+  createLineAction: async (arcId, name = "", title = "", type = "subplot" as const, color = "#6b7280") => {
+    const line = await writingApi.createLine(arcId, name, title, type, color);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) =>
+          a.id === arcId ? { ...a, lines: [...(a.lines || []), line] } : a
+        ),
+      } : null,
+    }));
+    return line;
+  },
+
+  updateLineAction: async (id, data) => {
+    const updated = await writingApi.updateLine(id, data);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) => l.id === id ? { ...l, ...updated } : l),
+        })),
+      } : null,
+    }));
+  },
+
+  deleteLineAction: async (id) => {
+    await writingApi.deleteLine(id);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).filter((l) => l.id !== id),
+        })),
+      } : null,
+    }));
+  },
+
+  createNodeAction: async (lineId, title = "", summary = "", purpose = "") => {
+    const node = await writingApi.createNode(lineId, title, summary, purpose);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) =>
+            l.id === lineId ? { ...l, nodes: [...(l.nodes || []), { ...node, beats: [] }] } : l
+          ),
+        })),
+      } : null,
+    }));
+    return node;
+  },
+
+  updateNodeAction: async (id, data) => {
+    const updated = await writingApi.updateNode(id, data);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) => ({
+            ...l,
+            nodes: (l.nodes || []).map((n) => n.id === id ? { ...n, ...updated } : n),
+          })),
+        })),
+      } : null,
+    }));
+  },
+
+  deleteNodeAction: async (id) => {
+    await writingApi.deleteNode(id);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) => ({
+            ...l,
+            nodes: (l.nodes || []).filter((n) => n.id !== id),
+          })),
+        })),
+      } : null,
+    }));
+  },
+
+  createBeatAction: async (nodeId, kind = "setup" as const, summary = "") => {
+    const beat = await writingApi.createBeat(nodeId, kind, summary);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) => ({
+            ...l,
+            nodes: (l.nodes || []).map((n) =>
+              n.id === nodeId ? { ...n, beats: [...(n.beats || []), beat] } : n
+            ),
+          })),
+        })),
+      } : null,
+    }));
+    return beat;
+  },
+
+  updateBeatAction: async (id, data) => {
+    const updated = await writingApi.updateBeat(id, data);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) => ({
+            ...l,
+            nodes: (l.nodes || []).map((n) => ({
+              ...n,
+              beats: (n.beats || []).map((b) => b.id === id ? { ...b, ...updated } : b),
+            })),
+          })),
+        })),
+      } : null,
+    }));
+  },
+
+  deleteBeatAction: async (id) => {
+    await writingApi.deleteBeat(id);
+    set((s) => ({
+      plotTree: s.plotTree ? {
+        ...s.plotTree,
+        arcs: (s.plotTree.arcs || []).map((a) => ({
+          ...a,
+          lines: (a.lines || []).map((l) => ({
+            ...l,
+            nodes: (l.nodes || []).map((n) => ({
+              ...n,
+              beats: (n.beats || []).filter((b) => b.id !== id),
+            })),
+          })),
+        })),
+      } : null,
+    }));
   },
 
   getActiveProject: () => {

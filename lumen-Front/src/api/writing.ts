@@ -709,3 +709,291 @@ export async function createChatMessage(threadId: string, role: string, content:
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+
+// ── Plot System ──
+
+export type PlotBeatKind =
+  | "setup" | "action" | "conflict" | "despair" | "relief" | "reward"
+  | "mystery" | "reveal" | "twist" | "payoff" | "result";
+
+export type PlotBeatStatus = "planted" | "resolved" | "abandoned";
+
+export type PlotLineType = "main" | "subplot" | "dark";
+
+export type PlotLineStatus = "active" | "dormant" | "surfaced" | "resolved";
+
+export type PlotLinkRelation = "foreshadow" | "echo" | "conflict" | "parallel";
+
+export const PLOT_BEAT_KIND_LABELS: Record<PlotBeatKind, string> = {
+  setup: "铺垫", action: "行动", conflict: "冲突", despair: "低谷",
+  relief: "释放", reward: "回报", mystery: "悬念", reveal: "揭示",
+  twist: "反转", payoff: "回收", result: "结果",
+};
+
+export const PLOT_BEAT_KIND_COLORS: Record<PlotBeatKind, string> = {
+  setup: "#94a3b8", action: "#3b82f6", conflict: "#ef4444", despair: "#6b21a8",
+  relief: "#22c55e", reward: "#eab308", mystery: "#8b5cf6", reveal: "#06b6d4",
+  twist: "#f97316", payoff: "#10b981", result: "#6b7280",
+};
+
+export const PLOT_BEAT_STATUS_LABELS: Record<PlotBeatStatus, string> = {
+  planted: "已埋", resolved: "已收", abandoned: "已弃",
+};
+
+export const PLOT_LINE_TYPE_LABELS: Record<PlotLineType, string> = {
+  main: "主线", subplot: "支线", dark: "暗线",
+};
+
+export const PLOT_LINK_RELATION_LABELS: Record<PlotLinkRelation, string> = {
+  foreshadow: "伏笔", echo: "呼应", conflict: "冲突", parallel: "并行",
+};
+
+export interface PlotBeat {
+  id: string;
+  node_id: string;
+  kind: PlotBeatKind;
+  summary: string;
+  effect: string;
+  status: PlotBeatStatus;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface PlotNode {
+  id: string;
+  line_id: string;
+  title: string;
+  summary: string;
+  purpose: string;
+  scene_ids: string[];
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+  beats?: PlotBeat[];
+}
+
+export interface PlotLine {
+  id: string;
+  arc_id: string;
+  name: string;
+  title: string;
+  type: PlotLineType;
+  color: string;
+  status: PlotLineStatus;
+  summary: string;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+  nodes?: PlotNode[];
+}
+
+export interface PlotArc {
+  id: string;
+  plot_id: string;
+  title: string;
+  summary: string;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+  lines?: PlotLine[];
+}
+
+export interface Plot {
+  id: string;
+  project_id: string;
+  title: string;
+  summary: string;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+  arcs?: PlotArc[];
+}
+
+export interface PlotLink {
+  id: string;
+  source_beat_id: string;
+  target_beat_id: string;
+  relation: PlotLinkRelation;
+  note: string;
+  created_at: number;
+  updated_at: number;
+}
+
+// Plot L1
+export async function getPlot(projectId: string): Promise<Plot> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/plot`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getPlotTree(projectId: string): Promise<Plot | null> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/plot-tree`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updatePlotApi(id: string, data: Partial<Pick<Plot, "title" | "summary">>): Promise<Plot> {
+  const res = await fetch(`${BASE}/plots/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// Arc L2
+export async function createArc(plotId: string, title = "", summary = ""): Promise<PlotArc> {
+  const res = await fetch(`${BASE}/plots/${encodeURIComponent(plotId)}/arcs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plot_id: plotId, title, summary }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function listArcs(plotId: string): Promise<PlotArc[]> {
+  const res = await fetch(`${BASE}/plots/${encodeURIComponent(plotId)}/arcs`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateArc(id: string, data: Partial<Pick<PlotArc, "title" | "summary">>): Promise<PlotArc> {
+  const res = await fetch(`${BASE}/arcs/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteArc(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/arcs/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// Line L3
+export async function createLine(arcId: string, name = "", title = "", type: PlotLineType = "subplot", color = "#6b7280"): Promise<PlotLine> {
+  const res = await fetch(`${BASE}/arcs/${encodeURIComponent(arcId)}/lines`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ arc_id: arcId, name, title, type, color }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function listLines(arcId: string): Promise<PlotLine[]> {
+  const res = await fetch(`${BASE}/arcs/${encodeURIComponent(arcId)}/lines`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateLine(id: string, data: Partial<Pick<PlotLine, "name" | "title" | "type" | "color" | "status" | "summary">>): Promise<PlotLine> {
+  const res = await fetch(`${BASE}/lines/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteLine(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/lines/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// Node L4
+export async function createNode(lineId: string, title = "", summary = "", purpose = "", sceneIds?: string[]): Promise<PlotNode> {
+  const res = await fetch(`${BASE}/lines/${encodeURIComponent(lineId)}/nodes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ line_id: lineId, title, summary, purpose, scene_ids: sceneIds }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function listNodes(lineId: string): Promise<PlotNode[]> {
+  const res = await fetch(`${BASE}/lines/${encodeURIComponent(lineId)}/nodes`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateNode(id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose">> & { scene_ids?: string[] }): Promise<PlotNode> {
+  const res = await fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteNode(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// Beat L5
+export async function createBeat(nodeId: string, kind: PlotBeatKind = "setup", summary = "", effect = "", status: PlotBeatStatus = "planted"): Promise<PlotBeat> {
+  const res = await fetch(`${BASE}/nodes/${encodeURIComponent(nodeId)}/beats`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_id: nodeId, kind, summary, effect, status }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function listBeats(nodeId: string): Promise<PlotBeat[]> {
+  const res = await fetch(`${BASE}/nodes/${encodeURIComponent(nodeId)}/beats`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateBeat(id: string, data: Partial<Pick<PlotBeat, "kind" | "summary" | "effect" | "status">>): Promise<PlotBeat> {
+  const res = await fetch(`${BASE}/beats/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteBeat(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/beats/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// Link
+export async function createPlotLink(sourceBeatId: string, targetBeatId: string, relation: PlotLinkRelation = "foreshadow", note = ""): Promise<PlotLink> {
+  const res = await fetch(`${BASE}/plot-links`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_beat_id: sourceBeatId, target_beat_id: targetBeatId, relation, note }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function listLinksForBeat(beatId: string): Promise<PlotLink[]> {
+  const res = await fetch(`${BASE}/beats/${encodeURIComponent(beatId)}/links`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deletePlotLink(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/plot-links/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}

@@ -6,6 +6,7 @@ import { PlanGridView } from "./PlanGridView";
 import { PlanMatrixView } from "./PlanMatrixView";
 import { PlanKanbanView } from "./PlanKanbanView";
 import { ThreadListView } from "./ThreadListView";
+import { PlotPanel } from "./plot/PlotPanel";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -42,6 +43,7 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
           {planViewMode === "grid" && <PlanKanbanView searchQuery={searchQuery} />}
           {planViewMode === "matrix" && <PlanMatrixView />}
           {planViewMode === "threads" && <ThreadListView />}
+          {planViewMode === "plot" && <PlotPanel />}
 
           {/* Bottom action row — only for structure views */}
           {planViewMode !== "threads" && (

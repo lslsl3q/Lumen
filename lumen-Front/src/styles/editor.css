@@ -13,6 +13,16 @@
 
 /* ── 富文本编辑器冷灰主题 ── */
 
+/* Format preference defaults — JS overrides on :root at runtime */
+:root {
+  --editor-font-family: "Noto Serif SC", "Source Serif Pro", Georgia, serif;
+  --editor-font-size: 17px;
+  --editor-line-height: 1.7;
+  --editor-paragraph-spacing: 4px;
+  --editor-text-indent: 0;
+  --editor-max-width: 720px;
+}
+
 /* ── 新编辑器容器（去纸张隐喻）── */
 
 .writing-editor-scroll {
@@ -61,21 +71,38 @@
 
 /* ProseMirror 编辑区 */
 .rich-text-editor-prosemirror {
-  font-size: 19px;
-  line-height: 1.7;
-  font-family: "Noto Serif SC", "Source Serif Pro", Georgia, serif;
+  font-size: var(--editor-font-size);
+  line-height: var(--editor-line-height);
+  font-family: var(--editor-font-family);
   color: var(--color-text-primary);
   caret-color: var(--color-primary);
+}
+
+/* Chicago Style — first-line indent */
+.rich-text-editor-prosemirror.chicago-style > p {
+  text-indent: var(--editor-text-indent);
+}
+
+/* Paragraph spacing */
+.rich-text-editor-prosemirror > p {
+  margin-bottom: var(--editor-paragraph-spacing);
+}
+
+/* Page width — applied to editor scroll container */
+.editor-page-width-container {
+  max-width: var(--editor-max-width, 720px);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .rich-text-editor-prosemirror:focus {
   outline: none;
 }
 
-/* 段落 — 首行缩进 */
+/* 段落 — 间距和缩进由 CSS 变量驱动 */
 .rich-text-editor-prosemirror p {
-  margin-bottom: 0.8em;
-  text-indent: 2em;
+  margin-bottom: var(--editor-paragraph-spacing, 0.8em);
+  text-indent: var(--editor-text-indent, 0);
 }
 
 /* 标题不缩进 */
@@ -1876,8 +1903,11 @@
 /* ── Manuscript scroll: BeatNavigator replaces scrollbar ── */
 
 .writing-manuscript-scroll [data-slot="scroll-area-viewport"] {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   --scene-gap: 2.5rem;
+}
+.writing-manuscript-scroll.smooth-follow [data-slot="scroll-area-viewport"] {
+  scroll-behavior: smooth;
 }
 .writing-manuscript-scroll [data-slot="scroll-area-scrollbar"] {
   display: none;
@@ -1885,7 +1915,7 @@
 
 /* One variable controls all content alignment */
 .manuscript-inner {
-  --content-w: 769px;
+  --content-w: var(--editor-max-width, 769px);
   --sidebar-w: 320px;
   --gap: 32px;
   --row-w: calc(var(--content-w) + var(--gap) + var(--sidebar-w) + 64px);
@@ -1914,6 +1944,9 @@
 .manuscript-side {
   width: var(--sidebar-w);
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
 }
 
 /* Scene — independent editor container */
@@ -2028,4 +2061,55 @@
 .toggle-switch:focus-visible {
   outline: 2px solid var(--color-primary, #3b82f6);
   outline-offset: 2px;
+}
+
+/* ── Summary editor (lightweight TipTap) ── */
+
+.summary-editor-wrapper .tiptap {
+  outline: none;
+  min-height: 24px;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.summary-editor-wrapper .tiptap p {
+  margin: 0;
+}
+
+.summary-editor-wrapper .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-dim);
+  opacity: 0.6;
+  pointer-events: none;
+  float: left;
+  height: 0;
+  font-style: italic;
+}
+
+/* ── Codex entry highlighting ── */
+
+.codex-hl {
+  cursor: pointer;
+  text-underline-offset: 3px;
+  border-radius: 0.25rem;
+  text-decoration: underline 1px dotted rgba(161, 161, 170, 0.6);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color 0.15s, text-decoration-color 0.15s, box-shadow 0.15s;
+}
+
+.codex-hl:hover {
+  background-color: rgba(234, 179, 8, 0.35);
+  text-decoration-color: rgba(250, 204, 21, 0.8);
+  box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.25);
+}
+
+.no-codex-colors .codex-hl {
+  color: inherit !important;
+}
+
+.no-codex-colors .codex-hl:hover {
+  background-color: transparent;
+  box-shadow: none;
 }
