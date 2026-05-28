@@ -1,0 +1,67 @@
+---
+name: "剧情结构"
+type: prompt_component
+category: components
+---
+{% if plot_outline is defined and plot_outline or plot_for_scene is defined and plot_for_scene %}
+<plot_context>
+{% if plot_outline is defined and plot_outline %}
+## 项目剧情概要
+{% for arc in plot_outline.arcs %}
+### {{ arc.title or "卷 " + loop.index|string }}
+{% for line in arc.lines %}
+- **{{ line.title or "故事线" }}**（{{ line.status }}）
+{% if line.summary %}  {{ line.summary }}{% endif %}
+{% for node in line.nodes %}
+{% if not node.resolved %}
+  - {{ node.title or "节点" }}（{{ node.status }}，{{ node.beat_count }} 个拍点）
+{% else %}
+  - ~~{{ node.title or "节点" }}~~（已完成）
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+{% if plot_for_scene is defined and plot_for_scene %}
+## 当前场景剧情上下文
+
+**所在故事线**：{{ plot_for_scene.line.title or "未命名故事线" }}
+**所在 Arc**：{{ plot_for_scene.arc.title or "未命名卷" }}
+
+### 当前剧情节点：{{ plot_for_scene.node.title or "未命名节点" }}
+{% if plot_for_scene.node.summary %}
+{{ plot_for_scene.node.summary }}
+{% endif %}
+{% if plot_for_scene.node.purpose %}
+**节点目的**：{{ plot_for_scene.node.purpose }}
+{% endif %}
+
+{% if plot_for_scene.node.beats %}
+#### 剧情拍点
+{% for beat in plot_for_scene.node.beats %}
+- **{{ beat.title or "Beat " + loop.index|string }}**（{{ beat.kind }}{% if beat.status %}，{{ beat.status }}{% endif %}）
+{% if beat.summary %}  {{ beat.summary }}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if plot_for_scene.sibling_nodes %}
+#### 同一故事线邻近节点
+{% for sib in plot_for_scene.sibling_nodes %}
+{% if sib.relative_order == 'past' %}
+- [前置] {{ sib.title }}（{{ sib.status }}）
+{% else %}
+- [后续] {{ sib.title }}（{{ sib.status }}）
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if plot_for_scene.linked_beats %}
+#### 关联剧情
+{% for lb in plot_for_scene.linked_beats %}
+- **{{ lb.title }}**（{{ lb.relation_type }}）：{{ lb.summary or "无摘要" }}
+{% endfor %}
+{% endif %}
+{% endif %}
+</plot_context>
+{% endif %}

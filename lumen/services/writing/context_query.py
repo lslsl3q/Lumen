@@ -170,9 +170,10 @@ class ContextQueryService:
     所有查询方法只读缓存，不做 DB 访问。
     """
 
-    def __init__(self, book_id: str, chapter_id: str):
+    def __init__(self, book_id: str, chapter_id: str, scene_id: str = ""):
         self._book_id = book_id
         self._chapter_id = chapter_id
+        self._scene_id = scene_id
         self._all_chapters: list[dict[str, Any]] | None = None
         self._all_settings: list[dict[str, Any]] | None = None
         self._all_threads: list[dict[str, Any]] = []
@@ -180,6 +181,9 @@ class ContextQueryService:
         self._current_index: int = 0
         self._context_selection: dict[str, Any] | None = None
         self._resolved_context: str = ""
+        # Plot 数据缓存
+        self._plot_outline: dict[str, Any] | None = None
+        self._plot_for_scene: dict[str, Any] | None = None
 
     def preload(self):
         """预加载章节数据和设定数据到内存"""
@@ -205,6 +209,36 @@ class ContextQueryService:
         for t in self._all_threads:
             tid = t.get("id", "")
             self._thread_nodes[tid] = list_thread_nodes(tid) or []
+
+        # 预加载 Plot 数据
+        self._preload_plot_data()
+
+    def _preload_plot_data(self):
+        """预加载 Plot 层级数据到内存"""
+        if not self._book_id:
+            return
+        from lumen.services.storage.writing import (
+            get_plot_outline_for_project, get_plot_for_scene, list_scenes,
+        )
+        self._plot_outline = get_plot_outline_for_project(self._book_id)
+
+        scene_id: str = self._scene_id
+        if not scene_id and self._chapter_id:
+            scenes = list_scenes(self._chapter_id)
+            if scenes:
+                scene_id = scenes[-1]["id"]
+        if scene_id:
+            self._plot_for_scene = get_plot_for_scene(scene_id)
+
+    # ── Plot 查询 ──
+
+    def plot_for_current_scene(self) -> dict[str, Any] | None:
+        """返回当前 scene 关联的 Plot 上下文数据"""
+        return self._plot_for_scene
+
+    def plot_outline(self) -> dict[str, Any] | None:
+        """返回项目 Plot 全景概要"""
+        return self._plot_outline
 
     # ── Context Selection (NC-aligned) ──
 
@@ -606,3 +640,11 @@ class _TemplateQueryProxy:
     def resolved_context(self) -> str:
         """返回前端选择的上下文文本（NC-aligned context selection）"""
         return self._svc.resolved_context()
+
+    def plot_for_current_scene(self) -> dict[str, Any] | None:
+        """返回当前 scene 关联的 Plot 上下文数据"""
+        return self._svc.plot_for_current_scene()
+
+    def plot_outline(self) -> dict[str, Any] | None:
+        """返回项目 Plot 全景概要"""
+        return self._svc.plot_outline()

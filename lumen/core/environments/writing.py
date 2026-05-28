@@ -40,6 +40,7 @@ async def direct_writing_stream(
     max_words: int | None = None,
     model_id: str = "",
     context_selection: dict | None = None,
+    scene_id: str = "",
 ) -> AsyncGenerator[dict, None]:
     """直接模板渲染 + LLM 调用，不经过 Agent 管道
 
@@ -49,6 +50,8 @@ async def direct_writing_stream(
     context_selection: 前端传入的结构化上下文选择，包含：
       fullNovelText, fullOutline, acts, chapters, scenes,
       snippets, codexEntries, codexTypes
+
+    scene_id: 当前编辑的 scene ID，用于 Plot 上下文精准匹配
     """
     from lumen.prompt.template_engine import render_message, build_context, TemplateError
     from lumen.services.writing.context_query import ContextQueryService, _TemplateQueryProxy
@@ -82,14 +85,18 @@ async def direct_writing_stream(
         chapter_content = chapter_content[-4000:]
         content_truncated = True
 
-    # 构建上下文查询服务（codex 注入）
-    svc = ContextQueryService(book_id, chapter_id)
+    # 构建上下文查询服务（codex + plot 注入）
+    svc = ContextQueryService(book_id, chapter_id, scene_id=scene_id)
     if book_id:
         await asyncio.to_thread(svc.preload)
         # 如果有前端传入的 context_selection，预加载选中数据
         if context_selection:
             await asyncio.to_thread(svc.set_context_selection, context_selection)
     query_proxy = _TemplateQueryProxy(svc)
+
+    # 获取预加载的 Plot 数据
+    plot_outline = svc.plot_outline()
+    plot_for_scene = svc.plot_for_current_scene()
 
     template_context = build_context(
         character_id="writing",
@@ -109,6 +116,8 @@ async def direct_writing_stream(
         pov=project_meta.get("pov", "3rd"),
         language=project_meta.get("language", "zh-CN"),
         narrative_character=narrative_character,
+        plot_outline=plot_outline,
+        plot_for_scene=plot_for_scene,
     )
 
     try:
@@ -317,5 +326,6 @@ class WritingEnvironment(BaseEnvironment):
                 max_words=metadata.get("max_words"),
                 model_id=metadata.get("model_id", ""),
                 context_selection=metadata.get("context_selection"),
+                scene_id=metadata.get("scene_id", ""),
             ):
                 yield event

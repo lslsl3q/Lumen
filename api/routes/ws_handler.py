@@ -175,6 +175,7 @@ async def handle_writing(ws: WebSocket, client_id: str, msg: dict):
                 beat_context=msg.get("beat_context", ""),
                 max_words=msg.get("max_words"),
                 model_id=msg.get("model_id", ""),
+                scene_id=msg.get("scene_id", ""),
             )
 
         async for event in stream:

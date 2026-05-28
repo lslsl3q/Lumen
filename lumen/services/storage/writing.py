@@ -1719,3 +1719,162 @@ def get_plot_tree(project_id: str) -> dict | None:
             arc["lines"].append(line)
         plot["arcs"].append(arc)
     return plot
+
+
+# Aggregate: plot context for a specific scene (for PlotComponent injection)
+
+def get_plot_for_scene(scene_id: str) -> dict | None:
+    """查询 scene 关联的 PlotNode 及其完整层级链（Node→Line→Arc→Plot）
+
+    返回结构：
+    {
+        "plot": {...},
+        "arc": {...},
+        "line": {...},
+        "node": {..., "beats": [...]},
+        "sibling_nodes": [...],  # 同 Line 下其他 Node（带 relative_order）
+        "linked_beats": [...]    # 通过 PlotLink 关联的 Beat
+    }
+    """
+    conn = get_conn()
+
+    # 1. 找到 scene 关联的 node
+    ns_row = conn.execute(
+        "SELECT node_id FROM plot_node_scenes WHERE scene_id = ?",
+        (scene_id,),
+    ).fetchone()
+    if not ns_row:
+        return None
+
+    node_id = ns_row["node_id"]
+
+    # 2. 加载 node 及其 beats
+    node_row = conn.execute("SELECT * FROM plot_nodes WHERE id = ?", (node_id,)).fetchone()
+    if not node_row:
+        return None
+    node = dict(node_row)
+    beats = conn.execute(
+        "SELECT * FROM plot_beats WHERE node_id = ? ORDER BY sort_order",
+        (node_id,),
+    ).fetchall()
+    node["beats"] = [dict(b) for b in beats]
+
+    # 3. 沿层级链向上查找：node → line → arc → plot
+    line_row = conn.execute("SELECT * FROM plot_lines WHERE id = ?", (node["line_id"],)).fetchone()
+    if not line_row:
+        return None
+    line = dict(line_row)
+
+    arc_row = conn.execute("SELECT * FROM plot_arcs WHERE id = ?", (line["arc_id"],)).fetchone()
+    if not arc_row:
+        return None
+    arc = dict(arc_row)
+
+    plot_row = conn.execute("SELECT * FROM plot WHERE id = ?", (arc["plot_id"],)).fetchone()
+    if not plot_row:
+        return None
+    plot = dict(plot_row)
+
+    # 4. 同 Line 下其他 Node（带相对位置）
+    sibling_rows = conn.execute(
+        "SELECT id, title, status, sort_order FROM plot_nodes WHERE line_id = ? ORDER BY sort_order",
+        (line["id"],),
+    ).fetchall()
+    current_sort = node.get("sort_order", 0)
+    sibling_nodes = []
+    for s in sibling_rows:
+        if s["id"] == node_id:
+            continue
+        sib = {"title": s["title"], "status": s["status"]}
+        sib["relative_order"] = "past" if s["sort_order"] < current_sort else "future"
+        sibling_nodes.append(sib)
+
+    # 5. PlotLink 关联的 Beat
+    link_rows = conn.execute(
+        "SELECT * FROM plot_links WHERE source_beat_id IN (SELECT id FROM plot_beats WHERE node_id = ?) "
+        "OR target_beat_id IN (SELECT id FROM plot_beats WHERE node_id = ?)",
+        (node_id, node_id),
+    ).fetchall()
+
+    linked_beats = []
+    beat_ids_in_node = {b["id"] for b in node["beats"]}
+    for lr in link_rows:
+        # 确定关联方向：linked beat 是对端的那个
+        linked_id = lr["target_beat_id"] if lr["source_beat_id"] in beat_ids_in_node else lr["source_beat_id"]
+        linked_beat_row = conn.execute("SELECT * FROM plot_beats WHERE id = ?", (linked_id,)).fetchone()
+        if linked_beat_row:
+            lb = dict(linked_beat_row)
+            lb["relation_type"] = lr["relation"]
+            lb["link_note"] = lr["note"]
+            linked_beats.append(lb)
+
+    return {
+        "plot": plot,
+        "arc": arc,
+        "line": line,
+        "node": node,
+        "sibling_nodes": sibling_nodes,
+        "linked_beats": linked_beats,
+    }
+
+
+def get_plot_outline_for_project(project_id: str) -> dict | None:
+    """返回 Plot 全景概要，精简版（只有 title/status/summary + beat_count）
+
+    resolved 的 node 不展开 beat 列表，只保留标题和状态。
+    """
+    conn = get_conn()
+    plot_row = conn.execute("SELECT * FROM plot WHERE project_id = ?", (project_id,)).fetchone()
+    if not plot_row:
+        return None
+    plot = dict(plot_row)
+
+    arcs = conn.execute(
+        "SELECT id, title, status, sort_order FROM plot_arcs WHERE plot_id = ? ORDER BY sort_order",
+        (plot["id"],),
+    ).fetchall()
+    plot["arcs"] = []
+    for arc_row in arcs:
+        arc = {"title": arc_row["title"], "status": arc_row["status"]}
+
+        lines = conn.execute(
+            "SELECT id, title, status, summary, line_type, sort_order FROM plot_lines WHERE arc_id = ? ORDER BY sort_order",
+            (arc_row["id"],),
+        ).fetchall()
+        arc["lines"] = []
+        for line_row in lines:
+            line = {
+                "title": line_row["title"],
+                "status": line_row["status"],
+                "summary": line_row["summary"],
+                "line_type": line_row["line_type"],
+            }
+
+            nodes = conn.execute(
+                "SELECT id, title, status, sort_order FROM plot_nodes WHERE line_id = ? ORDER BY sort_order",
+                (line_row["id"],),
+            ).fetchall()
+
+            # 批量获取 beat 计数（避免 N+1）
+            beat_counts = {}
+            if nodes:
+                node_ids = [n["id"] for n in nodes]
+                placeholders = ",".join("?" * len(node_ids))
+                count_rows = conn.execute(
+                    f"SELECT node_id, COUNT(*) as cnt FROM plot_beats WHERE node_id IN ({placeholders}) GROUP BY node_id",
+                    node_ids,
+                ).fetchall()
+                for cr in count_rows:
+                    beat_counts[cr["node_id"]] = cr["cnt"]
+
+            line["nodes"] = []
+            for node_row in nodes:
+                n = {"title": node_row["title"], "status": node_row["status"]}
+                n["beat_count"] = beat_counts.get(node_row["id"], 0)
+                n["resolved"] = node_row["status"] == "resolved"
+                line["nodes"].append(n)
+
+            arc["lines"].append(line)
+        plot["arcs"].append(arc)
+
+    return plot
