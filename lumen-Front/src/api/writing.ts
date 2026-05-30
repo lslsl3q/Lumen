@@ -493,149 +493,6 @@ export async function reorderLabels(projectId: string, orderedIds: string[]): Pr
   if (!res.ok) throw new Error(await res.text());
 }
 
-// ── Threads (叙事线) ──
-
-export interface WritingThread {
-  id: string;
-  project_id: string;
-  type: "main" | "subplot" | "dark";
-  tags: string[];
-  name: string;
-  description: Record<string, unknown>;
-  color: string;
-  status: "active" | "dormant" | "surfaced" | "resolved";
-  sort_order: number;
-  linked_codex_ids: string[];
-  metadata: Record<string, unknown>;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface WritingThreadNode {
-  id: string;
-  thread_id: string;
-  type: "advance" | "surface" | "resolve" | "background";
-  scene_id: string | null;
-  title: string;
-  note: string;
-  story_time: string;
-  goal: boolean;
-  satisfaction: { type: string; intensity: number } | null;
-  sort_order: number;
-  metadata: Record<string, unknown>;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface ThreadNodeWithThread extends WritingThreadNode {
-  thread_name: string;
-  thread_type: string;
-  thread_color: string;
-  thread_status: string;
-}
-
-export async function listThreads(projectId: string): Promise<WritingThread[]> {
-  const res = await fetch(`${BASE}/projects/${encodeURIComponent(projectId)}/threads`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function createThread(
-  projectId: string, type: WritingThread["type"] = "dark", name = "",
-  color = "#6b7280", description: Record<string, unknown> = {},
-  linkedCodexIds: string[] = [], tags: string[] = [],
-): Promise<WritingThread> {
-  const res = await fetch(`${BASE}/threads`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, type, name, color, description, linked_codex_ids: linkedCodexIds, tags }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function getThread(id: string): Promise<WritingThread> {
-  const res = await fetch(`${BASE}/threads/${encodeURIComponent(id)}`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function updateThread(id: string, data: Partial<WritingThread>): Promise<WritingThread> {
-  const res = await fetch(`${BASE}/threads/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function deleteThread(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/threads/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function reorderThreads(projectId: string, orderedIds: string[]): Promise<void> {
-  const res = await fetch(`${BASE}/threads/reorder`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, ordered_ids: orderedIds }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-// ── Thread Nodes ──
-
-export async function listThreadNodes(threadId: string): Promise<WritingThreadNode[]> {
-  const res = await fetch(`${BASE}/threads/${encodeURIComponent(threadId)}/nodes`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function createThreadNode(
-  threadId: string, type: WritingThreadNode["type"] = "advance", title = "",
-  note = "", sceneId: string | null = null, storyTime = "",
-  goal = false, satisfaction: WritingThreadNode["satisfaction"] = null,
-): Promise<WritingThreadNode> {
-  const res = await fetch(`${BASE}/thread-nodes`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ thread_id: threadId, type, title, note, scene_id: sceneId, story_time: storyTime, goal, satisfaction }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function updateThreadNode(id: string, data: Partial<WritingThreadNode>): Promise<WritingThreadNode> {
-  const res = await fetch(`${BASE}/thread-nodes/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function deleteThreadNode(id: string): Promise<void> {
-  const res = await fetch(`${BASE}/thread-nodes/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function reorderThreadNodes(threadId: string, orderedIds: string[]): Promise<void> {
-  const res = await fetch(`${BASE}/thread-nodes/reorder`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ thread_id: threadId, ordered_ids: orderedIds }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function getThreadsForScene(sceneId: string): Promise<ThreadNodeWithThread[]> {
-  const res = await fetch(`${BASE}/scenes/${encodeURIComponent(sceneId)}/thread-nodes`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
 
 // ── Chat Thread / Message ──
 
@@ -714,31 +571,33 @@ export async function createChatMessage(threadId: string, role: string, content:
 // ── Plot System ──
 
 export type PlotBeatKind =
-  | "setup" | "action" | "conflict" | "despair" | "relief" | "reward"
-  | "mystery" | "reveal" | "twist" | "payoff" | "result";
+  | "action" | "conflict" | "despair" | "relief" | "reward"
+  | "twist" | "result" | "escalation" | "scheme" | "revenge"
+  | "romance" | "comedy" | "cliffhanger" | "lore-reveal";
 
-export type PlotBeatStatus = "planted" | "resolved" | "abandoned";
+// Removed (2026-05-29): setup, mystery, reveal, payoff — covered by PlotLink relations
+// Removed: PlotBeatStatus (planted/resolved/abandoned) — foreshadow lifecycle now handled by PlotLink
 
 export type PlotLineType = "main" | "subplot" | "dark";
 
+export const PLOT_LINE_TYPES: PlotLineType[] = ["main", "subplot", "dark"];
+
 export type PlotLineStatus = "active" | "dormant" | "surfaced" | "resolved";
 
-export type PlotLinkRelation = "foreshadow" | "echo" | "conflict" | "parallel";
+export type PlotLinkRelation = "trigger" | "foreshadow" | "suspense" | "reveal";
 
 export const PLOT_BEAT_KIND_LABELS: Record<PlotBeatKind, string> = {
-  setup: "铺垫", action: "行动", conflict: "冲突", despair: "低谷",
-  relief: "释放", reward: "回报", mystery: "悬念", reveal: "揭示",
-  twist: "反转", payoff: "回收", result: "结果",
+  action: "行动", conflict: "冲突", despair: "低谷",
+  relief: "释放", reward: "回报", twist: "反转", result: "结果",
+  escalation: "升级", scheme: "算计", revenge: "复仇",
+  romance: "暧昧", comedy: "调侃", cliffhanger: "断章", "lore-reveal": "设定揭示",
 };
 
 export const PLOT_BEAT_KIND_COLORS: Record<PlotBeatKind, string> = {
-  setup: "#94a3b8", action: "#3b82f6", conflict: "#ef4444", despair: "#6b21a8",
-  relief: "#22c55e", reward: "#eab308", mystery: "#8b5cf6", reveal: "#06b6d4",
-  twist: "#f97316", payoff: "#10b981", result: "#6b7280",
-};
-
-export const PLOT_BEAT_STATUS_LABELS: Record<PlotBeatStatus, string> = {
-  planted: "已埋", resolved: "已收", abandoned: "已弃",
+  action: "#3b82f6", conflict: "#ef4444", despair: "#6b21a8",
+  relief: "#22c55e", reward: "#eab308", twist: "#f97316", result: "#6b7280",
+  escalation: "#f59e0b", scheme: "#8b5cf6", revenge: "#dc2626",
+  romance: "#ec4899", comedy: "#14b8a6", cliffhanger: "#a855f7", "lore-reveal": "#06b6d4",
 };
 
 export const PLOT_LINE_TYPE_LABELS: Record<PlotLineType, string> = {
@@ -746,7 +605,7 @@ export const PLOT_LINE_TYPE_LABELS: Record<PlotLineType, string> = {
 };
 
 export const PLOT_LINK_RELATION_LABELS: Record<PlotLinkRelation, string> = {
-  foreshadow: "伏笔", echo: "呼应", conflict: "冲突", parallel: "并行",
+  trigger: "触发", foreshadow: "伏笔", suspense: "悬念", reveal: "揭示",
 };
 
 export interface PlotBeat {
@@ -755,7 +614,6 @@ export interface PlotBeat {
   kind: PlotBeatKind;
   summary: string;
   effect: string;
-  status: PlotBeatStatus;
   sort_order: number;
   metadata: Record<string, unknown>;
   created_at: number;
@@ -770,6 +628,9 @@ export interface PlotNode {
   purpose: string;
   scene_ids: string[];
   sort_order: number;
+  start_ch?: number;
+  end_ch?: number;
+  resolved?: boolean;
   metadata: Record<string, unknown>;
   created_at: number;
   updated_at: number;
@@ -817,8 +678,8 @@ export interface Plot {
 
 export interface PlotLink {
   id: string;
-  source_beat_id: string;
-  target_beat_id: string;
+  source_node_id: string;
+  target_node_id: string;
   relation: PlotLinkRelation;
   note: string;
   created_at: number;
@@ -913,11 +774,11 @@ export async function deleteLine(id: string): Promise<void> {
 }
 
 // Node L4
-export async function createNode(lineId: string, title = "", summary = "", purpose = "", sceneIds?: string[]): Promise<PlotNode> {
+export async function createNode(lineId: string, title = "", summary = "", purpose = "", sceneIds?: string[], startCh?: number, endCh?: number): Promise<PlotNode> {
   const res = await fetch(`${BASE}/lines/${encodeURIComponent(lineId)}/nodes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ line_id: lineId, title, summary, purpose, scene_ids: sceneIds }),
+    body: JSON.stringify({ line_id: lineId, title, summary, purpose, scene_ids: sceneIds, start_ch: startCh, end_ch: endCh }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -929,7 +790,7 @@ export async function listNodes(lineId: string): Promise<PlotNode[]> {
   return res.json();
 }
 
-export async function updateNode(id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose">> & { scene_ids?: string[] }): Promise<PlotNode> {
+export async function updateNode(id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose" | "start_ch" | "end_ch" | "resolved">> & { scene_ids?: string[] }): Promise<PlotNode> {
   const res = await fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -945,11 +806,11 @@ export async function deleteNode(id: string): Promise<void> {
 }
 
 // Beat L5
-export async function createBeat(nodeId: string, kind: PlotBeatKind = "setup", summary = "", effect = "", status: PlotBeatStatus = "planted"): Promise<PlotBeat> {
+export async function createBeat(nodeId: string, kind: PlotBeatKind = "action", summary = "", effect = ""): Promise<PlotBeat> {
   const res = await fetch(`${BASE}/nodes/${encodeURIComponent(nodeId)}/beats`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ node_id: nodeId, kind, summary, effect, status }),
+    body: JSON.stringify({ node_id: nodeId, kind, summary, effect }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -961,7 +822,7 @@ export async function listBeats(nodeId: string): Promise<PlotBeat[]> {
   return res.json();
 }
 
-export async function updateBeat(id: string, data: Partial<Pick<PlotBeat, "kind" | "summary" | "effect" | "status">>): Promise<PlotBeat> {
+export async function updateBeat(id: string, data: Partial<Pick<PlotBeat, "kind" | "summary" | "effect">>): Promise<PlotBeat> {
   const res = await fetch(`${BASE}/beats/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -977,18 +838,18 @@ export async function deleteBeat(id: string): Promise<void> {
 }
 
 // Link
-export async function createPlotLink(sourceBeatId: string, targetBeatId: string, relation: PlotLinkRelation = "foreshadow", note = ""): Promise<PlotLink> {
+export async function createPlotLink(sourceNodeId: string, targetNodeId: string, relation: PlotLinkRelation = "trigger", note = ""): Promise<PlotLink> {
   const res = await fetch(`${BASE}/plot-links`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source_beat_id: sourceBeatId, target_beat_id: targetBeatId, relation, note }),
+    body: JSON.stringify({ source_node_id: sourceNodeId, target_node_id: targetNodeId, relation, note }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-export async function listLinksForBeat(beatId: string): Promise<PlotLink[]> {
-  const res = await fetch(`${BASE}/beats/${encodeURIComponent(beatId)}/links`);
+export async function listLinksForNode(nodeId: string): Promise<PlotLink[]> {
+  const res = await fetch(`${BASE}/nodes/${encodeURIComponent(nodeId)}/links`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

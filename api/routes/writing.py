@@ -25,17 +25,13 @@ from lumen.services.storage.writing import (
     create_snippet, list_snippets, get_snippet, update_snippet, delete_snippet,
     # Labels
     create_label, list_labels, update_label, delete_label, reorder_labels,
-    # Threads
-    create_thread, list_threads, get_thread, update_thread, delete_thread, reorder_threads,
-    create_thread_node, list_thread_nodes, get_thread_node, update_thread_node, delete_thread_node, reorder_thread_nodes,
-    get_threads_for_scene,
     # Plot System
     get_or_create_plot, update_plot,
     create_arc, list_arcs, update_arc, delete_arc, reorder_arcs,
     create_line, list_lines, update_line, delete_line, reorder_lines,
     create_node, list_nodes, update_node, delete_node, reorder_nodes,
     create_beat, list_beats, update_beat, delete_beat, reorder_beats,
-    create_link, list_links_for_beat, delete_link,
+    create_link, list_links_for_node, delete_link,
     get_plot_tree,
 )
 from lumen.services.storage.writing_snapshot import (
@@ -678,161 +674,6 @@ async def api_reorder_labels(project_id: str, req: ReorderRequest):
     return {"ok": True}
 
 
-# ── 叙事线 (Threads) ──
-
-class CreateThreadRequest(BaseModel):
-    project_id: str
-    type: str = "dark"
-    name: str = ""
-    color: str = "#6b7280"
-    description: dict = Field(default_factory=dict)
-    linked_codex_ids: list[str] = Field(default_factory=list)
-    tags: list[str] = Field(default_factory=list)
-
-
-class UpdateThreadRequest(BaseModel):
-    type: str | None = None
-    name: str | None = None
-    description: dict | None = None
-    color: str | None = None
-    status: str | None = None
-    linked_codex_ids: list[str] | None = None
-    metadata: dict | None = None
-    tags: list[str] | None = None
-
-
-class ReorderThreadsRequest(BaseModel):
-    project_id: str
-    ordered_ids: list[str]
-
-
-class CreateThreadNodeRequest(BaseModel):
-    thread_id: str
-    type: str = "advance"
-    title: str = ""
-    note: str = ""
-    scene_id: str | None = None
-    story_time: str = ""
-    goal: bool = False
-    satisfaction: dict | None = None
-
-
-class UpdateThreadNodeRequest(BaseModel):
-    type: str | None = None
-    title: str | None = None
-    note: str | None = None
-    scene_id: str | None = None
-    story_time: str | None = None
-    metadata: dict | None = None
-    goal: bool | None = None
-    satisfaction: dict | None = None
-
-
-class ReorderThreadNodesRequest(BaseModel):
-    thread_id: str
-    ordered_ids: list[str]
-
-
-@router.get("/projects/{project_id}/threads")
-async def api_list_threads(project_id: str):
-    return await asyncio.to_thread(list_threads, project_id)
-
-
-@router.post("/threads")
-async def api_create_thread(req: CreateThreadRequest):
-    return await asyncio.to_thread(
-        create_thread, req.project_id, req.type, req.name, req.color, req.description, req.linked_codex_ids, req.tags
-    )
-
-
-@router.get("/threads/{thread_id}")
-async def api_get_thread(thread_id: str):
-    t = await asyncio.to_thread(get_thread, thread_id)
-    if not t:
-        raise HTTPException(status_code=404, detail="叙事线不存在")
-    return t
-
-
-@router.patch("/threads/{thread_id}")
-async def api_update_thread(thread_id: str, req: UpdateThreadRequest):
-    updates = req.model_dump(exclude_unset=True)
-    if not updates:
-        t = await asyncio.to_thread(get_thread, thread_id)
-        if not t:
-            raise HTTPException(status_code=404, detail="叙事线不存在")
-        return t
-    t = await asyncio.to_thread(update_thread, thread_id, **updates)
-    if not t:
-        raise HTTPException(status_code=404, detail="叙事线不存在")
-    return t
-
-
-@router.delete("/threads/{thread_id}")
-async def api_delete_thread(thread_id: str):
-    await asyncio.to_thread(delete_thread, thread_id)
-    return {"status": "deleted"}
-
-
-@router.post("/threads/reorder")
-async def api_reorder_threads(req: ReorderThreadsRequest):
-    await asyncio.to_thread(reorder_threads, req.project_id, req.ordered_ids)
-    return {"status": "reordered"}
-
-
-# ── 叙事线节点 (Thread Nodes) ──
-
-@router.get("/threads/{thread_id}/nodes")
-async def api_list_thread_nodes(thread_id: str):
-    return await asyncio.to_thread(list_thread_nodes, thread_id)
-
-
-@router.post("/thread-nodes")
-async def api_create_thread_node(req: CreateThreadNodeRequest):
-    return await asyncio.to_thread(
-        create_thread_node, req.thread_id, req.type, req.title, req.note, req.scene_id, req.story_time, req.goal, req.satisfaction
-    )
-
-
-@router.get("/thread-nodes/{node_id}")
-async def api_get_thread_node(node_id: str):
-    n = await asyncio.to_thread(get_thread_node, node_id)
-    if not n:
-        raise HTTPException(status_code=404, detail="节点不存在")
-    return n
-
-
-@router.patch("/thread-nodes/{node_id}")
-async def api_update_thread_node(node_id: str, req: UpdateThreadNodeRequest):
-    updates = req.model_dump(exclude_unset=True)
-    if not updates:
-        n = await asyncio.to_thread(get_thread_node, node_id)
-        if not n:
-            raise HTTPException(status_code=404, detail="节点不存在")
-        return n
-    n = await asyncio.to_thread(update_thread_node, node_id, **updates)
-    if not n:
-        raise HTTPException(status_code=404, detail="节点不存在")
-    return n
-
-
-@router.delete("/thread-nodes/{node_id}")
-async def api_delete_thread_node(node_id: str):
-    await asyncio.to_thread(delete_thread_node, node_id)
-    return {"status": "deleted"}
-
-
-@router.post("/thread-nodes/reorder")
-async def api_reorder_thread_nodes(req: ReorderThreadNodesRequest):
-    await asyncio.to_thread(reorder_thread_nodes, req.thread_id, req.ordered_ids)
-    return {"status": "reordered"}
-
-
-# ── 查询：场景关联的线程节点 ──
-
-@router.get("/scenes/{scene_id}/thread-nodes")
-async def api_get_threads_for_scene(scene_id: str):
-    return await asyncio.to_thread(get_threads_for_scene, scene_id)
-
 
 # ── Plot System ──
 
@@ -880,6 +721,8 @@ class CreateNodeRequest(BaseModel):
     summary: str = ""
     purpose: str = ""
     scene_ids: list[str] | None = None
+    start_ch: int | None = None
+    end_ch: int | None = None
 
 
 class UpdateNodeRequest(BaseModel):
@@ -887,6 +730,9 @@ class UpdateNodeRequest(BaseModel):
     summary: str | None = None
     purpose: str | None = None
     scene_ids: list[str] | None = None
+    start_ch: int | None = None
+    end_ch: int | None = None
+    resolved: bool | None = None
 
 
 class ReorderNodesRequest(BaseModel):
@@ -896,17 +742,15 @@ class ReorderNodesRequest(BaseModel):
 
 class CreateBeatRequest(BaseModel):
     node_id: str
-    kind: str = "setup"
+    kind: str = "action"
     summary: str = ""
     effect: str = ""
-    status: str = "planted"
 
 
 class UpdateBeatRequest(BaseModel):
     kind: str | None = None
     summary: str | None = None
     effect: str | None = None
-    status: str | None = None
 
 
 class ReorderBeatsRequest(BaseModel):
@@ -915,9 +759,9 @@ class ReorderBeatsRequest(BaseModel):
 
 
 class CreateLinkRequest(BaseModel):
-    source_beat_id: str
-    target_beat_id: str
-    relation: str = "foreshadow"
+    source_node_id: str
+    target_node_id: str
+    relation: str = "trigger"
     note: str = ""
 
 
@@ -1012,7 +856,7 @@ async def api_reorder_lines(req: ReorderLinesRequest):
 @router.post("/lines/{line_id}/nodes")
 async def api_create_node(line_id: str, req: CreateNodeRequest):
     req.line_id = line_id
-    return await asyncio.to_thread(create_node, req.line_id, req.title, req.summary, req.purpose, req.scene_ids)
+    return await asyncio.to_thread(create_node, req.line_id, req.title, req.summary, req.purpose, req.scene_ids, req.start_ch, req.end_ch)
 
 
 @router.get("/lines/{line_id}/nodes")
@@ -1046,7 +890,7 @@ async def api_reorder_nodes(req: ReorderNodesRequest):
 @router.post("/nodes/{node_id}/beats")
 async def api_create_beat(node_id: str, req: CreateBeatRequest):
     req.node_id = node_id
-    return await asyncio.to_thread(create_beat, req.node_id, req.kind, req.summary, req.effect, req.status)
+    return await asyncio.to_thread(create_beat, req.node_id, req.kind, req.summary, req.effect)
 
 
 @router.get("/nodes/{node_id}/beats")
@@ -1078,12 +922,12 @@ async def api_reorder_beats(req: ReorderBeatsRequest):
 
 @router.post("/plot-links")
 async def api_create_link(req: CreateLinkRequest):
-    return await asyncio.to_thread(create_link, req.source_beat_id, req.target_beat_id, req.relation, req.note)
+    return await asyncio.to_thread(create_link, req.source_node_id, req.target_node_id, req.relation, req.note)
 
 
-@router.get("/beats/{beat_id}/links")
-async def api_list_links(beat_id: str):
-    return await asyncio.to_thread(list_links_for_beat, beat_id)
+@router.get("/nodes/{node_id}/links")
+async def api_list_links(node_id: str):
+    return await asyncio.to_thread(list_links_for_node, node_id)
 
 
 @router.delete("/plot-links/{link_id}")

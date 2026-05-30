@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingThread, WritingThreadNode, WritingChatThread, Plot, PlotArc, PlotLine, PlotNode, PlotBeat } from "../api/writing";
+import type { WritingProject, WritingAct, ManuscriptAct, ManuscriptChapter, WritingChapter, WritingScene, CodexEntry, WritingSnapshot, WritingSnippet, WritingLabel, WritingChatThread, Plot, PlotArc, PlotLine, PlotNode, PlotBeat } from "../api/writing";
 import * as writingApi from "../api/writing";
 
 export type AiMode = "chat" | "continue" | "rewrite" | "expand" | "condense" | "beat_generate";
@@ -55,8 +55,6 @@ interface WritingState {
   snippets: WritingSnippet[];
   activeSnippetId: string | null;
   labels: WritingLabel[];
-  threads: WritingThread[];
-  threadNodes: Record<string, WritingThreadNode[]>;
   manuscriptFilter: { type: "all" } | { type: "act"; id: string } | { type: "chapter"; id: string };
   setManuscriptFilter: (filter: WritingState["manuscriptFilter"]) => void;
 
@@ -69,17 +67,17 @@ interface WritingState {
   createLineAction: (arcId: string, name?: string, title?: string, type?: PlotLine["type"], color?: string) => Promise<PlotLine | null>;
   updateLineAction: (id: string, data: Partial<Pick<PlotLine, "name" | "title" | "type" | "color" | "status" | "summary">>) => Promise<void>;
   deleteLineAction: (id: string) => Promise<void>;
-  createNodeAction: (lineId: string, title?: string, summary?: string, purpose?: string) => Promise<PlotNode | null>;
-  updateNodeAction: (id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose">> & { scene_ids?: string[] }) => Promise<void>;
+  createNodeAction: (lineId: string, title?: string, summary?: string, purpose?: string, startCh?: number, endCh?: number) => Promise<PlotNode | null>;
+  updateNodeAction: (id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose" | "start_ch" | "end_ch" | "resolved">> & { scene_ids?: string[] }) => Promise<void>;
   deleteNodeAction: (id: string) => Promise<void>;
   createBeatAction: (nodeId: string, kind?: PlotBeat["kind"], summary?: string) => Promise<PlotBeat | null>;
-  updateBeatAction: (id: string, data: Partial<Pick<PlotBeat, "kind" | "summary" | "effect" | "status">>) => Promise<void>;
+  updateBeatAction: (id: string, data: Partial<Pick<PlotBeat, "kind" | "summary" | "effect">>) => Promise<void>;
   deleteBeatAction: (id: string) => Promise<void>;
 
   // Plan view state
-  planViewMode: "grid" | "outline" | "matrix" | "threads" | "plot";
+  planViewMode: "grid" | "outline" | "matrix";
   setPlanViewMode: (mode: WritingState["planViewMode"]) => void;
-  writingViewTab: "plan" | "write" | "chat" | "review";
+  writingViewTab: "plan" | "write" | "chat" | "review" | "plot";
   setWritingViewTab: (tab: WritingState["writingViewTab"]) => void;
   showPromptManager: boolean;
   setShowPromptManager: (show: boolean) => void;
@@ -183,15 +181,6 @@ interface WritingState {
   // UI
   setAiMode: (mode: AiMode) => void;
   setSidebarWidth: (w: number) => void;
-  // Threads
-  loadThreads: (projectId: string) => Promise<void>;
-  createThread: (type?: WritingThread["type"], name?: string, color?: string) => Promise<WritingThread>;
-  updateThreadAction: (id: string, data: Partial<WritingThread>) => Promise<void>;
-  deleteThreadAction: (id: string) => Promise<void>;
-  loadThreadNodes: (threadId: string) => Promise<void>;
-  createThreadNodeAction: (threadId: string, type?: WritingThreadNode["type"], title?: string, sceneId?: string | null) => Promise<WritingThreadNode>;
-  updateThreadNodeAction: (id: string, data: Partial<WritingThreadNode>) => Promise<void>;
-  deleteThreadNodeAction: (id: string) => Promise<void>;
 
   getActiveProject: () => WritingProject | undefined;
 }
@@ -220,8 +209,6 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   activeSnippetId: null,
   labels: [],
   manuscriptFilter: { type: "all" },
-  threads: [],
-  threadNodes: {},
   plotTree: null,
   planViewMode: "outline",
   writingViewTab: "write",
@@ -315,11 +302,10 @@ export const useWritingStore = create<WritingState>((set, get) => ({
   },
 
   setActiveProject: async (id) => {
-    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], threads: [], threadNodes: {}, chatThreads: [], activeThreadId: null, chatPanelMode: "none", plotTree: null });
+    set({ activeProjectId: id, acts: [], activeSceneId: null, codexEntries: [], chatThreads: [], activeThreadId: null, chatPanelMode: "none", plotTree: null });
     if (id) {
       await get().loadManuscript(id);
       await get().loadCodex(id);
-      await get().loadThreads(id);
       await get().loadChatThreads(id);
       await get().loadPlotTree(id);
     }
@@ -612,88 +598,6 @@ export const useWritingStore = create<WritingState>((set, get) => ({
 
   setActiveCodexEntry: (id) => set({ activeCodexEntryId: id }),
 
-  // ── Threads ──
-
-  loadThreads: async (projectId) => {
-    const threads = await writingApi.listThreads(projectId);
-    set({ threads });
-    // 自动加载每条线的节点
-    for (const t of threads) {
-      const nodes = await writingApi.listThreadNodes(t.id);
-      set((s) => ({ threadNodes: { ...s.threadNodes, [t.id]: nodes } }));
-    }
-  },
-
-  createThread: async (type = "dark", name = "", color = "#6b7280") => {
-    const { activeProjectId } = get();
-    if (!activeProjectId) throw new Error("No active project");
-    const thread = await writingApi.createThread(activeProjectId, type, name, color);
-    set((s) => ({
-      threads: [...s.threads, thread],
-      threadNodes: { ...s.threadNodes, [thread.id]: [] },
-    }));
-    return thread;
-  },
-
-  updateThreadAction: async (id, data) => {
-    const updated = await writingApi.updateThread(id, data);
-    set((s) => ({ threads: s.threads.map((t) => t.id === id ? updated : t) }));
-  },
-
-  deleteThreadAction: async (id) => {
-    await writingApi.deleteThread(id);
-    set((s) => {
-      const { [id]: _, ...rest } = s.threadNodes;
-      return { threads: s.threads.filter((t) => t.id !== id), threadNodes: rest };
-    });
-  },
-
-  loadThreadNodes: async (threadId) => {
-    const nodes = await writingApi.listThreadNodes(threadId);
-    set((s) => ({ threadNodes: { ...s.threadNodes, [threadId]: nodes } }));
-  },
-
-  createThreadNodeAction: async (threadId, type = "advance", title = "", sceneId = null) => {
-    const node = await writingApi.createThreadNode(threadId, type, title, "", sceneId);
-    set((s) => ({
-      threadNodes: {
-        ...s.threadNodes,
-        [threadId]: [...(s.threadNodes[threadId] || []), node],
-      },
-    }));
-    return node;
-  },
-
-  updateThreadNodeAction: async (id, data) => {
-    const updated = await writingApi.updateThreadNode(id, data);
-    set((s) => ({
-      threadNodes: Object.fromEntries(
-        Object.entries(s.threadNodes).map(([tid, nodes]) => [
-          tid,
-          nodes.map((n) => n.id === id ? updated : n),
-        ]),
-      ),
-    }));
-  },
-
-  deleteThreadNodeAction: async (id) => {
-    // 找到节点所属的 thread
-    const { threadNodes } = get();
-    let targetThreadId: string | null = null;
-    for (const [tid, nodes] of Object.entries(threadNodes)) {
-      if (nodes.some((n) => n.id === id)) { targetThreadId = tid; break; }
-    }
-    await writingApi.deleteThreadNode(id);
-    if (targetThreadId) {
-      set((s) => ({
-        threadNodes: {
-          ...s.threadNodes,
-          [targetThreadId]: (s.threadNodes[targetThreadId] || []).filter((n) => n.id !== id),
-        },
-      }));
-    }
-  },
-
   // ── Plot System ──
 
   loadPlotTree: async (projectId) => {
@@ -775,8 +679,8 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     }));
   },
 
-  createNodeAction: async (lineId, title = "", summary = "", purpose = "") => {
-    const node = await writingApi.createNode(lineId, title, summary, purpose);
+  createNodeAction: async (lineId, title = "", summary = "", purpose = "", startCh?: number, endCh?: number) => {
+    const node = await writingApi.createNode(lineId, title, summary, purpose, undefined, startCh, endCh);
     set((s) => ({
       plotTree: s.plotTree ? {
         ...s.plotTree,
@@ -823,7 +727,7 @@ export const useWritingStore = create<WritingState>((set, get) => ({
     }));
   },
 
-  createBeatAction: async (nodeId, kind = "setup" as const, summary = "") => {
+  createBeatAction: async (nodeId, kind = "action" as const, summary = "") => {
     const beat = await writingApi.createBeat(nodeId, kind, summary);
     set((s) => ({
       plotTree: s.plotTree ? {

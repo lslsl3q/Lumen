@@ -1,239 +1,326 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useWritingStore } from "../../../stores/useWritingStore";
-import {
-  PLOT_BEAT_KIND_LABELS, PLOT_BEAT_KIND_COLORS, PLOT_BEAT_STATUS_LABELS,
-  PLOT_LINE_TYPE_LABELS,
-  type PlotArc, type PlotLine, type PlotNode, type PlotBeat,
-  type PlotBeatKind, type PlotLineType, type PlotBeatStatus,
-} from "../../../api/writing";
-import { ChevronRight, ChevronDown, Plus, Trash2, GripVertical } from "lucide-react";
+import { NarrativeRuler, arcChapterRange } from "./NarrativeRuler";
+import { NodeWorkbench } from "./NodeWorkbench";
+import { NodeContextMenu } from "./NodeContextMenu";
+import { AddNodeMenu } from "./AddNodeMenu";
+import { Plus } from "lucide-react";
+import type { PlotLineType, Plot, PlotNode, PlotLine, PlotArc } from "../../../api/writing";
 
 
-// ── Kind Chip ──
+// ── Helpers ──
 
-function KindChip({ kind }: { kind: PlotBeatKind }) {
-  const color = PLOT_BEAT_KIND_COLORS[kind] || "#6b7280";
-  return (
-    <span
-      className="inline-flex items-center h-[20px] px-1.5 rounded text-[10px] font-semibold shrink-0"
-      style={{ color, background: color + "20" }}
-    >
-      {PLOT_BEAT_KIND_LABELS[kind]}
-    </span>
-  );
+interface NodeInfo {
+  node: PlotNode;
+  line: PlotLine;
+  arc: PlotArc;
 }
 
-// ── Status Chip ──
-
-function StatusChip({ status }: { status: PlotBeatStatus }) {
-  const colors: Record<PlotBeatStatus, string> = {
-    planted: "#eab308", resolved: "#22c55e", abandoned: "#6b7280",
-  };
-  return (
-    <span
-      className="inline-flex items-center h-[18px] px-1 rounded text-[9px] font-medium shrink-0"
-      style={{ color: colors[status], background: colors[status] + "20" }}
-    >
-      {PLOT_BEAT_STATUS_LABELS[status]}
-    </span>
-  );
+function buildNodeIndex(plotTree: Plot | null): Map<string, NodeInfo> {
+  const map = new Map<string, NodeInfo>();
+  if (!plotTree?.arcs) return map;
+  for (const arc of plotTree.arcs) {
+    for (const line of arc.lines || []) {
+      for (const node of line.nodes || []) {
+        map.set(node.id, { node, line, arc });
+      }
+    }
+  }
+  return map;
 }
 
-// ── Line Type Badge ──
-
-function LineTypeBadge({ type }: { type: PlotLineType }) {
-  const colors: Record<PlotLineType, string> = { main: "#3b82f6", subplot: "#22c55e", dark: "#a855f7" };
-  return (
-    <span
-      className="inline-flex items-center h-[18px] px-1.5 rounded text-[10px] font-medium"
-      style={{ color: colors[type], background: colors[type] + "20" }}
-    >
-      {PLOT_LINE_TYPE_LABELS[type]}
-    </span>
-  );
-}
-
-
-// ── Beat Row ──
-
-function BeatRow({ beat }: { beat: PlotBeat }) {
-  const [editing, setEditing] = useState(false);
-  const updateBeat = useWritingStore((s) => s.updateBeatAction);
-  const deleteBeat = useWritingStore((s) => s.deleteBeatAction);
-
-  return (
-    <div className="flex items-start gap-2 py-1.5 px-2 group hover:bg-zinc-800/30 rounded">
-      <GripVertical className="w-3 h-3 text-zinc-600 mt-1 shrink-0 cursor-grab" />
-      <div className="flex-1 min-w-0">
-        {editing ? (
-          <input
-            autoFocus
-            className="w-full bg-transparent text-[13px] text-zinc-200 outline-none border-b border-zinc-600 pb-0.5"
-            defaultValue={beat.summary}
-            onBlur={(e) => { updateBeat(beat.id, { summary: e.target.value }); setEditing(false); }}
-            onKeyDown={(e) => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } }}
-          />
-        ) : (
-          <p
-            className="text-[13px] text-zinc-300 cursor-pointer hover:text-zinc-100 truncate"
-            onClick={() => setEditing(true)}
-            title={beat.summary || "点击编辑"}
-          >
-            {beat.summary || "未填写"}
-          </p>
-        )}
-        {beat.effect && (
-          <p className="text-[11px] text-zinc-500 truncate mt-0.5">{beat.effect}</p>
-        )}
-      </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <KindChip kind={beat.kind} />
-        <StatusChip status={beat.status} />
-      </div>
-      <button
-        onClick={() => deleteBeat(beat.id)}
-        className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-opacity"
-      >
-        <Trash2 className="w-3 h-3" />
-      </button>
-    </div>
-  );
-}
-
-
-// ── Node Section ──
-
-function NodeSection({ node }: { node: PlotNode }) {
-  const [expanded, setExpanded] = useState(true);
-  const createBeat = useWritingStore((s) => s.createBeatAction);
-
-  return (
-    <div className="ml-4 border-l border-zinc-700/50 pl-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 text-[13px] font-medium text-zinc-300 hover:text-zinc-100 py-1 w-full text-left"
-      >
-        {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        <span className="truncate">{node.title || "未命名节点"}</span>
-        {node.scene_ids.length > 0 && (
-          <span className="text-[10px] text-zinc-500">{node.scene_ids.length} scenes</span>
-        )}
-      </button>
-
-      {expanded && (
-        <div className="mt-1">
-          {(node.beats || []).map((beat) => (
-            <BeatRow key={beat.id} beat={beat} />
-          ))}
-          <button
-            onClick={() => createBeat(node.id)}
-            className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 py-1 px-2"
-          >
-            <Plus className="w-3 h-3" /> 添加节拍
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ── Line Section ──
-
-function LineSection({ line }: { line: PlotLine }) {
-  const [expanded, setExpanded] = useState(true);
-  const createNode = useWritingStore((s) => s.createNodeAction);
-  const deleteLine = useWritingStore((s) => s.deleteLineAction);
-
-  return (
-    <div className="border border-zinc-700/40 rounded-lg overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800/40">
-        <button onClick={() => setExpanded(!expanded)}>
-          {expanded ? <ChevronDown className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
-        </button>
-        <div
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ background: line.color }}
-        />
-        <span className="text-[13px] font-medium text-zinc-200 truncate flex-1">
-          {line.title || line.name || "未命名线"}
-        </span>
-        <LineTypeBadge type={line.type} />
-        <button
-          onClick={() => deleteLine(line.id)}
-          className="text-zinc-500 hover:text-red-400 transition-colors"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="py-2">
-          {(line.nodes || []).map((node) => (
-            <NodeSection key={node.id} node={node} />
-          ))}
-          <div className="ml-4 pl-3">
-            <button
-              onClick={() => createNode(line.id)}
-              className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 py-1 px-2"
-            >
-              <Plus className="w-3 h-3" /> 添加节点
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ── Arc Section ──
-
-function ArcSection({ arc }: { arc: PlotArc }) {
-  const [expanded, setExpanded] = useState(true);
-  const createLine = useWritingStore((s) => s.createLineAction);
-  const deleteArc = useWritingStore((s) => s.deleteArcAction);
-
-  return (
-    <div className="mb-3">
-      <div className="flex items-center gap-2 mb-2">
-        <button onClick={() => setExpanded(!expanded)}>
-          {expanded ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
-        </button>
-        <h3 className="text-[14px] font-semibold text-zinc-200 flex-1">
-          {arc.title || "未命名阶段"}
-        </h3>
-        <button
-          onClick={() => deleteArc(arc.id)}
-          className="text-zinc-500 hover:text-red-400 transition-colors"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="space-y-2 pl-2">
-          {(arc.lines || []).map((line) => (
-            <LineSection key={line.id} line={line} />
-          ))}
-          <button
-            onClick={() => createLine(arc.id)}
-            className="flex items-center gap-1 text-[12px] text-zinc-500 hover:text-zinc-300 py-1.5 px-3 border border-dashed border-zinc-700 rounded-lg w-full"
-          >
-            <Plus className="w-3.5 h-3.5" /> 添加剧情线
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-// ── PlotPanel (main) ──
 
 export function PlotPanel() {
   const plotTree = useWritingStore((s) => s.plotTree);
+  const nodeIndex = useMemo(() => buildNodeIndex(plotTree), [plotTree]);
   const createArc = useWritingStore((s) => s.createArcAction);
+  const createLineAction = useWritingStore((s) => s.createLineAction);
+  const createNodeAction = useWritingStore((s) => s.createNodeAction);
+  const updateNodeAction = useWritingStore((s) => s.updateNodeAction);
+  const deleteNodeAction = useWritingStore((s) => s.deleteNodeAction);
+  const activeProject = useWritingStore((s) => {
+    const proj = s.projects.find(p => p.id === s.activeProjectId);
+    return proj || null;
+  });
+  const acts = useWritingStore((s) => s.acts);
+
+  // Whole-book total chapters — purely from plot data (planning scope)
+  const totalChapters = useMemo(() => {
+    if (plotTree?.arcs) {
+      let maxCh = 0;
+      for (const arc of plotTree.arcs) {
+        const { end } = arcChapterRange(arc);
+        if (end > maxCh) maxCh = end;
+      }
+      if (maxCh > 0) return maxCh;
+    }
+    return 20;
+  }, [plotTree]);
+
+  // Shared zoom state
+  const [viewRange, setViewRange] = useState<[number, number]>(() => [1, totalChapters]);
+  useEffect(() => { setViewRange([1, totalChapters]); }, [totalChapters]);
+
+  // ── Playhead state ──
+  const [playheadChapter, setPlayheadChapter] = useState(1);
+
+  // ── Manuscript progress: max end_ch across all nodes ──
+  const manuscriptProgress = useMemo(() => {
+    if (!plotTree?.arcs) return 1;
+    let maxEnd = 0;
+    for (const arc of plotTree.arcs) {
+      for (const line of arc.lines || []) {
+        for (const node of line.nodes || []) {
+          const end = node.end_ch || 0;
+          if (end > maxEnd) maxEnd = end;
+        }
+      }
+    }
+    return maxEnd > 0 ? maxEnd : 1;
+  }, [plotTree]);
+
+  // Workbench state
+  const [workbenchNodeId, setWorkbenchNodeId] = useState<string | null>(null);
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState<{ nodeId: string; x: number; y: number; lineType: PlotLineType } | null>(null);
+
+  const getNodeLineType = useCallback((nodeId: string): PlotLineType => {
+    const info = nodeIndex.get(nodeId);
+    return (info?.line.type as PlotLineType) || "main";
+  }, [nodeIndex]);
+
+  const handleDoubleClickNode = useCallback((nodeId: string) => {
+    setWorkbenchNodeId(nodeId);
+  }, []);
+
+  const handleContextMenuNode = useCallback((nodeId: string, e: React.MouseEvent) => {
+    setCtxMenu({ nodeId, x: e.clientX, y: e.clientY, lineType: getNodeLineType(nodeId) });
+  }, [getNodeLineType]);
+
+  // ── Ripple shift helper (batched parallel) ──
+  const rippleShiftInLine = useCallback(async (
+    lineId: string, excludeNodeId: string, pivotCh: number, delta: number
+  ) => {
+    if (!plotTree?.arcs) return;
+    const updates: Promise<void>[] = [];
+    for (const arc of plotTree.arcs) {
+      for (const line of arc.lines || []) {
+        if (line.id !== lineId) continue;
+        for (const n of line.nodes || []) {
+          if (n.id === excludeNodeId) continue;
+          const sc = n.start_ch || 1;
+          if (sc >= pivotCh) {
+            const ec = n.end_ch || (sc + 1);
+            updates.push(updateNodeAction(n.id, { start_ch: sc + delta, end_ch: ec + delta }));
+          }
+        }
+      }
+    }
+    await Promise.all(updates);
+  }, [plotTree, updateNodeAction]);
+
+  // ── Delete handlers ──
+  const handleDeleteNode = useCallback(async () => {
+    if (!ctxMenu) return;
+    await deleteNodeAction(ctxMenu.nodeId);
+    if (workbenchNodeId === ctxMenu.nodeId) setWorkbenchNodeId(null);
+  }, [ctxMenu, deleteNodeAction, workbenchNodeId]);
+
+  const handleRippleDeleteNode = useCallback(async () => {
+    if (!ctxMenu) return;
+    const info = nodeIndex.get(ctxMenu.nodeId);
+    if (!info) return;
+    const sc = info.node.start_ch || 1;
+    const len = (info.node.end_ch || (sc + 1)) - sc;
+    await deleteNodeAction(ctxMenu.nodeId);
+    if (workbenchNodeId === ctxMenu.nodeId) setWorkbenchNodeId(null);
+    rippleShiftInLine(info.line.id, ctxMenu.nodeId, sc + len, -len);
+  }, [ctxMenu, deleteNodeAction, workbenchNodeId, nodeIndex, rippleShiftInLine]);
+
+  // RESERVED: 线型切换 — 需实现 switchNodeLineType action
+  const handleChangeType = useCallback((_type: PlotLineType) => {
+  }, []);
+
+  // RESERVED: 节点复制 — 需实现 copyNode action
+  const handleCopyNode = useCallback(() => {
+  }, []);
+
+  // ── Insert helpers ──
+  const doInsert = useCallback(async (
+    lineId: string, startCh: number, ripple: boolean, pivotCh: number
+  ) => {
+    const node = await createNodeAction(lineId, "", "", "", startCh, startCh + 1);
+    if (node) {
+      if (ripple) rippleShiftInLine(lineId, node.id, pivotCh, 1);
+      setPlayheadChapter(startCh + 1);
+      setWorkbenchNodeId(node.id);
+    }
+    setCtxMenu(null);
+  }, [createNodeAction, rippleShiftInLine]);
+
+  // ── Context menu: smart insert ──
+  const handleInsertBeforeRipple = useCallback(() => {
+    if (!ctxMenu) return;
+    const info = nodeIndex.get(ctxMenu.nodeId);
+    if (!info) return;
+    const ch = info.node.start_ch || 1;
+    doInsert(info.line.id, ch, true, ch);
+  }, [ctxMenu, nodeIndex, doInsert]);
+
+  const handleInsertBeforeStay = useCallback(() => {
+    if (!ctxMenu) return;
+    const info = nodeIndex.get(ctxMenu.nodeId);
+    if (!info) return;
+    const ch = info.node.start_ch || 1;
+    doInsert(info.line.id, ch, false, ch);
+  }, [ctxMenu, nodeIndex, doInsert]);
+
+  const handleInsertAfterRipple = useCallback(() => {
+    if (!ctxMenu) return;
+    const info = nodeIndex.get(ctxMenu.nodeId);
+    if (!info) return;
+    const endCh = info.node.end_ch || ((info.node.start_ch || 1) + 1);
+    doInsert(info.line.id, endCh, true, endCh);
+  }, [ctxMenu, nodeIndex, doInsert]);
+
+  const handleInsertAfterStay = useCallback(() => {
+    if (!ctxMenu) return;
+    const info = nodeIndex.get(ctxMenu.nodeId);
+    if (!info) return;
+    const endCh = info.node.end_ch || ((info.node.start_ch || 1) + 1);
+    doInsert(info.line.id, endCh, false, endCh);
+  }, [ctxMenu, nodeIndex, doInsert]);
+
+  // ── Context menu: compute hasGapBefore / hasNodeAfter ──
+  const ctxMenuMeta = useMemo(() => {
+    if (!ctxMenu) return { hasGapBefore: false, hasNodeAfter: false };
+    const info = nodeIndex.get(ctxMenu.nodeId);
+    if (!info) return { hasGapBefore: false, hasNodeAfter: false };
+    const sc = info.node.start_ch || 1;
+    const ec = info.node.end_ch || (sc + 1);
+    const siblings = info.line.nodes || [];
+    // Gap before: if start_ch > 1 and no sibling node ends at sc - 1 or sc
+    const hasGapBefore = sc > 1 && !siblings.some(n =>
+      n.id !== ctxMenu.nodeId && ((n.end_ch || ((n.start_ch || 1) + 1)) >= sc)
+    );
+    // Node after: any sibling starts at or before endCh (would overlap)
+    const hasNodeAfter = siblings.some(n =>
+      n.id !== ctxMenu.nodeId && (n.start_ch || 1) < ec + 1
+    );
+    return { hasGapBefore, hasNodeAfter };
+  }, [ctxMenu, nodeIndex]);
+
+  // ── Toolbar "+" button: visual tracks for AddNodeMenu ──
+  // Group lines by visual track (same as NarrativeRuler display):
+  //   main → one "主线" track
+  //   subplot → one "支线" track
+  //   dark → grouped by line.name || line.id
+  const visualTracks = useMemo(() => {
+    if (!plotTree?.arcs) return [];
+    const trackMap = new Map<string, {
+      key: string; label: string; type: PlotLineType;
+      color: string; allNodes: PlotNode[];
+    }>();
+
+    for (const arc of plotTree.arcs) {
+      for (const line of arc.lines || []) {
+        const lt = line.type as PlotLineType;
+        if (lt === "dark") {
+          const groupKey = line.name || line.id;
+          const existing = trackMap.get(groupKey);
+          if (existing) {
+            existing.allNodes.push(...(line.nodes || []));
+          } else {
+            trackMap.set(groupKey, {
+              key: groupKey,
+              label: line.name || line.title || "暗线",
+              type: "dark",
+              color: line.color || "#7b6ba0",
+              allNodes: [...(line.nodes || [])],
+            });
+          }
+        } else if (lt === "subplot") {
+          const existing = trackMap.get("__subplot__");
+          if (existing) {
+            existing.allNodes.push(...(line.nodes || []));
+          } else {
+            trackMap.set("__subplot__", {
+              key: "__subplot__",
+              label: "支线",
+              type: "subplot",
+              color: line.color || "#6b9e78",
+              allNodes: [...(line.nodes || [])],
+            });
+          }
+        } else {
+          const existing = trackMap.get("__main__");
+          if (existing) {
+            existing.allNodes.push(...(line.nodes || []));
+          } else {
+            trackMap.set("__main__", {
+              key: "__main__",
+              label: "主线",
+              type: "main",
+              color: line.color || "#D4A84B",
+              allNodes: [...(line.nodes || [])],
+            });
+          }
+        }
+      }
+    }
+
+    // Order: main first, subplot second, dark lines last
+    const result = [
+      trackMap.get("__main__"),
+      trackMap.get("__subplot__"),
+      ...[...trackMap.entries()]
+        .filter(([k]) => k !== "__main__" && k !== "__subplot__")
+        .map(([, v]) => v),
+    ].filter(Boolean) as typeof trackMap extends Map<any, infer V> ? V[] : never;
+    return result;
+  }, [plotTree]);
+
+  // Resolve a visual track key + start chapter → actual lineId for node creation
+  const resolveLineIdForTrack = useCallback((trackKey: string, startCh: number): string | null => {
+    if (!plotTree?.arcs) return null;
+    for (const arc of plotTree.arcs) {
+      const { start, end } = arcChapterRange(arc);
+      if (startCh < start || startCh > end + 50) continue; // loose match
+      for (const line of arc.lines || []) {
+        if (trackKey === "__main__" && line.type === "main") return line.id;
+        if (trackKey === "__subplot__" && line.type === "subplot") return line.id;
+        if (line.type === "dark") {
+          const groupKey = line.name || line.id;
+          if (groupKey === trackKey) return line.id;
+        }
+      }
+    }
+    // Fallback: first matching line regardless of arc
+    for (const arc of plotTree.arcs) {
+      for (const line of arc.lines || []) {
+        if (trackKey === "__main__" && line.type === "main") return line.id;
+        if (trackKey === "__subplot__" && line.type === "subplot") return line.id;
+        if (line.type === "dark" && (line.name || line.id) === trackKey) return line.id;
+      }
+    }
+    return null;
+  }, [plotTree]);
+
+  const handleAddNodeCreate = useCallback(async (trackKey: string, startCh: number, length: number) => {
+    const lineId = resolveLineIdForTrack(trackKey, startCh);
+    if (!lineId) return;
+    const node = await createNodeAction(lineId, "", "", "", startCh, startCh + length);
+    if (node) setWorkbenchNodeId(node.id);
+  }, [resolveLineIdForTrack, createNodeAction]);
+
+  // ── Create Arc with auto-create main line ──
+  const handleCreateArc = useCallback(async () => {
+    const arc = await createArc("新阶段");
+    if (arc) {
+      await createLineAction(arc.id, "", "主线", "main", "#D4A84B");
+    }
+  }, [createArc, createLineAction]);
 
   if (!plotTree) {
     return (
@@ -243,35 +330,106 @@ export function PlotPanel() {
     );
   }
 
+  const arcs = plotTree.arcs || [];
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-none px-4 py-3 border-b border-zinc-700/50">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-semibold text-zinc-200">剧情编排</h2>
-          <button
-            onClick={() => createArc("新阶段")}
-            className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 px-2.5 py-1 rounded"
-          >
-            <Plus className="w-3.5 h-3.5" /> 新阶段
-          </button>
-        </div>
-        {plotTree.title && (
-          <p className="text-[12px] text-zinc-500 mt-1">{plotTree.title}</p>
+    <div className="flex flex-col h-full bg-[var(--color-surface-deep)]">
+      {/* Overview */}
+      <div className="flex-none border-b border-zinc-700/50">
+        {arcs.length === 0 ? (
+          <div className="px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[15px] font-semibold text-zinc-200">
+                {activeProject?.name || plotTree.title || "剧情编排"}
+              </h2>
+              <button
+                onClick={handleCreateArc}
+                className="flex items-center gap-1 text-[12px] text-zinc-400 hover:text-zinc-200 bg-zinc-800/50 px-2.5 py-1 rounded"
+              >
+                <Plus className="w-3.5 h-3.5" /> 新阶段
+              </button>
+            </div>
+            <p className="text-zinc-600 text-[12px]">点击「新阶段」开始规划剧情结构</p>
+          </div>
+        ) : (
+          <NarrativeRuler
+            arcs={arcs}
+            totalChapters={totalChapters}
+            currentChapter={manuscriptProgress}
+            plotTitle={plotTree.title || activeProject?.name}
+            compact={true}
+            showDarkLines={false}
+            acts={acts}
+            viewRange={viewRange}
+            onViewRangeChange={setViewRange}
+            playhead={playheadChapter}
+            onPlayheadChange={setPlayheadChapter}
+          />
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        {(plotTree.arcs || []).length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-zinc-500 text-[13px]">还没有剧情阶段</p>
-            <p className="text-zinc-600 text-[12px] mt-1">点击「新阶段」开始规划</p>
+      {/* Main timeline */}
+      <div className="flex-initial overflow-y-auto min-h-0 mb-4">
+        {arcs.length > 0 ? (
+          <div className="px-6 pt-3 pb-6">
+            <NarrativeRuler
+              arcs={arcs}
+              totalChapters={totalChapters}
+              currentChapter={manuscriptProgress}
+              compact={false}
+              showDarkLines={true}
+              viewRange={viewRange}
+              onViewRangeChange={setViewRange}
+              onDoubleClickNode={handleDoubleClickNode}
+              onContextMenuNode={handleContextMenuNode}
+              playhead={playheadChapter}
+              onPlayheadChange={setPlayheadChapter}
+              addNodeSlot={
+                visualTracks.length > 0 ? (
+                  <AddNodeMenu
+                    tracks={visualTracks}
+                    defaultStartCh={playheadChapter}
+                    totalChapters={totalChapters}
+                    onCreate={handleAddNodeCreate}
+                  />
+                ) : undefined
+              }
+            />
           </div>
-        ) : (
-          (plotTree.arcs || []).map((arc) => (
-            <ArcSection key={arc.id} arc={arc} />
-          ))
-        )}
+        ) : null}
       </div>
+
+      {/* Workbench area */}
+      {workbenchNodeId && (
+        <div className="flex-none border-t border-zinc-700/50 pt-2 max-h-[50vh] overflow-y-auto">
+          <NodeWorkbench
+            nodeId={workbenchNodeId}
+            onClose={() => setWorkbenchNodeId(null)}
+          />
+        </div>
+      )}
+
+      {/* Context menu */}
+      {ctxMenu && (
+        <NodeContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          lineType={ctxMenu.lineType}
+          hasGapBefore={ctxMenuMeta.hasGapBefore}
+          hasNodeAfter={ctxMenuMeta.hasNodeAfter}
+          onEdit={() => { setWorkbenchNodeId(ctxMenu.nodeId); setCtxMenu(null); }}
+          onChangeType={handleChangeType}
+          onCopy={handleCopyNode}
+          onDelete={handleDeleteNode}
+          onRippleDelete={handleRippleDeleteNode}
+          onInsertBeforeRipple={handleInsertBeforeRipple}
+          onInsertBeforeStay={handleInsertBeforeStay}
+          onInsertAfterRipple={handleInsertAfterRipple}
+          onInsertAfterStay={handleInsertAfterStay}
+          onClose={() => setCtxMenu(null)}
+        />
+      )}
+
     </div>
   );
 }

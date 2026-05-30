@@ -5,8 +5,6 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { PlanGridView } from "./PlanGridView";
 import { PlanMatrixView } from "./PlanMatrixView";
 import { PlanKanbanView } from "./PlanKanbanView";
-import { ThreadListView } from "./ThreadListView";
-import { PlotPanel } from "./plot/PlotPanel";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -36,17 +34,18 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
   return (
     <div className="flex flex-col h-full bg-[var(--color-surface-deep)]">
       <ScrollArea className="flex-1 plan-scroll-area">
-        <div className={planViewMode === "grid" ? "p-4 pl-6" : planViewMode === "matrix" ? "p-3" : "p-4 max-w-4xl mx-auto"}>
+        <div className={
+          planViewMode === "grid" ? "p-4 pl-6" :
+          planViewMode === "matrix" ? "p-3" :
+          "p-4 max-w-4xl mx-auto"
+        }>
           {/* outline key = NC Outline (tree view) */}
           {planViewMode === "outline" && <PlanGridView searchQuery={searchQuery} />}
           {/* grid key = NC Grid (kanban cards) */}
           {planViewMode === "grid" && <PlanKanbanView searchQuery={searchQuery} />}
           {planViewMode === "matrix" && <PlanMatrixView />}
-          {planViewMode === "threads" && <ThreadListView />}
-          {planViewMode === "plot" && <PlotPanel />}
 
           {/* Bottom action row — only for structure views */}
-          {planViewMode !== "threads" && (
           <div className="flex gap-2 items-start mt-4">
             <button
               type="button"
@@ -73,7 +72,6 @@ export function PlanView({ searchQuery = "" }: { searchQuery?: string }) {
               {stats.scenes} 场景 / {stats.words.toLocaleString()} 词
             </span>
           </div>
-          )}
         </div>
       </ScrollArea>
     </div>

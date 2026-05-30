@@ -2,6 +2,7 @@ import { Component, useEffect, useState } from "react";
 import { WritingSidebar } from "./writing/WritingSidebar";
 import { WritingEditor } from "./writing/WritingEditor";
 import { PlanView } from "./writing/PlanView";
+import { PlotPanel } from "./writing/plot/PlotPanel";
 import { ReviewView } from "./writing/ReviewView";
 import { ChatView } from "./writing/ChatView";
 import { FloatingChatPanel } from "./writing/FloatingChatPanel";
@@ -13,7 +14,7 @@ import { CodexPreviewCard } from "./writing/CodexPreviewCard";
 import { useWritingStore } from "../stores/useWritingStore";
 import type { ManuscriptAct } from "../api/writing";
 import { cn } from "../lib/utils";
-import { Eye, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, FolderTree, ListTree, Table2, Search, LayoutGrid, GitBranch, GitMerge } from "lucide-react";
+import { Eye, PenLine, LayoutList, MessageCircle, FileCheck, ChevronDown, BookOpen, FileText, FolderTree, ListTree, Table2, Search, LayoutGrid, GitMerge } from "lucide-react";
 import { Toggle } from "../components/ui/toggle";
 import { Separator } from "../components/ui/separator";
 import {
@@ -32,14 +33,13 @@ const writingViewTabs = [
   { key: "write" as const, icon: PenLine, label: "写", disabled: false },
   { key: "chat" as const, icon: MessageCircle, label: "聊天", disabled: false },
   { key: "review" as const, icon: FileCheck, label: "统计", disabled: false },
+  { key: "plot" as const, icon: GitMerge, label: "剧情", disabled: false },
 ];
 
 const PLAN_VIEWS = [
   { key: "grid" as const, label: "网格", icon: LayoutGrid },
   { key: "matrix" as const, label: "矩阵", icon: Table2 },
   { key: "outline" as const, label: "大纲", icon: ListTree },
-  { key: "threads" as const, label: "线索", icon: GitBranch },
-  { key: "plot" as const, label: "剧情", icon: GitMerge },
 ];
 
 function filterLabel(
@@ -280,6 +280,8 @@ export default function WritingMode() {
             <ChatView />
           ) : writingViewTab === "review" ? (
             <ReviewView />
+          ) : writingViewTab === "plot" ? (
+            <PlotPanel />
           ) : (
             <PlanView searchQuery={planSearch} />
           )}

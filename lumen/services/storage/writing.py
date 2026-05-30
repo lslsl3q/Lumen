@@ -149,44 +149,6 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_wlbl_project ON writing_labels(project_id);
 
-        -- 叙事线（标签化，不再限制 main/subplot/dark）
-        CREATE TABLE IF NOT EXISTS writing_threads (
-            id          TEXT PRIMARY KEY,
-            project_id  TEXT NOT NULL,
-            type        TEXT NOT NULL DEFAULT 'dark',
-            tags        TEXT NOT NULL DEFAULT '[]',
-            name        TEXT NOT NULL DEFAULT '',
-            description TEXT NOT NULL DEFAULT '{}',
-            color       TEXT NOT NULL DEFAULT '#6b7280',
-            status      TEXT NOT NULL DEFAULT 'active',
-            sort_order  INTEGER NOT NULL DEFAULT 0,
-            linked_codex_ids TEXT NOT NULL DEFAULT '[]',
-            metadata    TEXT NOT NULL DEFAULT '{}',
-            created_at  REAL NOT NULL,
-            updated_at  REAL NOT NULL,
-            FOREIGN KEY (project_id) REFERENCES writing_projects(id) ON DELETE CASCADE
-        );
-        CREATE INDEX IF NOT EXISTS idx_wt_project ON writing_threads(project_id);
-
-        -- 叙事线节点（advance/surface/resolve/background，crossing 改为自动检测）
-        CREATE TABLE IF NOT EXISTS writing_thread_nodes (
-            id          TEXT PRIMARY KEY,
-            thread_id   TEXT NOT NULL,
-            type        TEXT NOT NULL DEFAULT 'advance',
-            scene_id    TEXT DEFAULT NULL,
-            title       TEXT NOT NULL DEFAULT '',
-            note        TEXT NOT NULL DEFAULT '',
-            story_time  TEXT DEFAULT '',
-            goal        INTEGER NOT NULL DEFAULT 0,
-            satisfaction TEXT DEFAULT NULL,
-            sort_order  INTEGER NOT NULL DEFAULT 0,
-            metadata    TEXT NOT NULL DEFAULT '{}',
-            created_at  REAL NOT NULL,
-            updated_at  REAL NOT NULL,
-            FOREIGN KEY (thread_id) REFERENCES writing_threads(id) ON DELETE CASCADE
-        );
-        CREATE INDEX IF NOT EXISTS idx_wtn_thread ON writing_thread_nodes(thread_id);
-        CREATE INDEX IF NOT EXISTS idx_wtn_scene ON writing_thread_nodes(scene_id);
 
         -- Chat 线程（写作模式对话持久化）
         CREATE TABLE IF NOT EXISTS writing_chat_threads (
@@ -268,12 +230,16 @@ def _init_tables(conn: sqlite3.Connection):
             summary     TEXT NOT NULL DEFAULT '',
             purpose     TEXT NOT NULL DEFAULT '',
             sort_order  INTEGER NOT NULL DEFAULT 0,
+            start_ch    INTEGER,
+            end_ch      INTEGER,
+            resolved    INTEGER NOT NULL DEFAULT 0,
             metadata    TEXT NOT NULL DEFAULT '{}',
             created_at  REAL NOT NULL,
             updated_at  REAL NOT NULL,
             FOREIGN KEY (line_id) REFERENCES plot_lines(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_pn_line ON plot_nodes(line_id);
+
 
         -- L5: PlotBeat — 情节节拍（最小叙事单元）
         CREATE TABLE IF NOT EXISTS plot_beats (
@@ -291,21 +257,22 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_pb_node ON plot_beats(node_id);
 
-        -- PlotLink — 跨线交叉引用（伏笔/呼应/冲突/并行）
+        -- PlotLink — 跨线因果关系连接器（连 Node，不连 Beat）
+        -- relation 枚举：trigger / foreshadow / suspense / reveal
         CREATE TABLE IF NOT EXISTS plot_links (
             id              TEXT PRIMARY KEY,
-            source_beat_id  TEXT NOT NULL,
-            target_beat_id  TEXT NOT NULL,
-            relation        TEXT NOT NULL DEFAULT 'foreshadow',
+            source_node_id  TEXT NOT NULL,
+            target_node_id  TEXT NOT NULL,
+            relation        TEXT NOT NULL DEFAULT 'trigger',
             note            TEXT NOT NULL DEFAULT '',
             sort_order      INTEGER NOT NULL DEFAULT 0,
             created_at      REAL NOT NULL,
             updated_at      REAL NOT NULL,
-            FOREIGN KEY (source_beat_id) REFERENCES plot_beats(id) ON DELETE CASCADE,
-            FOREIGN KEY (target_beat_id) REFERENCES plot_beats(id) ON DELETE CASCADE
+            FOREIGN KEY (source_node_id) REFERENCES plot_nodes(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_node_id) REFERENCES plot_nodes(id) ON DELETE CASCADE
         );
-        CREATE INDEX IF NOT EXISTS idx_plk_source ON plot_links(source_beat_id);
-        CREATE INDEX IF NOT EXISTS idx_plk_target ON plot_links(target_beat_id);
+        CREATE INDEX IF NOT EXISTS idx_plk_source ON plot_links(source_node_id);
+        CREATE INDEX IF NOT EXISTS idx_plk_target ON plot_links(target_node_id);
 
         -- PlotNode ↔ Scene 关联（M:N）
         CREATE TABLE IF NOT EXISTS plot_node_scenes (
@@ -321,49 +288,54 @@ def _init_tables(conn: sqlite3.Connection):
         CREATE INDEX IF NOT EXISTS idx_pns_scene ON plot_node_scenes(scene_id);
     """)
 
-    # 删旧表（测试数据，无需迁移）
+    # 删旧表
     conn.execute("DROP TABLE IF EXISTS writing_settings")
+    conn.execute("DROP TABLE IF EXISTS writing_thread_nodes")
+    conn.execute("DROP TABLE IF EXISTS writing_threads")
 
-    # 迁移旧节点类型 → 新类型（event→advance, emergence→surface, seed→surface, crossing→advance）
-    _migrate_node_types(conn)
-
-
-# 旧→新节点类型映射（幂等，已迁移的不会重复执行）
-_NODE_TYPE_MIGRATION = {
-    "event": "advance",
-    "emergence": "surface",
-    "seed": "surface",
-    "crossing": "advance",
-    # resolution→resolve
-    "resolution": "resolve",
-}
-
-
-def _migrate_node_types(conn: sqlite3.Connection):
-    for old_type, new_type in _NODE_TYPE_MIGRATION.items():
-        conn.execute(
-            "UPDATE writing_thread_nodes SET type = ? WHERE type = ?",
-            (new_type, old_type),
-        )
-    # 迁移旧列：添加 goal/satisfaction 列（如果不存在）
-    _ensure_columns(conn, "writing_thread_nodes", {
-        "goal": "INTEGER NOT NULL DEFAULT 0",
-        "satisfaction": "TEXT DEFAULT NULL",
-    })
-    # 迁移 writing_threads：添加 tags 列（如果不存在）
-    _ensure_columns(conn, "writing_threads", {
-        "tags": "TEXT NOT NULL DEFAULT '[]'",
-    })
-    # 迁移 writing_scenes：添加 codex_ids 列（如果不存在）
-    _ensure_columns(conn, "writing_scenes", {
-        "codex_ids": "TEXT NOT NULL DEFAULT '[]'",
-        "label_ids": "TEXT NOT NULL DEFAULT '[]'",
-    })
-    # 迁移 codex：添加 category 列（如果不存在）
-    _ensure_columns(conn, "codex", {
-        "category": "TEXT DEFAULT NULL",
-    })
+    # 统一迁移
+    _migrate_columns(conn)
     conn.commit()
+
+
+def _migrate_columns(conn: sqlite3.Connection):
+    """Migrate legacy databases to current schema."""
+    import logging
+    log = logging.getLogger(__name__)
+
+    # plot_nodes: add start_ch, end_ch, resolved columns
+    for col, defn in [("start_ch", "INTEGER"), ("end_ch", "INTEGER"), ("resolved", "INTEGER NOT NULL DEFAULT 0")]:
+        try:
+            conn.execute(f"ALTER TABLE plot_nodes ADD COLUMN {col} {defn}")
+        except Exception:
+            pass
+
+    # plot_links: beat-based -> node-based (drop + recreate if old schema exists)
+    try:
+        conn.execute("SELECT source_beat_id FROM plot_links LIMIT 1")
+        log.warning("plot_links has old beat-based schema — dropping and recreating (data lost)")
+        conn.execute("DROP TABLE IF EXISTS plot_links")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS plot_links (
+                id              TEXT PRIMARY KEY,
+                source_node_id  TEXT NOT NULL,
+                target_node_id  TEXT NOT NULL,
+                relation        TEXT NOT NULL DEFAULT 'trigger',
+                note            TEXT NOT NULL DEFAULT '',
+                sort_order      INTEGER NOT NULL DEFAULT 0,
+                created_at      REAL NOT NULL,
+                updated_at      REAL NOT NULL,
+                FOREIGN KEY (source_node_id) REFERENCES plot_nodes(id) ON DELETE CASCADE,
+                FOREIGN KEY (target_node_id) REFERENCES plot_nodes(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_plk_source ON plot_links(source_node_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_plk_target ON plot_links(target_node_id)")
+    except Exception:
+        pass  # New schema or table doesn't exist yet
+
+    # plot_arcs: add status/metadata columns if missing
+    _ensure_columns(conn, "plot_arcs", {"status": "TEXT NOT NULL DEFAULT 'active'"})
 
 
 def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]):
@@ -878,223 +850,6 @@ def reorder_labels(project_id: str, ordered_ids: list[str]):
         conn.commit()
 
 
-# ── 叙事线 (Threads) ──
-
-def create_thread(project_id: str, type: str = "dark", name: str = "",
-                  color: str = "#6b7280", description: dict | None = None,
-                  linked_codex_ids: list | None = None, tags: list | None = None) -> dict:
-    with write_lock:
-        conn = get_conn()
-        tid = f"thrd-{uuid.uuid4().hex[:10]}"
-        now = time.time()
-        max_order = conn.execute(
-            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_threads WHERE project_id = ?",
-            (project_id,),
-        ).fetchone()[0]
-        # Auto-derive tags from type if not provided
-        thread_tags = tags if tags is not None else [type]
-        conn.execute(
-            """INSERT INTO writing_threads
-               (id, project_id, type, tags, name, description, color, status, sort_order, linked_codex_ids, metadata, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, '{}', ?, ?)""",
-            (tid, project_id, type,
-             json.dumps(thread_tags, ensure_ascii=False),
-             name,
-             json.dumps(description or {}, ensure_ascii=False),
-             color, max_order,
-             json.dumps(linked_codex_ids or [], ensure_ascii=False),
-             now, now),
-        )
-        conn.commit()
-        return _row_to_dict(conn.execute("SELECT * FROM writing_threads WHERE id = ?", (tid,)).fetchone())
-
-
-def list_threads(project_id: str) -> list[dict]:
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM writing_threads WHERE project_id = ? ORDER BY sort_order",
-        (project_id,),
-    ).fetchall()
-    return [_row_to_dict(r) for r in rows]
-
-
-def get_thread(thread_id: str) -> dict | None:
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM writing_threads WHERE id = ?", (thread_id,)).fetchone()
-    return _row_to_dict(row) if row else None
-
-
-def update_thread(thread_id: str, **kwargs) -> dict | None:
-    with write_lock:
-        conn = get_conn()
-        allowed = {"type", "tags", "name", "description", "color", "status", "linked_codex_ids", "metadata"}
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return get_thread(thread_id)
-        for json_field in ("description", "linked_codex_ids", "metadata", "tags"):
-            if json_field in updates and not isinstance(updates[json_field], str):
-                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
-        updates["updated_at"] = time.time()
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [thread_id]
-        conn.execute(f"UPDATE writing_threads SET {set_clause} WHERE id = ?", values)
-        conn.commit()
-    return get_thread(thread_id)
-
-
-def delete_thread(thread_id: str) -> bool:
-    with write_lock:
-        conn = get_conn()
-        try:
-            conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute("SELECT project_id FROM writing_threads WHERE id = ?", (thread_id,)).fetchone()
-            project_id = row["project_id"] if row else None
-            conn.execute("DELETE FROM writing_threads WHERE id = ?", (thread_id,))
-            conn.commit()
-            if project_id:
-                remaining = conn.execute(
-                    "SELECT id FROM writing_threads WHERE project_id = ? ORDER BY sort_order",
-                    (project_id,),
-                ).fetchall()
-                for i, r in enumerate(remaining):
-                    conn.execute("UPDATE writing_threads SET sort_order = ? WHERE id = ?", (i, r["id"]))
-                conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-    return True
-
-
-def reorder_threads(project_id: str, ordered_ids: list[str]):
-    with write_lock:
-        conn = get_conn()
-        try:
-            conn.execute("BEGIN IMMEDIATE")
-            for i, tid in enumerate(ordered_ids):
-                conn.execute(
-                    "UPDATE writing_threads SET sort_order = ?, updated_at = ? WHERE id = ? AND project_id = ?",
-                    (i, time.time(), tid, project_id),
-                )
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-
-
-# ── 叙事线节点 (Thread Nodes) ──
-
-def create_thread_node(thread_id: str, type: str = "advance", title: str = "",
-                       note: str = "", scene_id: str | None = None,
-                       story_time: str = "", goal: bool = False,
-                       satisfaction: dict | None = None) -> dict:
-    with write_lock:
-        conn = get_conn()
-        nid = f"tn-{uuid.uuid4().hex[:11]}"
-        now = time.time()
-        max_order = conn.execute(
-            "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_thread_nodes WHERE thread_id = ?",
-            (thread_id,),
-        ).fetchone()[0]
-        sat_json = json.dumps(satisfaction, ensure_ascii=False) if satisfaction else None
-        conn.execute(
-            """INSERT INTO writing_thread_nodes
-               (id, thread_id, type, scene_id, title, note, story_time, goal, satisfaction, sort_order, metadata, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}', ?, ?)""",
-            (nid, thread_id, type, scene_id, title, note, story_time,
-             1 if goal else 0, sat_json,
-             max_order, now, now),
-        )
-        conn.commit()
-        return _row_to_dict(conn.execute("SELECT * FROM writing_thread_nodes WHERE id = ?", (nid,)).fetchone())
-
-
-def list_thread_nodes(thread_id: str) -> list[dict]:
-    conn = get_conn()
-    rows = conn.execute(
-        "SELECT * FROM writing_thread_nodes WHERE thread_id = ? ORDER BY sort_order",
-        (thread_id,),
-    ).fetchall()
-    return [_row_to_dict(r) for r in rows]
-
-
-def get_thread_node(node_id: str) -> dict | None:
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM writing_thread_nodes WHERE id = ?", (node_id,)).fetchone()
-    return _row_to_dict(row) if row else None
-
-
-def update_thread_node(node_id: str, **kwargs) -> dict | None:
-    with write_lock:
-        conn = get_conn()
-        allowed = {"type", "title", "note", "scene_id", "story_time", "metadata", "goal", "satisfaction"}
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return get_thread_node(node_id)
-        for json_field in ("metadata", "satisfaction"):
-            if json_field in updates and not isinstance(updates[json_field], str):
-                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
-            if json_field in updates and not isinstance(updates[json_field], str):
-                updates[json_field] = json.dumps(updates[json_field], ensure_ascii=False)
-        updates["updated_at"] = time.time()
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [node_id]
-        conn.execute(f"UPDATE writing_thread_nodes SET {set_clause} WHERE id = ?", values)
-        conn.commit()
-    return get_thread_node(node_id)
-
-
-def delete_thread_node(node_id: str) -> bool:
-    with write_lock:
-        conn = get_conn()
-        try:
-            conn.execute("BEGIN IMMEDIATE")
-            row = conn.execute("SELECT thread_id FROM writing_thread_nodes WHERE id = ?", (node_id,)).fetchone()
-            thread_id = row["thread_id"] if row else None
-            conn.execute("DELETE FROM writing_thread_nodes WHERE id = ?", (node_id,))
-            conn.commit()
-            if thread_id:
-                remaining = conn.execute(
-                    "SELECT id FROM writing_thread_nodes WHERE thread_id = ? ORDER BY sort_order",
-                    (thread_id,),
-                ).fetchall()
-                for i, r in enumerate(remaining):
-                    conn.execute("UPDATE writing_thread_nodes SET sort_order = ? WHERE id = ?", (i, r["id"]))
-                conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-    return True
-
-
-def reorder_thread_nodes(thread_id: str, ordered_ids: list[str]):
-    with write_lock:
-        conn = get_conn()
-        try:
-            conn.execute("BEGIN IMMEDIATE")
-            for i, nid in enumerate(ordered_ids):
-                conn.execute(
-                    "UPDATE writing_thread_nodes SET sort_order = ?, updated_at = ? WHERE id = ? AND thread_id = ?",
-                    (i, time.time(), nid, thread_id),
-                )
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-
-
-def get_threads_for_scene(scene_id: str) -> list[dict]:
-    """返回绑定了指定 scene_id 的所有节点及其所属线程（用于 PlanView 标记）。"""
-    conn = get_conn()
-    rows = conn.execute(
-        """SELECT n.*, t.name AS thread_name, t.type AS thread_type, t.color AS thread_color, t.status AS thread_status
-           FROM writing_thread_nodes n
-           JOIN writing_threads t ON n.thread_id = t.id
-           WHERE n.scene_id = ?
-           ORDER BY t.sort_order, n.sort_order""",
-        (scene_id,),
-    ).fetchall()
-    return [dict(r) for r in rows]
-
 
 # ── 辅助 ──
 
@@ -1109,6 +864,13 @@ def _row_to_dict(row: sqlite3.Row | None) -> dict | None:
                 d[key] = json.loads(d[key])
             except json.JSONDecodeError:
                 pass
+    return d
+
+
+def _normalize_node(d: dict) -> dict:
+    """Normalize SQLite INTEGER fields to Python/JSON types for PlotNode."""
+    if "resolved" in d and not isinstance(d["resolved"], bool):
+        d["resolved"] = bool(d["resolved"])
     return d
 
 
@@ -1488,15 +1250,16 @@ def reorder_lines(arc_id: str, ordered_ids: list[str]) -> None:
 # L4: PlotNode
 
 def create_node(line_id: str, title: str = "", summary: str = "", purpose: str = "",
-                scene_ids: list[str] | None = None) -> dict:
+                scene_ids: list[str] | None = None, start_ch: int | None = None,
+                end_ch: int | None = None, resolved: bool = False) -> dict:
     nid = str(uuid.uuid4())
     now = time.time()
     with write_lock:
         conn = get_conn()
         mx = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM plot_nodes WHERE line_id = ?", (line_id,)).fetchone()[0]
         conn.execute(
-            "INSERT INTO plot_nodes (id, line_id, title, summary, purpose, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (nid, line_id, title, summary, purpose, mx + 1, now, now),
+            "INSERT INTO plot_nodes (id, line_id, title, summary, purpose, sort_order, start_ch, end_ch, resolved, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (nid, line_id, title, summary, purpose, mx + 1, start_ch, end_ch, 1 if resolved else 0, now, now),
         )
         if scene_ids:
             for si, sid in enumerate(scene_ids):
@@ -1506,9 +1269,10 @@ def create_node(line_id: str, title: str = "", summary: str = "", purpose: str =
                     (pns_id, nid, sid, si),
                 )
         conn.commit()
-    return {"id": nid, "line_id": line_id, "title": title, "summary": summary,
-            "purpose": purpose, "sort_order": mx + 1, "metadata": "{}",
-            "scene_ids": scene_ids or [], "created_at": now, "updated_at": now}
+    return _normalize_node({"id": nid, "line_id": line_id, "title": title, "summary": summary,
+            "purpose": purpose, "sort_order": mx + 1, "start_ch": start_ch, "end_ch": end_ch,
+            "resolved": resolved, "metadata": "{}",
+            "scene_ids": scene_ids or [], "created_at": now, "updated_at": now})
 
 
 def list_nodes(line_id: str) -> list[dict]:
@@ -1522,13 +1286,17 @@ def list_nodes(line_id: str) -> list[dict]:
             (d["id"],),
         ).fetchall()
         d["scene_ids"] = [s["scene_id"] for s in scenes]
+        _normalize_node(d)
         result.append(d)
     return result
 
 
 def update_node(node_id: str, **kwargs) -> dict:
-    allowed = {"title", "summary", "purpose", "sort_order", "metadata"}
+    allowed = {"title", "summary", "purpose", "sort_order", "metadata", "start_ch", "end_ch", "resolved"}
     fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    # Convert bool → int for SQLite
+    if "resolved" in fields and isinstance(fields["resolved"], bool):
+        fields["resolved"] = 1 if fields["resolved"] else 0
     has_scene_update = "scene_ids" in kwargs and kwargs["scene_ids"] is not None
     if not fields and not has_scene_update:
         raise ValueError("No valid fields to update")
@@ -1556,6 +1324,7 @@ def update_node(node_id: str, **kwargs) -> dict:
         (node_id,),
     ).fetchall()
     d["scene_ids"] = [s["scene_id"] for s in scenes]
+    _normalize_node(d)
     return d
 
 
@@ -1577,30 +1346,28 @@ def reorder_nodes(line_id: str, ordered_ids: list[str]) -> None:
 # L5: PlotBeat
 
 VALID_BEAT_KINDS = {
-    "setup", "action", "conflict", "despair", "relief", "reward",
-    "mystery", "reveal", "twist", "payoff", "result",
+    "action", "conflict", "despair", "relief", "reward",
+    "twist", "result", "escalation", "scheme", "revenge",
+    "romance", "comedy", "cliffhanger", "lore-reveal",
 }
-VALID_BEAT_STATUSES = {"planted", "resolved", "abandoned"}
 
 
-def create_beat(node_id: str, kind: str = "setup", summary: str = "",
-                effect: str = "", status: str = "planted") -> dict:
+def create_beat(node_id: str, kind: str = "action", summary: str = "",
+                effect: str = "") -> dict:
     if kind not in VALID_BEAT_KINDS:
-        kind = "setup"
-    if status not in VALID_BEAT_STATUSES:
-        status = "planted"
+        kind = "action"
     bid = str(uuid.uuid4())
     now = time.time()
     with write_lock:
         conn = get_conn()
         mx = conn.execute("SELECT COALESCE(MAX(sort_order), -1) FROM plot_beats WHERE node_id = ?", (node_id,)).fetchone()[0]
         conn.execute(
-            "INSERT INTO plot_beats (id, node_id, kind, summary, effect, status, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (bid, node_id, kind, summary, effect, status, mx + 1, now, now),
+            "INSERT INTO plot_beats (id, node_id, kind, summary, effect, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (bid, node_id, kind, summary, effect, mx + 1, now, now),
         )
         conn.commit()
     return {"id": bid, "node_id": node_id, "kind": kind, "summary": summary,
-            "effect": effect, "status": status, "sort_order": mx + 1,
+            "effect": effect, "sort_order": mx + 1,
             "metadata": "{}", "created_at": now, "updated_at": now}
 
 
@@ -1611,11 +1378,9 @@ def list_beats(node_id: str) -> list[dict]:
 
 
 def update_beat(beat_id: str, **kwargs) -> dict | None:
-    allowed = {"kind", "summary", "effect", "status", "sort_order", "metadata"}
+    allowed = {"kind", "summary", "effect", "sort_order", "metadata"}
     if "kind" in kwargs and kwargs["kind"] not in VALID_BEAT_KINDS:
         del kwargs["kind"]
-    if "status" in kwargs and kwargs["status"] not in VALID_BEAT_STATUSES:
-        del kwargs["status"]
     fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
     if not fields:
         raise ValueError("No valid fields to update")
@@ -1646,34 +1411,34 @@ def reorder_beats(node_id: str, ordered_ids: list[str]) -> None:
         conn.commit()
 
 
-# PlotLink
+# PlotLink — 连 Node（不是 Beat），跨轨道因果关系
 
-VALID_LINK_RELATIONS = {"foreshadow", "echo", "conflict", "parallel"}
+VALID_LINK_RELATIONS = {"trigger", "foreshadow", "suspense", "reveal"}
 
 
-def create_link(source_beat_id: str, target_beat_id: str, relation: str = "foreshadow",
+def create_link(source_node_id: str, target_node_id: str, relation: str = "trigger",
                 note: str = "") -> dict:
     if relation not in VALID_LINK_RELATIONS:
-        relation = "foreshadow"
+        relation = "trigger"
     lid = str(uuid.uuid4())
     now = time.time()
     with write_lock:
         conn = get_conn()
         conn.execute(
-            "INSERT INTO plot_links (id, source_beat_id, target_beat_id, relation, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (lid, source_beat_id, target_beat_id, relation, note, now, now),
+            "INSERT INTO plot_links (id, source_node_id, target_node_id, relation, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (lid, source_node_id, target_node_id, relation, note, now, now),
         )
         conn.commit()
-    return {"id": lid, "source_beat_id": source_beat_id, "target_beat_id": target_beat_id,
+    return {"id": lid, "source_node_id": source_node_id, "target_node_id": target_node_id,
             "relation": relation, "note": note, "sort_order": 0,
             "created_at": now, "updated_at": now}
 
 
-def list_links_for_beat(beat_id: str) -> list[dict]:
+def list_links_for_node(node_id: str) -> list[dict]:
     conn = get_conn()
     rows = conn.execute(
-        "SELECT * FROM plot_links WHERE source_beat_id = ? OR target_beat_id = ?",
-        (beat_id, beat_id),
+        "SELECT * FROM plot_links WHERE source_node_id = ? OR target_node_id = ?",
+        (node_id, node_id),
     ).fetchall()
     return [dict(r) for r in rows]
 
@@ -1715,6 +1480,7 @@ def get_plot_tree(project_id: str) -> dict | None:
                     (node["id"],),
                 ).fetchall()
                 node["beats"] = [dict(b) for b in beats]
+                _normalize_node(node)
                 line["nodes"].append(node)
             arc["lines"].append(line)
         plot["arcs"].append(arc)
@@ -1733,7 +1499,7 @@ def get_plot_for_scene(scene_id: str) -> dict | None:
         "line": {...},
         "node": {..., "beats": [...]},
         "sibling_nodes": [...],  # 同 Line 下其他 Node（带 relative_order）
-        "linked_beats": [...]    # 通过 PlotLink 关联的 Beat
+        "linked_nodes": [...]    # 通过 PlotLink 关联的 Node
     }
     """
     conn = get_conn()
@@ -1789,24 +1555,21 @@ def get_plot_for_scene(scene_id: str) -> dict | None:
         sib["relative_order"] = "past" if s["sort_order"] < current_sort else "future"
         sibling_nodes.append(sib)
 
-    # 5. PlotLink 关联的 Beat
+    # 5. PlotLink 关联的 Node（连 Node，不连 Beat）
     link_rows = conn.execute(
-        "SELECT * FROM plot_links WHERE source_beat_id IN (SELECT id FROM plot_beats WHERE node_id = ?) "
-        "OR target_beat_id IN (SELECT id FROM plot_beats WHERE node_id = ?)",
+        "SELECT * FROM plot_links WHERE source_node_id = ? OR target_node_id = ?",
         (node_id, node_id),
     ).fetchall()
 
-    linked_beats = []
-    beat_ids_in_node = {b["id"] for b in node["beats"]}
+    linked_nodes = []
     for lr in link_rows:
-        # 确定关联方向：linked beat 是对端的那个
-        linked_id = lr["target_beat_id"] if lr["source_beat_id"] in beat_ids_in_node else lr["source_beat_id"]
-        linked_beat_row = conn.execute("SELECT * FROM plot_beats WHERE id = ?", (linked_id,)).fetchone()
-        if linked_beat_row:
-            lb = dict(linked_beat_row)
-            lb["relation_type"] = lr["relation"]
-            lb["link_note"] = lr["note"]
-            linked_beats.append(lb)
+        linked_node_id = lr["target_node_id"] if lr["source_node_id"] == node_id else lr["source_node_id"]
+        linked_node_row = conn.execute("SELECT * FROM plot_nodes WHERE id = ?", (linked_node_id,)).fetchone()
+        if linked_node_row:
+            ln = dict(linked_node_row)
+            ln["relation_type"] = lr["relation"]
+            ln["link_note"] = lr["note"]
+            linked_nodes.append(ln)
 
     return {
         "plot": plot,
@@ -1814,7 +1577,7 @@ def get_plot_for_scene(scene_id: str) -> dict | None:
         "line": line,
         "node": node,
         "sibling_nodes": sibling_nodes,
-        "linked_beats": linked_beats,
+        "linked_nodes": linked_nodes,
     }
 
 

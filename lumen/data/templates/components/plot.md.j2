@@ -56,10 +56,10 @@ category: components
 {% endfor %}
 {% endif %}
 
-{% if plot_for_scene.linked_beats %}
-#### 关联剧情
-{% for lb in plot_for_scene.linked_beats %}
-- **{{ lb.title }}**（{{ lb.relation_type }}）：{{ lb.summary or "无摘要" }}
+{% if plot_for_scene.linked_nodes %}
+#### 关联节点（PlotLink）
+{% for ln in plot_for_scene.linked_nodes %}
+- **{{ ln.title }}**（{{ ln.relation_type }}）：{{ ln.summary or "无摘要" }}
 {% endfor %}
 {% endif %}
 {% endif %}

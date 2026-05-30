@@ -39,6 +39,9 @@ export interface ContextSelection {
   codexDetails?: string[];
   codexCategories?: string[];
   codexTags?: string[];
+  plotEnabled?: boolean;
+  plotArcs?: string[];
+  plotLines?: string[];
 }
 
 // ── Helpers ──
@@ -80,6 +83,7 @@ export function BeatContextMenu({
   const codexEntries = useWritingStore(s => s.codexEntries ?? []);
   const snippets = useWritingStore(s => s.snippets ?? []);
   const activeProjectId = useWritingStore(s => s.activeProjectId);
+  const plotTree = useWritingStore(s => s.plotTree);
 
   const allChapters = useMemo(() => {
     const result: (WritingChapter & { actTitle: string; actId: string })[] = [];
@@ -153,6 +157,14 @@ export function BeatContextMenu({
   const hasCdSel = (selection.codexDetails?.length ?? 0) > 0;
   const hasCcSel = (selection.codexCategories?.length ?? 0) > 0;
   const hasCgSel = (selection.codexTags?.length ?? 0) > 0;
+  const hasPlotArcSel = (selection.plotArcs?.length ?? 0) > 0;
+  const hasPlotLineSel = (selection.plotLines?.length ?? 0) > 0;
+  const plotArcs = plotTree?.arcs || [];
+  const selectedArcIds = new Set(selection.plotArcs || []);
+  const plotLines = (selectedArcIds.size > 0
+    ? plotArcs.filter(a => selectedArcIds.has(a.id))
+    : plotArcs
+  ).flatMap(a => a.lines || []);
 
   const toggle = useCallback(<K extends keyof ContextSelection>(key: K, id: string) => {
     const arr = (selection[key] as string[]) || [];
@@ -414,6 +426,65 @@ export function BeatContextMenu({
             )}
           </DropdownMenuSub>
         </DropdownMenuGroup>
+
+        {plotArcs.length > 0 && (
+          <>
+            <DropdownMenuSeparator className={separatorCls} />
+
+            {/* ── Group 4: Plot ── */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className={groupLabelCls}>Plot</DropdownMenuLabel>
+
+              <DropdownMenuCheckboxItem
+                checked={selection.plotEnabled ?? false}
+                onCheckedChange={(v) => setBool("plotEnabled", !!v)}
+                onSelect={(e) => e.preventDefault()}
+                className={itemCls}
+              >注入剧情结构</DropdownMenuCheckboxItem>
+
+              {selection.plotEnabled && (
+                <>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className={itemCls}>
+                      <DotIndicator visible={hasPlotArcSel} />Arcs
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className={`min-w-[220px] p-0 ${subContentCls}`}>
+                      {plotArcs.map(arc => (
+                        <DropdownMenuCheckboxItem
+                          key={arc.id}
+                          checked={(selection.plotArcs || []).includes(arc.id)}
+                          onCheckedChange={() => toggle("plotArcs", arc.id)}
+                          onSelect={(e) => e.preventDefault()}
+                          className={itemCls}
+                        >{arc.title || `Arc ${(arc.sort_order ?? 0) + 1}`}</DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className={itemCls}>
+                      <DotIndicator visible={hasPlotLineSel} />Lines
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className={`min-w-[220px] p-0 ${subContentCls}`}>
+                      {plotLines.map(line => (
+                        <DropdownMenuCheckboxItem
+                          key={line.id}
+                          checked={(selection.plotLines || []).includes(line.id)}
+                          onCheckedChange={() => toggle("plotLines", line.id)}
+                          onSelect={(e) => e.preventDefault()}
+                          className={itemCls}
+                        >
+                          {line.title || line.name || "未命名线"}
+                          <span className="ml-auto text-[10px] text-text-dim">{line.type}</span>
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                </>
+              )}
+            </DropdownMenuGroup>
+          </>
+        )}
 
         {hasSelection && (
           <>

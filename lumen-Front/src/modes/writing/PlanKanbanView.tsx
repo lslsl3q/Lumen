@@ -45,6 +45,7 @@ import {
   handleActDrag,
   filterActs,
 } from "./usePlanDrag";
+import { extractDocText } from "../../lib/tiptap";
 
 // ── Draggable Scene Card ──
 
@@ -411,7 +412,7 @@ export function PlanKanbanView({ searchQuery }: { searchQuery: string }) {
           return { label: ch.title || "章节" };
         for (const sc of ch.scenes || []) {
           if (activeType === "scene" && sc.id === activeId)
-            return { label: sc.summary || "场景" };
+            return { label: extractDocText(sc.summary) || "场景" };
         }
       }
     }

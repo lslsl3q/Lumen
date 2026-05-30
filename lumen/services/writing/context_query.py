@@ -13,7 +13,7 @@ import logging
 from typing import Any
 
 from lumen.services.storage.writing import (
-    list_chapters, list_codex, list_threads, list_thread_nodes,
+    list_chapters, list_codex,
     list_acts, list_snippets, list_scenes,
 )
 
@@ -176,8 +176,6 @@ class ContextQueryService:
         self._scene_id = scene_id
         self._all_chapters: list[dict[str, Any]] | None = None
         self._all_settings: list[dict[str, Any]] | None = None
-        self._all_threads: list[dict[str, Any]] = []
-        self._thread_nodes: dict[str, list[dict[str, Any]]] = {}
         self._current_index: int = 0
         self._context_selection: dict[str, Any] | None = None
         self._resolved_context: str = ""
@@ -203,12 +201,6 @@ class ContextQueryService:
             (i for i, ch in enumerate(self._all_chapters) if ch.get("id") == self._chapter_id),
             len(self._all_chapters),
         )
-
-        # 预加载叙事线及节点
-        self._all_threads = list_threads(self._book_id) or []
-        for t in self._all_threads:
-            tid = t.get("id", "")
-            self._thread_nodes[tid] = list_thread_nodes(tid) or []
 
         # 预加载 Plot 数据
         self._preload_plot_data()
@@ -344,6 +336,12 @@ class ContextQueryService:
             entries = [s for s in self._all_settings if s.get("category") in codex_categories]
             if entries:
                 parts.append(_format_settings_grouped(entries))
+
+        # Plot context — 按选中项过滤注入
+        if sel.get("plotEnabled") and self._plot_outline:
+            arc_ids = sel.get("plotArcs", [])
+            line_ids = sel.get("plotLines", [])
+            parts.append(_format_plot_selection(self._plot_outline, self._plot_for_scene, arc_ids, line_ids))
 
         return "\n\n".join(parts)
 
@@ -540,58 +538,63 @@ class ContextQueryService:
         # Step 7: 格式化输出
         return _format_settings_grouped(active_list)
 
-    # ── 叙事线查询 ──
 
-    def active_threads(self) -> str:
-        """格式化所有活跃叙事线及其最新节点状态"""
-        if not self._all_threads:
-            return ""
-        type_labels = {"main": "明线", "subplot": "支线", "dark": "暗线"}
-        status_labels = {"active": "活跃", "dormant": "潜伏", "surfaced": "浮现", "resolved": "收束"}
-        node_labels = {"advance": "推进", "surface": "浮现", "resolve": "收束", "background": "背景"}
+# ── Plot 选择项格式化（模块级） ──
 
-        lines = ["当前叙事线："]
-        for t in self._all_threads:
-            tid = t.get("id", "")
-            name = t.get("name", "未命名")
-            ttype = type_labels.get(t.get("type", ""), t.get("type", ""))
-            status = status_labels.get(t.get("status", ""), t.get("status", ""))
-            nodes = self._thread_nodes.get(tid, [])
-            line = f"- [{ttype}] {name}（{status}，{len(nodes)} 个节点）"
+def _format_plot_selection(outline: dict[str, Any] | None,
+                           scene_plot: dict[str, Any] | None,
+                           arc_ids: list[str],
+                           line_ids: list[str]) -> str:
+    """按选中项过滤 Plot 数据并格式化为注入文本。"""
+    if not outline:
+        return ""
 
-            # 最近 3 个节点摘要
-            recent = nodes[-3:] if len(nodes) > 3 else nodes
-            if recent:
-                parts = []
-                for n in recent:
-                    ntype = node_labels.get(n.get("type", "advance"), n.get("type", "advance"))
-                    title = n.get("title", "")
-                    goal = " ★目标" if n.get("goal") else ""
-                    parts.append(f"{ntype}{goal}: {title or '无标题'}")
-                line += "\n  最近: " + " → ".join(parts)
-            lines.append(line)
-        return "\n".join(lines)
+    result: list[str] = []
 
-    def unfilled_pits(self) -> str:
-        """格式化未填的伏笔（surface 节点无配对 resolve）"""
-        pits: list[str] = []
-        for t in self._all_threads:
-            tid = t.get("id", "")
-            nodes = self._thread_nodes.get(tid, [])
-            surface_nodes = [n for n in nodes if n.get("type") == "surface"]
-            if not surface_nodes:
-                continue
-            has_resolve = any(n.get("type") == "resolve" for n in nodes)
-            if has_resolve:
-                continue
-            name = t.get("name", "未命名")
-            for n in surface_nodes:
-                title = n.get("title", "未命名浮现节点")
-                pits.append(f"- [{name}] {title}")
+    arcs = outline.get("arcs", [])
+    filtered_arcs = [a for a in arcs if not arc_ids or a.get("id") in arc_ids]
 
-        if not pits:
-            return ""
-        return "未填的伏笔（已浮现但未收束）：\n" + "\n".join(pits)
+    if filtered_arcs:
+        result.append("## 项目剧情概要")
+        for arc in filtered_arcs:
+            result.append(f"### {arc.get('title', 'Arc')}")
+            for line in arc.get("lines", []) or []:
+                if line_ids and line.get("id") not in line_ids:
+                    continue
+                lt = line.get("type", "main")
+                lt_label = {"main": "主线", "subplot": "支线", "dark": "暗线"}.get(lt, lt)
+                result.append(f"- **{line.get('title', '故事线')}**（{lt_label}，{line.get('status', '')}）")
+                if line.get("summary"):
+                    result.append(f"  {line['summary']}")
+                for node in line.get("nodes", []) or []:
+                    marker = "~~" if node.get("resolved") else ""
+                    ch = f"ch {node.get('start_ch', '?')}~{node.get('end_ch', '?')}" if node.get("start_ch") is not None else ""
+                    result.append(f"  - {marker}{node.get('title', '节点')}{marker}（{ch}）")
+
+    if scene_plot:
+        result.append("## 当前场景剧情上下文")
+        node = scene_plot.get("node", {})
+        if node:
+            result.append(f"**当前剧情节点**：{node.get('title', '未命名')}")
+            if node.get("summary"):
+                result.append(str(node["summary"]))
+            if node.get("purpose"):
+                result.append(f"**节点目的**：{node['purpose']}")
+        line = scene_plot.get("line", {})
+        if line:
+            result.append(f"**所在故事线**：{line.get('title', '')}（{line.get('type', '')}）")
+        arc = scene_plot.get("arc", {})
+        if arc:
+            result.append(f"**所在 Arc**：{arc.get('title', '')}")
+
+        linked = scene_plot.get("linked_nodes", [])
+        if linked:
+            result.append("#### 关联节点（PlotLink）")
+            for ln in linked:
+                rel = ln.get("relation_type", "")
+                result.append(f"- **{ln.get('title', '')}**（{rel}）：{ln.get('summary', '无摘要')}")
+
+    return "\n".join(result)
 
 
 class _TemplateQueryProxy:
@@ -630,12 +633,6 @@ class _TemplateQueryProxy:
 
     def codex_injection(self, text: str = "") -> str:
         return self._svc.codex_injection(text=text)
-
-    def active_threads(self) -> str:
-        return self._svc.active_threads()
-
-    def unfilled_pits(self) -> str:
-        return self._svc.unfilled_pits()
 
     def resolved_context(self) -> str:
         """返回前端选择的上下文文本（NC-aligned context selection）"""

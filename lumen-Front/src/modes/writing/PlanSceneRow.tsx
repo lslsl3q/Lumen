@@ -10,6 +10,7 @@ import {
 import { useWritingStore } from "../../stores/useWritingStore";
 import type { WritingScene } from "../../api/writing";
 import type { SceneDragData } from "./usePlanDrag";
+import { extractDocText, wrapAsDoc } from "../../lib/tiptap";
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = "auto";
@@ -44,9 +45,10 @@ export function PlanSceneRow({ scene }: PlanSceneRowProps) {
 
   const handleSummaryBlur = useCallback(
     (e: React.FocusEvent<HTMLTextAreaElement>) => {
-      const summary = e.currentTarget.value;
-      if (summary !== (scene.summary || "")) {
-        useWritingStore.getState().patchScene(scene.id, { summary });
+      const text = e.currentTarget.value;
+      const json = wrapAsDoc(text);
+      if (json !== (scene.summary || "")) {
+        useWritingStore.getState().patchScene(scene.id, { summary: json });
       }
     },
     [scene.id, scene.summary],
@@ -83,7 +85,7 @@ export function PlanSceneRow({ scene }: PlanSceneRowProps) {
           ref={textareaRef}
           className="flex-1 min-h-[56px] text-[14px] leading-[22.75px] font-normal text-zinc-300 resize-none outline-none bg-transparent border-none p-2 placeholder:text-zinc-600"
           placeholder="场景摘要…"
-          defaultValue={scene.summary || ""}
+          defaultValue={extractDocText(scene.summary || "")}
           rows={2}
           onFocus={(e) => autoResize(e.currentTarget)}
           onInput={(e) => autoResize(e.currentTarget as HTMLTextAreaElement)}

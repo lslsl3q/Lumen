@@ -11,22 +11,24 @@ echo ========================================
 echo.
 
 echo [1/2] Checking Backend API...
-curl -s http://127.0.0.1:8888/docs > nul 2>&1
-if %errorlevel% equ 0 (
-    echo [OK] Backend API is running (http://127.0.0.1:8888)
-) else (
-    echo [ERROR] Backend API is not running, please start:
-    echo   cd F:\AI\tools\VCP\Lumen
-    echo   Start backend.bat
+curl -sf http://127.0.0.1:8888/docs -o nul 2>nul && (
+    echo [OK] Backend API is running
+) || (
+    echo [ERROR] Backend API is not running
+    echo   Please start: 启动后端.bat
+    echo.
     pause
     exit /b 1
 )
 
 echo.
 echo [2/2] Starting Frontend Application...
-echo Starting Tauri application...
 cd /d "%~dp0"
 set PATH=%USERPROFILE%\.cargo\bin;%PATH%
-pnpm tauri dev
+pnpm tauri dev 2>&1
 
+echo.
+echo ========================================
+echo   Process exited (code: %errorlevel%)
+echo ========================================
 pause

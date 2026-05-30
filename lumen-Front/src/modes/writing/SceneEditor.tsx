@@ -37,7 +37,7 @@ const LABEL_COLORS: { key: string; hex: string }[] = [
 const LABEL_COLOR_MAP = Object.fromEntries(LABEL_COLORS.map(c => [c.key, c.hex]));
 import { ActionsMenu } from "./ActionsMenu";
 import { SelectionToolbar } from "../../components/editors/SelectionToolbar";
-import type { WritingScene, WritingThreadNode } from "../../api/writing";
+import type { WritingScene } from "../../api/writing";
 import { useWritingStore } from "../../stores/useWritingStore";
 
 function autoResize(el: HTMLTextAreaElement) {
@@ -195,8 +195,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
   }, [editor, scene.id]);
 
   const codexEntries = useWritingStore((s) => s.codexEntries);
-  const allThreads = useWritingStore((s) => s.threads);
-  const allThreadNodes = useWritingStore((s) => s.threadNodes);
 
   // Force codex terms rebuild + decoration recalculation when entries change
   useEffect(() => {
@@ -234,19 +232,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
     return codexEntries.filter(e => detected.has(e.id));
   }, [scene.codex_ids, scene.summary, scene.content, codexEntries]);
 
-  const sceneThreadNodes = useMemo(() => {
-    const result: (WritingThreadNode & { threadName: string; threadColor: string })[] = [];
-    for (const thread of allThreads) {
-      const nodes = allThreadNodes[thread.id] || [];
-      for (const node of nodes) {
-        if (node.scene_id === scene.id) {
-          result.push({ ...node, threadName: thread.name, threadColor: thread.color });
-        }
-      }
-    }
-    return result;
-  }, [scene.id, allThreads, allThreadNodes]);
-
   const toggleCodex = useCallback((codexId: string) => {
     const currentIds: string[] = Array.isArray(scene.codex_ids) ? [...scene.codex_ids] : (() => { try { return JSON.parse(scene.codex_ids || "[]"); } catch { return []; } })();
     const idx = currentIds.indexOf(codexId);
@@ -268,10 +253,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
     else ids.push(labelId);
     useWritingStore.getState().patchScene(scene.id, { label_ids: ids } as any);
   }, [scene.id, currentLabelIds]);
-
-  const handleAddThreadNode = useCallback((threadId: string) => {
-    useWritingStore.getState().createThreadNodeAction(threadId, "advance", "", scene.id);
-  }, [scene.id]);
 
   const wordCount = editor.storage?.characterCount?.words?.() ?? 0;
   const sceneNumber = scene.scene_number ?? 0;
@@ -370,42 +351,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
             </PopoverContent>
           </Popover>
 
-          {/* Thread tags */}
-          {sceneThreadNodes.map(node => (
-            <span
-              key={node.id}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[72px]"
-              style={{ color: node.threadColor, background: node.threadColor + "15" }}
-              title={`${node.threadName} — ${node.title || node.type}`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: node.threadColor }} />
-              <span className="truncate">{node.threadName || "未命名"}</span>
-            </span>
-          ))}
-          {allThreads.length > 0 && (
-            <Popover>
-              <PopoverTrigger
-                className="inline-flex items-center gap-0.5 py-0.5 px-1 rounded text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors cursor-pointer"
-              >
-                <Plus className="w-2.5 h-2.5" />
-                Thread
-              </PopoverTrigger>
-              <PopoverContent side="top" align="start" className="w-48 max-h-48 overflow-y-auto p-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl">
-                {allThreads.map(thread => (
-                  <button
-                    key={thread.id}
-                    onClick={() => handleAddThreadNode(thread.id)}
-                    className="w-full text-left px-2 py-1 rounded text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-1.5"
-                    type="button"
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: thread.color }} />
-                    {thread.name || "未命名"}
-                  </button>
-                ))}
-              </PopoverContent>
-            </Popover>
-          )}
-
           <div className="flex-1" />
           <span className="text-zinc-600 tabular-nums shrink-0">{wordCount}w</span>
         </div>
@@ -469,15 +414,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
                 </button>
               </span>
             ))}
-            {sceneThreadNodes.map(node => (
-              <span key={node.id}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] truncate max-w-[80px]"
-                style={{ color: node.threadColor, background: node.threadColor + "15" }}
-                title={`${node.threadName} — ${node.title || node.type}`}>
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: node.threadColor }} />
-                <span className="truncate">{node.threadName || "未命名"}</span>
-              </span>
-            ))}
           </div>
 
           {/* Action buttons row */}
@@ -527,25 +463,6 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
               </PopoverContent>
             </Popover>
 
-            {allThreads.length > 0 && (
-              <Popover>
-                <PopoverTrigger
-                  className="flex items-center gap-1 py-0.5 rounded text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3 h-3" />
-                  Thread
-                </PopoverTrigger>
-                <PopoverContent side="top" align="start" className="w-48 max-h-48 overflow-y-auto p-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl">
-                  {allThreads.map(thread => (
-                    <button key={thread.id} onClick={() => handleAddThreadNode(thread.id)}
-                      className="w-full text-left px-2 py-1 rounded text-[11px] text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors cursor-pointer flex items-center gap-1.5" type="button">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: thread.color }} />
-                      {thread.name || "未命名"}
-                    </button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-            )}
           </div>
         </div>
       </div>
