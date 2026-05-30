@@ -38,7 +38,7 @@ echo.
 echo Press Ctrl+C to stop service
 echo.
 
-.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8888
+.venv\Scripts\python.exe -m uvicorn api.main:app --host 127.0.0.1 --port 8888 --reload
 
 REM Handle exit
 if %errorlevel% neq 0 (

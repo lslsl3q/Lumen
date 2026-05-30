@@ -6,6 +6,7 @@ import { NodeContextMenu } from "./NodeContextMenu";
 import { AddNodeMenu } from "./AddNodeMenu";
 import { Plus } from "lucide-react";
 import type { PlotLineType, Plot, PlotNode, PlotLine, PlotArc } from "../../../api/writing";
+import { extractDocText } from "../../../lib/tiptap";
 
 
 // ── Helpers ──
@@ -64,20 +65,40 @@ export function PlotPanel() {
   // ── Playhead state ──
   const [playheadChapter, setPlayheadChapter] = useState(1);
 
-  // ── Manuscript progress: max end_ch across all nodes ──
-  const manuscriptProgress = useMemo(() => {
-    if (!plotTree?.arcs) return 1;
-    let maxEnd = 0;
-    for (const arc of plotTree.arcs) {
-      for (const line of arc.lines || []) {
-        for (const node of line.nodes || []) {
-          const end = node.end_ch || 0;
-          if (end > maxEnd) maxEnd = end;
+  // ── Manuscript progress (auto + manual override) ──
+  const autoProgress = useMemo(() => {
+    let maxCh = 0;
+    for (const act of acts) {
+      for (const ch of act.chapters || []) {
+        const hasContent = (ch.scenes || []).some((sc: any) => {
+          const c = sc?.content;
+          if (!c) return false;
+          if (typeof c === "object") {
+            const texts: string[] = [];
+            const walk = (n: any) => { if (n.text) texts.push(n.text); if (n.content) n.content.forEach(walk); };
+            if (c.content) c.content.forEach(walk);
+            return texts.join("").trim().length > 0;
+          }
+          if (typeof c === "string") {
+            return extractDocText(c).trim().length > 0;
+          }
+          return false;
+        });
+        if (hasContent) {
+          const chNum = ch.numerate;
+          if (chNum > maxCh) maxCh = chNum;
         }
       }
     }
-    return maxEnd > 0 ? maxEnd : 1;
-  }, [plotTree]);
+    return maxCh > 0 ? maxCh : 1;
+  }, [acts]);
+
+  const [manualProgress, setManualProgress] = useState<number | null>(null);
+  const currentChapter = Math.max(autoProgress, manualProgress ?? 0);
+
+  const handleProgressChange = useCallback((ch: number | null) => {
+    setManualProgress(ch);
+  }, []);
 
   // Workbench state
   const [workbenchNodeId, setWorkbenchNodeId] = useState<string | null>(null);
@@ -355,7 +376,8 @@ export function PlotPanel() {
           <NarrativeRuler
             arcs={arcs}
             totalChapters={totalChapters}
-            currentChapter={manuscriptProgress}
+            currentChapter={currentChapter}
+            onProgressChange={handleProgressChange}
             plotTitle={plotTree.title || activeProject?.name}
             compact={true}
             showDarkLines={false}
@@ -375,7 +397,7 @@ export function PlotPanel() {
             <NarrativeRuler
               arcs={arcs}
               totalChapters={totalChapters}
-              currentChapter={manuscriptProgress}
+              currentChapter={currentChapter}
               compact={false}
               showDarkLines={true}
               viewRange={viewRange}

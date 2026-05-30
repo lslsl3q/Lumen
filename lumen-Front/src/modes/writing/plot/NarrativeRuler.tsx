@@ -174,6 +174,8 @@ export interface NarrativeRulerProps {
   onPlayheadChange?: (chapter: number) => void;
   /** If provided, renders arbitrary content in the zoom bar (e.g. AddNodeMenu) */
   addNodeSlot?: React.ReactNode;
+  /** Fired when user edits the progress chapter number in overview */
+  onProgressChange?: (chapter: number | null) => void;
 }
 
 export function NarrativeRuler({
@@ -193,6 +195,7 @@ export function NarrativeRuler({
   playhead,
   onPlayheadChange,
   addNodeSlot,
+  onProgressChange,
 }: NarrativeRulerProps) {
   // ── Simplified controlled / uncontrolled state ──
   const [internalRange, setInternalRange] = useState<[number, number]>(() => [1, totalChapters]);
@@ -531,7 +534,37 @@ export function NarrativeRuler({
     return (
       <div className="nr-overview">
         {plotTitle && <div className="nr-ov-title">{plotTitle}</div>}
-        <div className="nr-ov-meta">全书 · {totalChapters} 章 · 进度 {progress}%（ch {currentChapter}）</div>
+        <div className="nr-ov-meta">
+          全书 · {totalChapters} 章 · 进度 {progress}%
+          {onProgressChange ? (
+            <>（ch <input
+              type="number"
+              className="nr-progress-input"
+              value={currentChapter}
+              min={1}
+              max={totalChapters}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= 1 && v <= totalChapters) {
+                  onProgressChange(v);
+                }
+              }}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v === "") onProgressChange(null); // clear = reset to auto
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+            />）</>
+          ) : (
+            <>（ch {currentChapter}）</>
+          )}
+        </div>
         <div className="nr-ov-track-container" ref={ovRef}>
           <div className="nr-ov-tl-bg" />
           <div className="nr-ov-ph-row">

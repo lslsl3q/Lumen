@@ -512,10 +512,15 @@ def create_chapter(act_id: str, project_id: str, title: str = "") -> dict:
             "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM writing_chapters WHERE act_id = ?",
             (act_id,),
         ).fetchone()[0]
+        # Global chapter number across all acts in this project
+        max_numerate = conn.execute(
+            "SELECT COALESCE(MAX(numerate), 0) FROM writing_chapters WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()[0]
         conn.execute(
             """INSERT INTO writing_chapters (id, act_id, project_id, title, numerate, show_number, sort_order, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?)""",
-            (cid, act_id, project_id, title, max_order, now, now),
+               VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)""",
+            (cid, act_id, project_id, title, max_numerate + 1, max_order, now, now),
         )
         conn.commit()
         return _row_to_dict(conn.execute("SELECT * FROM writing_chapters WHERE id = ?", (cid,)).fetchone())
