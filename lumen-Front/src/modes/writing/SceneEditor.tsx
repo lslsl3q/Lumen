@@ -14,6 +14,7 @@ import { GhostTextExtension } from "../../components/editors/GhostTextExtension"
 import { SlashCommandExtension } from "../../components/editors/SlashCommandExtension";
 import { SceneBeatNode } from "../../components/editors/SceneBeatNode";
 import { SectionBlockNode } from "../../components/editors/SectionBlockNode";
+import { CodexAdditionNode } from "../../components/editors/CodexAdditionNode";
 import { CodexHighlightExtension, codexPluginKey, invalidateCodexTerms } from "../../components/editors/CodexHighlightExtension";
 import {
   DropdownMenuItem,
@@ -48,7 +49,7 @@ function autoResize(el: HTMLTextAreaElement) {
 
 const sceneExtensions = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false, underline: false }),
-  Placeholder.configure({ placeholder: "开始写作，或输入 '/' 以使用命令…" }),
+  Placeholder.configure({ placeholder: "开始写作，或输入 '/' 以使用命令…", showOnlyCurrent: true }),
   CharacterCount,
   Highlight.configure({ multicolor: true }),
   Underline,
@@ -61,6 +62,7 @@ const sceneExtensions = [
   SlashCommandExtension,
   SceneBeatNode,
   SectionBlockNode,
+  CodexAdditionNode,
   CodexHighlightExtension,
 ];
 

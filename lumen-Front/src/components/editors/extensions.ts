@@ -26,6 +26,7 @@ import { GhostTextExtension } from "./GhostTextExtension";
 import { SlashCommandExtension } from "./SlashCommandExtension";
 import { SceneBeatNode } from "./SceneBeatNode";
 import { SectionBlockNode } from "./SectionBlockNode";
+import { CodexAdditionNode } from "./CodexAdditionNode";
 
 export const defaultExtensions = [
   StarterKit.configure({
@@ -34,7 +35,8 @@ export const defaultExtensions = [
     underline: false,
   }),
   Placeholder.configure({
-    placeholder: "开始写作…",
+    placeholder: "开始写作，或输入 '/' 以使用命令…",
+    showOnlyCurrent: true,
   }),
   CharacterCount,
   TaskList,
@@ -62,4 +64,5 @@ export const defaultExtensions = [
   SlashCommandExtension,
   SceneBeatNode,
   SectionBlockNode,
+  CodexAdditionNode,
 ];

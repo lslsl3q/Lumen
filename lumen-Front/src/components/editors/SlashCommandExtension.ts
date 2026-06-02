@@ -79,6 +79,19 @@ export const SlashCommandExtension = Extension.create({
       const charBefore = editor.state.doc.textBetween(from - 1, from);
       if (charBefore !== "/") return;
 
+      // 只在行首触发（/ 是段落第一个字符，或前面只有空格）
+      const $pos = editor.state.doc.resolve(from - 1);
+      const parentOffset = $pos.parentOffset;
+      if (parentOffset > 0) {
+        // 检查 / 前面是否全是空格
+        if (parentOffset > 1) {
+          try {
+            const textBefore = editor.state.doc.textBetween(from - 1 - parentOffset, from - 1);
+            if (textBefore.trim().length > 0) return;
+          } catch { return; }
+        }
+      }
+
       // 找 query 文本（/ 到下一个空格/换行）
       let queryEnd = from;
       const maxPos = Math.min(editor.state.doc.content.size, from + 50);
@@ -121,6 +134,7 @@ export const SlashCommandExtension = Extension.create({
     return {
       suggestion: {
         char: "/",
+        startOfLine: true,
         command: ({ editor, range, props }: { editor: any; range: any; props: SlashCommandItem }) => {
           props.command({ editor, range });
         },

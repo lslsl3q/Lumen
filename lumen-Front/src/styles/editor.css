@@ -365,7 +365,8 @@
   caret-color: var(--color-primary);
 }
 
-.rich-text-editor-prosemirror.typewriter-mode .is-editor-empty:first-child::before {
+.rich-text-editor-prosemirror.typewriter-mode .is-editor-empty::before,
+.rich-text-editor-prosemirror.typewriter-mode .is-empty::before {
   content: attr(data-placeholder);
   float: left;
   color: var(--color-text-dim);
@@ -397,7 +398,8 @@
 }
 
 /* 占位符 */
-.rich-text-editor-prosemirror .is-editor-empty:first-child::before {
+.rich-text-editor-prosemirror .is-editor-empty::before,
+.rich-text-editor-prosemirror .is-empty::before {
   content: attr(data-placeholder);
   float: left;
   color: var(--color-text-dim);
@@ -3024,6 +3026,12 @@
   border-style: dashed;
 }
 
+/* Note variant: solid border, softer background */
+.section-block-variant-note .section-block {
+  border-style: solid;
+  background: var(--color-surface-elevated, rgba(255, 255, 255, 0.03));
+}
+
 /* Color dot grid */
 .section-block-color-grid {
   display: flex;
@@ -3072,4 +3080,147 @@
   0% { transform: translateY(3px) scaleY(0.6); }
   60% { transform: translateY(0) scaleY(1); }
   100% { transform: translateY(-2px); }
+}
+
+/* ── Codex Addition — 设定演进块 ── */
+
+.codex-addition {
+  border: 1.4px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface-elevated, rgba(255, 255, 255, 0.03));
+  overflow: hidden;
+  margin: 1em 0;
+}
+
+.codex-addition-missing {
+  padding: 8px 12px;
+  color: var(--color-text-dim);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.codex-addition-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  min-height: 28px;
+  color: var(--color-text-dim);
+}
+
+.codex-addition-grip {
+  cursor: grab;
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+
+.codex-addition-grip:active {
+  cursor: grabbing;
+}
+
+.codex-addition-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.codex-addition-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.codex-addition-entry-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.codex-addition-entry-name:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-primary);
+}
+
+.codex-addition-menu-trigger {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.codex-addition-menu-trigger:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.codex-addition-content {
+  padding: 0 12px 8px;
+  min-height: 24px;
+}
+
+.codex-addition-content p {
+  text-indent: 0;
+}
+
+
+.codex-addition-collapse {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.codex-addition-collapse:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.codex-addition-content-hidden {
+  display: none;
+}
+
+.codex-addition-collapsed {
+  border-style: dashed;
+}
+
+.codex-addition-entry-select {
+  border: 1px solid var(--color-border-default);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.codex-addition-entry-select:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--color-border);
 }

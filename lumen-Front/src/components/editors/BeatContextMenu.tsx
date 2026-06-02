@@ -36,7 +36,6 @@ export interface ContextSelection {
   snippets?: string[];
   codexEntries?: string[];
   codexTypes?: string[];
-  codexDetails?: string[];
   codexCategories?: string[];
   codexTags?: string[];
   plotEnabled?: boolean;
@@ -117,18 +116,6 @@ export function BeatContextMenu({
     return Array.from(types);
   }, [codexEntries]);
 
-  const codexDetails = useMemo(() => {
-    const keys = new Set<string>();
-    for (const entry of codexEntries) {
-      if (entry.custom_fields && typeof entry.custom_fields === "object") {
-        for (const key of Object.keys(entry.custom_fields)) {
-          keys.add(key);
-        }
-      }
-    }
-    return Array.from(keys);
-  }, [codexEntries]);
-
   const codexCategories = useMemo(() => {
     const cats = new Set<string>();
     for (const entry of codexEntries) {
@@ -154,7 +141,6 @@ export function BeatContextMenu({
   const hasSnSel = (selection.snippets?.length ?? 0) > 0;
   const hasCeSel = (selection.codexEntries?.length ?? 0) > 0;
   const hasCtSel = (selection.codexTypes?.length ?? 0) > 0;
-  const hasCdSel = (selection.codexDetails?.length ?? 0) > 0;
   const hasCcSel = (selection.codexCategories?.length ?? 0) > 0;
   const hasCgSel = (selection.codexTags?.length ?? 0) > 0;
   const hasPlotArcSel = (selection.plotArcs?.length ?? 0) > 0;
@@ -361,28 +347,6 @@ export function BeatContextMenu({
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger disabled={codexDetails.length === 0} className={itemCls}>
-              <DotIndicator visible={hasCdSel} />按详情选择
-            </DropdownMenuSubTrigger>
-            {codexDetails.length > 0 && (
-              <DropdownMenuSubContent className={`min-w-[200px] p-0 ${subContentCls}`}>
-                {codexDetails.map(key => (
-                  <DropdownMenuCheckboxItem
-                    key={key}
-                    checked={(selection.codexDetails || []).includes(key)}
-                    onCheckedChange={() => toggle("codexDetails", key)}
-                    closeParentOnClick={false}
-                    className={itemCls}
-                  >
-                    {key}
-                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.custom_fields && key in e.custom_fields).length}</span>
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuSubContent>
-            )}
-          </DropdownMenuSub>
-
-          <DropdownMenuSub>
             <DropdownMenuSubTrigger disabled={codexCategories.length === 0} className={itemCls}>
               <DotIndicator visible={hasCcSel} />按分类选择
             </DropdownMenuSubTrigger>
@@ -558,9 +522,6 @@ export function ContextSelectionTags({
   }
   for (const typeName of selection.codexTypes || []) {
     tags.push({ key: "codexTypes", id: typeName, label: `类型: ${typeName}` });
-  }
-  for (const detailName of selection.codexDetails || []) {
-    tags.push({ key: "codexDetails", id: detailName, label: `详情: ${detailName}` });
   }
   for (const catName of selection.codexCategories || []) {
     tags.push({ key: "codexCategories", id: catName, label: `分类: ${catName}` });

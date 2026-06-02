@@ -79,6 +79,14 @@ export const SectionBlockNode = Node.create({
           return { "data-color": attrs.color };
         },
       },
+      variant: {
+        default: "section",
+        parseHTML: (el) => (el.getAttribute("data-variant") as "section" | "note") ?? "section",
+        renderHTML: (attrs) => {
+          if (attrs.variant === "section") return {};
+          return { "data-variant": "note" };
+        },
+      },
     };
   },
 

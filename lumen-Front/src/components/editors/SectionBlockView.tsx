@@ -107,6 +107,7 @@ export function SectionBlockView({
   const hideFromAI = Boolean(node.attrs.hideFromAI);
   const hideFromCount = Boolean(node.attrs.hideFromCount);
   const color = (node.attrs.color as SectionColor) ?? "";
+  const variant = (node.attrs.variant as "section" | "note") ?? "section";
 
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -284,7 +285,7 @@ export function SectionBlockView({
   return (
     <NodeViewWrapper
       ref={wrapperRef}
-      className={`section-block-wrapper ${collapsed ? "section-block-collapsed" : ""} ${color ? `section-block-color-${color}` : ""}`}
+      className={`section-block-wrapper ${variant === "note" ? "section-block-variant-note" : ""} ${collapsed ? "section-block-collapsed" : ""} ${color ? `section-block-color-${color}` : ""}`}
     >
       <div className="section-block">
         {/* Color indicator strip */}
@@ -316,7 +317,7 @@ export function SectionBlockView({
             className="section-block-title-input"
             value={title}
             onChange={handleTitleChange}
-            placeholder="Untitled Section"
+            placeholder={variant === "note" ? "Note" : "Untitled Section"}
           />
           <button
             onClick={handleToggleAI}

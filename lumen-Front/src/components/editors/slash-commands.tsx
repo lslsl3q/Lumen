@@ -69,14 +69,12 @@ export const allCommands: SlashCommandItem[] = [
   // ── Codex ──
   {
     title: "法典演进",
-    description: "追踪角色/世界观在章节中的发展",
-    searchTerms: ["codex", "progression", "法典", "演进", "设定"],
+    description: "设定演进 — 写内容同步到设定条目",
+    searchTerms: ["codex", "progression", "法典", "演进", "设定", "addition"],
     category: "codex",
     iconSvg: codexIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertContent({
-        type: "codexProgression",
-      }).run();
+      editor.chain().focus().deleteRange(range).insertCodexAddition({ entryId: "" }).run();
     },
   },
 
@@ -104,14 +102,21 @@ export const allCommands: SlashCommandItem[] = [
 
   // ── 其他 ──
   {
-    title: "笔记",
-    description: "作者笔记（可排除字数统计）",
+    title: "Note",
+    description: "作者笔记（不进导出、不喂 AI、不计字数）",
     searchTerms: ["note", "笔记", "备注"],
     category: "other",
     iconSvg: noteIcon,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).insertContent({
-        type: "writingNote",
+        type: "sectionBlock",
+        attrs: {
+          title: "Note",
+          variant: "note",
+          hideFromAI: true,
+          hideFromCount: true,
+        },
+        content: [{ type: "paragraph" }],
       }).run();
     },
   },
