@@ -1,9 +1,17 @@
 /**
- * GenerationBar — 通用 AI 生成状态条
+ * GenerationBar — 统一 AI 生成状态条
  *
- * 解耦组件，被 Scene Beat / Continue Writing / 未来 AI 块复用。
- * 显示生成状态（转圈/按钮）和结果操作（Apply/Retry/Discard/Section）。
+ * 分段按钮组风格：一体化容器 + divide-x 分隔线
+ * 布局：[Stop/Apply] | [Retry] | [Discard] | [Section]  ·  字数, 模型
  */
+
+import { TypingDots } from "./TypingDots";
+import {
+  Check,
+  RotateCw,
+  Trash2,
+} from "lucide-react";
+import { SectionBlockIcon } from "../icons";
 
 interface GenerationBarProps {
   status: "generating" | "done";
@@ -26,68 +34,66 @@ export function GenerationBar({
   onStop,
   onSection,
 }: GenerationBarProps) {
+  const generating = status === "generating";
+
   return (
     <div className="generation-bar" contentEditable={false}>
-      {status === "generating" ? (
-        <div className="generation-bar-active">
-          <span className="generation-bar-spinner" />
-          <span className="generation-bar-text">正在生成...</span>
-          <button
-            onClick={onRetry}
-            className="generation-bar-btn generation-bar-btn-secondary"
-            title="重新生成"
-          >
-            ↻ Retry
-          </button>
+      {/* 按钮组：分段式 */}
+      <div className="generation-bar-group">
+        {generating ? (
           <button
             onClick={onStop}
-            className="generation-bar-btn generation-bar-btn-secondary"
+            className="generation-bar-btn generation-bar-btn-stop"
             title="停止生成"
           >
-            ⏹ 停止
+            <span className="generation-bar-spin" />
+            Stop
           </button>
-        </div>
-      ) : (
-        <div className="generation-bar-done">
-          <div className="generation-bar-actions">
-            <button
-              onClick={onApply}
-              className="generation-bar-btn generation-bar-btn-primary"
-              title="接受生成内容"
-            >
-              ✓ Apply
-            </button>
-            <button
-              onClick={onRetry}
-              className="generation-bar-btn generation-bar-btn-secondary"
-              title="重新生成"
-            >
-              ↻ Retry
-            </button>
-            <button
-              onClick={onDiscard}
-              className="generation-bar-btn generation-bar-btn-secondary"
-              title="丢弃生成内容"
-            >
-              ✕ Discard
-            </button>
-            {onSection && (
-              <button
-                onClick={onSection}
-                className="generation-bar-btn generation-bar-btn-secondary"
-                title="拆分为段落块"
-              >
-                § Section
-              </button>
-            )}
-          </div>
-          <div className="generation-bar-info">
-            <span>{wordCount} 字</span>
-            <span className="generation-bar-sep">|</span>
-            <span>{model}</span>
-          </div>
-        </div>
-      )}
+        ) : (
+          <button
+            onClick={onApply}
+            className="generation-bar-btn"
+            title="接受生成内容"
+          >
+            <Check size={13} />
+            Apply
+          </button>
+        )}
+
+        <button
+          onClick={onRetry}
+          className="generation-bar-btn"
+          title="重新生成"
+        >
+          <RotateCw size={13} />
+          Retry
+        </button>
+        <button
+          onClick={onDiscard}
+          className="generation-bar-btn"
+          title="丢弃生成内容"
+        >
+          <Trash2 size={13} />
+          Discard
+        </button>
+        {onSection && (
+          <button
+            onClick={onSection}
+            className="generation-bar-btn"
+            title="拆分为段落块"
+          >
+            <SectionBlockIcon size={13} />
+            Section
+          </button>
+        )}
+      </div>
+
+      {/* 信息区 */}
+      <div className="generation-bar-info">
+        {generating ? <TypingDots size={4} /> : <span>{wordCount} 字</span>}
+        <span className="generation-bar-info-sep">·</span>
+        <span>{model}</span>
+      </div>
     </div>
   );
 }

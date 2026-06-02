@@ -337,6 +337,17 @@ def _migrate_columns(conn: sqlite3.Connection):
     # plot_arcs: add status/metadata columns if missing
     _ensure_columns(conn, "plot_arcs", {"status": "TEXT NOT NULL DEFAULT 'active'"})
 
+    # plot_lines: add status/summary columns if missing
+    _ensure_columns(conn, "plot_lines", {
+        "status": "TEXT NOT NULL DEFAULT 'active'",
+        "summary": "TEXT NOT NULL DEFAULT ''",
+    })
+
+    # plot_nodes: add summary/purpose columns if missing
+    _ensure_columns(conn, "plot_nodes", {
+        "summary": "TEXT NOT NULL DEFAULT ''",
+        "purpose": "TEXT NOT NULL DEFAULT ''",
+    })
 
 def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]):
     for col, definition in columns.items():
@@ -1606,7 +1617,7 @@ def get_plot_outline_for_project(project_id: str) -> dict | None:
         arc = {"title": arc_row["title"], "status": arc_row["status"]}
 
         lines = conn.execute(
-            "SELECT id, title, status, summary, line_type, sort_order FROM plot_lines WHERE arc_id = ? ORDER BY sort_order",
+            "SELECT id, title, status, summary, type, sort_order FROM plot_lines WHERE arc_id = ? ORDER BY sort_order",
             (arc_row["id"],),
         ).fetchall()
         arc["lines"] = []
@@ -1615,7 +1626,7 @@ def get_plot_outline_for_project(project_id: str) -> dict | None:
                 "title": line_row["title"],
                 "status": line_row["status"],
                 "summary": line_row["summary"],
-                "line_type": line_row["line_type"],
+                "line_type": line_row["type"],
             }
 
             nodes = conn.execute(

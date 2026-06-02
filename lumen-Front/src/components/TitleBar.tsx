@@ -62,7 +62,7 @@ function TitleBar() {
   };
 
   return (
-    <div className="h-9 flex items-center bg-surface-rail/80 border-b border-border-default select-none relative">
+    <div className="h-9 flex items-center bg-surface-rail border-b border-border-default select-none relative z-60">
       {/* 左侧：Logo */}
       <div className="flex items-center pl-2 h-full shrink-0">
         <button

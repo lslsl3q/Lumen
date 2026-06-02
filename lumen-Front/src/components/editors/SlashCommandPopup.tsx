@@ -4,7 +4,7 @@
  * 使用 shadcn Command（基于 cmdk）渲染，自动处理键盘导航。
  * 通过 ReactRenderer + createPortal 挂载，解决 Tauri 事件遮挡问题。
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   Command,
@@ -30,9 +30,27 @@ interface SlashCommandPopupProps {
 }
 
 export function SlashCommandPopup({ items, command, clientRect }: SlashCommandPopupProps) {
-  const rect = clientRect?.();
-  const style: React.CSSProperties = rect
-    ? { position: "fixed", left: rect.left, top: rect.bottom + 4, zIndex: 99999 }
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // 跟随光标：滚动时持续更新位置
+  useEffect(() => {
+    if (!clientRect) return;
+
+    const updatePosition = () => {
+      const rect = clientRect();
+      if (!rect || !popupRef.current) return;
+      popupRef.current.style.left = `${rect.left}px`;
+      popupRef.current.style.top = `${rect.bottom + 4}px`;
+    };
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    return () => window.removeEventListener("scroll", updatePosition, true);
+  }, [clientRect]);
+
+  const initialRect = clientRect?.();
+  const style: React.CSSProperties = initialRect
+    ? { position: "fixed", left: initialRect.left, top: initialRect.bottom + 4, zIndex: 5 }
     : { position: "fixed", top: -9999, left: -9999 };
 
   // 按分类分组
@@ -54,7 +72,7 @@ export function SlashCommandPopup({ items, command, clientRect }: SlashCommandPo
   );
 
   return createPortal(
-    <div style={style} onMouseDown={(e) => e.preventDefault()}>
+    <div ref={popupRef} style={style} onMouseDown={(e) => e.preventDefault()}>
       <Command className="slash-command-popup" shouldFilter={false}>
         <CommandList>
           <CommandEmpty>无匹配命令</CommandEmpty>

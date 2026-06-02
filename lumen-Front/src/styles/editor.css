@@ -469,9 +469,19 @@
 
 .slash-command-icon {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-text-dim);
+}
+
+.slash-command-icon svg {
   width: 18px;
   height: 18px;
-  color: var(--color-text-dim);
 }
 
 .slash-command-text {
@@ -1813,25 +1823,66 @@
   margin-top: 2px;
 }
 
+/* ── GenerationBar — segmented button group ── */
+
 .generation-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 8px);
-  padding: 6px 12px;
+  border-radius: var(--radius-md, 6px);
+  padding: 3px;
   user-select: none;
   width: fit-content;
   box-shadow: var(--shadow-card, 0 4px 24px rgba(0,0,0,0.3));
 }
 
-.generation-bar-active {
+/* 分段按钮组：一体化容器 + divide-x */
+.generation-bar-group {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border-subtle);
 }
 
-.generation-bar-spinner {
-  width: 14px;
-  height: 14px;
+/* 每个按钮段 */
+.generation-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  border-right: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background var(--duration-instant, 75ms) var(--ease-default, ease),
+              color var(--duration-instant, 75ms) var(--ease-default, ease);
+  background: transparent;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.generation-bar-btn:last-child {
+  border-right: none;
+}
+
+.generation-bar-btn:hover {
+  background: var(--color-interactive-hover);
+  color: var(--color-text-secondary);
+}
+
+/* Stop 按钮特殊样式 */
+.generation-bar-btn-stop {
+  gap: 5px;
+}
+
+/* Spinner 动画 */
+.generation-bar-spin {
+  width: 12px;
+  height: 12px;
   border: 2px solid var(--color-border);
   border-top-color: var(--color-primary);
   border-radius: 50%;
@@ -1842,59 +1893,17 @@
   to { transform: rotate(360deg); }
 }
 
-.generation-bar-text {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  flex: 1;
-}
-
-.generation-bar-done {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.generation-bar-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.generation-bar-btn {
-  padding: 3px 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm, 4px);
-  font-size: 11px;
-  cursor: pointer;
-  transition: all var(--duration-instant, 75ms) var(--ease-default, ease);
-  background: transparent;
-  color: var(--color-text-muted);
-}
-
-.generation-bar-btn-primary {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-
-.generation-bar-btn-primary:hover {
-  background: var(--color-primary);
-  color: var(--color-primary-foreground, #fff);
-}
-
-.generation-bar-btn-secondary:hover {
-  border-color: var(--color-border);
-  color: var(--color-text-secondary);
-}
-
+/* 信息区 */
 .generation-bar-info {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-dim);
   display: flex;
   gap: 6px;
   align-items: center;
+  padding: 0 6px;
 }
 
-.generation-bar-sep {
+.generation-bar-info-sep {
   opacity: 0.4;
 }
 
@@ -2875,3 +2884,192 @@
   border-radius: 2px;
 }
 
+/* ── Section Block — NC-aligned container ── */
+
+.section-block-wrapper {
+  position: relative;
+  cursor: default;
+  margin: 8px 0;
+}
+
+.section-block {
+  border: 1.4px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+}
+
+/* Color indicator strip */
+.section-block-color-strip {
+  height: 3px;
+  width: 100%;
+}
+
+.section-block-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  min-height: 32px;
+}
+
+.section-block-drag {
+  cursor: grab;
+  color: var(--color-text-dim);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.section-block-drag:hover {
+  opacity: 0.8;
+}
+
+.section-block-drag:active {
+  cursor: grabbing;
+  opacity: 1;
+}
+
+.section-block-collapse {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.section-block-collapse:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.section-block-title-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 2px 6px;
+  min-width: 0;
+}
+
+.section-block-title-input::placeholder {
+  color: var(--color-text-dim);
+}
+
+.section-block-ai-toggle {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.section-block-ai-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.section-block-ai-excluded {
+  color: var(--color-text-dim);
+  border-color: transparent;
+  opacity: 0.7;
+}
+
+.section-block-menu-trigger {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.section-block-menu-trigger:hover {
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Content area */
+.section-block-content {
+  padding: 0 12px 8px;
+  min-height: 24px;
+}
+
+.section-block-content-hidden {
+  display: none;
+}
+
+/* Collapsed state */
+.section-block-collapsed .section-block {
+  border-style: dashed;
+}
+
+/* Color dot grid */
+.section-block-color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.section-block-color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease;
+  position: relative;
+}
+
+.section-block-color-dot:hover {
+  transform: scale(1.2);
+}
+
+.section-block-color-dot-active {
+  box-shadow: 0 0 0 2px var(--color-surface-deep), 0 0 0 3.5px var(--color-text-secondary);
+}
+
+/* ── TypingDots — 三点弹跳动画 ── */
+
+.typing-dots {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.typing-dots-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  animation: typing-bounce 0.6s alternate infinite ease;
+}
+
+@keyframes typing-bounce {
+  0% { transform: translateY(3px) scaleY(0.6); }
+  60% { transform: translateY(0) scaleY(1); }
+  100% { transform: translateY(-2px); }
+}

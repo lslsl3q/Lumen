@@ -28,20 +28,6 @@ const noteIcon = '<svg width="18" height="18" fill="none" viewBox="0 0 24 24" st
 export const allCommands: SlashCommandItem[] = [
   // ── AI ──
   {
-    title: "新建场景",
-    description: "插入一个场景容器（Scene）",
-    searchTerms: ["scene", "场景", "new scene", "新建"],
-    category: "ai",
-    iconSvg: beatIcon,
-    command: ({ editor, range }) => {
-      editor.chain().focus().insertContentAt(range, {
-        type: "scene",
-        attrs: { sceneId: crypto.randomUUID() },
-        content: [{ type: "paragraph" }],
-      }).run();
-    },
-  },
-  {
     title: "场景节拍",
     description: "AI 微控制器 — 写指令，AI 写正文",
     searchTerms: ["scene", "beat", "节拍", "场景"],
@@ -69,10 +55,14 @@ export const allCommands: SlashCommandItem[] = [
     category: "ai",
     iconSvg: continueIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertSceneBeat({
-        beatType: "continue",
-        maxWords: 400,
-      }).run();
+      try {
+        editor.chain().focus().deleteRange(range).insertSceneBeat({
+          beatType: "continue",
+          maxWords: 400,
+        }).run();
+      } catch (e) {
+        console.error("[SlashCmd] 续写场景 error:", e);
+      }
     },
   },
 
@@ -92,19 +82,6 @@ export const allCommands: SlashCommandItem[] = [
 
   // ── 格式 ──
   {
-    title: "章节标题",
-    description: "插入章节标题行（Chapter Row）",
-    searchTerms: ["chapter", "章节", "chapter title", "标题"],
-    category: "formatting",
-    iconSvg: sectionIcon,
-    command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertContent({
-        type: "chapterRow",
-        attrs: { chapterNumber: 1 },
-      }).run();
-    },
-  },
-  {
     title: "分割线",
     description: "水平虚线分割（NC 风格）",
     searchTerms: ["horizontal", "rule", "line", "divider", "分割线"],
@@ -115,15 +92,13 @@ export const allCommands: SlashCommandItem[] = [
     },
   },
   {
-    title: "段落区",
-    description: "可折叠的上下文容器",
-    searchTerms: ["section", "context", "段落", "区", "上下文"],
+    title: "Section Block",
+    description: "插入可折叠的 Section 容器",
+    searchTerms: ["section", "container", "折叠", "容器"],
     category: "formatting",
     iconSvg: sectionIcon,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).insertContent({
-        type: "writingSection",
-      }).run();
+      editor.chain().focus().deleteRange(range).insertSectionBlock().run();
     },
   },
 

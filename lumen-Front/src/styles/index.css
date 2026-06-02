@@ -76,6 +76,12 @@
   --color-ghost-text: rgba(214, 211, 209, 0.3);
   --color-selection-bg: rgba(204, 124, 94, 0.2);
 
+  /* shadcn 语义色映射 — dropdown menu / checkbox 等组件依赖 */
+  --color-accent: var(--color-surface-elevated);
+  --color-accent-foreground: var(--color-text-primary);
+  --color-destructive: var(--color-error);
+  --color-muted-foreground: var(--color-text-muted);
+
   /* === 圆角 === */
   --radius-sm: 3px;
   --radius-md: 5px;

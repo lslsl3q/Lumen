@@ -1,17 +1,17 @@
 /**
  * SelectionToolbar — 选中文字时弹出的浮动工具栏
  *
- * NovelCrafter 风格：两排独立浮块，位置锚定选区起点，不超出编辑器文字区域。
- * 不使用 BubbleMenu（其定位逻辑无法满足需求），改为手动定位 + Portal 渲染。
+ * 使用 Floating UI 定位（virtual element 锚定选区起点），
+ * autoUpdate 自动追踪 scroll/resize，GPU 加速。
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { NodeSelection } from "@tiptap/pm/state";
+import { useFloating, offset, shift } from "@floating-ui/react";
 import { Undo2, Redo2, Bold, Italic, Underline, Strikethrough, Highlighter, Code, Ban, ChevronDown, Quote, List, ListOrdered, IndentIncrease, IndentDecrease, UnfoldVertical, RefreshCw, FoldVertical } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
 
-// 半透明基色 — 自动适配深浅模式（normal blend 叠加背景）
 const HIGHLIGHT_COLORS = [
   { label: "Red", color: "rgba(220, 80, 70, 0.32)" },
   { label: "Yellow", color: "rgba(220, 170, 50, 0.32)" },
@@ -20,7 +20,6 @@ const HIGHLIGHT_COLORS = [
   { label: "Purple", color: "rgba(140, 80, 200, 0.32)" },
 ];
 
-// 简单工具按钮（Bubble Menu 不需要 Tooltip）
 function ToolBtn({ onClick, active, children }: {
   onClick: () => void;
   active?: boolean;
@@ -40,73 +39,82 @@ type AiActionMode = "expand" | "rewrite" | "condense";
 
 export function SelectionToolbar({ editor, onAiAction, hidden }: { editor: Editor; onAiAction?: (mode: AiActionMode) => void; hidden?: boolean }) {
   const [charCount, setCharCount] = useState(0);
-  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
-  const [tick, setTick] = useState(0);
+  const [open, setOpen] = useState(false);
   const [aiPopoverOpen, setAiPopoverOpen] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
-  void tick;
+  // 存储选区的 ProseMirror 位置（文档偏移），不是视口坐标
+  const selectionFromRef = useRef<number | null>(null);
+
+  // Floating UI：virtual element 定位，手动触发 scroll 更新
+  const { refs, floatingStyles, update } = useFloating({
+    open,
+    placement: "top-start",
+    middleware: [offset(8), shift({ padding: 8 })],
+  });
+
+  // Virtual element：getBoundingClientRect 从编辑器实时计算视口坐标
+  useEffect(() => {
+    refs.setReference({
+      getBoundingClientRect: () => {
+        const from = selectionFromRef.current;
+        if (from == null) return { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
+        try {
+          const coords = editor.view.coordsAtPos(from);
+          return { x: coords.left, y: coords.top, width: 0, height: 0, top: coords.top, left: coords.left, right: coords.left, bottom: coords.top };
+        } catch {
+          return { x: 0, y: 0, width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
+        }
+      },
+    });
+  }, [refs, editor]);
+
+  // 手动监听滚动触发 Floating UI update（virtual element 无法被 autoUpdate 自动追踪）
+  useEffect(() => {
+    if (!open) return;
+    const scrollEl = (editor.view.dom as HTMLElement).closest("[data-slot='scroll-area-viewport']");
+    scrollEl?.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
+    return () => {
+      scrollEl?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, editor, update]);
 
   useEffect(() => {
-    const scrollEl = (editor.view.dom as HTMLElement).closest(".writing-paper-container");
-
     const update = () => {
       const { from, to, empty } = editor.state.selection;
       if (empty || editor.state.selection instanceof NodeSelection) {
         setCharCount(0);
-        setAnchor(null);
+        selectionFromRef.current = null;
+        setOpen(false);
         return;
       }
-      setTick((t) => t + 1);
       try {
         setCharCount(editor.state.doc.textBetween(from, to, "").length);
       } catch {
         setCharCount(0);
       }
-      try {
-        const coords = editor.view.coordsAtPos(from);
-        setAnchor({ left: coords.left, top: coords.top });
-      } catch {
-        setAnchor(null);
-      }
+      selectionFromRef.current = from;
+      setOpen(true);
     };
 
     editor.on("transaction", update);
-    scrollEl?.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update, { passive: true });
     return () => {
       editor.off("transaction", update);
-      scrollEl?.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
     };
   }, [editor]);
 
-  const el = ref.current;
-  const w = el?.offsetWidth ?? 0;
-
-  let pos: { left: number; bottom: number } | null = null;
-  if (anchor) {
-    const editorBounds = (editor.view.dom as HTMLElement).getBoundingClientRect();
-    let left = anchor.left;
-    if (left + w > editorBounds.right) left = editorBounds.right - w;
-    if (left < editorBounds.left) left = editorBounds.left;
-    pos = { left, bottom: window.innerHeight - anchor.top + 8 };
-  }
-
-  if (hidden || !pos) return null;
+  if (hidden || !open) return null;
 
   return createPortal(
     <div
-      ref={ref}
-      className="selection-toolbar"
-      style={{
-        position: "fixed",
-        left: pos ? pos.left : -9999,
-        bottom: pos ? pos.bottom : -9999,
-        zIndex: 99999,
-        visibility: pos ? "visible" : "hidden",
-        pointerEvents: pos ? "auto" : "none",
+      ref={(node) => {
+        (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        refs.setFloating(node);
       }}
+      className="selection-toolbar"
+      style={{ ...floatingStyles, zIndex: 50 }}
       onMouseDown={(e) => e.preventDefault()}
     >
       {/* 第一排：字数 | 撤销 | 重做 */}
@@ -136,7 +144,6 @@ export function SelectionToolbar({ editor, onAiAction, hidden }: { editor: Edito
           <Strikethrough size={15} />
         </ToolBtn>
 
-        {/* 高亮颜色选择器 — 用原生 title，Tooltip 和 Popover 嵌套冲突 */}
         <Popover>
           <PopoverTrigger
             className={`selection-toolbar-btn highlight-trigger ${editor.isActive("highlight") ? "active" : ""}`}
@@ -171,14 +178,12 @@ export function SelectionToolbar({ editor, onAiAction, hidden }: { editor: Edito
           <Code size={15} />
         </ToolBtn>
 
-        {/* 段落格式 — 分割线隔开 */}
         <span className="selection-toolbar-divider" />
 
         <ToolBtn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive("blockquote")}>
           <Quote size={15} />
         </ToolBtn>
 
-        {/* Heading 选择器 */}
         <Popover>
           <PopoverTrigger
             className={`selection-toolbar-btn highlight-trigger ${editor.isActive("heading") ? "active" : ""}`}
@@ -208,7 +213,6 @@ export function SelectionToolbar({ editor, onAiAction, hidden }: { editor: Edito
           </PopoverContent>
         </Popover>
 
-        {/* List 选择器 */}
         <Popover>
           <PopoverTrigger
             className={`selection-toolbar-btn highlight-trigger ${editor.isActive("bulletList") || editor.isActive("orderedList") ? "active" : ""}`}
@@ -250,7 +254,7 @@ export function SelectionToolbar({ editor, onAiAction, hidden }: { editor: Edito
         </Popover>
       </div>
 
-      {/* 第三排：AI 操作 — 选中超 3 字才显示 */}
+      {/* 第三排：AI 操作 */}
       {charCount > 3 && (
       <div className="selection-toolbar-row-separated">
         <Popover open={aiPopoverOpen === "expand"} onOpenChange={(o) => setAiPopoverOpen(o ? "expand" : null)}>

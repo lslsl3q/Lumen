@@ -146,7 +146,7 @@ export default function WritingMode() {
 
         <div className="flex flex-col flex-1 min-w-0 h-full">
           {/* Merged toolbar — tabs + format tools */}
-          <div className="flex-none h-14 flex items-center px-3 border-b border-border-default bg-surface-deep">
+          <div className="flex-none h-14 flex items-center px-3 border-b border-border-default bg-surface-deep relative z-60">
             <div className="flex items-center gap-1">
               {writingViewTabs.map(({ key, icon: Icon, label, disabled }) => (
                 <button

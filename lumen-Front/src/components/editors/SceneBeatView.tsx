@@ -9,6 +9,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react";
+import { useFloating, autoUpdate, offset } from "@floating-ui/react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { useWebSocket } from "../../hooks/useWebSocket";
 import type { StreamEvent } from "../../api/chat";
@@ -55,20 +56,53 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const collapsed = Boolean(node.attrs.collapsed);
 
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
-  const activeChapterId = useWritingStore((s) => s.activeChapterId);
   const activeProject = useWritingStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
-  const activeChapter = useWritingStore((s) => {
-    for (const act of s.acts) {
-      const ch = (act.chapters || []).find((c: any) => c.id === s.activeChapterId);
-      if (ch) return ch;
+
+  // 从 beat 所在的场景推导章节信息（不依赖全局 activeChapterId）
+  // sceneId 在组件生命周期内不变，缓存它避免重复 DOM 查询
+  const sceneId = useMemo(() => {
+    const editorEl = editor.view.dom as HTMLElement;
+    return editorEl.closest("[data-scene-id]")?.getAttribute("data-scene-id") ?? null;
+  }, [editor]);
+
+  const chapterId = useWritingStore((s) => {
+    if (sceneId) {
+      for (const act of s.acts) {
+        for (const ch of (act.chapters || []) as any[]) {
+          if ((ch.scenes || []).some((sc: any) => sc.id === sceneId)) return ch.id;
+        }
+      }
     }
-    return undefined;
+    return s.activeChapterId ?? "";
+  });
+
+  const chapterTitle = useWritingStore((s) => {
+    if (sceneId) {
+      for (const act of s.acts) {
+        for (const ch of (act.chapters || []) as any[]) {
+          if ((ch.scenes || []).some((sc: any) => sc.id === sceneId)) return ch.title || "";
+        }
+      }
+    }
+    return "";
+  });
+
+  const chapterContent = useWritingStore((s) => {
+    if (sceneId) {
+      for (const act of s.acts) {
+        for (const ch of (act.chapters || []) as any[]) {
+          if ((ch.scenes || []).some((sc: any) => sc.id === sceneId)) return ch.content || "";
+        }
+      }
+    }
+    return "";
   });
   const setGhostText = useWritingStore((s) => s.setGhostText);
   const clearGhostText = useWritingStore((s) => s.clearGhostText);
 
   const requestIdRef = useRef<string | null>(null);
   const generatedTextRef = useRef("");
+  const ghostParaPosRef = useRef<number | null>(null);
 
   const [genStatus, setGenStatus] = useState<"idle" | "generating" | "done">(
     status === "generating" ? "generating" : status === "done" ? "done" : "idle"
@@ -112,7 +146,15 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   );
 
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [genBarRect, setGenBarRect] = useState<{ left: number; top: number } | null>(null);
+  const [showGenBar, setShowGenBar] = useState(false);
+
+  // Floating UI 定位：自动追踪 scroll/resize，GPU 加速
+  const { refs: genBarRefs, floatingStyles } = useFloating({
+    open: showGenBar,
+    placement: "bottom-start",
+    middleware: [offset(4)],
+    whileElementsMounted: autoUpdate,
+  });
 
   // ── Custom drag: pure mouse events ──
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -130,7 +172,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     const offsetX = e.clientX - (blockRect?.left ?? e.clientX);
     const offsetY = e.clientY - (blockRect?.top ?? e.clientY);
     ghost.style.cssText = `
-      position:fixed; pointer-events:none; z-index:99999; opacity:0.5;
+      position:fixed; pointer-events:none; z-index:51; opacity:0.5;
       width:${blockRect?.width ?? 200}px;
       left:${blockRect?.left ?? e.clientX}px;
       top:${blockRect?.top ?? e.clientY}px;
@@ -141,7 +183,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     const editorRect = editorEl.getBoundingClientRect();
     const dropLine = document.createElement("div");
     dropLine.style.cssText = `
-      position:fixed;height:0;z-index:99998;pointer-events:none;
+      position:fixed;height:0;z-index:50;pointer-events:none;
       left:${editorRect.left}px;width:${editorRect.width}px;
       border-top:1px solid var(--color-text-secondary,#888);
     `;
@@ -196,25 +238,34 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     document.addEventListener("mouseup", onMouseUp);
   }, [editor, getPos]);
 
-  // Track GenerationBar floating position
+  // 控制 GenerationBar 显示/隐藏
   useEffect(() => {
-    if (genStatus === "idle" || !wrapperRef.current) {
-      setGenBarRect(null);
-      return;
-    }
-    const update = () => {
-      const rect = wrapperRef.current?.getBoundingClientRect();
-      if (rect) setGenBarRect({ left: rect.left, top: rect.bottom + 4 });
-    };
-    update();
-    const editorEl = document.querySelector(".writing-paper");
-    editorEl?.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update, { passive: true });
-    return () => {
-      editorEl?.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
+    setShowGenBar(genStatus !== "idle");
   }, [genStatus]);
+
+  /** 更新编辑器中的 ghost 段落内容 */
+  const updateGhostParagraph = useCallback((text: string) => {
+    const ghostPos = ghostParaPosRef.current;
+    if (ghostPos == null) return;
+
+    try {
+      const ghostNode = editor.state.doc.nodeAt(ghostPos);
+      if (!ghostNode) return;
+
+      const ghostMark = editor.schema.marks.ghostText;
+      if (!ghostMark) return;
+
+      const textNode = text ? editor.schema.text(text, [ghostMark.create()]) : null;
+      const newPara = editor.schema.nodes.paragraph.create(null, textNode ? [textNode] : []);
+
+      const tr = editor.state.tr;
+      tr.replaceWith(ghostPos, ghostPos + ghostNode.nodeSize, newPara);
+      tr.setMeta("ghostText", true);
+      editor.view.dispatch(tr);
+    } catch (e) {
+      console.warn("[Beat] updateGhostParagraph failed:", e);
+    }
+  }, [editor]);
 
   const { sendMessage: wsSend } = useWebSocket(
     useCallback((event: StreamEvent) => {
@@ -222,21 +273,21 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
 
       if (event.type === "text" && event.content) {
         generatedTextRef.current += event.content;
-        setGhostText(generatedTextRef.current, requestIdRef.current);
+        updateGhostParagraph(generatedTextRef.current);
         setGenWordCount(generatedTextRef.current.trim().length);
         return;
       }
 
       if (event.type === "text_set") {
         generatedTextRef.current = event.content ?? "";
-        setGhostText(generatedTextRef.current, requestIdRef.current);
+        updateGhostParagraph(generatedTextRef.current);
         setGenWordCount(generatedTextRef.current.trim().length);
         return;
       }
 
       if (event.type === "text_clear") {
         generatedTextRef.current = "";
-        clearGhostText();
+        updateGhostParagraph("");
         setGenWordCount(0);
         return;
       }
@@ -253,7 +304,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         setGenStatus("idle");
         requestIdRef.current = null;
       }
-    }, [clearGhostText, setGhostText, updateAttributes])
+    }, [updateAttributes, updateGhostParagraph])
   );
 
   const updateMaxWords = useCallback(
@@ -265,7 +316,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   );
 
   const handleGenerate = useCallback((opts?: GenerateOptions) => {
-    if (!activeProjectId || !activeChapterId || !activeProject || !activeChapter) return;
+    if (!activeProjectId || !chapterId || !activeProject) return;
 
     const beatText = node.textContent.trim();
     if (!beatText) return;
@@ -277,6 +328,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     const requestId = crypto.randomUUID();
     requestIdRef.current = requestId;
     generatedTextRef.current = "";
+    ghostParaPosRef.current = null;
     useWritingStore.setState({ aiMode: "beat_generate" });
     clearGhostText();
     updateAttributes({ status: "generating", maxWords: finalMaxWords });
@@ -284,20 +336,29 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     setGenWordCount(0);
     setDialogOpen(false);
 
+    // 在 beat 后面插入空段落（ghost text 容器），立即推下后面的组件
     const pos = getPos();
     if (pos != null) {
-      const afterBeat = pos + node.nodeSize;
-      editor.chain().focus().setTextSelection(afterBeat).run();
+      try {
+        const afterBeat = pos + node.nodeSize;
+        const emptyPara = editor.schema.nodes.paragraph.create(null);
+        const tr = editor.state.tr.insert(afterBeat, emptyPara);
+        tr.setMeta("ghostText", true);
+        editor.view.dispatch(tr);
+        ghostParaPosRef.current = afterBeat;
+      } catch (e) {
+        console.warn("[Beat] 插入 ghost 段落失败:", e);
+      }
     }
 
-    const chapterContent = activeChapter.content ?? "";
-    wsSend({
-      type: "writing",
-      ai_mode: "beat_generate",
+    const trimmedContent = chapterContent.length > 8000 ? chapterContent.slice(-8000) : chapterContent;
+    const payload = {
+      type: "writing" as const,
+      ai_mode: "beat_generate" as const,
       book_id: activeProjectId,
-      chapter_id: activeChapterId,
-      chapter_title: activeChapter.title,
-      chapter_content: chapterContent.length > 8000 ? chapterContent.slice(-8000) : chapterContent,
+      chapter_id: chapterId,
+      chapter_title: chapterTitle,
+      chapter_content: trimmedContent,
       book_name: activeProject.name,
       selected_text: "",
       content: beatText,
@@ -307,12 +368,14 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       instructions: finalInstructions,
       request_id: requestId,
       context_selection: effectiveSelection,
-    });
+    };
+    wsSend(payload);
   }, [
-    activeChapter,
-    activeChapterId,
     activeProject,
     activeProjectId,
+    chapterContent,
+    chapterId,
+    chapterTitle,
     clearGhostText,
     editor,
     effectiveSelection,
@@ -325,35 +388,99 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   ]);
 
   const handleApply = useCallback(() => {
+    try { editor.commands.acceptGhost(); } catch {}
     updateAttributes({ status: "idle" });
     setGenStatus("idle");
     requestIdRef.current = null;
     generatedTextRef.current = "";
-    editor.chain().focus().acceptGhost().run();
+    ghostParaPosRef.current = null;
     clearGhostText();
   }, [clearGhostText, editor, updateAttributes]);
 
-  const handleRetry = useCallback(() => {
-    handleGenerate();
-  }, [handleGenerate]);
+  const handleApplySection = useCallback(() => {
+    const text = generatedTextRef.current;
+    if (!text.trim()) {
+      // 没有文字，删除空 ghost 段落
+      editor.chain().focus().rejectGhost().run();
+      updateAttributes({ status: "idle" });
+      setGenStatus("idle");
+      requestIdRef.current = null;
+      generatedTextRef.current = "";
+      ghostParaPosRef.current = null;
+      clearGhostText();
+      return;
+    }
 
-  const handleDiscard = useCallback(() => {
+    // 先 reject ghost（删除 ghost 段落），再插入 SectionBlock
+    try { editor.commands.rejectGhost(); } catch {}
+
+    const pos = getPos();
+    if (pos != null) {
+      const afterBeat = pos + node.nodeSize;
+      const paragraphs = text
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => ({
+          type: "paragraph" as const,
+          content: [{ type: "text" as const, text: line }],
+        }));
+
+      editor.chain().focus().insertContentAt(afterBeat, {
+        type: "sectionBlock",
+        attrs: { title: modelId || "AI" },
+        content: paragraphs,
+      }).run();
+    }
+
     updateAttributes({ status: "idle" });
     setGenStatus("idle");
     requestIdRef.current = null;
     generatedTextRef.current = "";
-    editor.chain().focus().rejectGhost().run();
+    ghostParaPosRef.current = null;
+    clearGhostText();
+  }, [clearGhostText, editor, getPos, modelId, node, updateAttributes]);
+
+  const handleRetry = useCallback(() => {
+    // 先清理幽灵文字
+    try { editor.commands.rejectGhost(); } catch {}
+
+    // 删除残留的空段落节点（rejectGhost 可能只移除 mark 不删节点）
+    const ghostPos = ghostParaPosRef.current;
+    if (ghostPos != null) {
+      try {
+        const ghostNode = editor.state.doc.nodeAt(ghostPos);
+        if (ghostNode) {
+          const tr = editor.state.tr.delete(ghostPos, ghostPos + ghostNode.nodeSize);
+          tr.setMeta("ghostText", true);
+          editor.view.dispatch(tr);
+        }
+      } catch {}
+    }
+
+    ghostParaPosRef.current = null;
+    generatedTextRef.current = "";
+    handleGenerate();
+  }, [editor, handleGenerate]);
+
+  const handleDiscard = useCallback(() => {
+    try { editor.commands.rejectGhost(); } catch {}
+    updateAttributes({ status: "idle" });
+    setGenStatus("idle");
+    requestIdRef.current = null;
+    generatedTextRef.current = "";
+    ghostParaPosRef.current = null;
     clearGhostText();
   }, [clearGhostText, editor, updateAttributes]);
 
   const handleStop = useCallback(() => {
     if (requestIdRef.current) {
-      wsSend({ type: "cancel", session_id: `writing_${activeProjectId}_${activeChapterId}` });
+      wsSend({ type: "cancel", session_id: `writing_${activeProjectId}_${chapterId}` });
     }
-    updateAttributes({ status: "idle" });
-    setGenStatus("idle");
+    // Stop ≠ Discard：保留已输出的部分，切到 done 让用户选择 Apply/Retry/Discard
+    updateAttributes({ status: "done" });
+    setGenStatus("done");
     requestIdRef.current = null;
-  }, [activeChapterId, activeProjectId, updateAttributes, wsSend]);
+  }, [activeProjectId, chapterId, updateAttributes, wsSend]);
 
   const handleClearBeat = useCallback(() => {
     editor.chain().focus().clearBeatContent().run();
@@ -365,7 +492,10 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
 
   return (
     <NodeViewWrapper
-      ref={wrapperRef}
+      ref={(node) => {
+        wrapperRef.current = node;
+        genBarRefs.setReference(node);
+      }}
       className={`scene-beat-wrapper ${collapsed ? "scene-beat-collapsed" : ""}`}
     >
       <div className="scene-beat-block">
@@ -472,7 +602,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
             <div className="scene-beat-footer" contentEditable={false}>
               <div className="scene-beat-generate-group">
                 <button
-                  onClick={() => setDialogOpen(true)}
+                  onClick={() => handleGenerate()}
                   className="scene-beat-generate-btn"
                 >
                   <span className="scene-beat-generate-icon">▶</span>
@@ -502,16 +632,18 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         )}
       </div>
 
-      {/* GenerationBar — floating overlay */}
-      {genStatus !== "idle" && genBarRect && createPortal(
+      {/* GenerationBar — floating overlay via Floating UI */}
+      {showGenBar && createPortal(
         <div
-          style={{ position: "fixed", left: genBarRect.left, top: genBarRect.top, zIndex: 99999 }}
+          ref={genBarRefs.setFloating}
+          style={{ ...floatingStyles, zIndex: 50 }}
         >
           <GenerationBar
             status={genStatus as "generating" | "done"}
             model={modelId || "默认模型"}
             wordCount={genWordCount}
             onApply={handleApply}
+            onSection={handleApplySection}
             onRetry={handleRetry}
             onDiscard={handleDiscard}
             onStop={handleStop}
@@ -528,8 +660,8 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         defaultMaxWords={maxWords}
         defaultModelId={modelId}
         contextIds={(effectiveSelection.codexEntries as string[]) ?? []}
-        chapterContent={activeChapter?.content ?? ""}
-        chapterTitle={activeChapter?.title ?? ""}
+        chapterContent={chapterContent}
+        chapterTitle={chapterTitle}
         beatText={node.textContent.trim()}
       />
     </NodeViewWrapper>

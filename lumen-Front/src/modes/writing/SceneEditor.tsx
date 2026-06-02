@@ -13,6 +13,7 @@ import FontFamily from "@tiptap/extension-font-family";
 import { GhostTextExtension } from "../../components/editors/GhostTextExtension";
 import { SlashCommandExtension } from "../../components/editors/SlashCommandExtension";
 import { SceneBeatNode } from "../../components/editors/SceneBeatNode";
+import { SectionBlockNode } from "../../components/editors/SectionBlockNode";
 import { CodexHighlightExtension, codexPluginKey, invalidateCodexTerms } from "../../components/editors/CodexHighlightExtension";
 import {
   DropdownMenuItem,
@@ -59,6 +60,7 @@ const sceneExtensions = [
   GhostTextExtension,
   SlashCommandExtension,
   SceneBeatNode,
+  SectionBlockNode,
   CodexHighlightExtension,
 ];
 
@@ -127,8 +129,9 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
         class: "rich-text-editor-prosemirror outline-none",
       },
     },
-    onUpdate: ({ editor: ed }) => {
+    onUpdate: ({ editor: ed, transaction }) => {
       if (isInternalUpdate.current) return;
+      if (transaction?.getMeta("ghostText")) return;
       useWritingStore.setState({ contentDirty: true });
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {

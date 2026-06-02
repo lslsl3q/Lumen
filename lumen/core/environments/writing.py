@@ -85,18 +85,17 @@ async def direct_writing_stream(
         chapter_content = chapter_content[-4000:]
         content_truncated = True
 
-    # 构建上下文查询服务（codex + plot 注入）
+    # 构建上下文查询服务 — 仅在用户选择了上下文时加载
     svc = ContextQueryService(book_id, chapter_id, scene_id=scene_id)
-    if book_id:
+    plot_outline = ""
+    plot_for_scene = ""
+    if book_id and context_selection:
         await asyncio.to_thread(svc.preload)
-        # 如果有前端传入的 context_selection，预加载选中数据
-        if context_selection:
-            await asyncio.to_thread(svc.set_context_selection, context_selection)
+        await asyncio.to_thread(svc.set_context_selection, context_selection)
+        # Plot 数据仅在 context_selection 包含 Plot 相关项时才加载
+        plot_outline = svc.plot_outline()
+        plot_for_scene = svc.plot_for_current_scene()
     query_proxy = _TemplateQueryProxy(svc)
-
-    # 获取预加载的 Plot 数据
-    plot_outline = svc.plot_outline()
-    plot_for_scene = svc.plot_for_current_scene()
 
     template_context = build_context(
         character_id="writing",

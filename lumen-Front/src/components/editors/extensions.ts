@@ -25,6 +25,7 @@ import { FocusModeExtension } from "./FocusModeExtension";
 import { GhostTextExtension } from "./GhostTextExtension";
 import { SlashCommandExtension } from "./SlashCommandExtension";
 import { SceneBeatNode } from "./SceneBeatNode";
+import { SectionBlockNode } from "./SectionBlockNode";
 
 export const defaultExtensions = [
   StarterKit.configure({
@@ -60,4 +61,5 @@ export const defaultExtensions = [
   GhostTextExtension,
   SlashCommandExtension,
   SceneBeatNode,
+  SectionBlockNode,
 ];

@@ -5,7 +5,7 @@
  * 负责：连接/重连/频道订阅/消息收发。
  */
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import type { StreamEvent } from '../api/chat';
 import { useThemeStore } from '../stores/useThemeStore';
 
@@ -106,7 +106,8 @@ function send(msg: Record<string, unknown>) {
   if (_ws?.readyState === WebSocket.OPEN) {
     _ws.send(JSON.stringify(msg));
   } else {
-    console.warn('[WS] 未连接，消息发送失败');
+    console.warn('[WS] 未连接，消息丢弃:', msg.type);
+    connect();
   }
 }
 
@@ -127,10 +128,13 @@ function unsubscribe(channelId: string) {
  */
 export function useWebSocket(onMessage: MessageHandler) {
   const [isConnected, setIsConnected] = useState(false);
+  const handlerRef = useRef(onMessage);
+  handlerRef.current = onMessage;
 
   useEffect(() => {
-    // 注册处理器
-    _handlers.add(onMessage);
+    // 用稳定引用包装，避免 deps 变化时反复 add/delete
+    const stableHandler: MessageHandler = (event) => handlerRef.current(event);
+    _handlers.add(stableHandler);
 
     // 首次连接
     if (!_ws || _ws.readyState === WebSocket.CLOSED) {
@@ -146,9 +150,8 @@ export function useWebSocket(onMessage: MessageHandler) {
     }, 1000);
 
     return () => {
-      _handlers.delete(onMessage);
+      _handlers.delete(stableHandler);
       clearInterval(interval);
-      // 不在此处断连 — 单例由 app 生命周期管理
     };
   }, []);
 
