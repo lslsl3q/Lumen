@@ -860,3 +860,53 @@ export async function deletePlotLink(id: string): Promise<void> {
   const res = await fetch(`${BASE}/plot-links/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
 }
+
+// ── Codex Progressions ──
+
+export interface CodexProgression {
+  id: string;
+  codex_id: string;
+  scene_id: string;
+  mode: "addition" | "replace";
+  content: string;
+  detail_field: string;
+  created_at: number;
+  codex_name?: string;
+  codex_category?: string;
+}
+
+export async function listProgressions(bookId: string, sceneId: string): Promise<CodexProgression[]> {
+  const res = await fetch(`${BASE}/projects/${encodeURIComponent(bookId)}/progressions?scene_id=${encodeURIComponent(sceneId)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function createProgression(
+  data: { codex_id: string; scene_id: string; content?: string; mode?: "addition" | "replace"; detail_field?: string },
+): Promise<CodexProgression> {
+  const res = await fetch(`${BASE}/progressions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function updateProgression(
+  id: string,
+  data: Partial<Pick<CodexProgression, "content" | "mode" | "detail_field" | "codex_id">>,
+): Promise<CodexProgression> {
+  const res = await fetch(`${BASE}/progressions/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteProgression(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/progressions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(await res.text());
+}

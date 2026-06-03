@@ -284,6 +284,21 @@ def _init_tables(conn: sqlite3.Connection):
         );
         CREATE INDEX IF NOT EXISTS idx_pns_node ON plot_node_scenes(node_id);
         CREATE INDEX IF NOT EXISTS idx_pns_scene ON plot_node_scenes(scene_id);
+
+        -- Codex Progressions — 场景级 Codex 条目演进
+        CREATE TABLE IF NOT EXISTS writing_codex_progressions (
+            id TEXT PRIMARY KEY,
+            codex_id TEXT NOT NULL,
+            scene_id TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'addition',
+            content TEXT NOT NULL DEFAULT '',
+            detail_field TEXT DEFAULT '',
+            created_at REAL NOT NULL,
+            FOREIGN KEY (codex_id) REFERENCES codex(id) ON DELETE CASCADE,
+            FOREIGN KEY (scene_id) REFERENCES writing_scenes(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_wcp_codex ON writing_codex_progressions(codex_id);
+        CREATE INDEX IF NOT EXISTS idx_wcp_scene ON writing_codex_progressions(scene_id);
     """)
 
     # 删旧表

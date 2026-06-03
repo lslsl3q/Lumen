@@ -16,8 +16,71 @@ import type { StreamEvent } from "../../api/chat";
 import { GenerationBar } from "./GenerationBar";
 import { GenerateTextDialog, type GenerateOptions } from "./GenerateTextDialog";
 import { BeatContextMenu, ContextSelectionTags, type ContextSelection } from "./BeatContextMenu";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
+} from "../ui/dropdown-menu";
+import { useModels } from "../../hooks/useModels";
 
 const WORD_LIMITS = [200, 400, 600] as const;
+
+/**
+ * 递归提取 ProseMirror 节点中的纯文本。
+ * 跳过 hideFromAI=true 的 sectionBlock 及其所有子节点。
+ */
+function _extractNodeText(node: any, hidden = false): string {
+  if (!hidden && node.type?.name === 'sectionBlock' && node.attrs?.hideFromAI) {
+    hidden = true;
+  }
+  if (node.type?.name === 'text' && node.text && !hidden) return node.text;
+  if (!node.content || node.content.size === 0) return '';
+  const parts: string[] = [];
+  node.content.forEach((child: any) => {
+    const t = _extractNodeText(child, hidden);
+    if (t) parts.push(t);
+  });
+  return parts.join('\n');
+}
+
+/**
+ * 提取当前场景中 beat 位置之前的纯文本。
+ * 遍历 beat 所在 scene 节点内的前序兄弟节点，递归提取文本。
+ * 跳过 hideFromAI=true 的 sectionBlock 和 sceneBeat 节点自身。
+ */
+function extractWordsBeforeBeat(editor: any, getPos: () => number | undefined): string {
+  const pos = getPos();
+  if (pos == null) return '';
+
+  const $pos = editor.state.doc.resolve(pos);
+  let sceneDepth = -1;
+  for (let d = $pos.depth; d > 0; d--) {
+    if ($pos.node(d).type.name === 'scene') {
+      sceneDepth = d;
+      break;
+    }
+  }
+  if (sceneDepth < 0) return '';
+
+  const sceneNode = $pos.node(sceneDepth);
+  const sceneStart = $pos.start(sceneDepth);
+  const beatOffsetInScene = pos - sceneStart;
+
+  const texts: string[] = [];
+  sceneNode.content.forEach((child: any, offset: number) => {
+    if (offset >= beatOffsetInScene) return;
+    if (child.type.name === 'sceneBeat') return;
+    const t = _extractNodeText(child);
+    if (t) texts.push(t);
+  });
+
+  const full = texts.join('\n');
+  return full.length > 8000 ? full.slice(-8000) : full;
+}
 
 const TYPE_LABELS: Record<string, string> = {
   beat: "SCENE BEAT",
@@ -111,6 +174,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const [customWords, setCustomWords] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { models } = useModels();
 
   // New structured context selection (NC-aligned)
   const contextSelection: ContextSelection = (node.attrs.contextSelection as ContextSelection) ?? {};
@@ -351,14 +415,15 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       }
     }
 
-    const trimmedContent = chapterContent.length > 8000 ? chapterContent.slice(-8000) : chapterContent;
+    const wordsBefore = extractWordsBeforeBeat(editor, getPos());
     const payload = {
       type: "writing" as const,
       ai_mode: "beat_generate" as const,
       book_id: activeProjectId,
       chapter_id: chapterId,
+      scene_id: sceneId ?? '',
       chapter_title: chapterTitle,
-      chapter_content: trimmedContent,
+      chapter_content: wordsBefore,
       book_name: activeProject.name,
       selected_text: "",
       content: beatText,
@@ -373,7 +438,6 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   }, [
     activeProject,
     activeProjectId,
-    chapterContent,
     chapterId,
     chapterTitle,
     clearGhostText,
@@ -383,6 +447,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     maxWords,
     modelId,
     node,
+    sceneId,
     updateAttributes,
     wsSend,
   ]);
@@ -611,14 +676,42 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                   </span>
                 </button>
                 <div className="scene-beat-generate-divider" />
-                <button
-                  className="scene-beat-generate-dropdown"
-                  title="切换模型"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M2.5 3.75L5 6.25L7.5 3.75" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="scene-beat-generate-dropdown"
+                      title="选择模型"
+                      type="button"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M2.5 3.75L5 6.25L7.5 3.75" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={4}>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>模型</DropdownMenuLabel>
+                      {models.map((m) => (
+                        <DropdownMenuItem
+                          key={m.id}
+                          onClick={() => {
+                            updateAttributes({ modelId: m.id });
+                            handleGenerate({ modelId: m.id });
+                          }}
+                        >
+                          {m.id}
+                        </DropdownMenuItem>
+                      ))}
+                      {models.length === 0 && (
+                        <DropdownMenuItem disabled>无可用模型</DropdownMenuItem>
+                      )}
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setDialogOpen(true)}>
+                      ⚙ Tweak and Generate...
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <button
                 onClick={handleClearBeat}

@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import shutil
+from typing import Literal
 import uuid
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import PlainTextResponse, StreamingResponse, FileResponse
@@ -936,3 +937,58 @@ async def api_list_links(node_id: str):
 async def api_delete_link(link_id: str):
     await asyncio.to_thread(delete_link, link_id)
     return {"status": "deleted"}
+
+
+# ── Codex Progressions ──
+
+class CreateProgressionRequest(BaseModel):
+    codex_id: str
+    scene_id: str
+    content: str = ""
+    mode: Literal["addition", "replace"] = "addition"
+    detail_field: str = ""
+
+
+class UpdateProgressionRequest(BaseModel):
+    content: str | None = None
+    mode: Literal["addition", "replace"] | None = None
+    detail_field: str | None = None
+    codex_id: str | None = None
+
+
+@router.get("/projects/{book_id}/progressions")
+async def api_list_progressions(book_id: str, scene_id: str):
+    """获取当前场景位置的活跃 progressions（scene_id 必填）"""
+    from lumen.services.storage.writing import get_active_progressions
+    return await asyncio.to_thread(get_active_progressions, book_id, scene_id)
+
+
+@router.post("/progressions")
+async def api_create_progression(req: CreateProgressionRequest):
+    """创建 Codex Progression"""
+    from lumen.services.storage.writing import create_progression
+    if not req.codex_id or not req.scene_id:
+        raise HTTPException(status_code=400, detail="codex_id and scene_id required")
+    return await asyncio.to_thread(
+        create_progression, req.codex_id, req.scene_id,
+        req.content, req.mode, req.detail_field,
+    )
+
+
+@router.patch("/progressions/{progression_id}")
+async def api_update_progression(progression_id: str, req: UpdateProgressionRequest):
+    """更新 Progression"""
+    from lumen.services.storage.writing import update_progression
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    result = await asyncio.to_thread(update_progression, progression_id, **updates)
+    if not result:
+        raise HTTPException(status_code=404, detail="Progression not found")
+    return result
+
+
+@router.delete("/progressions/{progression_id}")
+async def api_delete_progression(progression_id: str):
+    """删除 Progression"""
+    from lumen.services.storage.writing import delete_progression
+    await asyncio.to_thread(delete_progression, progression_id)
+    return {"ok": True}

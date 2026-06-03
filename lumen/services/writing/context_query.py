@@ -55,18 +55,27 @@ def _strip_html(text: str) -> str:
     return _HTML_TAG_RE.sub("", text).strip()
 
 
-def _pm_json_text(content_str: str) -> str:
-    """Extract plain text from ProseMirror JSON content string."""
+def _pm_json_text(content_str: str, hide_blocks: bool = True) -> str:
+    """Extract plain text from ProseMirror JSON content string.
+
+    When *hide_blocks* is True (default), nodes whose attrs contain
+    ``hideFromAI=True`` are skipped entirely – none of their descendant
+    text is emitted.
+    """
     try:
         doc = json.loads(content_str)
     except (json.JSONDecodeError, TypeError):
         return content_str if isinstance(content_str, str) else ""
-    texts = []
-    def walk(node):
-        if node.get("type") == "text" and node.get("text"):
+    texts: list[str] = []
+    def walk(node: dict, hidden: bool = False) -> None:
+        if hide_blocks and not hidden:
+            attrs = node.get("attrs", {})
+            if attrs.get("hideFromAI"):
+                hidden = True
+        if node.get("type") == "text" and node.get("text") and not hidden:
             texts.append(node["text"])
         for child in node.get("content", []):
-            walk(child)
+            walk(child, hidden)
     walk(doc)
     return "\n".join(texts)
 
@@ -204,6 +213,12 @@ class ContextQueryService:
 
         # 预加载 Plot 数据
         self._preload_plot_data()
+
+        # 预加载 Progressions
+        self._progressions: list[dict] | None = None
+        if self._scene_id and self._book_id:
+            from lumen.services.storage.writing import get_active_progressions
+            self._progressions = get_active_progressions(self._book_id, self._scene_id)
 
     def _preload_plot_data(self):
         """预加载 Plot 层级数据到内存"""
@@ -538,6 +553,21 @@ class ContextQueryService:
         # Step 7: 格式化输出
         return _format_settings_grouped(active_list)
 
+    # ── Progressions 查询 ──
+
+    def progressions(self) -> str:
+        '''返回当前场景位置的活跃 Codex Progressions 文本'''
+        if not self._progressions:
+            return ''
+        parts = []
+        for p in self._progressions:
+            name = p.get('codex_name', '未知条目')
+            mode_label = '追加' if p.get('mode') == 'addition' else '替换'
+            content = p.get('content', '')
+            if content:
+                parts.append(f'[{mode_label}] {name}：{content}')
+        return '场景级设定演进：\n' + '\n'.join(parts) if parts else ''
+
 
 # ── Plot 选择项格式化（模块级） ──
 
@@ -645,3 +675,6 @@ class _TemplateQueryProxy:
     def plot_outline(self) -> dict[str, Any] | None:
         """返回项目 Plot 全景概要"""
         return self._svc.plot_outline()
+
+    def progressions(self) -> str:
+        return self._svc.progressions()

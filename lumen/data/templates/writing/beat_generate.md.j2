@@ -21,7 +21,7 @@ category: writing
 {{ query.last_n_chapters(n=3, format="summary") }}
 {% endif %}
 {% if chapter_content %}
-当前正文（最近部分）：
+当前场景正文（节拍之前）：
 ---
 {{ chapter_content }}
 ---
@@ -33,6 +33,9 @@ category: writing
 ---
 {% endif %}
 {% include "components/codex.md.j2" %}
+{% if query is defined and query.progressions() %}
+{{ query.progressions() }}
+{% endif %}
 {% include "components/plot.md.j2" %}
 {% if query is defined and query.resolved_context() %}
 

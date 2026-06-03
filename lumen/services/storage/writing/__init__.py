@@ -22,6 +22,9 @@ from .snippet import __all__ as _snippet_all
 from .chat import *  # noqa: F401,F403
 from .chat import __all__ as _chat_all
 
+from .progression import *  # noqa: F401,F403
+from .progression import __all__ as _progression_all
+
 __all__ = [
     # _base
     "get_conn", "close_conn", "write_lock", "DB_PATH",
@@ -35,4 +38,6 @@ __all__ = [
     *_snippet_all,
     # chat
     *_chat_all,
+    # progression
+    *_progression_all,
 ]
