@@ -626,6 +626,7 @@ export interface PlotNode {
   title: string;
   summary: string;
   purpose: string;
+  status: string;
   scene_ids: string[];
   sort_order: number;
   start_ch?: number;
@@ -658,6 +659,7 @@ export interface PlotArc {
   plot_id: string;
   title: string;
   summary: string;
+  status: string;
   sort_order: number;
   metadata: Record<string, unknown>;
   created_at: number;
@@ -726,7 +728,7 @@ export async function listArcs(plotId: string): Promise<PlotArc[]> {
   return res.json();
 }
 
-export async function updateArc(id: string, data: Partial<Pick<PlotArc, "title" | "summary">>): Promise<PlotArc> {
+export async function updateArc(id: string, data: Partial<Pick<PlotArc, "title" | "summary" | "status">>): Promise<PlotArc> {
   const res = await fetch(`${BASE}/arcs/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -790,7 +792,7 @@ export async function listNodes(lineId: string): Promise<PlotNode[]> {
   return res.json();
 }
 
-export async function updateNode(id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose" | "start_ch" | "end_ch" | "resolved">> & { scene_ids?: string[] }): Promise<PlotNode> {
+export async function updateNode(id: string, data: Partial<Pick<PlotNode, "title" | "summary" | "purpose" | "status" | "start_ch" | "end_ch" | "resolved">> & { scene_ids?: string[] }): Promise<PlotNode> {
   const res = await fetch(`${BASE}/nodes/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

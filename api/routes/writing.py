@@ -686,6 +686,7 @@ class CreateArcRequest(BaseModel):
 class UpdateArcRequest(BaseModel):
     title: str | None = None
     summary: str | None = None
+    status: str | None = None
 
 
 class ReorderArcsRequest(BaseModel):
@@ -729,6 +730,7 @@ class UpdateNodeRequest(BaseModel):
     title: str | None = None
     summary: str | None = None
     purpose: str | None = None
+    status: str | None = None
     scene_ids: list[str] | None = None
     start_ch: int | None = None
     end_ch: int | None = None

@@ -178,14 +178,14 @@ export function BeatContextMenu({
           <DropdownMenuCheckboxItem
             checked={selection.fullNovelText ?? false}
             onCheckedChange={(v) => setBool("fullNovelText", !!v)}
-            closeParentOnClick={false}
+            closeOnClick={false}
             disabled={!hasContent(activeProjectId)}
             className={itemCls}
           >全部手稿</DropdownMenuCheckboxItem>
           <DropdownMenuCheckboxItem
             checked={selection.fullOutline ?? false}
             onCheckedChange={(v) => setBool("fullOutline", !!v)}
-            closeParentOnClick={false}
+            closeOnClick={false}
             disabled={!hasContent(activeProjectId)}
             className={itemCls}
           >全部大纲</DropdownMenuCheckboxItem>
@@ -206,7 +206,7 @@ export function BeatContextMenu({
                     key={a.id}
                     checked={(selection.acts || []).includes(a.id)}
                     onCheckedChange={() => toggle("acts", a.id)}
-                    closeParentOnClick={false}
+                    closeOnClick={false}
                     className={itemCls}
                   >{a.title || `Act ${(a.sort_order ?? 0) + 1}`}</DropdownMenuCheckboxItem>
                 ))}
@@ -232,7 +232,7 @@ export function BeatContextMenu({
                         key={ch.id}
                         checked={(selection.chapters || []).includes(ch.id)}
                         onCheckedChange={() => toggle("chapters", ch.id)}
-                        closeParentOnClick={false}
+                        closeOnClick={false}
                         className={itemCls}
                       >{ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`}</DropdownMenuCheckboxItem>
                     ))}
@@ -267,7 +267,7 @@ export function BeatContextMenu({
                         key={sc.id}
                         checked={(selection.scenes || []).includes(sc.id)}
                         onCheckedChange={() => toggle("scenes", sc.id)}
-                        closeParentOnClick={false}
+                        closeOnClick={false}
                         className={itemCls}
                       >{sc.subtitle || sc.summary?.slice(0, 30) || `Scene`}</DropdownMenuCheckboxItem>
                     ))}
@@ -289,7 +289,7 @@ export function BeatContextMenu({
                     key={sn.id}
                     checked={(selection.snippets || []).includes(sn.id)}
                     onCheckedChange={() => toggle("snippets", sn.id)}
-                    closeParentOnClick={false}
+                    closeOnClick={false}
                     className={itemCls}
                   >{sn.name || "Untitled Snippet"}</DropdownMenuCheckboxItem>
                 ))}
@@ -313,7 +313,7 @@ export function BeatContextMenu({
                     key={e.id}
                     checked={(selection.codexEntries || []).includes(e.id)}
                     onCheckedChange={() => toggle("codexEntries", e.id)}
-                    closeParentOnClick={false}
+                    closeOnClick={false}
                     className={itemCls}
                   >
                     {e.name || "(未命名)"}
@@ -335,7 +335,7 @@ export function BeatContextMenu({
                     key={t}
                     checked={(selection.codexTypes || []).includes(t)}
                     onCheckedChange={() => toggle("codexTypes", t)}
-                    closeParentOnClick={false}
+                    closeOnClick={false}
                     className={itemCls}
                   >
                     {t}
@@ -357,7 +357,7 @@ export function BeatContextMenu({
                     key={cat}
                     checked={(selection.codexCategories || []).includes(cat)}
                     onCheckedChange={() => toggle("codexCategories", cat)}
-                    closeParentOnClick={false}
+                    closeOnClick={false}
                     className={itemCls}
                   >
                     {cat}
@@ -379,7 +379,7 @@ export function BeatContextMenu({
                     key={t}
                     checked={(selection.codexTags || []).includes(t)}
                     onCheckedChange={() => toggle("codexTags", t)}
-                    closeParentOnClick={false}
+                    closeOnClick={false}
                     className={itemCls}
                   >
                     {t}
@@ -402,7 +402,7 @@ export function BeatContextMenu({
               <DropdownMenuCheckboxItem
                 checked={selection.plotEnabled ?? false}
                 onCheckedChange={(v) => setBool("plotEnabled", !!v)}
-                closeParentOnClick={false}
+                closeOnClick={false}
                 className={itemCls}
               >注入剧情结构</DropdownMenuCheckboxItem>
 
@@ -418,7 +418,7 @@ export function BeatContextMenu({
                           key={arc.id}
                           checked={(selection.plotArcs || []).includes(arc.id)}
                           onCheckedChange={() => toggle("plotArcs", arc.id)}
-                          closeParentOnClick={false}
+                          closeOnClick={false}
                           className={itemCls}
                         >{arc.title || `Arc ${(arc.sort_order ?? 0) + 1}`}</DropdownMenuCheckboxItem>
                       ))}
@@ -435,7 +435,7 @@ export function BeatContextMenu({
                           key={line.id}
                           checked={(selection.plotLines || []).includes(line.id)}
                           onCheckedChange={() => toggle("plotLines", line.id)}
-                          closeParentOnClick={false}
+                          closeOnClick={false}
                           className={itemCls}
                         >
                           {line.title || line.name || "未命名线"}

@@ -345,7 +345,7 @@ export function SectionBlockView({
               <DropdownMenuCheckboxItem
                 checked={!hideFromCount}
                 onCheckedChange={handleToggleCount}
-                closeParentOnClick={false}
+                closeOnClick={false}
                 className={itemCls}
               >
                 Include in word count
