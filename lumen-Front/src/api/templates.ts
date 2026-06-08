@@ -1,5 +1,29 @@
 const API_BASE_URL = "http://127.0.0.1:8888";
 
+export interface TemplateInputDef {
+  name: string;
+  label: string;
+  description?: string;
+  required?: boolean;
+  multi?: boolean;
+  generate_only?: boolean;
+  // Three toggleable content types (NC-style: one input can have multiple)
+  custom_content?: boolean;
+  content_selection?: boolean;
+  checkbox?: boolean;
+  // Custom content config
+  options?: string[];
+  placeholder?: string;
+  allow_formatted_text?: boolean;
+  default?: string;
+  // Content selection config
+  content_types?: string[];
+  add_to_context?: boolean;
+  display_name?: string;
+  // Inheritance
+  source_component?: string;
+}
+
 export interface TemplateMeta {
   name: string;
   path: string;
@@ -8,6 +32,9 @@ export interface TemplateMeta {
   category: string;
   model: string;
   has_user_section: boolean;
+  inputs?: TemplateInputDef[];
+  description?: string;
+  user_created?: boolean;
 }
 
 export interface TemplateDetail extends TemplateMeta {
@@ -24,6 +51,7 @@ export interface PreviewResult {
   name: string;
   system: string;
   user: string;
+  messages?: { role: string; content: string }[];
 }
 
 export async function listTemplates(category?: string): Promise<TemplateListResponse> {
@@ -40,7 +68,7 @@ export async function getTemplate(path: string): Promise<TemplateDetail> {
   return res.json();
 }
 
-export async function updateTemplate(path: string, content: string): Promise<{ status: string; name: string }> {
+export async function updateTemplate(path: string, content: string): Promise<{ status: string; name: string; label: string }> {
   const res = await fetch(`${API_BASE_URL}/templates/${encodeURIComponent(path)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
