@@ -44,6 +44,9 @@ class AgentConfig:
     system_prompt: str = ""
     max_depth: int = 1
     source: str = "builtin"  # builtin | user | project
+    thinking: str = ""       # high/medium/low/空(不启用)
+    system_prompt_mode: str = "replace"  # replace(覆盖) / append(追加到默认)
+    default_reads: list[str] = field(default_factory=list)  # 启动时自动读取的文件
 
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
@@ -85,6 +88,22 @@ def _load_agent_file(filepath: str, source: str) -> AgentConfig | None:
     else:
         tools = []
 
+    # 解析 thinking
+    thinking_raw = meta.get("thinking", "")
+    thinking = str(thinking_raw).lower() if thinking_raw else ""
+
+    # 解析 systemPromptMode
+    prompt_mode = str(meta.get("systemPromptMode", "replace")).lower()
+
+    # 解析 defaultReads
+    reads_raw = meta.get("defaultReads", "")
+    if isinstance(reads_raw, str):
+        default_reads = [r.strip() for r in reads_raw.split(",") if r.strip()]
+    elif isinstance(reads_raw, list):
+        default_reads = [str(r) for r in reads_raw]
+    else:
+        default_reads = []
+
     return AgentConfig(
         name=name,
         description=meta.get("description", ""),
@@ -93,6 +112,9 @@ def _load_agent_file(filepath: str, source: str) -> AgentConfig | None:
         system_prompt=body,
         max_depth=int(meta.get("max_depth", 1)),
         source=source,
+        thinking=thinking,
+        system_prompt_mode=prompt_mode,
+        default_reads=default_reads,
     )
 
 

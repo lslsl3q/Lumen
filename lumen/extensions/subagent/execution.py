@@ -39,7 +39,7 @@ async def run_single(
     Returns:
         {"output": str, "tool_calls": int, "iterations": int, "run_id": str, "session_file": str}
     """
-    from lumen.services.llm import chat
+    from lumen.services.llm import chat, build_thinking_params
     from lumen.config import get_model
     from lumen.tools.parse import parse_tool_call
     from lumen.tool import execute_tool
@@ -54,7 +54,13 @@ async def run_single(
         session_file = session.create_session(run_id, agent.name, task, "single")
 
     model = agent.model or default_model or get_model()
-    system_prompt = agent.system_prompt or "你是子代理，完成分配的任务。直接给出结果。"
+
+    # systemPromptMode: append=追加到默认 prompt, replace=完全覆盖
+    default_prompt = "你是子代理，完成分配的任务。直接给出结果。"
+    if agent.system_prompt_mode == "append" and agent.system_prompt:
+        system_prompt = f"{default_prompt}\n\n{agent.system_prompt}"
+    else:
+        system_prompt = agent.system_prompt or default_prompt
 
     # 构建工具提示词（如果 agent 配置了工具白名单）
     tool_prompt = ""
@@ -71,9 +77,36 @@ async def run_single(
     if skill_text:
         system_content += f"\n\n{skill_text}"
 
+    # defaultReads: 自动读取文件内容注入到用户消息
+    reads_content = ""
+    if agent.default_reads:
+        read_parts = []
+        for filepath in agent.default_reads:
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    read_parts.append(f"### {filepath}\n{f.read()[:5000]}")
+            except IOError:
+                logger.warning(f"DefaultReads: cannot read {filepath}")
+        if read_parts:
+            reads_content = "\n\n".join(read_parts)
+
+    # thinking: 构建思考参数
+    thinking_extra = {}
+    thinking_effort = None
+    if agent.thinking:
+        budget_map = {"high": 16000, "medium": 8000, "low": 2000}
+        budget = budget_map.get(agent.thinking, 0)
+        if budget:
+            thinking_extra, thinking_effort = build_thinking_params(model, {
+                "enabled": True,
+                "budget_tokens": budget,
+            })
+
     # 构建用户消息
     user_content = task
-    if context:
+    if reads_content:
+        user_content = f"参考文件：\n{reads_content}\n\n任务：{task}"
+    elif context:
         user_content = f"上下文：\n{context}\n\n任务：{task}"
 
     messages: list[dict[str, str]] = [
@@ -88,7 +121,11 @@ async def run_single(
     total_tool_calls = 0
 
     for iteration in range(_MAX_TOOL_ITERATIONS):
-        response = await chat(messages=messages, model=model, stream=False)
+        response = await chat(
+            messages=messages, model=model, stream=False,
+            extra_body=thinking_extra or None,
+            reasoning_effort=thinking_effort,
+        )
         if not response or not response.choices:
             break
 
@@ -145,7 +182,11 @@ async def run_single(
             session.log_message(session_file, "tool", result_msg[:1000])
 
     # 循环结束还没返回，最后调用一次拿纯文本
-    response = await chat(messages=messages, model=model, stream=False)
+    response = await chat(
+        messages=messages, model=model, stream=False,
+        extra_body=thinking_extra or None,
+        reasoning_effort=thinking_effort,
+    )
     output = ""
     if response and response.choices:
         output = response.choices[0].message.content or ""
