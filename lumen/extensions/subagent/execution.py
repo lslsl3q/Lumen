@@ -109,11 +109,13 @@ async def run_single(
             })
 
     # 构建用户消息
-    user_content = task
+    parts = []
     if reads_content:
-        user_content = f"参考文件：\n{reads_content}\n\n任务：{task}"
-    elif context:
-        user_content = f"上下文：\n{context}\n\n任务：{task}"
+        parts.append(f"参考文件：\n{reads_content}")
+    if context:
+        parts.append(f"上下文：\n{context}")
+    parts.append(f"任务：{task}")
+    user_content = "\n\n".join(parts)
 
     messages: list[dict[str, str]] = [
         {"role": "system", "content": system_content},
@@ -125,7 +127,7 @@ async def run_single(
         session.log_message(session_file, "user", user_content[:500])
 
     total_tool_calls = 0
-    max_iterations = agent.max_iterations or 8
+    max_iterations = min(agent.max_iterations or 8, 50)
 
     for iteration in range(max_iterations):
         response = await chat(
@@ -223,9 +225,6 @@ async def run_single(
     }
 
 
-_RESUME_MAX_ITERATIONS = 8
-
-
 async def resume_single(
     run_id: str,
     follow_up: str = "",
@@ -241,7 +240,7 @@ async def resume_single(
     Returns:
         同 run_single 的返回值，或 None（会话不存在）
     """
-    from lumen.services.llm import chat
+    from lumen.services.llm import chat, build_thinking_params
     from lumen.config import get_model
     from lumen.tools.parse import parse_tool_call
     from lumen.tool import execute_tool
@@ -261,6 +260,20 @@ async def resume_single(
     model = agent.model or default_model or get_model()
     messages = resume_data["messages"]
 
+    max_iterations = min(agent.max_iterations or 8, 50)
+
+    # thinking: 恢复会话也继承 agent 的 thinking 配置
+    thinking_extra = {}
+    thinking_effort = None
+    if agent.thinking:
+        budget_map = {"high": 16000, "medium": 8000, "low": 2000}
+        budget = budget_map.get(agent.thinking, 0)
+        if budget:
+            thinking_extra, thinking_effort = build_thinking_params(model, {
+                "enabled": True,
+                "budget_tokens": budget,
+            })
+
     # 如果有 follow_up，追加到消息末尾
     if follow_up:
         messages.append({"role": "user", "content": follow_up})
@@ -271,8 +284,12 @@ async def resume_single(
 
     total_tool_calls = 0
 
-    for iteration in range(_RESUME_MAX_ITERATIONS):
-        response = await chat(messages=messages, model=model, stream=False)
+    for iteration in range(max_iterations):
+        response = await chat(
+            messages=messages, model=model, stream=False,
+            extra_body=thinking_extra or None,
+            reasoning_effort=thinking_effort,
+        )
         if not response or not response.choices:
             break
 
@@ -322,12 +339,16 @@ async def resume_single(
         session.log_message(session_file, "tool", result_msg[:1000])
 
     # 循环结束
-    response = await chat(messages=messages, model=model, stream=False)
+    response = await chat(
+        messages=messages, model=model, stream=False,
+        extra_body=thinking_extra or None,
+        reasoning_effort=thinking_effort,
+    )
     if response and response.choices:
         output = response.choices[0].message.content or ""
     else:
         output = ""
-    session.end_session(session_file, output, total_tool_calls, _RESUME_MAX_ITERATIONS, bool(output))
+    session.end_session(session_file, output, total_tool_calls, max_iterations, bool(output))
 
     om = manage_output(output, new_run_id)
     return {
@@ -336,7 +357,7 @@ async def resume_single(
         "output_file": om["output_file"],
         "full_length": om["full_length"],
         "tool_calls": total_tool_calls,
-        "iterations": _RESUME_MAX_ITERATIONS,
+        "iterations": max_iterations,
         "run_id": new_run_id,
         "session_file": session_file,
         "resumed_from": run_id,

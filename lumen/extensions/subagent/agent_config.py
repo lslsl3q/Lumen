@@ -92,9 +92,15 @@ def _load_agent_file(filepath: str, source: str) -> AgentConfig | None:
     # 解析 thinking
     thinking_raw = meta.get("thinking", "")
     thinking = str(thinking_raw).lower() if thinking_raw else ""
+    if thinking and thinking not in ("high", "medium", "low"):
+        logger.warning(f"Agent '{name}': invalid thinking='{thinking}', expected high/medium/low")
+        thinking = ""
 
     # 解析 systemPromptMode
     prompt_mode = str(meta.get("systemPromptMode", "replace")).lower()
+    if prompt_mode not in ("replace", "append"):
+        logger.warning(f"Agent '{name}': invalid systemPromptMode='{prompt_mode}', expected replace/append")
+        prompt_mode = "replace"
 
     # 解析 defaultReads
     reads_raw = meta.get("defaultReads", "")
