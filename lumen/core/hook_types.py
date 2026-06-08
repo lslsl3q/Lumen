@@ -138,3 +138,21 @@ class InputReceivedPayload(HookEvent):
     channel_id: str = ""
     transformed: bool = False  # handler 修改 user_input 后设为 True
     blocked: bool = False  # handler 设为 True 可阻断输入处理
+
+
+# ── 子代理事件 ──
+
+class SubagentCompletePayload(HookEvent):
+    """子代理异步任务完成时触发"""
+    event_name: str = "subagent.completed"
+    run_id: str = ""
+    output: str = ""
+    tool_calls: int = 0
+    iterations: int = 0
+
+
+class SubagentFailedPayload(HookEvent):
+    """子代理异步任务失败时触发"""
+    event_name: str = "subagent.failed"
+    run_id: str = ""
+    error: str = ""
