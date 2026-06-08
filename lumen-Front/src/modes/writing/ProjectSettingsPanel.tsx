@@ -3,6 +3,7 @@ import { AlertTriangle, Trash2, Download, Upload, ImageIcon, Plus, GripVertical,
 import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { RadioDot } from "../../components/ui/radio-dot";
 import { useWritingStore } from "../../stores/useWritingStore";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -15,7 +16,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { getCoverUrl, uploadCover } from "../../api/writing";
-import { cn } from "../../lib/utils";
+import { LabelRow } from "../../components/editors/LabelRow";
 
 type SettingsTab = "metadata" | "writing" | "export";
 
@@ -424,16 +425,9 @@ function WritingTab() {
             <p className="text-[13px] text-zinc-500 mb-2">小说的叙述时态，会影响 AI 续写生成的文本时态。</p>
             <div className="flex items-center gap-3">
               {TENSE_OPTIONS.map((opt) => (
-                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="tense"
-                    value={opt.value}
-                    checked={tense === opt.value}
-                    onChange={() => handleTenseChange(opt.value)}
-                    className="accent-zinc-400"
-                  />
-                  <span className="text-[14px] text-zinc-300">{opt.label}</span>
+                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer" onClick={() => handleTenseChange(opt.value)}>
+                  <RadioDot selected={tense === opt.value} />
+                  <span className={`text-[14px] transition-colors duration-300 ${tense === opt.value ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>{opt.label}</span>
                 </label>
               ))}
             </div>
@@ -491,16 +485,9 @@ function WritingTab() {
             <p className="text-[13px] text-zinc-500 mb-2">小说的叙述人称视角，会影响 AI 续写。（可在场景级别覆盖。）</p>
             <div className="flex flex-col gap-2">
               {POV_OPTIONS.map((opt) => (
-                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="pov"
-                    value={opt.value}
-                    checked={pov === opt.value}
-                    onChange={() => handlePovChange(opt.value)}
-                    className="accent-zinc-400"
-                  />
-                  <span className="text-[14px] text-zinc-300">{opt.label}</span>
+                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer" onClick={() => handlePovChange(opt.value)}>
+                  <RadioDot selected={pov === opt.value} />
+                  <span className={`text-[14px] transition-colors duration-300 ${pov === opt.value ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-secondary)]'}`}>{opt.label}</span>
                 </label>
               ))}
             </div>
@@ -683,20 +670,7 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
   );
 }
 
-// ── Label Colors ──
-
-const LABEL_COLORS: { key: string; hex: string }[] = [
-  { key: "Black", hex: "#1f2937" },
-  { key: "Gray", hex: "#6b7280" },
-  { key: "Brown", hex: "#92400e" },
-  { key: "Orange", hex: "#ea580c" },
-  { key: "Yellow", hex: "#ca8a04" },
-  { key: "Green", hex: "#16a34a" },
-  { key: "Blue", hex: "#2563eb" },
-  { key: "Purple", hex: "#7c3aed" },
-  { key: "Pink", hex: "#db2777" },
-  { key: "Red", hex: "#dc2626" },
-];
+// ── Label Colors (from shared LabelRow) ──
 
 // ── SortableLabelRow (with drag handle + star) ──
 
@@ -710,24 +684,8 @@ function SortableLabelRow({ label }: { label: import("../../api/writing").Writin
     isDragging,
   } = useSortable({ id: label.id });
 
-  const [expanded, setExpanded] = useState(false);
-  const [name, setName] = useState(label.name);
   const updateLabelAction = useWritingStore((s) => s.updateLabelAction);
   const deleteLabelAction = useWritingStore((s) => s.deleteLabelAction);
-
-  const handleNameBlur = useCallback(() => {
-    if (name !== label.name) updateLabelAction(label.id, { name });
-  }, [name, label.name, label.id, updateLabelAction]);
-
-  const handleColorChange = useCallback((color: string) => {
-    updateLabelAction(label.id, { color });
-  }, [label.id, updateLabelAction]);
-
-  const handleDelete = useCallback(async () => {
-    await deleteLabelAction(label.id);
-  }, [label.id, deleteLabelAction]);
-
-  const currentColor = LABEL_COLORS.find((c) => c.key === label.color);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -736,91 +694,33 @@ function SortableLabelRow({ label }: { label: import("../../api/writing").Writin
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="border border-zinc-700/50 rounded-lg overflow-hidden"
-    >
-      <div className="flex items-center gap-1 px-1 py-1.5 hover:bg-white/5 transition-colors">
-        {/* Drag handle */}
-        <button
-          {...attributes}
-          {...listeners}
-          className="p-0.5 cursor-grab text-zinc-600 hover:text-zinc-400 shrink-0"
-          type="button"
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Star / AI visibility toggle */}
-        <button
-          className="p-0.5 shrink-0"
-          type="button"
-          title="AI 可见性（暂未接入）"
-        >
-          <Star className="w-3 h-3 text-zinc-600" />
-        </button>
-
-        {/* Color indicator */}
-        <span
-          className="w-3 h-3 rounded-sm shrink-0"
-          style={{ background: currentColor?.hex || "#6b7280" }}
-        />
-
-        {/* Label name — click to expand */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex-1 text-left text-[13px] text-zinc-300 truncate cursor-pointer bg-transparent border-none outline-none"
-          type="button"
-        >
-          {label.name || "Unnamed Label"}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="px-3 pb-3 pt-1 border-t border-zinc-700/50 space-y-3">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={handleNameBlur}
-            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-            className="!h-[31px] !bg-[rgba(63,63,70,0.25)] !border-zinc-600 !rounded-sm !text-[13px] !text-zinc-300 focus:!border-zinc-500 focus:!ring-0"
-          />
-
-          <div className="flex items-center gap-1.5 flex-wrap">
+    <div ref={setNodeRef} style={style}>
+      <LabelRow
+        name={label.name}
+        color={label.color}
+        onNameChange={(name) => updateLabelAction(label.id, { name })}
+        onColorChange={(color) => updateLabelAction(label.id, { color })}
+        onDelete={() => deleteLabelAction(label.id)}
+        leading={
+          <>
             <button
-              onClick={() => updateLabelAction(label.id, { color: label.color })}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 px-1"
+              {...attributes}
+              {...listeners}
+              className="p-0.5 cursor-grab text-zinc-600 hover:text-zinc-400 shrink-0"
               type="button"
             >
-              Clear
+              <GripVertical className="w-3.5 h-3.5" />
             </button>
-            {LABEL_COLORS.map((c) => (
-              <button
-                key={c.key}
-                onClick={() => handleColorChange(c.key)}
-                className={cn(
-                  "w-5 h-5 rounded-sm transition-transform cursor-pointer",
-                  label.color === c.key && "ring-2 ring-white/40 scale-110"
-                )}
-                style={{ background: c.hex }}
-                title={c.key}
-                type="button"
-              />
-            ))}
-          </div>
-
-          <Button
-            variant="ghost"
-            className="!h-[25px] !text-[11px] text-red-400 hover:text-red-300 hover:bg-red-900/20"
-            onClick={handleDelete}
-            type="button"
-          >
-            <Trash2 className="w-3 h-3 mr-1" />
-            Delete Label
-          </Button>
-        </div>
-      )}
+            <button
+              className="p-0.5 shrink-0"
+              type="button"
+              title="AI 可见性（暂未接入）"
+            >
+              <Star className="w-3 h-3 text-zinc-600" />
+            </button>
+          </>
+        }
+      />
     </div>
   );
 }

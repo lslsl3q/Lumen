@@ -38,21 +38,9 @@ function groupTemplates(templates: TemplateMeta[]) {
   return grouped;
 }
 
-function typeBadge(type: string): { label: string; className: string } | null {
-  switch (type) {
-    case "beat_generate":
-      return { label: "Scene Beat", className: "bg-amber-500/15 text-amber-400" };
-    case "text_replacement":
-      return { label: "System", className: "bg-blue-500/15 text-blue-400" };
-    case "analyze_chapter":
-      return { label: "System", className: "bg-blue-500/15 text-blue-400" };
-    case "workshop_chat":
-      return { label: "System", className: "bg-blue-500/15 text-blue-400" };
-    case "prompt_component":
-      return { label: "Component", className: "bg-emerald-500/15 text-emerald-400" };
-    default:
-      return null;
-  }
+function typeBadge(userCreated?: boolean): { label: string; className: string } | null {
+  if (userCreated) return null;
+  return { label: "System", className: "bg-blue-500/15 text-blue-400" };
 }
 
 export function TemplateListSidebar({
@@ -88,7 +76,7 @@ export function TemplateListSidebar({
   }, [groups, search]);
 
   return (
-    <div className="w-[320px] flex-none border-r border-zinc-700/40 flex flex-col overflow-hidden">
+    <div className="w-[400px] flex-none border-r border-zinc-700/40 flex flex-col overflow-hidden bg-surface-panel">
       {/* Search + New toolbar */}
       <div className="flex-none flex items-center gap-1.5 px-2 py-2 border-b border-zinc-700/40">
         <div className="flex-1 flex items-center bg-zinc-800/40 border border-zinc-700/50 rounded text-[13px]">
@@ -112,7 +100,7 @@ export function TemplateListSidebar({
       </div>
 
       {/* Grouped list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {filteredGroups.map((group) => (
           <div key={group.key}>
             {/* Section header — NC style: label + count + add button */}
@@ -136,7 +124,7 @@ export function TemplateListSidebar({
 
             {/* List items */}
             {group.items.map((t) => {
-              const badge = typeBadge(t.type);
+              const badge = typeBadge(t.user_created);
               return (
                 <button
                   key={t.name}

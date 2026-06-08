@@ -4,9 +4,8 @@ Lumen - 工具协议类型定义（Pydantic）
 """
 
 from pydantic import BaseModel, ConfigDict
-from typing import Any, Optional, List, Dict, Union, TypedDict
+from typing import Any, Optional, Union, TypedDict
 from datetime import datetime
-
 
 class ErrorCode:
     """工具执行错误代码"""
@@ -31,12 +30,10 @@ class ErrorCode:
     TOOL_UNKNOWN = "TOOL.UNKNOWN"
     TOOL_BROKEN = "TOOL.BROKEN"
 
-
 class ToolDefinition(TypedDict, total=False):
     """从 registry.json 加载的工具定义"""
     description: str
-    parameters: Dict[str, Any]
-
+    parameters: dict[str, Any]
 
 class ToolResult(BaseModel):
     """工具执行结果 — 每个工具必须返回这个形状"""
@@ -45,12 +42,11 @@ class ToolResult(BaseModel):
     success: bool
     tool: str
     data: Any = None
-    error_code: Optional[str] = None
-    error_message: Optional[str] = None
-    timestamp: Optional[str] = None
-    execution_time: Optional[float] = None
-    error_detail: Optional[Dict[str, Any]] = None
-
+    error_code: str | None = None
+    error_message: str | None = None
+    timestamp: str | None = None
+    execution_time: float | None = None
+    error_detail: dict[str, Any] | None = None
 
 class SingleToolCall(BaseModel):
     """解析出的单个工具调用"""
@@ -59,22 +55,19 @@ class SingleToolCall(BaseModel):
     mode: str = "single"
     tool: str = ""
     command: str = ""
-    params: Dict[str, Any] = {}
-    call_id: Optional[str] = None
-    run_in_background: Optional[bool] = None
-
+    params: dict[str, Any] = {}
+    call_id: str | None = None
+    run_in_background: bool | None = None
 
 class ParallelToolCall(BaseModel):
     """解析出的并行工具调用"""
     mode: str = "parallel"
-    calls: List[Dict[str, Any]] = []
-    call_id: Optional[str] = None
+    calls: list[dict[str, Any]] = []
+    call_id: str | None = None
 
+ParsedToolCall = SingleToolCall | ParallelToolCall
 
-ParsedToolCall = Union[SingleToolCall, ParallelToolCall]
-
-
-def success_result(tool: str, data: Any, **metadata) -> Dict[str, Any]:
+def success_result(tool: str, data: Any, **metadata) -> dict[str, Any]:
     """构造成功结果"""
     result = ToolResult(
         success=True,
@@ -85,8 +78,7 @@ def success_result(tool: str, data: Any, **metadata) -> Dict[str, Any]:
     )
     return result.model_dump(exclude_none=True)
 
-
-def error_result(tool: str, code: str, message: str, detail: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def error_result(tool: str, code: str, message: str, detail: dict[str, Any] | None = None) -> dict[str, Any]:
     """构造错误结果"""
     result = ToolResult(
         success=False,

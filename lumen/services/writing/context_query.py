@@ -15,6 +15,7 @@ from typing import Any
 from lumen.services.storage.writing import (
     list_chapters, list_codex,
     list_acts, list_snippets, list_scenes,
+    get_codex,
 )
 
 logger = logging.getLogger(__name__)
@@ -219,6 +220,16 @@ class ContextQueryService:
         if self._scene_id and self._book_id:
             from lumen.services.storage.writing import get_active_progressions
             self._progressions = get_active_progressions(self._book_id, self._scene_id)
+
+        # 预加载 POV 角色
+        self._pov_entry: dict | None = None
+        if self._scene_id:
+            from lumen.services.storage.writing import get_scene
+            sc = get_scene(self._scene_id)
+            if sc and sc.get("pov_codex_id"):
+                pov = get_codex(sc["pov_codex_id"])
+                if pov and pov.get("enabled", 1):
+                    self._pov_entry = pov
 
     def _preload_plot_data(self):
         """预加载 Plot 层级数据到内存"""
@@ -568,6 +579,20 @@ class ContextQueryService:
                 parts.append(f'[{mode_label}] {name}：{content}')
         return '场景级设定演进：\n' + '\n'.join(parts) if parts else ''
 
+    def pov_entry(self) -> str:
+        '''返回 POV 角色的 Codex 条目文本'''
+        if not self._pov_entry:
+            return ''
+        name = self._pov_entry.get('name', '未知角色')
+        content = self._pov_entry.get('description', {})
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                content = {}
+        formatted = _format_entity(name, content)
+        return f'POV 角色：\n{formatted}'
+
 
 # ── Plot 选择项格式化（模块级） ──
 
@@ -678,3 +703,6 @@ class _TemplateQueryProxy:
 
     def progressions(self) -> str:
         return self._svc.progressions()
+
+    def pov_entry(self) -> str:
+        return self._svc.pov_entry()

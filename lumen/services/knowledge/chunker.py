@@ -4,14 +4,12 @@ Lumen - 文本分块器
 """
 import re
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
 _BREAK_CHARS = set('。！？；\n.!?;:')
 
-
-def split_sentences(text: str) -> List[str]:
+def split_sentences(text: str) -> list[str]:
     """将文本切分为句子列表（中文为主，兼容英文）
 
     规则：在句末标点（。！？；.!?）和换行处切分，
@@ -52,12 +50,11 @@ def split_sentences(text: str) -> List[str]:
     # 过滤空句子
     return [s for s in sentences if s.strip()]
 
-
 def chunk_text(
     text: str,
     chunk_size: int = 300,
     overlap: int = 60,
-) -> List[str]:
+) -> list[str]:
     """将文本按句子边界切分为带重叠的 chunk
 
     Args:
@@ -106,7 +103,6 @@ def chunk_text(
         start = next_start
 
     return chunks
-
 
 def _find_sentence_break(text: str, search_start: int, search_end: int) -> int:
     """在 [search_start, search_end) 范围内找最后一个句子边界"""

@@ -2,6 +2,23 @@
 name: "从摘要生成场景节拍"
 type: workshop_chat
 category: writing
+inputs:
+  - name: scene
+    label: Scene
+    description: The scene to develop beats for
+    required: true
+    content_selection: true
+    content_types:
+      - scene
+  - name: amount
+    label: Amount
+    description: How many beats should be generated?
+    required: true
+    custom_content: true
+    options:
+      - "6"
+      - "8"
+      - "12"
 ---
 
 # --- SYSTEM ---

@@ -32,6 +32,11 @@ class ContextComponent(ABC):
     每个组件负责拼接 System Prompt 的一个层。
     Agent.act() 按 priority 排序后依次调用 pre_act()，
     按 zone 分组后分别拼成静态区和动态区。
+
+    两种使用方式：
+    1. 继承并实现 pre_act()（传统方式，Agent 直接调用）
+    2. 继承并实现 register()，通过 HookBus 事件注册（事件驱动方式）
+       注册后 pre_act() 仍会被调用，但 register() 提供更灵活的扩展点。
     """
 
     name: str = ""
@@ -46,6 +51,15 @@ class ContextComponent(ABC):
         if zone is not None:
             self.zone = zone
         self.last_output: str = ""
+
+    def register(self, hook_bus) -> None:
+        """可选：注册到 HookBus，订阅事件。
+
+        子类重写此方法可订阅 tool.call、context.build 等事件，
+        实现比 pre_act() 更灵活的行为（拦截工具、修改上下文等）。
+        默认不做任何注册。
+        """
+        pass
 
     @abstractmethod
     async def pre_act(self, context: dict) -> str:

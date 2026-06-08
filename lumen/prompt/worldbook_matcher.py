@@ -7,11 +7,10 @@ T27 Phase 4: 注册为 agent.before_act Hook handler，匹配结果写入 contex
 
 import re
 import logging
-from typing import List, Dict, Optional
+from typing import Optional
 import unicodedata
 
 logger = logging.getLogger(__name__)
-
 
 def _contains_cjk(text: str) -> bool:
     """检查文本是否包含 CJK 字符（中日韩统一表意文字）"""
@@ -19,7 +18,6 @@ def _contains_cjk(text: str) -> bool:
         if '\u4e00' <= ch <= '\u9fff' or '\u3400' <= ch <= '\u4dbf' or '\uf900' <= ch <= '\ufaff':
             return True
     return False
-
 
 def compile_keyword_pattern(keyword: str, case_sensitive: bool, whole_word: bool) -> re.Pattern:
     """编译关键词匹配模式
@@ -42,12 +40,11 @@ def compile_keyword_pattern(keyword: str, case_sensitive: bool, whole_word: bool
 
     return re.compile(pattern, flags)
 
-
 def match_worldbooks(
-    messages: List[Dict],
+    messages: list[dict],
     character_id: str,
-    entries: List[Dict]
-) -> List[Dict]:
+    entries: list[dict]
+) -> list[dict]:
     """匹配世界书条目
 
     Args:
@@ -124,12 +121,11 @@ def match_worldbooks(
 
     return matched
 
-
 def get_injection_context(
-    messages: List[Dict],
+    messages: list[dict],
     character_id: str,
-    entries: Optional[List[Dict]] = None
-) -> List[Dict]:
+    entries: list[dict] | None = None
+) -> list[dict]:
     """获取要注入的动态上下文
 
     Args:
@@ -163,7 +159,6 @@ def get_injection_context(
         })
 
     return contexts
-
 
 # ── T27 Phase 4: HookBus 注册 ──
 

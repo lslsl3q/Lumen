@@ -309,7 +309,7 @@ function MatrixCodexCell({
               catch { return []; }
             })();
             if (codexEntry) {
-              useWritingStore.getState().patchScene(scene.id, { codex_ids: [...codexIds, codexEntry.id] } as any);
+              useWritingStore.getState().patchScene(scene.id, { codex_ids: [...codexIds, codexEntry.id] });
             }
           }}
           className="text-[12px] text-zinc-400 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity px-1.5 py-1 rounded cursor-pointer hover:bg-white/5 h-full w-full flex items-center justify-center"

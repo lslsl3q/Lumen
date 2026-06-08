@@ -17,7 +17,7 @@ import shutil
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any
 
 import httpx
 
@@ -25,7 +25,6 @@ from lumen.tool import success_result, error_result, ErrorCode
 from lumen.tools.file_security import validate_path, get_max_file_size_mb, is_readonly_mode
 
 logger = logging.getLogger(__name__)
-
 
 # ========================================
 # 文件类型常量
@@ -56,7 +55,6 @@ _IMAGE_EXTENSIONS = {
 
 # PDF 文件后缀
 _PDF_EXTENSIONS = {".pdf"}
-
 
 # ========================================
 # Command 分发
@@ -113,7 +111,6 @@ def execute(params: dict, command: str = "") -> dict:
 
     return handler(params)
 
-
 # ========================================
 # 通用辅助函数
 # ========================================
@@ -127,8 +124,7 @@ def _format_size(size_bytes: int) -> str:
     else:
         return f"{size_bytes / 1024 / 1024:.1f}MB"
 
-
-def _validate_write(path: str, must_exist: bool = False) -> Dict[str, Any]:
+def _validate_write(path: str, must_exist: bool = False) -> dict[str, Any]:
     """验证写入路径的合法性
 
     Args:
@@ -151,7 +147,6 @@ def _validate_write(path: str, must_exist: bool = False) -> Dict[str, Any]:
 
     return {"ok": True, "real_path": real_path}
 
-
 def _auto_rename_if_exists(path: str) -> str:
     """如果文件已存在，自动加 (1) 后缀"""
     if not os.path.exists(path):
@@ -164,7 +159,6 @@ def _auto_rename_if_exists(path: str) -> str:
         if not os.path.exists(new_path):
             return new_path
         counter += 1
-
 
 # ========================================
 # read -- 读文件
@@ -211,7 +205,6 @@ def _cmd_read(params: dict) -> dict:
     else:
         return _read_text(real_path, encoding, offset, limit)
 
-
 def _read_text(path: str, encoding: str, offset: int, limit: int) -> dict:
     """读取文本文件"""
     try:
@@ -244,7 +237,6 @@ def _read_text(path: str, encoding: str, offset: int, limit: int) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"读取文件失败: {e}")
 
-
 def _read_image(path: str, ext: str) -> dict:
     """读取图片文件（返回 base64）"""
     try:
@@ -267,7 +259,6 @@ def _read_image(path: str, ext: str) -> dict:
 
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"读取图片失败: {e}")
-
 
 def _read_pdf(path: str, encoding: str) -> dict:
     """读取 PDF 文件（提取文本）"""
@@ -301,7 +292,6 @@ def _read_pdf(path: str, encoding: str) -> dict:
                             "PDF 读取需要 PyPDF2 库，请运行: uv pip install PyPDF2")
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"读取 PDF 失败: {e}")
-
 
 # ========================================
 # list -- 列目录
@@ -364,7 +354,6 @@ def _cmd_list(params: dict) -> dict:
 
     return success_result("file_manager", "\n".join(lines))
 
-
 # ========================================
 # glob -- 按文件名模式搜索
 # ========================================
@@ -419,7 +408,6 @@ def _cmd_glob(params: dict) -> dict:
 
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"搜索失败: {e}")
-
 
 # ========================================
 # grep -- 按文件内容搜索
@@ -503,7 +491,6 @@ def _cmd_grep(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"搜索失败: {e}")
 
-
 def _grep_in_file(filepath: Path, regex: re.Pattern) -> list:
     """在单个文件中搜索正则匹配
 
@@ -519,7 +506,6 @@ def _grep_in_file(filepath: Path, regex: re.Pattern) -> list:
     except (OSError, PermissionError):
         pass
     return matches
-
 
 # ========================================
 # info -- 文件元信息
@@ -580,7 +566,6 @@ def _cmd_info(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"获取文件信息失败: {e}")
 
-
 # ========================================
 # write -- 创建/覆盖文件
 # ========================================
@@ -626,7 +611,6 @@ def _cmd_write(params: dict) -> dict:
 
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"写入文件失败: {e}")
-
 
 # ========================================
 # edit -- SEARCH/REPLACE 精确替换（Claude Code 方式）
@@ -696,7 +680,6 @@ def _cmd_edit(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"编辑文件失败: {e}")
 
-
 # ========================================
 # append -- 追加内容
 # ========================================
@@ -732,7 +715,6 @@ def _cmd_append(params: dict) -> dict:
 
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"追加内容失败: {e}")
-
 
 # ========================================
 # copy -- 复制文件
@@ -786,7 +768,6 @@ def _cmd_copy(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"复制文件失败: {e}")
 
-
 # ========================================
 # move -- 移动文件
 # ========================================
@@ -833,7 +814,6 @@ def _cmd_move(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"移动文件失败: {e}")
 
-
 # ========================================
 # rename -- 重命名
 # ========================================
@@ -876,7 +856,6 @@ def _cmd_rename(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"重命名失败: {e}")
 
-
 # ========================================
 # delete -- 删除到回收站
 # ========================================
@@ -916,7 +895,6 @@ def _cmd_delete(params: dict) -> dict:
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"删除失败: {e}")
 
-
 # ========================================
 # mkdir -- 创建目录
 # ========================================
@@ -937,7 +915,6 @@ def _cmd_mkdir(params: dict) -> dict:
 
     except Exception as e:
         return error_result("file_manager", ErrorCode.EXEC_FAILED, f"创建目录失败: {e}")
-
 
 # ========================================
 # download -- 从 URL 下载文件

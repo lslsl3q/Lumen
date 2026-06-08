@@ -3,10 +3,7 @@ Lumen - 工具提示词生成
 从工具注册表生成 <tools> 格式的提示词文本，注入到系统提示词中
 """
 
-from typing import List, Dict
-
-
-def get_tool_prompt_from_registry(tool_names: List[str] = None, tool_tips: Dict[str, str] = None) -> str:
+def get_tool_prompt_from_registry(tool_names: list[str] = None, tool_tips: dict[str, str] = None) -> str:
     """从工具注册表生成工具提示词
 
     工具描述和使用指南用中文，格式规则用英文（模型遵循度更高）。
@@ -115,7 +112,6 @@ Tool result handling:
 - If a tool result contains an error, read the error message carefully and adjust your approach
 - Important information from tool results should be incorporated into your final response
 </tools>"""
-
 
 def get_tool_prompt() -> str:
     """生成工具提示词（包含所有可用工具）"""

@@ -112,6 +112,29 @@ class Agent:
         static_prompt = "\n\n".join(static_outputs)
         dynamic_prompt = "\n\n".join(dynamic_outputs)
 
+        # 2.5. HookBus: 上下文构建完毕（扩展可追加/修改 prompt）
+        try:
+            from lumen.core.hook_types import ContextBuildPayload
+
+            ctx_payload = ContextBuildPayload(
+                agent_id=self.id,
+                character_id=context.get("character_id", ""),
+                static_prompt=static_prompt,
+                dynamic_prompt=dynamic_prompt,
+                context=context,
+            )
+            await HookBus.get().emit("context.build", ctx_payload)
+            # handler 对 static_prompt / dynamic_prompt 的直接修改生效
+            static_prompt = ctx_payload.static_prompt
+            dynamic_prompt = ctx_payload.dynamic_prompt
+            # handler 写入的 extra_static / extra_dynamic 追加到 prompt
+            if ctx_payload.extra_static:
+                static_prompt += "\n\n" + "\n\n".join(ctx_payload.extra_static)
+            if ctx_payload.extra_dynamic:
+                dynamic_prompt += "\n\n" + "\n\n".join(ctx_payload.extra_dynamic)
+        except Exception as e:
+            logger.warning(f"HookBus context.build emit failed: {e}")
+
         # 3. 交给 ActingComponent
         if self.act_component is None:
             raise RuntimeError(f"Agent {self.id} 没有 ActingComponent")

@@ -665,6 +665,41 @@ class ReActActingComponent(ActingComponent):
         set_tool_context(self.session.session_id or "", self.session.character_id or "",
                          on_room_move=_make_room_move_callback())
 
+        # HookBus: 工具执行前（handler 可修改 params 或阻断）
+        try:
+            from lumen.core.hook_bus import HookBus
+            from lumen.core.hook_types import ToolCallPayload
+
+            tool_call_payload = ToolCallPayload(
+                tool_name=tool_name,
+                tool_params=dict(tool_params),
+                tool_command=tool_command,
+                session_id=self.session.session_id or "",
+                character_id=self.session.character_id or "",
+            )
+            await HookBus.get().emit("tool.call", tool_call_payload)
+            if tool_call_payload.blocked:
+                from lumen.tool import error_result
+                from lumen.types.tools import ErrorCode
+                tool_result = error_result(tool_name, ErrorCode.PERMISSION_DENIED,
+                                            tool_call_payload.block_reason or "工具调用被扩展阻断")
+                yield {"type": "tool_result", "tool": tool_name, "command": tool_command,
+                       "success": False, "data": None, "error": tool_call_payload.block_reason}
+                # 将阻断结果写入消息历史
+                self.session.messages.append({
+                    "role": "user",
+                    "content": format_result_for_ai(tool_result, caller=self.config.get("name", "")),
+                    "metadata": {"type": "tool_result", "tool_name": tool_name, "folded": False},
+                })
+                history.save_message(self.session.session_id, "user",
+                    format_result_for_ai(tool_result, caller=self.config.get("name", "")),
+                    {"type": "tool_result", "tool_name": tool_name, "folded": False})
+                return
+            # handler 可能修改了 params
+            tool_params = tool_call_payload.tool_params
+        except Exception as e:
+            logger.warning(f"HookBus tool.call emit failed: {e}")
+
         tool_exec_start = time.perf_counter()
         try:
             tool_result = await execute_tool(tool_name, tool_params, command=tool_command)
@@ -676,6 +711,26 @@ class ReActActingComponent(ActingComponent):
 
         tool_exec_ms = round((time.perf_counter() - tool_exec_start) * 1000)
         logger.info(f"工具调用: {tool_name}({tool_params}) → {'✅' if tool_result['success'] else '❌'}")
+
+        # HookBus: 工具执行后（handler 可修改结果）
+        try:
+            from lumen.core.hook_bus import HookBus
+            from lumen.core.hook_types import ToolResultPayload
+
+            tool_result_payload = ToolResultPayload(
+                tool_name=tool_name,
+                tool_params=tool_params,
+                tool_command=tool_command,
+                result=tool_result,
+                duration_ms=tool_exec_ms,
+                session_id=self.session.session_id or "",
+                character_id=self.session.character_id or "",
+            )
+            await HookBus.get().emit("tool.result", tool_result_payload)
+            # handler 可能修改了 result
+            tool_result = tool_result_payload.result
+        except Exception as e:
+            logger.warning(f"HookBus tool.result emit failed: {e}")
 
         yield {
             "type": "tool_result",

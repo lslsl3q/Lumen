@@ -4,7 +4,7 @@
  * 使用 Floating UI 定位（virtual element 锚定选区起点），
  * autoUpdate 自动追踪 scroll/resize，GPU 加速。
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { NodeSelection } from "@tiptap/pm/state";

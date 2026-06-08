@@ -2,6 +2,11 @@
 name: "Additional Instructions"
 type: prompt_component
 category: components
+inputs:
+  - name: instructions
+    label: Instructions
+    description: Additional instructions to inject into the prompt
+    custom_content: true
 ---
 
 {% if instructions is defined and instructions %}

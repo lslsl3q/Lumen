@@ -51,17 +51,41 @@ export function PromptManagerView() {
     };
   }, [selectedName]);
 
-  const handleCreateInGroup = useCallback(async (_groupKey: string) => {
-    const name = prompt("Component name:");
-    if (!name?.trim()) return;
+  const handleCreateInGroup = useCallback(async (groupKey: string) => {
+    const defaults: Record<string, { type: string; category: string; name: string }> = {
+      scene_beat: { type: "beat_generate", category: "writing", name: "New Scene Beat" },
+      summarization: { type: "scene_summarization", category: "writing", name: "New Scene Summarization" },
+      text_replacement: { type: "text_replacement", category: "writing", name: "New Text Replacement" },
+      workshop_chat: { type: "workshop_chat", category: "writing", name: "New Workshop Chat" },
+      analysis: { type: "analyze_chapter", category: "writing", name: "New Analysis" },
+      gm: { type: "prompt_component", category: "gm", name: "New GM Component" },
+      components: { type: "prompt_component", category: "components", name: "New Prompt Component" },
+    };
+    const d = defaults[groupKey] || { type: "prompt_component", category: "components", name: "New Component" };
+
+    // Generate unique name if conflicts exist
+    const existingNames = new Set(templates.map((t) => t.label || t.name));
+    let name = d.name;
+    let counter = 2;
+    while (existingNames.has(name)) {
+      name = `${d.name} ${counter}`;
+      counter++;
+    }
+
     try {
-      const result = await createComponent(name.trim(), "prompt_component", "components", "# " + name.trim() + "\n\n");
+      const result = await createComponent(name, d.type, d.category, "");
       const data = await listTemplates();
       setTemplates(data.templates);
       setSelectedName(result.name);
     } catch (e: any) {
       setError(e.message || "创建失败");
     }
+  }, [templates]);
+
+  const handleDelete = useCallback(async () => {
+    const data = await listTemplates();
+    setTemplates(data.templates);
+    setSelectedName(data.templates.length > 0 ? data.templates[0].name : null);
   }, []);
 
   if (loading) {
@@ -79,16 +103,16 @@ export function PromptManagerView() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full min-h-0 bg-surface-deep">
       <TemplateListSidebar
         templates={templates}
         selectedName={selectedName}
         onSelect={setSelectedName}
         onCreateInGroup={handleCreateInGroup}
       />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-h-0 min-w-0">
         {selectedTemplate ? (
-          <TemplateEditorTabs key={selectedTemplate.name} template={selectedTemplate} />
+          <TemplateEditorTabs key={selectedTemplate.name} template={selectedTemplate} onDelete={handleDelete} onRefreshList={async (newName) => { const data = await listTemplates(); setTemplates(data.templates); setSelectedName(newName); }} />
         ) : (
           <div className="flex items-center justify-center h-full text-[13px] text-zinc-500">
             Select a template to start editing

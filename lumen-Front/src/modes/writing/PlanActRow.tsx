@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react"
-import { useDraggable, useDroppable } from "@dnd-kit/core"
+import { useState, useCallback } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronRight,
   ChevronDown,
@@ -8,105 +9,117 @@ import {
   Trash2,
   MoreVertical,
   Plus,
-} from "lucide-react"
+} from "lucide-react";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
-} from "../../components/ui/collapsible"
+} from "../../components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "../../components/ui/dropdown-menu"
-import { ToggleSwitch } from "../../components/ui/toggle-switch"
-import { useWritingStore } from "../../stores/useWritingStore"
-import type { WritingAct } from "../../api/writing"
-import type { ActDragData } from "./usePlanDrag"
+} from "../../components/ui/dropdown-menu";
+import { ToggleSwitch } from "../../components/ui/toggle-switch";
+import { useWritingStore } from "../../stores/useWritingStore";
+import type { WritingAct } from "../../api/writing";
+import type { ActDragData } from "./usePlanDrag";
 
 interface PlanActRowProps {
-  act: WritingAct
-  children?: React.ReactNode
+  act: WritingAct;
+  children?: React.ReactNode;
 }
 
 export function PlanActRow({ act, children }: PlanActRowProps) {
-  const [open, setOpen] = useState(true)
-  const [title, setTitle] = useState(act.title)
+  const [open, setOpen] = useState(true);
+  const [title, setTitle] = useState(act.title);
 
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: act.id,
-    data: { type: "act" },
-  })
-
-  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: act.id,
     data: { type: "act", actId: act.id } satisfies ActDragData,
-  })
+  });
 
-  const setRefs = useCallback((node: HTMLDivElement | null) => {
-    setDropRef(node)
-    setDragRef(node)
-  }, [setDropRef, setDragRef])
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const handleTitleBlur = useCallback(() => {
-    const trimmed = title.trim()
+    const trimmed = title.trim();
     if (trimmed && trimmed !== act.title) {
-      useWritingStore.getState().updateActAction(act.id, { title: trimmed })
+      useWritingStore.getState().updateActAction(act.id, { title: trimmed });
     } else {
-      setTitle(act.title)
+      setTitle(act.title);
     }
-  }, [title, act.id, act.title])
+  }, [title, act.id, act.title]);
 
   const handleTitleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Enter") {
-        e.currentTarget.blur()
+        e.currentTarget.blur();
       }
       if (e.key === "Escape") {
-        setTitle(act.title)
-        e.currentTarget.blur()
+        setTitle(act.title);
+        e.currentTarget.blur();
       }
     },
-    [act.title]
-  )
+    [act.title],
+  );
 
   const handleEditInManuscript = useCallback(() => {
-    useWritingStore.getState().setManuscriptFilter({ type: "act", id: act.id })
-    useWritingStore.getState().setWritingViewTab("write")
-  }, [act.id])
+    useWritingStore.getState().setManuscriptFilter({ type: "act", id: act.id });
+    useWritingStore.getState().setWritingViewTab("write");
+  }, [act.id]);
 
   const handleDeleteAct = useCallback(() => {
-    useWritingStore.getState().deleteActAction(act.id)
-  }, [act.id])
+    useWritingStore.getState().deleteActAction(act.id);
+  }, [act.id]);
 
   const handleToggleNumerate = useCallback(
     (checked: boolean) => {
       useWritingStore
         .getState()
-        .updateActAction(act.id, { numerate: checked ? 1 : 0 })
+        .updateActAction(act.id, { numerate: checked ? 1 : 0 });
     },
-    [act.id]
-  )
+    [act.id],
+  );
 
   const handleAddChapter = useCallback(() => {
-    useWritingStore.getState().createChapter(act.id, "新章节")
-  }, [act.id])
+    useWritingStore.getState().createChapter(act.id, "新章节");
+  }, [act.id]);
 
-  const chapters = (act as any).chapters || []
-  const totalScenes = chapters.reduce((sum: number, ch: any) => sum + (ch.scenes || []).length, 0)
+  const chapters = (act as any).chapters || [];
+  const totalScenes = chapters.reduce((sum: number, ch: any) => sum + (ch.scenes || []).length, 0);
 
   // Sync title when act prop changes externally
   if (act.title !== title && document.activeElement?.getAttribute("data-act-title-input") !== act.id) {
-    setTitle(act.title)
+    setTitle(act.title);
+  }
+
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ ...style, minHeight: 60 }}
+        className="flex py-2 items-start rounded bg-zinc-700/30 border border-dashed border-zinc-600/50"
+      />
+    );
   }
 
   return (
     <div
-      ref={setRefs}
-      style={{ opacity: isDragging ? 0.3 : 1 }}
-      className={`flex py-2 items-start rounded transition-colors ${isOver ? "bg-zinc-700/15" : ""}`}
+      ref={setNodeRef}
+      style={style}
+      className="flex py-2 items-start rounded"
     >
       {/* Grip handle */}
       <button
@@ -206,5 +219,5 @@ export function PlanActRow({ act, children }: PlanActRowProps) {
         </Collapsible>
       </div>
     </div>
-  )
+  );
 }

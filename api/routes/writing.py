@@ -93,6 +93,7 @@ class UpdateSceneRequest(BaseModel):
     chapter_id: str | None = None
     codex_ids: list[str] | None = None
     label_ids: list[str] | None = None
+    pov_codex_id: str | None = None
 
 
 class ReorderScenesRequest(BaseModel):

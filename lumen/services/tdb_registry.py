@@ -16,7 +16,7 @@ TDB Registry — TriviumDB 实例统一注册表
 import os
 import logging
 import threading
-from typing import Optional, Dict, List
+from typing import Optional
 
 import triviumdb
 
@@ -32,9 +32,8 @@ _INTERNAL = {"knowledge_sentences"}
 _KB_INDEX_FIELDS = ["owner_id", "type", "status", "source"]
 
 # 实例缓存 + 锁（double-check locking）
-_instances: Dict[str, triviumdb.TriviumDB] = {}
+_instances: dict[str, triviumdb.TriviumDB] = {}
 _lock = threading.Lock()
-
 
 def _open_tdb(path: str, dim: int, index_fields: list[str] = None) -> triviumdb.TriviumDB:
     """创建 TriviumDB 实例（目录创建 + auto_compaction + 属性索引）"""
@@ -52,8 +51,7 @@ def _open_tdb(path: str, dim: int, index_fields: list[str] = None) -> triviumdb.
                 pass
     return db
 
-
-def _resolve_kb_path(name: str) -> Optional[str]:
+def _resolve_kb_path(name: str) -> str | None:
     """通过 manifest 查找知识库 TDB 的绝对路径，找不到返回 None"""
     from lumen.services.knowledge.manifest import load_kb_manifest, ensure_manifest_for_existing_kb
     try:
@@ -70,7 +68,6 @@ def _resolve_kb_path(name: str) -> Optional[str]:
     if not manifest or not manifest.get("tdb_path"):
         return None
     return os.path.join(_LUMEN_DIR, manifest["tdb_path"])
-
 
 def get_tdb(name: str) -> triviumdb.TriviumDB:
     """统一获取 TDB 实例（懒加载 + 缓存，线程安全）
@@ -120,7 +117,6 @@ def get_tdb(name: str) -> triviumdb.TriviumDB:
         logger.info(f"TDB Registry 已打开: {name} ({tdb_path}, dim={dim})")
         return db
 
-
 def is_user_tdb(name: str) -> bool:
     """是否是对用户可见的 TDB（非内部 TDB）"""
     if name in _INTERNAL:
@@ -130,8 +126,7 @@ def is_user_tdb(name: str) -> bool:
     # 知识库 TDB — 有 manifest 就算可见
     return _resolve_kb_path(name) is not None
 
-
-def list_user_tdbs() -> List[dict]:
+def list_user_tdbs() -> list[dict]:
     """列出所有用户可见的 TDB
 
     返回格式与旧 config/tdbs 接口一致：[{"name", "filename", "size"}]
@@ -168,7 +163,6 @@ def list_user_tdbs() -> List[dict]:
         logger.warning(f"扫描知识库 TDB 失败（返回已有结果）: {e}")
 
     return tdbs
-
 
 def close_all():
     """关闭所有缓存的 TDB 实例（退出时调用）"""

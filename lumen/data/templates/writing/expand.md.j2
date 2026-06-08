@@ -2,6 +2,18 @@
 name: "扩写"
 type: text_replacement
 category: writing
+inputs:
+  - name: instructions
+    label: Instructions
+    description: How should the text be expanded?
+    custom_content: true
+  - name: length
+    label: Length
+    description: How long should the expanded text be?
+    custom_content: true
+    options:
+      - "double"
+      - "triple"
 ---
 
 # --- SYSTEM ---

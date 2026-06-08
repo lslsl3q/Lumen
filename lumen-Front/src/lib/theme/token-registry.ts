@@ -14,11 +14,11 @@ export interface TokenMeta {
 }
 
 export const TOKEN_REGISTRY: Record<keyof import("./types").ThemeTokens, TokenMeta> = {
-  primary:            { type: "color",   cssVar: "color-primary",             description: "主交互色，按钮/选中/高亮" },
-  primaryDim:         { type: "color",   cssVar: "color-primary-dim",         description: "深一级 accent" },
-  primaryDeep:        { type: "color",   cssVar: "color-primary-deep",        description: "最深 accent" },
-  primarySubtle:      { type: "color",   cssVar: "color-primary-subtle",      description: "极淡 accent 背景" },
-  primaryForeground:  { type: "color",   cssVar: "color-primary-foreground",  description: "accent 色上文字" },
+  primary:            { type: "color",   cssVar: "color-primary",             description: "主交互色，暗模式用中性亮灰(zinc-300)" },
+  primaryDim:         { type: "color",   cssVar: "color-primary-dim",         description: "次级交互色(zinc-400)" },
+  primaryDeep:        { type: "color",   cssVar: "color-primary-deep",        description: "深交互底色(zinc-700)" },
+  primarySubtle:      { type: "color",   cssVar: "color-primary-subtle",      description: "极淡 hover 背景" },
+  primaryForeground:  { type: "color",   cssVar: "color-primary-foreground",  description: "亮色上文字" },
   success:            { type: "color",   cssVar: "color-success",             description: "成功状态色" },
   successLight:       { type: "color",   cssVar: "color-success-light",       description: "成功浅色" },
   error:              { type: "color",   cssVar: "color-error",               description: "错误状态色" },
@@ -44,6 +44,10 @@ export const TOKEN_REGISTRY: Record<keyof import("./types").ThemeTokens, TokenMe
   selectionBg:        { type: "color",   cssVar: "color-selection-bg",        description: "文字选中高亮背景" },
   glowPrimary:        { type: "color",   cssVar: "glow-primary",              description: "主发光效果色" },
   glowSubtle:         { type: "color",   cssVar: "glow-subtle",               description: "微发光效果色" },
+
+  // === 组件专属：SceneBeat ===
+  beatSurface:        { type: "color",   cssVar: "color-beat-surface",        description: "SceneBeat 组件背景色" },
+  beatSettingsSurface:{ type: "color",   cssVar: "color-beat-settings-surface", description: "SceneBeat 字数选择区域背景色" },
   spacingTight:       { type: "length",  cssVar: "spacing-tight",             description: "紧凑间距 4px" },
   spacingNormal:      { type: "length",  cssVar: "spacing-normal",            description: "标准间距 8px" },
   spacingRelaxed:     { type: "length",  cssVar: "spacing-relaxed",           description: "舒适间距 16px" },

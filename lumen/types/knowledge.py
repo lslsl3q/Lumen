@@ -2,8 +2,7 @@
 Lumen - 知识库类型定义
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
-
+from typing import Optional
 
 class KnowledgeFileCard(BaseModel):
     """知识库文件完整定义"""
@@ -14,14 +13,13 @@ class KnowledgeFileCard(BaseModel):
     category: str = Field(default="imports", description="分类: imports/notes/rpg/public")
     chunk_count: int = Field(default=0, description="切分后的 chunk 数量")
     char_count: int = Field(default=0, description="原始文件字符数")
-    access_list: List[str] = Field(default_factory=lambda: ["public"], description="访问控制列表")
+    access_list: list[str] = Field(default_factory=lambda: ["public"], description="访问控制列表")
     owner_id: str = Field(default="", description="所属 Agent ID")
     file_id: str = Field(default="", description="源文件追踪 ID")
     # RESERVED: P2 标签系统 — 知识库条目分类标签
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     created_at: str = Field(default="", description="导入时间 ISO格式")
     updated_at: str = Field(default="", description="最后更新时间")
-
 
 class KnowledgeCreateRequest(BaseModel):
     """创建知识库条目请求"""
@@ -31,11 +29,9 @@ class KnowledgeCreateRequest(BaseModel):
     subdir: str = Field(default="", description="子目录（如 世界观/地理）")
     kb_name: str = Field(default="knowledge", description="目标知识库名称")
 
-
 class KnowledgeUpdateRequest(BaseModel):
     """更新知识库条目请求"""
-    tags: Optional[List[str]] = None
-
+    tags: list[str] | None = None
 
 class KnowledgeListItem(BaseModel):
     """知识库文件列表项（轻量级）"""
@@ -46,18 +42,16 @@ class KnowledgeListItem(BaseModel):
     category: str
     chunk_count: int
     char_count: int
-    tags: List[str]
+    tags: list[str]
     created_at: str
-
 
 class KnowledgeSearchRequest(BaseModel):
     """搜索请求"""
     query: str = Field(..., min_length=1, description="搜索文本")
     top_k: int = Field(default=5, ge=1, le=50, description="返回结果数")
     min_score: float = Field(default=0.3, ge=0.0, le=1.0, description="最低相似度")
-    category: Optional[str] = Field(default=None, description="按分类过滤")
+    category: str | None = Field(default=None, description="按分类过滤")
     kb_name: str = Field(default="knowledge", description="目标知识库名称")
-
 
 class KnowledgeSearchResult(BaseModel):
     """单条搜索结果"""

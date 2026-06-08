@@ -38,12 +38,12 @@
   --color-amber-500: #B86A4A;
   --color-amber-950: #331610;
 
-  /* === 语义色 — 值来自 lumen-dark.json，此处为 Tailwind 类名生成 === */
-  --color-primary: var(--color-amber-400);
-  --color-primary-dim: var(--color-amber-500);
-  --color-primary-deep: var(--color-amber-950);
-  --color-primary-subtle: rgba(204, 124, 94, 0.08);
-  --color-primary-foreground: #09090b;
+  /* === 语义色 — 暗模式用中性亮灰，不抢视觉 === */
+  --color-primary: #d4d4d8;                /* zinc-300，选中/激活 */
+  --color-primary-dim: #a1a1aa;            /* zinc-400，次级激活 */
+  --color-primary-deep: #3f3f46;           /* zinc-700，深底色 */
+  --color-primary-subtle: rgba(255, 255, 255, 0.06);  /* 极淡 hover 背景 */
+  --color-primary-foreground: #09090b;     /* 亮色上的文字 */
   --color-success: #10b981;
   --color-success-light: #34d399;
   --color-error: #ef4444;
@@ -74,7 +74,11 @@
   --color-hover-surface: rgba(255, 255, 255, 0.05);
   --color-interactive-hover: rgba(255, 255, 255, 0.08);
   --color-ghost-text: rgba(214, 211, 209, 0.3);
-  --color-selection-bg: rgba(204, 124, 94, 0.2);
+  --color-selection-bg: rgba(212, 212, 216, 0.15);
+
+  /* 组件专属：SceneBeat */
+  --color-beat-surface: #27272a;
+  --color-beat-settings-surface: #2d2d31;
 
   /* shadcn 语义色映射 — dropdown menu / checkbox 等组件依赖 */
   --color-accent: var(--color-surface-elevated);
@@ -239,5 +243,15 @@
   }
   *::-webkit-scrollbar-corner {
     background: transparent;
+  }
+}
+
+/* RadioDot — 父元素 data-checked 驱动选中态（RadioGroupItem 场景） */
+@layer components {
+  [data-checked] > .radio-dot {
+    scale: 0.9;
+    border-width: 4px;
+    border-color: var(--color-primary);
+    box-shadow: none;
   }
 }

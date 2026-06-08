@@ -10,7 +10,7 @@ import sqlite3
 import os
 import logging
 import threading
-from typing import Optional, List, Dict, Tuple
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +19,7 @@ from lumen.config import PERMISSIONS_DB_PATH as DB_PATH
 _local = threading.local()
 _write_lock = threading.Lock()
 
-_instance: Optional["AccessControl"] = None
-
+_instance: "AccessControl" | None = None
 
 def _get_conn() -> sqlite3.Connection:
     if not hasattr(_local, "conn") or _local.conn is None:
@@ -28,7 +27,6 @@ def _get_conn() -> sqlite3.Connection:
         _local.conn = sqlite3.connect(DB_PATH, check_same_thread=True)
         _local.conn.row_factory = sqlite3.Row
     return _local.conn
-
 
 def _init_tables():
     conn = _get_conn()
@@ -48,14 +46,12 @@ def _init_tables():
     conn.execute("DELETE FROM acl_rules WHERE access = 'deny'")
     conn.commit()
 
-
 def get_instance() -> "AccessControl":
     global _instance
     if _instance is None:
         _instance = AccessControl()
         _init_tables()
     return _instance
-
 
 def close():
     if hasattr(_local, "conn") and _local.conn is not None:
@@ -64,12 +60,11 @@ def close():
     global _instance
     _instance = None
 
-
 class AccessControl:
     """纯白名单权限服务 — 有规则即允许，无规则即拒绝"""
 
     def __init__(self):
-        self._cache: Dict[Tuple[str, str, str], List[dict]] = {}
+        self._cache: dict[tuple[str, str, str], list[dict]] = {}
 
     def _cache_key(self, character_id: str, resource_type: str, resource_id: str):
         return (character_id, resource_type, resource_id)
@@ -77,7 +72,7 @@ class AccessControl:
     def _invalidate(self, character_id: str, resource_type: str, resource_id: str):
         self._cache.pop(self._cache_key(character_id, resource_type, resource_id), None)
 
-    def _get_rules(self, character_id: str, resource_type: str, resource_id: str) -> List[dict]:
+    def _get_rules(self, character_id: str, resource_type: str, resource_id: str) -> list[dict]:
         key = self._cache_key(character_id, resource_type, resource_id)
         if key not in self._cache:
             conn = _get_conn()
@@ -89,7 +84,7 @@ class AccessControl:
         return self._cache[key]
 
     @staticmethod
-    def _find_best_rule(action_rules: List[dict], folder_path: str):
+    def _find_best_rule(action_rules: list[dict], folder_path: str):
         """前缀匹配：找最长匹配的规则"""
         best_match = None
         best_len = -1
@@ -149,14 +144,14 @@ class AccessControl:
             self._invalidate(character_id, resource_type, resource_id)
 
     def get_permissions(self, character_id: str, resource_type: str,
-                        resource_id: str) -> List[dict]:
+                        resource_id: str) -> list[dict]:
         """获取角色的所有权限规则"""
         rules = self._get_rules(character_id, resource_type, resource_id)
         return [{"folder_path": r["folder_path"], "action": r["action"]}
                 for r in rules]
 
     def batch_set(self, character_id: str, resource_type: str,
-                  resource_id: str, entries: List[dict]) -> None:
+                  resource_id: str, entries: list[dict]) -> None:
         """批量设置权限（覆盖式：先清后写）"""
         for entry in entries:
             if entry["action"] not in ("read", "write"):
@@ -179,7 +174,7 @@ class AccessControl:
             self._invalidate(character_id, resource_type, resource_id)
 
     def get_characters_with_access(self, resource_type: str, resource_id: str,
-                                   folder_path: str, action: str) -> List[str]:
+                                   folder_path: str, action: str) -> list[str]:
         """反查：获取某路径有显式 allow 规则的角色 ID 列表"""
         conn = _get_conn()
         rows = conn.execute(
@@ -191,7 +186,7 @@ class AccessControl:
 
     def batch_check(self, resource_type: str, resource_id: str,
                     folder_path: str, action: str,
-                    character_ids: List[str]) -> dict:
+                    character_ids: list[str]) -> dict:
         """批量检查：返回 {char_id: bool}"""
         result = {}
         for cid in character_ids:
@@ -199,7 +194,7 @@ class AccessControl:
         return result
 
     def get_allowed_folders(self, character_id: str, resource_type: str,
-                            resource_id: str, all_folders: List[str]) -> List[str]:
+                            resource_id: str, all_folders: list[str]) -> list[str]:
         """展开为精确的叶子文件夹列表"""
         return [f for f in all_folders if self.can_read(
             character_id, resource_type, resource_id, f)]

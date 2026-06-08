@@ -12,7 +12,7 @@ import json
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Optional
 
 from lumen.types.messages import Message
 from lumen.services.types import SessionInfo
@@ -27,7 +27,6 @@ _local = threading.local()
 # 写操作锁：确保同一时刻只有一个线程在写
 _write_lock = threading.Lock()
 
-
 def _get_conn():
     """获取数据库连接（每个线程独立连接，避免 SQLite 线程安全问题）"""
     if not hasattr(_local, "conn") or _local.conn is None:
@@ -36,13 +35,11 @@ def _get_conn():
         _local.conn.row_factory = sqlite3.Row
     return _local.conn
 
-
 def close_conn():
     """关闭当前线程的数据库连接（程序退出时调用）"""
     if hasattr(_local, "conn") and _local.conn is not None:
         _local.conn.close()
         _local.conn = None
-
 
 def _migrate_add_metadata():
     """数据库迁移：给 messages 表添加 metadata 字段"""
@@ -59,7 +56,6 @@ def _migrate_add_metadata():
         conn.commit()
         logger.info("数据库迁移: 完成")
 
-
 def _migrate_add_authors_note():
     """数据库迁移：给 sessions 表添加 authors_note 字段"""
     conn = _get_conn()
@@ -74,7 +70,6 @@ def _migrate_add_authors_note():
         conn.commit()
         logger.info("数据库迁移: 完成")
 
-
 def _migrate_add_title():
     """数据库迁移：给 sessions 表添加 title 字段"""
     conn = _get_conn()
@@ -88,7 +83,6 @@ def _migrate_add_title():
         cursor.execute("ALTER TABLE sessions ADD COLUMN title TEXT DEFAULT NULL")
         conn.commit()
         logger.info("数据库迁移: 完成")
-
 
 def _migrate_add_channels():
     """数据库迁移：创建 channels 表 + messages 加 channel_id 字段（T26）"""
@@ -126,7 +120,6 @@ def _migrate_add_channels():
         conn.commit()
         logger.info("数据库迁移: 完成")
 
-
 def _init_fts5(conn):
     """初始化 FTS5 全文索引（unicode61 + jieba 分词，支持中文 BM25）"""
     cursor = conn.cursor()
@@ -149,7 +142,6 @@ def _init_fts5(conn):
         conn.commit()
         logger.info("FTS5 全文索引初始化完成")
 
-
 def _rebuild_fts5_index(cursor):
     """重建 FTS5 索引：对每条消息做 jieba 分词后存入"""
     import jieba
@@ -163,7 +155,6 @@ def _rebuild_fts5_index(cursor):
         tokens = " ".join(jieba.cut(content))
         cursor.execute("INSERT INTO messages_fts(rowid, content) VALUES(?, ?)", (msg_id, tokens))
 
-
 # ── 消息搜索（供 memory 系统调用） ──
 
 # 工具消息标记，搜索结果中跳过
@@ -172,7 +163,6 @@ _TOOL_MARKERS = (
     '"calls":', '"calls" :', '{"success":', '{"error_code":',
     '<tool_result', '<<<[TOOL_REQUEST]',
 )
-
 
 def search_messages_bm25(
     keywords: list[str],
@@ -232,7 +222,6 @@ def search_messages_bm25(
         })
     return results
 
-
 def search_messages(
     keyword: str,
     character_id: str,
@@ -284,7 +273,6 @@ def search_messages(
         })
     return results
 
-
 def get_message_context(session_id: str, center_id: int, window: int = 2) -> list[dict[str, str]]:
     """获取某条消息的前后上下文
 
@@ -306,9 +294,6 @@ def get_message_context(session_id: str, center_id: int, window: int = 2) -> lis
     """, (session_id, center_id - window, center_id + window)).fetchall()
 
     return [{"role": row["role"], "content": row["content"]} for row in rows]
-
-
-
 
 def _init_db():
     """初始化数据库，创建表（只在第一次运行时执行）"""
@@ -348,10 +333,8 @@ def _init_db():
     # active_memories / knowledge_chunks / graph_edge_meta 表
     # 由各自模块在 import 时自动创建（lumen.services.memory.active_store 等）
 
-
 # 程序启动时自动初始化数据库
 _init_db()
-
 
 # ========================================
 # Channel CRUD（T26: Session→Channel 迁移）
@@ -374,7 +357,6 @@ def create_channel(name: str, channel_type: str = "chat", description: str = "",
     logger.info(f"频道已创建: {channel_id} ({name}, type={channel_type})")
     return channel_id
 
-
 def list_channels(limit: int = 50) -> list[dict]:
     """列出所有频道，按 order ASC + created_at DESC"""
     conn = _get_conn()
@@ -384,7 +366,6 @@ def list_channels(limit: int = 50) -> list[dict]:
         (limit,),
     ).fetchall()
     return [dict(row) for row in rows]
-
 
 def delete_channel(channel_id: str) -> bool:
     """删除频道，同时将关联消息的 channel_id 设为 NULL"""
@@ -401,7 +382,6 @@ def delete_channel(channel_id: str) -> bool:
             logger.info(f"频道已删除: {channel_id}")
             return True
     return False
-
 
 def get_channel_messages(channel_id: str, limit: int = 50,
                          since_id: int = 0) -> list[dict]:
@@ -431,9 +411,8 @@ def get_channel_messages(channel_id: str, limit: int = 50,
         ).fetchall()
     return [_row_to_message_dict(row) for row in rows]
 
-
 def save_message_to_channel(channel_id: str, session_id: str, role: str,
-                            content: str, metadata: Optional[Dict[str, Any]] = None) -> int:
+                            content: str, metadata: dict[str, Any] | None = None) -> int:
     """保存消息到频道（同时关联频道和会话）
 
     Returns:
@@ -469,7 +448,6 @@ def save_message_to_channel(channel_id: str, session_id: str, role: str,
                 pass
         return msg_id
 
-
 def _row_to_message_dict(row) -> dict:
     """将 SQLite Row 转为消息 dict（统一解析 metadata）"""
     msg = {"id": row["id"], "role": row["role"], "content": row["content"]}
@@ -488,11 +466,9 @@ def _row_to_message_dict(row) -> dict:
         msg["metadata"] = {"type": "normal", "folded": False}
     return msg
 
-
 # ========================================
 # Session 管理
 # ========================================
-
 
 def new_session(character_id: str = "default") -> str:
     """创建新会话，返回会话ID"""
@@ -507,8 +483,7 @@ def new_session(character_id: str = "default") -> str:
         conn.commit()
     return session_id
 
-
-def _normalize_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def _normalize_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
     meta = dict(metadata or {})
     msg_type = meta.setdefault("type", "normal")
     meta.setdefault("folded", False)
@@ -518,8 +493,7 @@ def _normalize_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         meta.setdefault("hidden", True)
     return meta
 
-
-def _message_is_vectorizable(role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
+def _message_is_vectorizable(role: str, content: str, metadata: dict[str, Any] | None = None) -> bool:
     if role not in ("user", "assistant") or not content or len(content) < 5:
         return False
     meta = _normalize_metadata(metadata)
@@ -527,8 +501,7 @@ def _message_is_vectorizable(role: str, content: str, metadata: Optional[Dict[st
         return False
     return meta.get("type", "normal") == "normal"
 
-
-def save_message(session_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> int:
+def save_message(session_id: str, role: str, content: str, metadata: dict[str, Any] | None = None) -> int:
     """保存一条消息到数据库
 
     Args:
@@ -569,7 +542,6 @@ def save_message(session_id: str, role: str, content: str, metadata: Optional[Di
                 pass
         return msg_id
 
-
 def update_message(msg_id: int, content: str) -> bool:
     """更新消息内容并重建 FTS5 索引"""
     with _write_lock:
@@ -595,7 +567,6 @@ def update_message(msg_id: int, content: str) -> bool:
         conn.commit()
         return True
 
-
 def delete_message(msg_id: int) -> bool:
     """删除消息及其 FTS5 索引"""
     with _write_lock:
@@ -608,7 +579,6 @@ def delete_message(msg_id: int) -> bool:
         conn.commit()
         return cursor.rowcount > 0
 
-
 def list_message_ids_from(session_id: str, from_id: int) -> list[int]:
     """列出某会话指定 ID 及之后的消息 ID。"""
     conn = _get_conn()
@@ -617,7 +587,6 @@ def list_message_ids_from(session_id: str, from_id: int) -> list[int]:
         (session_id, from_id),
     ).fetchall()
     return [row["id"] for row in rows]
-
 
 def delete_messages_from(session_id: str, from_id: int) -> int:
     """删除指定 ID 及之后的所有消息（含 FTS 索引），返回删除数量"""
@@ -638,7 +607,6 @@ def delete_messages_from(session_id: str, from_id: int) -> int:
         conn.commit()
         return cursor.rowcount
 
-
 def copy_messages_to(src_session_id: str, dst_session_id: str, up_to_id: int):
     """复制源会话中指定 ID 及之前的所有消息到目标会话"""
     conn = _get_conn()
@@ -657,7 +625,6 @@ def copy_messages_to(src_session_id: str, dst_session_id: str, up_to_id: int):
                 (dst_session_id, role, content, metadata_json, datetime.now().isoformat()),
             )
         conn_exec.commit()
-
 
 def load_session(session_id: str) -> list[Message]:
     """加载某个会话的所有消息，返回 messages 列表
@@ -689,7 +656,6 @@ def load_session(session_id: str) -> list[Message]:
 
     return messages
 
-
 def list_sessions(limit: int = 20, character_id: str | None = None) -> list[SessionInfo]:
     """列出最近的会话，按最后更新时间倒序"""
     conn = _get_conn()
@@ -708,7 +674,6 @@ def list_sessions(limit: int = 20, character_id: str | None = None) -> list[Sess
         for row in rows
     ]
 
-
 def sessions_exist(session_ids: set[str]) -> set[str]:
     """批量检查会话是否存在，返回存在的 session_id 集合"""
     if not session_ids:
@@ -721,8 +686,7 @@ def sessions_exist(session_ids: set[str]) -> set[str]:
     ).fetchall()
     return {row["id"] for row in rows}
 
-
-def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
+def get_session_info(session_id: str) -> dict[str, Any] | None:
     """获取单个会话的基本信息（从数据库查询，不依赖内存）"""
     conn = _get_conn()
     row = conn.execute(
@@ -733,7 +697,6 @@ def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
         return {"session_id": session_id, "character_id": row["character_id"], "title": row["title"]}
     return None
 
-
 def update_session_title(session_id: str, title: str):
     """更新会话标题"""
     with _write_lock:
@@ -741,7 +704,6 @@ def update_session_title(session_id: str, title: str):
         conn.execute("UPDATE sessions SET title = ? WHERE id = ?", (title, session_id))
         conn.commit()
     logger.info(f"会话标题已更新: {session_id} → {title}")
-
 
 def delete_session(session_id: str):
     """删除一个会话及其所有消息、摘要、FTS5 索引和向量"""
@@ -774,7 +736,6 @@ def delete_session(session_id: str):
     except Exception as e:
         logger.warning(f"向量清理失败（不影响已删除的会话）: {e}")
 
-
 def save_summary(session_id: str, character_id: str, summary: str):
     """保存会话摘要"""
     now = datetime.now().isoformat()
@@ -785,7 +746,6 @@ def save_summary(session_id: str, character_id: str, summary: str):
             (session_id, character_id, summary, now),
         )
         conn.commit()
-
 
 def load_summaries(character_id: str, limit: int = 3) -> list:
     """读取某角色最近的 N 条摘要
@@ -798,12 +758,11 @@ def load_summaries(character_id: str, limit: int = 3) -> list:
     ).fetchall()
     return [(row["session_id"], row["summary"]) for row in rows]
 
-
 # ========================================
 # Author's Note
 # ========================================
 
-def get_authors_note(session_id: str) -> Optional[Dict[str, Any]]:
+def get_authors_note(session_id: str) -> dict[str, Any] | None:
     """读取会话的 Author's Note 配置
 
     Returns:
@@ -823,8 +782,7 @@ def get_authors_note(session_id: str) -> Optional[Dict[str, Any]]:
             return None
     return None
 
-
-def save_authors_note(session_id: str, note_json: Optional[str]):
+def save_authors_note(session_id: str, note_json: str | None):
     """写入或清除会话的 Author's Note"""
     with _write_lock:
         conn = _get_conn()
@@ -833,7 +791,6 @@ def save_authors_note(session_id: str, note_json: Optional[str]):
             (note_json, session_id),
         )
         conn.commit()
-
 
 # ========================================
 # Compact（原子消息替换）
@@ -862,5 +819,4 @@ def replace_session_messages(session_id: str, messages: list[Message]):
             conn.rollback()
             logger.error(f"替换会话 {session_id} 消息失败: {e}")
             raise
-
 

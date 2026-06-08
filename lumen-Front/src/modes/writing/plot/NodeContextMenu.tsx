@@ -29,7 +29,7 @@ interface SubMenuState {
 
 export function NodeContextMenu({
   x, y, lineType, hasGapBefore, hasNodeAfter,
-  onEdit, onChangeType, onCopy, onDelete, onRippleDelete,
+  onEdit, onChangeType: _onChangeType, onCopy: _onCopy, onDelete, onRippleDelete,
   onInsertBeforeRipple, onInsertBeforeStay,
   onInsertAfterRipple, onInsertAfterStay,
   onClose,

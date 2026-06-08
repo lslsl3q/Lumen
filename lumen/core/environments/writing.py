@@ -41,6 +41,8 @@ async def direct_writing_stream(
     model_id: str = "",
     context_selection: dict | None = None,
     scene_id: str = "",
+    instructions: str = "",
+    **extra_context,
 ) -> AsyncGenerator[dict, None]:
     """直接模板渲染 + LLM 调用，不经过 Agent 管道
 
@@ -110,6 +112,7 @@ async def direct_writing_stream(
         beat_text=beat_text,
         beat_context=beat_context,
         max_words=max_words,
+        instructions=instructions,
         query=query_proxy,
         tense=project_meta.get("tense", "past"),
         pov=project_meta.get("pov", "3rd"),
@@ -117,19 +120,15 @@ async def direct_writing_stream(
         narrative_character=narrative_character,
         plot_outline=plot_outline,
         plot_for_scene=plot_for_scene,
+        **extra_context,
     )
 
     try:
-        system_part, user_part = render_message(f"writing/{ai_mode}", template_context)
-    except TemplateError as e:
+        from lumen.prompt.template_engine import render_messages
+        messages = render_messages(f"writing/{ai_mode}", template_context)
+    except Exception as e:
         yield {"type": "error", "message": f"模板错误: {e}"}
         return
-
-    messages = []
-    if system_part:
-        messages.append({"role": "system", "content": system_part})
-    if user_part:
-        messages.append({"role": "user", "content": user_part})
 
     if not messages:
         yield {"type": "error", "message": "模板渲染结果为空"}
@@ -195,12 +194,19 @@ def _build_writing_agent(
 
     agent = Agent(f"writing-{book_id}")
 
-    agent.add_component(IdentityComponent())
-    agent.add_component(WritingContextComponent())
-    agent.add_component(LoreComponent())
-    agent.add_component(MemoryComponent())
-    agent.add_component(SkillsComponent())
-    agent.add_component(ToolComponent())
+    components = [
+        IdentityComponent(),
+        WritingContextComponent(),
+        LoreComponent(),
+        MemoryComponent(),
+        SkillsComponent(),
+        ToolComponent(),
+    ]
+    from lumen.core.hook_bus import HookBus
+    hook_bus = HookBus.get()
+    for comp in components:
+        agent.add_component(comp)
+        comp.register(hook_bus)
 
     from types import SimpleNamespace
     temp_session = SimpleNamespace(
@@ -256,6 +262,10 @@ async def writing_chat_stream(
     }
     if extra_context:
         context.update(extra_context)
+
+    # 确保扩展已加载
+    from lumen.core.agent_chat import _ensure_hookbus
+    _ensure_hookbus()
 
     agent = _build_writing_agent(
         book_id=book_id,
@@ -326,5 +336,6 @@ class WritingEnvironment(BaseEnvironment):
                 model_id=metadata.get("model_id", ""),
                 context_selection=metadata.get("context_selection"),
                 scene_id=metadata.get("scene_id", ""),
+                instructions=metadata.get("instructions", ""),
             ):
                 yield event

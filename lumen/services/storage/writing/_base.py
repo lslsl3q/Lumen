@@ -88,11 +88,13 @@ def _init_tables(conn: sqlite3.Connection):
             subtitle     TEXT NOT NULL DEFAULT '',
             codex_ids    TEXT NOT NULL DEFAULT '[]',
             label_ids    TEXT NOT NULL DEFAULT '[]',
+            pov_codex_id TEXT DEFAULT NULL,
             scene_number INTEGER NOT NULL DEFAULT 0,
             sort_order   INTEGER NOT NULL DEFAULT 0,
             created_at   REAL NOT NULL,
             updated_at   REAL NOT NULL,
-            FOREIGN KEY (chapter_id) REFERENCES writing_chapters(id) ON DELETE CASCADE
+            FOREIGN KEY (chapter_id) REFERENCES writing_chapters(id) ON DELETE CASCADE,
+            FOREIGN KEY (pov_codex_id) REFERENCES codex(id) ON DELETE SET NULL
         );
         CREATE INDEX IF NOT EXISTS idx_ws_chapter ON writing_scenes(chapter_id);
 
@@ -366,6 +368,11 @@ def _migrate_columns(conn: sqlite3.Connection):
     # codex: add category column if missing
     _ensure_columns(conn, "codex", {
         "category": "TEXT NOT NULL DEFAULT ''",
+    })
+
+    # writing_scenes: add pov_codex_id column if missing
+    _ensure_columns(conn, "writing_scenes", {
+        "pov_codex_id": "TEXT DEFAULT NULL",
     })
 
 

@@ -94,6 +94,14 @@ export const SceneBeatNode = Node.create({
           return { "data-context-selection": JSON.stringify(sel) };
         },
       },
+      lastPresetId: {
+        default: "",
+        parseHTML: (el) => el.getAttribute("data-last-preset") ?? "",
+        renderHTML: (attrs) => {
+          if (!attrs.lastPresetId) return {};
+          return { "data-last-preset": attrs.lastPresetId };
+        },
+      },
       excludeFromExport: {
         default: true,
         parseHTML: () => true,

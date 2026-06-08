@@ -8,7 +8,6 @@ import asyncio
 import logging
 import math
 import os
-from typing import List
 
 from lumen.services.types import SearchResult
 
@@ -21,7 +20,6 @@ _PROXY = os.getenv("SEARCH_PROXY", "")
 _RERANK_ENABLED = os.getenv("SEARCH_RERANK_ENABLED", "True").lower() in ("true", "1", "yes")
 _RERANK_TOP_K = int(os.getenv("SEARCH_RERANK_TOP_K", "5"))
 _RERANK_MIN_SCORE = float(os.getenv("SEARCH_RERANK_MIN_SCORE", "0.3"))
-
 
 def _duckduckgo_search(query: str, max_results: int = 5) -> list[SearchResult]:
     """DuckDuckGo 搜索后端"""
@@ -44,7 +42,6 @@ def _duckduckgo_search(query: str, max_results: int = 5) -> list[SearchResult]:
 
     logger.info(f"[DuckDuckGo] 搜索 '{query}' 返回 {len(formatted)} 条结果")
     return formatted
-
 
 async def _rerank_results(query: str, results: list[SearchResult], top_k: int, min_score: float) -> list[SearchResult]:
     """用嵌入模型对搜索结果做语义重排序
@@ -88,7 +85,6 @@ async def _rerank_results(query: str, results: list[SearchResult], top_k: int, m
         logger.warning(f"[搜索重排] 重排序失败 ({type(e).__name__}: {e})，降级返回原始结果")
         return results
 
-
 async def _do_rerank(query: str, results: list[SearchResult]) -> list[tuple[float, dict]] | None:
     """执行实际的重排序编码和相似度计算，返回 [(score, result_dict), ...] 或 None"""
     from lumen.services.search.embedding import get_service
@@ -116,14 +112,12 @@ async def _do_rerank(query: str, results: list[SearchResult]) -> list[tuple[floa
 
     return scored
 
-
 # 当前使用的搜索后端
 _default_backend = "duckduckgo"
 
 _backends = {
     "duckduckgo": _duckduckgo_search,
 }
-
 
 async def search_async(query: str, max_results: int = 5, backend: str = None, rerank: bool = True) -> list[SearchResult]:
     """搜索互联网（异步版，支持语义重排序）
@@ -164,7 +158,6 @@ async def search_async(query: str, max_results: int = 5, backend: str = None, re
         results = await _rerank_results(query, results, top_k=max_results, min_score=_RERANK_MIN_SCORE)
 
     return results
-
 
 def search(query: str, max_results: int = 5, backend: str = None) -> list[SearchResult]:
     """搜索互联网（同步版，向后兼容，无重排序）"""

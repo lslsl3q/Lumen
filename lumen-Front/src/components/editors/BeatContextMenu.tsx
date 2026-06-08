@@ -8,9 +8,9 @@
  *   Dot indicator when submenu has checked items
  *   Disabled items: opacity-50
  */
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, Children, type ReactElement } from "react";
 import { useWritingStore } from "../../stores/useWritingStore";
-import type { WritingChapter, WritingScene } from "../../api/writing";
+import type { WritingChapter, WritingScene, ManuscriptChapter } from "../../api/writing";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -47,6 +47,30 @@ export interface ContextSelection {
 
 function hasContent(str: string | undefined | null): boolean {
   return !!str && str.trim().length > 0;
+}
+
+/**
+ * 从 TipTap JSON 字符串或纯文本中提取可显示的文本
+ * TipTap JSON 格式：{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"..."}]}]}
+ */
+function extractTextFromTipTap(jsonStr: string | undefined | null): string {
+  if (!jsonStr) return "";
+  // 先尝试作为 JSON 解析
+  if (jsonStr.trim().startsWith("{")) {
+    try {
+      const doc = JSON.parse(jsonStr);
+      const texts: string[] = [];
+      const walk = (node: any) => {
+        if (node.text) texts.push(node.text);
+        if (node.content) node.content.forEach(walk);
+      };
+      walk(doc);
+      return texts.join("").trim();
+    } catch {
+      // JSON 解析失败，返回原字符串
+    }
+  }
+  return jsonStr.trim();
 }
 
 /** NC-aligned dark theme classes */
@@ -96,12 +120,13 @@ export function BeatContextMenu({
   }, [acts]);
 
   const allScenes = useMemo(() => {
-    const result: (WritingScene & { chapterTitle: string; chapterId: string })[] = [];
+    const result: (WritingScene & { chapterTitle: string; chapterId: string; chapterNumber: number })[] = [];
     for (const act of acts) {
       for (const ch of act.chapters) {
-        const chTitle = ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`;
+        const chapterNumber = (ch.sort_order ?? 0) + 1;
+        const chTitle = ch.title ? `第${chapterNumber}章: ${ch.title}` : `第${chapterNumber}章`;
         for (const sc of ch.scenes) {
-          result.push({ ...sc, chapterTitle: chTitle, chapterId: ch.id });
+          result.push({ ...sc, chapterTitle: chTitle, chapterId: ch.id, chapterNumber });
         }
       }
     }
@@ -158,6 +183,14 @@ export function BeatContextMenu({
     onChange({ ...selection, [key]: next });
   }, [selection, onChange]);
 
+  const toggleAll = useCallback(<K extends keyof ContextSelection>(key: K, allIds: string[]) => {
+    const current = (selection[key] as string[]) || [];
+    // 如果已全选，则清空；否则全选
+    const isAllSelected = allIds.length > 0 && allIds.every(id => current.includes(id));
+    const next = isAllSelected ? [] : [...allIds];
+    onChange({ ...selection, [key]: next });
+  }, [selection, onChange]);
+
   const setBool = useCallback(<K extends keyof ContextSelection>(key: K, value: boolean) => {
     onChange({ ...selection, [key]: value || undefined });
   }, [selection, onChange]);
@@ -170,7 +203,7 @@ export function BeatContextMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuTrigger render={Children.only(children) as ReactElement} />
 
       <DropdownMenuContent className={`min-w-[224px] p-0 ${menuContentCls}`}>
         {/* ── Group 1: Toggles ── */}
@@ -227,15 +260,19 @@ export function BeatContextMenu({
                         {act.title || `Act ${(act.sort_order ?? 0) + 1}`}
                       </DropdownMenuLabel>
                     )}
-                    {act.chapters.map(ch => (
-                      <DropdownMenuCheckboxItem
-                        key={ch.id}
-                        checked={(selection.chapters || []).includes(ch.id)}
-                        onCheckedChange={() => toggle("chapters", ch.id)}
-                        closeOnClick={false}
-                        className={itemCls}
-                      >{ch.title || `Chapter ${(ch.sort_order ?? 0) + 1}`}</DropdownMenuCheckboxItem>
-                    ))}
+                    {act.chapters.map(ch => {
+                      const chapterNumber = (ch.sort_order ?? 0) + 1;
+                      const displayTitle = ch.title ? `第${chapterNumber}章: ${ch.title}` : `第${chapterNumber}章`;
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={ch.id}
+                          checked={(selection.chapters || []).includes(ch.id)}
+                          onCheckedChange={() => toggle("chapters", ch.id)}
+                          closeOnClick={false}
+                          className={itemCls}
+                        >{displayTitle}</DropdownMenuCheckboxItem>
+                      );
+                    })}
                     {gi < filtered.length - 1 && <DropdownMenuSeparator className={separatorCls} />}
                   </DropdownMenuGroup>
                 ))}
@@ -249,10 +286,10 @@ export function BeatContextMenu({
                 <DotIndicator visible={hasScSel} />场景
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className={`min-w-[240px] max-h-[360px] p-0 ${subContentCls}`}>
-                {allScenes.reduce<{ chapterId: string; chapterTitle: string; scenes: WritingScene[] }[]>((groups, sc) => {
+                {allScenes.reduce<{ chapterId: string; chapterTitle: string; chapterNumber: number; scenes: WritingScene[] }[]>((groups, sc) => {
                   let group = groups.find(g => g.chapterId === sc.chapterId);
                   if (!group) {
-                    group = { chapterId: sc.chapterId, chapterTitle: sc.chapterTitle, scenes: [] };
+                    group = { chapterId: sc.chapterId, chapterTitle: sc.chapterTitle, chapterNumber: sc.chapterNumber, scenes: [] };
                     groups.push(group);
                   }
                   group.scenes.push(sc);
@@ -262,15 +299,18 @@ export function BeatContextMenu({
                     {arr.length > 1 && (
                       <DropdownMenuLabel className={groupLabelCls}>{group.chapterTitle}</DropdownMenuLabel>
                     )}
-                    {group.scenes.map(sc => (
-                      <DropdownMenuCheckboxItem
-                        key={sc.id}
-                        checked={(selection.scenes || []).includes(sc.id)}
-                        onCheckedChange={() => toggle("scenes", sc.id)}
-                        closeOnClick={false}
-                        className={itemCls}
-                      >{sc.subtitle || sc.summary?.slice(0, 30) || `Scene`}</DropdownMenuCheckboxItem>
-                    ))}
+                    {group.scenes.map(sc => {
+                      const displayText = extractTextFromTipTap(sc.subtitle) || extractTextFromTipTap(sc.summary)?.slice(0, 30) || `Scene`;
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={sc.id}
+                          checked={(selection.scenes || []).includes(sc.id)}
+                          onCheckedChange={() => toggle("scenes", sc.id)}
+                          closeOnClick={false}
+                          className={itemCls}
+                        >{displayText}</DropdownMenuCheckboxItem>
+                      );
+                    })}
                     {gi < arr.length - 1 && <DropdownMenuSeparator className={separatorCls} />}
                   </DropdownMenuGroup>
                 ))}
@@ -317,7 +357,6 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {e.name || "(未命名)"}
-                    <span className="ml-auto text-xs text-text-dim">{e.type}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -330,6 +369,14 @@ export function BeatContextMenu({
             </DropdownMenuSubTrigger>
             {codexTypes.length > 0 && (
               <DropdownMenuSubContent className={`min-w-[200px] p-0 ${subContentCls}`}>
+                <DropdownMenuCheckboxItem
+                  key="__all-types__"
+                  checked={codexTypes.length > 0 && codexTypes.every(t => (selection.codexTypes || []).includes(t))}
+                  onCheckedChange={() => toggleAll("codexTypes", codexTypes)}
+                  closeOnClick={false}
+                  className={itemCls}
+                >所有类型</DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator className={separatorCls} />
                 {codexTypes.map(t => (
                   <DropdownMenuCheckboxItem
                     key={t}
@@ -339,7 +386,6 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {t}
-                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.type === t).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -352,6 +398,14 @@ export function BeatContextMenu({
             </DropdownMenuSubTrigger>
             {codexCategories.length > 0 && (
               <DropdownMenuSubContent className={`min-w-[200px] p-0 ${subContentCls}`}>
+                <DropdownMenuCheckboxItem
+                  key="__all-categories__"
+                  checked={codexCategories.length > 0 && codexCategories.every(cat => (selection.codexCategories || []).includes(cat))}
+                  onCheckedChange={() => toggleAll("codexCategories", codexCategories)}
+                  closeOnClick={false}
+                  className={itemCls}
+                >所有分类</DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator className={separatorCls} />
                 {codexCategories.map(cat => (
                   <DropdownMenuCheckboxItem
                     key={cat}
@@ -361,7 +415,6 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {cat}
-                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.category === cat).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -374,6 +427,14 @@ export function BeatContextMenu({
             </DropdownMenuSubTrigger>
             {codexTags.length > 0 && (
               <DropdownMenuSubContent className={`min-w-[200px] p-0 ${subContentCls}`}>
+                <DropdownMenuCheckboxItem
+                  key="__all-tags__"
+                  checked={codexTags.length > 0 && codexTags.every(t => (selection.codexTags || []).includes(t))}
+                  onCheckedChange={() => toggleAll("codexTags", codexTags)}
+                  closeOnClick={false}
+                  className={itemCls}
+                >所有标签</DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator className={separatorCls} />
                 {codexTags.map(t => (
                   <DropdownMenuCheckboxItem
                     key={t}
@@ -383,7 +444,6 @@ export function BeatContextMenu({
                     className={itemCls}
                   >
                     {t}
-                    <span className="ml-auto text-xs text-text-dim">{codexEntries.filter(e => e.tags?.includes(t)).length}</span>
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuSubContent>
@@ -463,6 +523,39 @@ export function BeatContextMenu({
 
 // ── Tags display ──
 
+interface BadgeItem {
+  key: string;
+  id: string;
+  type: string;
+  title: string;
+  subtitle?: string;
+}
+
+export function typeIcon(type: string) {
+  switch (type) {
+    case "fullNovelText":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>;
+    case "fullOutline":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>;
+    case "acts":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /></svg>;
+    case "chapters":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><path d="M8 7h8" /><path d="M8 11h6" /></svg>;
+    case "scenes":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>;
+    case "snippets":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>;
+    case "codexEntries":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>;
+    case "codexTypes":
+    case "codexCategories":
+    case "codexTags":
+      return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" /></svg>;
+    default:
+      return null;
+  }
+}
+
 export function ContextSelectionTags({
   selection,
   onRemove,
@@ -474,7 +567,7 @@ export function ContextSelectionTags({
   const codexEntries = useWritingStore(s => s.codexEntries ?? []);
   const snippets = useWritingStore(s => s.snippets ?? []);
   const allChapters = useMemo(() => {
-    const result: (WritingChapter & { actTitle: string })[] = [];
+    const result: (ManuscriptChapter & { actTitle: string })[] = [];
     for (const act of acts) {
       const actTitle = act.title || `Act ${(act.sort_order ?? 0) + 1}`;
       for (const ch of act.chapters) {
@@ -496,48 +589,70 @@ export function ContextSelectionTags({
     return result;
   }, [acts]);
 
-  const tags: { key: string; id: string; label: string }[] = [];
+  const badges: BadgeItem[] = [];
 
-  if (selection.fullNovelText) tags.push({ key: "fullNovelText", id: "", label: "全部手稿" });
-  if (selection.fullOutline) tags.push({ key: "fullOutline", id: "", label: "全部大纲" });
+  if (selection.fullNovelText) badges.push({ key: "fullNovelText", id: "", type: "fullNovelText", title: "全部手稿" });
+  if (selection.fullOutline) badges.push({ key: "fullOutline", id: "", type: "fullOutline", title: "全部大纲" });
   for (const id of selection.acts || []) {
     const act = acts.find(a => a.id === id);
-    if (act) tags.push({ key: "acts", id, label: act.title || `Act ${(act.sort_order ?? 0) + 1}` });
+    if (act) {
+      const chCount = act.chapters?.length ?? 0;
+      badges.push({ key: "acts", id, type: "acts", title: act.title || `Act ${(act.sort_order ?? 0) + 1}`, subtitle: `${chCount} 章节` });
+    }
   }
   for (const id of selection.chapters || []) {
     const ch = allChapters.find(c => c.id === id);
-    if (ch) tags.push({ key: "chapters", id, label: ch.title || `Ch ${(ch.sort_order ?? 0) + 1}` });
+    if (ch) {
+      const scCount = ch.scenes?.length ?? 0;
+      const chapterNumber = (ch.sort_order ?? 0) + 1;
+      const title = ch.title ? `第${chapterNumber}章: ${ch.title}` : `第${chapterNumber}章`;
+      badges.push({ key: "chapters", id, type: "chapters", title, subtitle: `${scCount} 场景` });
+    }
   }
   for (const id of selection.scenes || []) {
     const sc = allScenes.find(s => s.id === id);
-    if (sc) tags.push({ key: "scenes", id, label: sc.subtitle || sc.summary || `Scene` });
+    if (sc) {
+      const text = extractTextFromTipTap(sc.subtitle) || extractTextFromTipTap(sc.summary)?.slice(0, 30) || "场景";
+      badges.push({ key: "scenes", id, type: "scenes", title: text, subtitle: sc.chapterTitle });
+    }
   }
   for (const id of selection.snippets || []) {
     const sn = snippets.find(s => s.id === id);
-    if (sn) tags.push({ key: "snippets", id, label: sn.name || "Snippet" });
+    if (sn) badges.push({ key: "snippets", id, type: "snippets", title: sn.name || "片段" });
   }
   for (const id of selection.codexEntries || []) {
     const entry = codexEntries.find(e => e.id === id);
-    if (entry) tags.push({ key: "codexEntries", id, label: entry.name || "Entry" });
+    if (entry) badges.push({ key: "codexEntries", id, type: "codexEntries", title: entry.name || "条目", subtitle: entry.type });
   }
-  for (const typeName of selection.codexTypes || []) {
-    tags.push({ key: "codexTypes", id: typeName, label: `类型: ${typeName}` });
+  for (const name of selection.codexTypes || []) {
+    const count = codexEntries.filter(e => e.type === name).length;
+    badges.push({ key: "codexTypes", id: name, type: "codexTypes", title: name, subtitle: `${count} 条目` });
   }
-  for (const catName of selection.codexCategories || []) {
-    tags.push({ key: "codexCategories", id: catName, label: `分类: ${catName}` });
+  for (const name of selection.codexCategories || []) {
+    const count = codexEntries.filter(e => e.category === name).length;
+    badges.push({ key: "codexCategories", id: name, type: "codexCategories", title: name, subtitle: `${count} 条目` });
   }
-  for (const tagName of selection.codexTags || []) {
-    tags.push({ key: "codexTags", id: tagName, label: `标签: ${tagName}` });
+  for (const name of selection.codexTags || []) {
+    const count = codexEntries.filter(e => e.tags?.includes(name)).length;
+    badges.push({ key: "codexTags", id: name, type: "codexTags", title: name, subtitle: `${count} 条目` });
   }
 
-  if (tags.length === 0) return null;
+  if (badges.length === 0) return null;
 
   return (
-    <div className="beat-ctx-tags">
-      {tags.map(tag => (
-        <span key={`${tag.key}-${tag.id}`} className="beat-ctx-tag">
-          {tag.label}
-          <button onClick={e => { e.stopPropagation(); onRemove(tag.key as keyof ContextSelection, tag.id); }} type="button">×</button>
+    <div className="ctx-badge-list">
+      {badges.map(b => (
+        <span key={`${b.key}-${b.id}`} className="ctx-badge">
+          <span className="ctx-badge-icon">{typeIcon(b.type)}</span>
+          <span className="ctx-badge-text">
+            <span className="ctx-badge-title">{b.title}</span>
+            {b.subtitle && <span className="ctx-badge-sub">{b.subtitle}</span>}
+          </span>
+          <button
+            className="ctx-badge-delete"
+            onClick={e => { e.stopPropagation(); onRemove(b.key as keyof ContextSelection, b.id || undefined); }}
+            type="button"
+          >×</button>
         </span>
       ))}
     </div>

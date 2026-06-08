@@ -44,6 +44,8 @@ export interface WritingScene {
   summary: string;
   subtitle: string;
   codex_ids: string[];
+  label_ids: string[];
+  pov_codex_id: string | null;
   scene_number: number;
   sort_order: number;
   created_at: number;

@@ -60,12 +60,19 @@ def _build_gm_agent(
     agent = Agent("gm")
 
     # ContextComponents — 按 priority 排序拼 system prompt
-    agent.add_component(GMIdentityComponent())        # priority=10, STATIC
-    agent.add_component(TimeContextComponent())        # priority=25, DYNAMIC
-    agent.add_component(GMWorldContextComponent())     # priority=30, DYNAMIC
-    agent.add_component(CognitiveStateComponent())     # priority=35, DYNAMIC
-    agent.add_component(GMResolutionComponent())       # priority=50, STATIC
-    agent.add_component(ToolComponent())               # priority=90, STATIC
+    components = [
+        GMIdentityComponent(),        # priority=10, STATIC
+        TimeContextComponent(),        # priority=25, DYNAMIC
+        GMWorldContextComponent(),     # priority=30, DYNAMIC
+        CognitiveStateComponent(),     # priority=35, DYNAMIC
+        GMResolutionComponent(),       # priority=50, STATIC
+        ToolComponent(),               # priority=90, STATIC
+    ]
+    from lumen.core.hook_bus import HookBus
+    hook_bus = HookBus.get()
+    for comp in components:
+        agent.add_component(comp)
+        comp.register(hook_bus)
 
     # 临时 session（SimpleNamespace 跳过 ChatSession 的 DB 操作）
     gm_session_id = f"gm_{session_id}" if session_id else "gm_temp"
@@ -180,6 +187,10 @@ async def gm_chat_stream(
     Yields:
         SSEEvent dict（text/tool_start/tool_result/rpg_state/done）
     """
+    # 确保扩展已加载
+    from lumen.core.agent_chat import _ensure_hookbus
+    _ensure_hookbus()
+
     # 记录玩家行动事件
     state = ws.get_agent_state(source_id)
     room_id = state.get("room_id", "") if state else ""

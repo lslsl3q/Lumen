@@ -10,7 +10,7 @@ import os
 import sqlite3
 import threading
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Any, Optional
 
 from lumen.config import GRAPH_META_DB
 
@@ -20,7 +20,6 @@ DB_PATH = GRAPH_META_DB
 _local = threading.local()
 write_lock = threading.Lock()
 
-
 def get_conn() -> sqlite3.Connection:
     if not hasattr(_local, "conn") or _local.conn is None:
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -29,12 +28,10 @@ def get_conn() -> sqlite3.Connection:
         _local.conn.execute("PRAGMA journal_mode=WAL")
     return _local.conn
 
-
 def close_conn():
     if hasattr(_local, "conn") and _local.conn is not None:
         _local.conn.close()
         _local.conn = None
-
 
 def _ensure_table():
     """初始化 graph_edge_meta 表（幂等）"""
@@ -54,7 +51,6 @@ def _ensure_table():
     """)
     conn.commit()
 
-
 def save_edge_meta(tdb: str, src_id: int, dst_id: int, label: str,
                    source_episode_id: str = "", owner_id: str = "") -> None:
     """保存边元数据（INSERT OR IGNORE，重复插入不报错）"""
@@ -69,8 +65,7 @@ def save_edge_meta(tdb: str, src_id: int, dst_id: int, label: str,
         )
         conn.commit()
 
-
-def get_edge_meta(tdb: str, src_id: int, dst_id: int) -> Optional[Dict[str, Any]]:
+def get_edge_meta(tdb: str, src_id: int, dst_id: int) -> dict[str, Any] | None:
     """获取单条边元数据"""
     conn = get_conn()
     row = conn.execute(
@@ -82,8 +77,7 @@ def get_edge_meta(tdb: str, src_id: int, dst_id: int) -> Optional[Dict[str, Any]
         return dict(row)
     return None
 
-
-def get_edges_by_owner(owner_id: str, tdb: str = "knowledge") -> List[Dict[str, Any]]:
+def get_edges_by_owner(owner_id: str, tdb: str = "knowledge") -> list[dict[str, Any]]:
     """获取某个 owner 的所有边元数据"""
     conn = get_conn()
     rows = conn.execute(
@@ -91,7 +85,6 @@ def get_edges_by_owner(owner_id: str, tdb: str = "knowledge") -> List[Dict[str, 
         (owner_id, tdb),
     ).fetchall()
     return [dict(r) for r in rows]
-
 
 def delete_edge_meta(tdb: str, src_id: int, dst_id: int) -> bool:
     """删除单条边元数据，返回是否成功"""
@@ -103,6 +96,5 @@ def delete_edge_meta(tdb: str, src_id: int, dst_id: int) -> bool:
         )
         conn.commit()
         return cursor.rowcount > 0
-
 
 _ensure_table()

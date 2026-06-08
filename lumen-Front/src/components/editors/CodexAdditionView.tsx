@@ -1,10 +1,11 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react";
 import { useWritingStore } from "../../stores/useWritingStore";
 import type { CodexEntry } from "../../api/writing";
 import { FileText } from "lucide-react";
 import { TYPE_ICONS } from "../../modes/writing/codex-shared";
+import { GripDotsIcon, useBlockDrag } from "./BlockDragHandle";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -48,11 +49,15 @@ export function CodexAdditionView({
   node,
   updateAttributes,
   deleteNode,
+  editor,
+  getPos,
 }: NodeViewProps) {
   const entryId = (node.attrs.entryId as string) ?? "";
   const field = (node.attrs.field as string) ?? "description";
   const mode = (node.attrs.mode as "add" | "replace") ?? "add";
   const collapsed = Boolean(node.attrs.collapsed);
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const codexEntries = useWritingStore((s) => s.codexEntries ?? []);
 
@@ -91,15 +96,18 @@ export function CodexAdditionView({
 
   const handleDelete = useCallback(() => deleteNode(), [deleteNode]);
 
+  const handleDragStart = useBlockDrag(editor, getPos, wrapperRef, ".codex-addition");
+
   return (
-    <NodeViewWrapper>
+    <NodeViewWrapper ref={wrapperRef}>
       <div className={`codex-addition ${collapsed ? "codex-addition-collapsed" : ""}`}>
         <div className="codex-addition-header" contentEditable={false}>
-          <svg className="codex-addition-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-            <circle cx="2" cy="3" r="1.5" /><circle cx="7" cy="3" r="1.5" />
-            <circle cx="2" cy="8" r="1.5" /><circle cx="7" cy="8" r="1.5" />
-            <circle cx="2" cy="13" r="1.5" /><circle cx="7" cy="13" r="1.5" />
-          </svg>
+          <span
+            className="block-drag-handle"
+            onMouseDown={handleDragStart}
+          >
+            <GripDotsIcon />
+          </span>
           <button onClick={handleToggleCollapsed} className="codex-addition-collapse" title={collapsed ? "展开" : "折叠"}>
             <ChevronIcon open={!collapsed} />
           </button>

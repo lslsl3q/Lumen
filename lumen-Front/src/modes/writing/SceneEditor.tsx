@@ -242,7 +242,7 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
     const idx = currentIds.indexOf(codexId);
     if (idx >= 0) currentIds.splice(idx, 1);
     else currentIds.push(codexId);
-    useWritingStore.getState().patchScene(scene.id, { codex_ids: currentIds } as any);
+    useWritingStore.getState().patchScene(scene.id, { codex_ids: currentIds });
   }, [scene.id, scene.codex_ids]);
 
   const allLabels = useWritingStore((s) => s.labels);
@@ -256,11 +256,23 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
     const idx = ids.indexOf(labelId);
     if (idx >= 0) ids.splice(idx, 1);
     else ids.push(labelId);
-    useWritingStore.getState().patchScene(scene.id, { label_ids: ids } as any);
+    useWritingStore.getState().patchScene(scene.id, { label_ids: ids });
   }, [scene.id, currentLabelIds]);
 
   const wordCount = editor.storage?.characterCount?.words?.() ?? 0;
   const sceneNumber = scene.scene_number ?? 0;
+
+  const characterEntries = useMemo(
+    () => codexEntries.filter(e => e.category === "character" || e.type === "character"),
+    [codexEntries],
+  );
+  const povEntry = useMemo(
+    () => characterEntries.find(e => e.id === scene.pov_codex_id),
+    [characterEntries, scene.pov_codex_id],
+  );
+  const setPov = useCallback((codexId: string | null) => {
+    useWritingStore.getState().patchScene(scene.id, { pov_codex_id: codexId });
+  }, [scene.id]);
 
   const handleSummaryBlur = async () => {
     setSummaryEditing(false);
@@ -381,6 +393,36 @@ export function SceneEditor({ scene, compact = false }: { scene: WritingScene; c
               {" — "}
               <span className="whitespace-nowrap">{wordCount} words</span>
             </span>
+          </div>
+
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-[10px] text-[var(--color-text-muted)] shrink-0">POV</span>
+            <Popover>
+              <PopoverTrigger
+                className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors cursor-pointer truncate max-w-[100px]"
+              >
+                {povEntry ? povEntry.name : "—"}
+              </PopoverTrigger>
+              <PopoverContent side="top" align="start" className="w-52 max-h-48 overflow-y-auto p-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl">
+                <button
+                  onClick={() => setPov(null)}
+                  className="w-full text-left px-2 py-1 rounded text-[11px] text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors cursor-pointer"
+                  type="button"
+                >
+                  — 无 POV —
+                </button>
+                {characterEntries.map(entry => (
+                  <button
+                    key={entry.id}
+                    onClick={() => setPov(entry.id)}
+                    className={`w-full text-left px-2 py-1 rounded text-[11px] transition-colors cursor-pointer truncate ${entry.id === scene.pov_codex_id ? "text-zinc-100 bg-zinc-700" : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"}`}
+                    type="button"
+                  >
+                    {entry.name}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
           </div>
 
           {scene.subtitle && (

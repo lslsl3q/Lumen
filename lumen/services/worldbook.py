@@ -8,15 +8,14 @@ import json
 import os
 import re
 import logging
-from typing import List, Dict, Optional
+from typing import Optional
 from lumen.types.worldbook import WorldBookEntry, WorldBookCreateRequest, WorldBookUpdateRequest
 from lumen.config import WORLDBOOKS_DIR
 
 logger = logging.getLogger(__name__)
 
 # 模块级缓存
-_cached_entries: Optional[List[Dict]] = None
-
+_cached_entries: list[dict] | None = None
 
 def _validate_entry_id(entry_id: str) -> str:
     """校验条目ID合法性（字母数字下划线连字符）"""
@@ -24,8 +23,7 @@ def _validate_entry_id(entry_id: str) -> str:
         raise ValueError(f"非法的世界书条目ID: {entry_id}")
     return entry_id
 
-
-def list_worldbooks() -> List[Dict]:
+def list_worldbooks() -> list[dict]:
     """列出所有世界书条目"""
     global _cached_entries
     if _cached_entries is not None:
@@ -50,7 +48,6 @@ def list_worldbooks() -> List[Dict]:
     _cached_entries = entries
     return entries
 
-
 def load_worldbook(entry_id: str) -> Dict:
     """加载单个世界书条目"""
     _validate_entry_id(entry_id)
@@ -63,7 +60,6 @@ def load_worldbook(entry_id: str) -> Dict:
 
     entry = WorldBookEntry.model_validate(raw)
     return entry.model_dump()
-
 
 def create_worldbook(entry_id: str, data: Dict) -> Dict:
     """创建世界书条目"""
@@ -84,7 +80,6 @@ def create_worldbook(entry_id: str, data: Dict) -> Dict:
     _clear_cache()
     logger.info("创建世界书条目: %s", entry_id)
     return raw
-
 
 def update_worldbook(entry_id: str, updates: Dict) -> Dict:
     """更新世界书条目"""
@@ -108,7 +103,6 @@ def update_worldbook(entry_id: str, updates: Dict) -> Dict:
     logger.info("更新世界书条目: %s", entry_id)
     return raw
 
-
 def delete_worldbook(entry_id: str) -> None:
     """删除世界书条目"""
     _validate_entry_id(entry_id)
@@ -119,7 +113,6 @@ def delete_worldbook(entry_id: str) -> None:
     os.remove(filepath)
     _clear_cache()
     logger.info("删除世界书条目: %s", entry_id)
-
 
 def _clear_cache():
     """清除缓存"""

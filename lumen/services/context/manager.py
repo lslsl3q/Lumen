@@ -8,10 +8,9 @@ Lumen - 上下文窗口管理
 - vector_fold.py: 向量相似度折叠（参考 VCP 的 ContextFoldingV2）
 """
 
-from typing import List, Dict, Any
+from typing import Any
 
 from lumen.types.messages import Message
-
 
 # ========================================
 # 工具调用折叠
@@ -66,7 +65,6 @@ def fold_tool_calls(messages: list[Message]) -> list[Message]:
 
     return result
 
-
 def filter_for_ai(messages: list[Message]) -> list[Message]:
     """过滤消息，只发送给 AI 可用的上下文投影。
 
@@ -86,7 +84,6 @@ def filter_for_ai(messages: list[Message]) -> list[Message]:
         filtered.append(msg)
     return filtered
 
-
 # ========================================
 # 上下文裁剪
 # ========================================
@@ -98,7 +95,6 @@ def trim_messages(messages: list[Message], max_messages: int = 50) -> list[Messa
     system_msg = messages[0]
     recent = messages[-max_messages:]
     return [system_msg] + recent
-
 
 def build_llm_context(messages: list[Message], max_messages: int = 50) -> list[Message]:
     """构建下一轮 LLM 上下文投影。

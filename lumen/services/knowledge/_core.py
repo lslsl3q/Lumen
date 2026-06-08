@@ -12,7 +12,7 @@ import random
 import string
 import logging
 import threading
-from typing import Optional, List, Dict
+from typing import Optional
 
 import triviumdb
 
@@ -57,7 +57,6 @@ def _get_db_for(kb_name: str) -> triviumdb.TriviumDB:
     """根据 kb_name 获取对应的 TDB 实例"""
     return get_tdb(kb_name)
 
-
 def _get_sentence_db_for(kb_name: str) -> triviumdb.TriviumDB:
     """根据 kb_name 获取对应的句子 TDB 实例"""
     from lumen.services.knowledge.manifest import load_kb_manifest
@@ -68,17 +67,15 @@ def _get_sentence_db_for(kb_name: str) -> triviumdb.TriviumDB:
         return get_tdb(basename)
     return get_tdb("knowledge_sentences")
 
-
 def _get_source_dir_for(kb_name: str) -> str:
     """获取 kb_name 对应的源文件目录"""
     return os.path.join(KNOWLEDGE_LIB_DIR, kb_name)
 
 # ── Registry 缓存（按 kb_name 隔离）──
-_registry_caches: Dict[str, Dict[str, Dict]] = {}
+_registry_caches: dict[str, dict[str, dict]] = {}
 _registry_lock = threading.Lock()
 
 MANIFEST_PATH = os.path.join(KNOWLEDGE_SOURCE_DIR, "_manifest.json")
-
 
 def _manifest_path_for(kb_name: str) -> str:
     """获取 kb_name 对应的 manifest 路径"""
@@ -86,13 +83,11 @@ def _manifest_path_for(kb_name: str) -> str:
         return MANIFEST_PATH
     return os.path.join(KNOWLEDGE_LIB_DIR, kb_name, "_manifest.json")
 
-
 def _prf_refine(db, query_vector: list[float], hits: list[dict],
                 alpha: float, beta: float) -> list[float] | None:
     """PRF 精炼查询向量（委托给 vector_store.prf_refine）"""
     from lumen.services.search.vector_store import prf_refine
     return prf_refine(db, query_vector, hits, alpha, beta)
-
 
 def _index_chunk_text(db, node_id: int, chunk: str, filename: str,
                       folder: str, tags: list = None) -> None:
@@ -135,7 +130,6 @@ def _index_chunk_text(db, node_id: int, chunk: str, filename: str,
     except Exception as e:
         logger.debug(f"TriviumDB 文本索引失败 (node {node_id}): {e}")
 
-
 def _enrich_sparse_content(db, sparse_hits: list[dict]):
     """从 TriviumDB 补充稀疏搜索结果的 content 字段
 
@@ -161,7 +155,6 @@ def _enrich_sparse_content(db, sparse_hits: list[dict]):
                     break
         except Exception:
             continue
-
 
 def _vector_search(db, search_vector, query_text, top_k, min_score,
                    payload_filter=None):
@@ -204,7 +197,6 @@ def _vector_search(db, search_vector, query_text, top_k, min_score,
     return db.search(search_vector, top_k=top_k, min_score=min_score,
                      payload_filter=payload_filter), "vector"
 
-
 async def search_diagnostics(query: str, top_k: int = 10) -> dict:
     """独立诊断接口：返回 TriviumDB 管线各阶段耗时
 
@@ -228,7 +220,6 @@ async def search_diagnostics(query: str, top_k: int = 10) -> dict:
         "custom_data": ctx.custom_data if hasattr(ctx, "custom_data") else {},
     }
 
-
 def _rrf_merge(
     vector_hits: list[dict],
     bm25_hits: list[dict],
@@ -244,8 +235,8 @@ def _rrf_merge(
     公式: rrf_score = Σ (weight / (k + rank))
     每条结果按 (file_id, chunk_index) 去重（图谱用 entity_id）。
     """
-    scores: Dict[tuple, float] = {}
-    content_map: Dict[tuple, dict] = {}
+    scores: dict[tuple, float] = {}
+    content_map: dict[tuple, dict] = {}
 
     # 向量路径
     for rank, hit in enumerate(vector_hits):
@@ -295,8 +286,7 @@ def _rrf_merge(
 
     return result
 
-
-def _load_registry(kb_name: str = "knowledge") -> Dict[str, Dict]:
+def _load_registry(kb_name: str = "knowledge") -> dict[str, dict]:
     """加载 registry（从 manifest 的 files 字段，带内存缓存）"""
     if kb_name in _registry_caches:
         return _registry_caches[kb_name]
@@ -312,8 +302,7 @@ def _load_registry(kb_name: str = "knowledge") -> Dict[str, Dict]:
     _registry_caches[kb_name] = {}
     return _registry_caches[kb_name]
 
-
-def _save_registry(registry: Dict[str, Dict], kb_name: str = "knowledge") -> None:
+def _save_registry(registry: dict[str, dict], kb_name: str = "knowledge") -> None:
     """保存 registry（写回 manifest 的 files 字段）并刷新缓存"""
     path = _manifest_path_for(kb_name)
     manifest = {}
@@ -326,7 +315,6 @@ def _save_registry(registry: Dict[str, Dict], kb_name: str = "knowledge") -> Non
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     _registry_caches[kb_name] = registry
 
-
 def _clear_registry_cache(kb_name: str = None) -> None:
     """清 registry 缓存（kb_name=None 时清全部）"""
     if kb_name is None:
@@ -334,18 +322,15 @@ def _clear_registry_cache(kb_name: str = None) -> None:
     else:
         _registry_caches.pop(kb_name, None)
 
-
 def _generate_file_id() -> str:
     """生成文件ID: kb{timestamp6}{random3}"""
     timestamp = str(int(time.time()))[-6:]
     random_chars = "".join(random.choices(string.ascii_lowercase, k=3))
     return f"kb{timestamp}{random_chars}"
 
-
 def _compute_md5(text: str) -> str:
     """计算文本内容 MD5"""
     return hashlib.md5(text.encode("utf-8")).hexdigest()
-
 
 def _read_file_content(path: str) -> str | None:
     """读取文件内容，自动尝试 UTF-8 和 GBK 编码"""
@@ -359,11 +344,9 @@ def _read_file_content(path: str) -> str | None:
             return None
     return None
 
-
 # ── 公开 API ──
 
-
-def list_files(category: str = None, kb_name: str = "knowledge") -> List[Dict]:
+def list_files(category: str = None, kb_name: str = "knowledge") -> list[dict]:
     """列出所有已导入的文件元数据，可按 category 过滤"""
     registry = _load_registry(kb_name)
     entries = list(registry.values())
@@ -371,14 +354,12 @@ def list_files(category: str = None, kb_name: str = "knowledge") -> List[Dict]:
         entries = [e for e in entries if e.get("category") == category]
     return sorted(entries, key=lambda e: e.get("created_at", ""), reverse=True)
 
-
 def get_file(file_id: str, kb_name: str = "knowledge") -> Dict:
     """获取单个文件的元数据"""
     registry = _load_registry(kb_name)
     if file_id not in registry:
         raise FileNotFoundError(f"文件不存在: {file_id}")
     return registry[file_id]
-
 
 async def import_file(
     filename: str,
@@ -556,7 +537,6 @@ async def import_file(
     logger.info(f"知识库导入: {fid} ({filename}), {len(chunks)} chunks")
     return meta
 
-
 async def refine_with_sentences(
     query: str,
     top_chunks: list[dict],
@@ -723,7 +703,6 @@ async def refine_with_sentences(
 
     return merged if merged else top_chunks
 
-
 async def search(
     query: str,
     top_k: int = 5,
@@ -732,7 +711,7 @@ async def search(
     character_id: str = None,
     kb_name: str = "knowledge",
     access_filter: dict = None,
-) -> List[Dict]:
+) -> list[dict]:
     """混合搜索: 向量+文本 + API稀疏 + 图谱 → 三路 RRF 合并 → PRF 精炼 → 句子级精排
 
     Args:
@@ -997,7 +976,6 @@ async def search(
 
     return hits
 
-
 async def delete_file(file_id: str, kb_name: str = "knowledge") -> None:
     """删除文件：删向量 + 删源文件 + 更新 registry"""
     registry = _load_registry(kb_name)
@@ -1050,7 +1028,6 @@ async def delete_file(file_id: str, kb_name: str = "knowledge") -> None:
     _save_registry(registry, kb_name)
 
     logger.info(f"知识库删除: {file_id} ({meta.get('filename', '')}), 清理 {count} 条向量")
-
 
 async def reindex_file(file_id: str, kb_name: str = "knowledge") -> dict:
     """重新索引已修改的文件（全文件覆写，幂等）。
@@ -1232,12 +1209,11 @@ async def reindex_file(file_id: str, kb_name: str = "knowledge") -> dict:
     logger.info(f"知识库重索引: {file_id} ({info.get('filename', '')}), {len(chunks)} chunks")
     return {"file_id": file_id, "chunks": len(chunks), "md5": new_md5}
 
-
 # ── 文件夹列表缓存（供 ACL 前置过滤用） ──
-_folder_cache: List[str] = []
+_folder_cache: list[str] = []
 _folder_cache_ts: float = 0
 
-def _get_all_folders(db, max_age: float = 60.0) -> List[str]:
+def _get_all_folders(db, max_age: float = 60.0) -> list[str]:
     """获取知识库中所有不重复的 folder 路径（带 60 秒缓存）"""
     global _folder_cache, _folder_cache_ts
     now = time.time()
@@ -1253,12 +1229,10 @@ def _get_all_folders(db, max_age: float = 60.0) -> List[str]:
     _folder_cache_ts = now
     return _folder_cache
 
-
 def close():
     """关闭 TriviumDB（已迁移到 tdb_registry）"""
     from lumen.services.tdb_registry import close_all
     close_all()
-
 
 def cleanup_orphan_registry(kb_name: str = "knowledge") -> int:
     """清理 registry 中指向不存在 TDB 节点的孤儿条目 + 级联清理关联索引
@@ -1320,7 +1294,6 @@ def cleanup_orphan_registry(kb_name: str = "knowledge") -> int:
     _save_registry(registry, kb_name)
     logger.info(f"Registry 级联清理: {len(orphans)} 个孤儿条目（registry + BM25 + 稀疏 + 句子）")
     return len(orphans)
-
 
 async def rebuild_if_empty(kb_name: str = "knowledge"):
     """启动时检测 knowledge.tdb 是否为空，为空则从源文件自动重建。
@@ -1398,9 +1371,7 @@ async def rebuild_if_empty(kb_name: str = "knowledge"):
         except Exception as e:
             logger.warning(f"图谱恢复失败: {e}")
 
-
 # ── 内部工具 ──
-
 
 def _build_meta(
     fid: str, filename: str, category: str, subdir: str,
@@ -1425,13 +1396,11 @@ def _build_meta(
         "graph_sync_needed": False,
     }
 
-
 def _update_registry(fid: str, meta: Dict, kb_name: str = "knowledge") -> None:
     with _registry_lock:
         registry = _load_registry(kb_name)
         registry[fid] = meta
         _save_registry(registry, kb_name)
-
 
 def _cleanup_empty_dirs(current: str, stop_at: str) -> None:
     """递归清理空目录（到 stop_at 为止）"""

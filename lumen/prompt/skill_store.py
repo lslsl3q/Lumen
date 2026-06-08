@@ -6,14 +6,12 @@ CRUD 操作在 services/skills.py。
 """
 import os
 import logging
-from typing import List
 
 from lumen.services.skills import load_skill, _skill_path
 from lumen.config import SKILLS_DIR
 from lumen.services.context.token_estimator import estimate_text_tokens
 
 logger = logging.getLogger(__name__)
-
 
 def get_skill_content_for_invoke(skill_id: str) -> str:
     """获取 skill 完整内容（用于懒加载/命令调用）
@@ -30,8 +28,7 @@ def get_skill_content_for_invoke(skill_id: str) -> str:
 
     return f"{header}\n\n{data['content']}"
 
-
-def get_skills_content(skill_ids: List[str], token_budget: int = 800) -> str:
+def get_skills_content(skill_ids: list[str], token_budget: int = 800) -> str:
     """渐进式披露注入（参考 Claude Code 设计）
 
     1. 始终注入清单（名称 + 描述 + when_to_use）
@@ -89,7 +86,6 @@ def get_skills_content(skill_ids: List[str], token_budget: int = 800) -> str:
     if content_parts:
         return listing + "\n<skills>\n" + "\n".join(content_parts) + "\n</skills>"
     return listing
-
 
 async def invoke_skill(skill_id: str, args: str = "") -> str:
     """完整 skill 调用（懒加载 + 脚本执行）

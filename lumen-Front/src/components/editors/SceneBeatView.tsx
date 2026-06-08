@@ -5,7 +5,7 @@
  * NC-aligned visual: uniform border, translucent bg, SVG drag handle,
  * grouped context menu, dashed collapse, no divider lines.
  */
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from "react";
 import { createPortal } from "react-dom";
 import type { NodeViewProps } from "@tiptap/react";
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react";
@@ -24,8 +24,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
   DropdownMenuGroup,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "../ui/dropdown-menu";
 import { useModels } from "../../hooks/useModels";
+import { GripDotsIcon, useBlockDrag } from "./BlockDragHandle";
+
+import { type PromptPreset, loadPresets } from "./preset-types";
 
 const WORD_LIMITS = [200, 400, 600] as const;
 
@@ -87,19 +93,6 @@ const TYPE_LABELS: Record<string, string> = {
   continue: "CONTINUE WRITING",
 };
 
-function GripDotsIcon() {
-  return (
-    <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
-      <circle cx="2" cy="3" r="1.5" />
-      <circle cx="7" cy="3" r="1.5" />
-      <circle cx="2" cy="8" r="1.5" />
-      <circle cx="7" cy="8" r="1.5" />
-      <circle cx="2" cy="13" r="1.5" />
-      <circle cx="7" cy="13" r="1.5" />
-    </svg>
-  );
-}
-
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
@@ -117,6 +110,18 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const status = (node.attrs.status as string) ?? "idle";
   const modelId = (node.attrs.modelId as string) ?? "";
   const collapsed = Boolean(node.attrs.collapsed);
+
+  // Force re-render when node.attrs changes (TipTap NodeView workaround)
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
+  const attrsKey = useMemo(() => JSON.stringify({
+    maxWords: node.attrs.maxWords,
+    modelId: node.attrs.modelId,
+    collapsed: node.attrs.collapsed
+  }), [node.attrs.maxWords, node.attrs.modelId, node.attrs.collapsed]);
+
+  useEffect(() => {
+    forceUpdate();
+  }, [attrsKey]);
 
   const activeProjectId = useWritingStore((s) => s.activeProjectId);
   const activeProject = useWritingStore((s) => s.projects.find((p) => p.id === s.activeProjectId));
@@ -171,10 +176,20 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     status === "generating" ? "generating" : status === "done" ? "done" : "idle"
   );
   const [genWordCount, setGenWordCount] = useState(0);
-  const [customWords, setCustomWords] = useState("");
-  const [showCustomInput, setShowCustomInput] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { models } = useModels();
+  const [presets, setPresets] = useState<PromptPreset[]>([]);
+
+  const templateName = useMemo(() => "writing/beat_generate", []);
+
+  // Load presets when templateName is available
+  useEffect(() => {
+    if (templateName) setPresets(loadPresets(templateName));
+  }, [templateName]);
+
+  // Track last used preset+model for quick-access
+  const lastPresetId = (node.attrs.lastPresetId as string) ?? "";
+  const lastPreset = presets.find(p => p.id === lastPresetId) ?? null;
 
   // New structured context selection (NC-aligned)
   const contextSelection: ContextSelection = (node.attrs.contextSelection as ContextSelection) ?? {};
@@ -220,87 +235,8 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
     whileElementsMounted: autoUpdate,
   });
 
-  // ── Custom drag: pure mouse events ──
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const pos = getPos();
-    if (pos == null) return;
-
-    const blockEl = wrapperRef.current?.querySelector<HTMLElement>(".scene-beat-block");
-    const ghost = blockEl
-      ? blockEl.cloneNode(true) as HTMLElement
-      : document.createElement("div");
-    const blockRect = blockEl?.getBoundingClientRect();
-    const offsetX = e.clientX - (blockRect?.left ?? e.clientX);
-    const offsetY = e.clientY - (blockRect?.top ?? e.clientY);
-    ghost.style.cssText = `
-      position:fixed; pointer-events:none; z-index:51; opacity:0.5;
-      width:${blockRect?.width ?? 200}px;
-      left:${blockRect?.left ?? e.clientX}px;
-      top:${blockRect?.top ?? e.clientY}px;
-    `;
-    document.body.appendChild(ghost);
-
-    const editorEl = editor.view.dom as HTMLElement;
-    const editorRect = editorEl.getBoundingClientRect();
-    const dropLine = document.createElement("div");
-    dropLine.style.cssText = `
-      position:fixed;height:0;z-index:50;pointer-events:none;
-      left:${editorRect.left}px;width:${editorRect.width}px;
-      border-top:1px solid var(--color-text-secondary,#888);
-    `;
-    dropLine.style.display = "none";
-    document.body.appendChild(dropLine);
-
-    const fromPos = pos;
-    let targetPos: number | null = null;
-
-    const onMouseMove = (me: MouseEvent) => {
-      ghost.style.left = `${me.clientX - offsetX}px`;
-      ghost.style.top = `${me.clientY - offsetY}px`;
-
-      const dropResult = editor.view.posAtCoords({ left: me.clientX, top: me.clientY });
-      if (!dropResult) { dropLine.style.display = "none"; targetPos = null; return; }
-
-      const $pos = editor.state.doc.resolve(dropResult.pos);
-      const blockPos = $pos.before($pos.depth);
-      targetPos = blockPos;
-
-      try {
-        const coords = editor.view.coordsAtPos(blockPos);
-        dropLine.style.top = `${coords.top - 1}px`;
-        dropLine.style.display = "block";
-      } catch {
-        dropLine.style.display = "none";
-      }
-    };
-
-    const onMouseUp = () => {
-      ghost.remove();
-      dropLine.remove();
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-
-      if (targetPos == null || targetPos === fromPos) return;
-
-      const node = editor.state.doc.nodeAt(fromPos);
-      if (!node) return;
-
-      let adjustedTo = targetPos > fromPos ? targetPos - node.nodeSize : targetPos;
-      if (adjustedTo < 0) adjustedTo = 0;
-      if (adjustedTo === fromPos) return;
-
-      const tr = editor.state.tr;
-      tr.delete(fromPos, fromPos + node.nodeSize);
-      tr.insert(adjustedTo, node.copy(node.content));
-      editor.view.dispatch(tr);
-    };
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [editor, getPos]);
+  // ── Custom drag: shared hook ──
+  const handleDragStart = useBlockDrag(editor, getPos, wrapperRef, ".scene-beat-block");
 
   // 控制 GenerationBar 显示/隐藏
   useEffect(() => {
@@ -374,7 +310,13 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
   const updateMaxWords = useCallback(
     (value: number) => {
       updateAttributes({ maxWords: value });
-      setShowCustomInput(false);
+    },
+    [updateAttributes]
+  );
+
+  const updateModelId = useCallback(
+    (value: string) => {
+      updateAttributes({ modelId: value });
     },
     [updateAttributes]
   );
@@ -433,6 +375,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
       instructions: finalInstructions,
       request_id: requestId,
       context_selection: effectiveSelection,
+      ...(opts?.inputValues || {}),
     };
     wsSend(payload);
   }, [
@@ -567,7 +510,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         {/* Header bar */}
         <div className="scene-beat-header" contentEditable={false}>
           <span
-            className="scene-beat-drag"
+            className="block-drag-handle"
             title="拖拽排序"
             onMouseDown={handleDragStart}
           >
@@ -586,7 +529,9 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
             className="scene-beat-delete"
             title="删除此节拍"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" />
+            </svg>
           </button>
         </div>
 
@@ -613,29 +558,12 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                     </button>
                   )}
                   <button
-                    onClick={() => setShowCustomInput(!showCustomInput)}
+                    onClick={() => setDialogOpen(true)}
                     className="scene-beat-ghost-btn"
                     title="自定义字数"
                   >
                     …
                   </button>
-                  {showCustomInput && (
-                    <input
-                      autoFocus
-                      type="number"
-                      value={customWords}
-                      onChange={(e) => setCustomWords(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const v = parseInt(customWords, 10);
-                          if (v > 0) updateMaxWords(v);
-                        }
-                      }}
-                      placeholder="字数..."
-                      className="scene-beat-custom-input"
-                    />
-                  )}
                 </div>
 
                 {/* Context button — shadcn DropdownMenu */}
@@ -670,9 +598,15 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                   onClick={() => handleGenerate()}
                   className="scene-beat-generate-btn"
                 >
-                  <span className="scene-beat-generate-icon">▶</span>
-                  <span className="scene-beat-generate-model">
-                    {modelId || "默认模型"}
+                  <span className="scene-beat-generate-icon">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2" />
+                      <path d="M5.5 4.5L9.5 7L5.5 9.5Z" fill="currentColor" />
+                    </svg>
+                  </span>
+                  <span className="scene-beat-generate-label">
+                    <span className="scene-beat-generate-preset">{lastPreset?.name ?? "General Purpose"}</span>
+                    <span className="scene-beat-generate-model">{modelId || "默认模型"}</span>
                   </span>
                 </button>
                 <div className="scene-beat-generate-divider" />
@@ -680,7 +614,7 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                   <DropdownMenuTrigger asChild>
                     <button
                       className="scene-beat-generate-dropdown"
-                      title="选择模型"
+                      title="生成选项"
                       type="button"
                     >
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -688,27 +622,110 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
                       </svg>
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" sideOffset={4}>
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel>模型</DropdownMenuLabel>
-                      {models.map((m) => (
-                        <DropdownMenuItem
-                          key={m.id}
-                          onClick={() => {
-                            updateAttributes({ modelId: m.id });
-                            handleGenerate({ modelId: m.id });
-                          }}
-                        >
-                          {m.id}
+                  <DropdownMenuContent align="start" sideOffset={4} className="scene-beat-menu-root">
+                    {/* Quick: last used preset+model */}
+                    {lastPreset && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          updateAttributes({ modelId: lastPreset.modelId, lastPresetId: lastPreset.id });
+                          handleGenerate({
+                            modelId: lastPreset.modelId,
+                            maxWords: Number(lastPreset.fields.words?.value) || maxWords,
+                            instructions: String(lastPreset.fields.instructions?.value ?? ""),
+                          });
+                        }}
+                      >
+                        <span className="scene-beat-menu-quick">
+                          Last used: {lastPreset.name} ({lastPreset.modelId || "default"})
+                        </span>
+                      </DropdownMenuItem>
+                    )}
+                    {lastPreset && <DropdownMenuSeparator />}
+
+                    {/* Custom presets — expandable submenus */}
+                    {presets.map((preset) => (
+                      <DropdownMenuSub key={preset.id}>
+                        <DropdownMenuSubTrigger>
+                          <span className="scene-beat-menu-preset-icon">✦</span>
+                          {preset.name}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="scene-beat-model-submenu">
+                          <DropdownMenuGroup>
+                            <div className="scene-beat-model-list">
+                              {models.map((m) => (
+                                <DropdownMenuItem
+                                  key={m.id}
+                                  onClick={() => {
+                                    updateAttributes({ modelId: m.id, lastPresetId: preset.id });
+                                    handleGenerate({
+                                      modelId: m.id,
+                                      maxWords: Number(preset.fields.words?.value) || maxWords,
+                                      instructions: String(preset.fields.instructions?.value ?? ""),
+                                    });
+                                  }}
+                                >
+                                  {m.id}
+                                </DropdownMenuItem>
+                              ))}
+                              {models.length === 0 && (
+                                <DropdownMenuItem disabled>No models</DropdownMenuItem>
+                              )}
+                            </div>
+                          </DropdownMenuGroup>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => {
+                            updateAttributes({ modelId: preset.modelId, lastPresetId: preset.id });
+                            setDialogOpen(true);
+                          }}>
+                            ⚙ Tweak and generate...
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    ))}
+
+                    {/* System default — expandable */}
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <span className="scene-beat-menu-preset-icon">◇</span>
+                        General Purpose
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="scene-beat-model-submenu">
+                        <DropdownMenuGroup>
+                          <div className="scene-beat-model-list">
+                            {models.map((m) => (
+                              <DropdownMenuItem
+                                key={m.id}
+                                onClick={() => {
+                                  updateAttributes({ modelId: m.id, lastPresetId: "" });
+                                  handleGenerate({ modelId: m.id });
+                                }}
+                              >
+                                {m.id}
+                              </DropdownMenuItem>
+                            ))}
+                            {models.length === 0 && (
+                              <DropdownMenuItem disabled>No models</DropdownMenuItem>
+                            )}
+                          </div>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => {
+                          updateAttributes({ lastPresetId: "" });
+                          setDialogOpen(true);
+                        }}>
+                          ⚙ Tweak and generate...
                         </DropdownMenuItem>
-                      ))}
-                      {models.length === 0 && (
-                        <DropdownMenuItem disabled>无可用模型</DropdownMenuItem>
-                      )}
-                    </DropdownMenuGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+
                     <DropdownMenuSeparator />
+
+                    {/* Actions */}
                     <DropdownMenuItem onClick={() => setDialogOpen(true)}>
-                      ⚙ Tweak and Generate...
+                      ⚙ Tweak and generate...
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled>
+                      Configure prompts and defaults...
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -752,10 +769,15 @@ export function SceneBeatView({ node, updateAttributes, deleteNode, editor, getP
         onGenerate={handleGenerate}
         defaultMaxWords={maxWords}
         defaultModelId={modelId}
+        defaultContextSelection={effectiveSelection}
+        onMaxWordsChange={updateMaxWords}
+        onModelChange={updateModelId}
+        onContextChange={updateContextSelection}
         contextIds={(effectiveSelection.codexEntries as string[]) ?? []}
         chapterContent={chapterContent}
         chapterTitle={chapterTitle}
         beatText={node.textContent.trim()}
+        templateName={templateName}
       />
     </NodeViewWrapper>
   );

@@ -5,10 +5,9 @@ Lumen - 工具调用解析
 
 import json
 import re
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Any
 
 from lumen.types.tools import SingleToolCall, ParallelToolCall
-
 
 # 已知的工具调用 JSON 开头模式
 _TOOL_CALL_PREFIXES = (
@@ -22,8 +21,7 @@ _TOOL_CALL_PREFIXES = (
     '{"calls" :',
 )
 
-
-def _looks_like_tool_call(buffer: str) -> Optional[bool]:
+def _looks_like_tool_call(buffer: str) -> bool | None:
     """判断流式 buffer 是否像工具调用
 
     Returns:
@@ -49,7 +47,6 @@ def _looks_like_tool_call(buffer: str) -> Optional[bool]:
 
     # 非 { 开头 → 确定不是工具调用
     return False
-
 
 def _repair_json(text: str) -> str:
     """修复 LLM 常见的 JSON 格式错误
@@ -88,8 +85,7 @@ def _repair_json(text: str) -> str:
 
     return text
 
-
-def _extract_brace_content(text: str) -> Optional[str]:
+def _extract_brace_content(text: str) -> str | None:
     """从文本中提取最外层花括号内容（支持嵌套）"""
     start_idx = text.find('{')
     if start_idx < 0:
@@ -122,8 +118,7 @@ def _extract_brace_content(text: str) -> Optional[str]:
 
     return None
 
-
-def extract_json(text: str) -> Tuple[Optional[dict], str]:
+def extract_json(text: str) -> tuple[dict | None, str]:
     """从文本中提取并解析 JSON
 
     Returns:
@@ -179,8 +174,7 @@ def extract_json(text: str) -> Tuple[Optional[dict], str]:
 
     return None, "No valid JSON found in response"
 
-
-def _validate_single(data: dict) -> Optional[Dict[str, Any]]:
+def _validate_single(data: dict) -> dict[str, Any] | None:
     """验证并标准化单个工具调用"""
     tool = data.get("tool", "")
     if not tool:
@@ -198,8 +192,7 @@ def _validate_single(data: dict) -> Optional[Dict[str, Any]]:
         call.run_in_background = data["run_in_background"]
     return call.model_dump(exclude_none=True)
 
-
-def _validate_parallel(data: dict) -> Optional[Dict[str, Any]]:
+def _validate_parallel(data: dict) -> dict[str, Any] | None:
     """验证并标准化并行工具调用"""
     calls = data.get("calls", [])
     if not calls:
@@ -213,8 +206,7 @@ def _validate_parallel(data: dict) -> Optional[Dict[str, Any]]:
         parallel.call_id = data["id"]
     return parallel.model_dump(exclude_none=True)
 
-
-def _classify_tool_call(data: dict) -> Tuple[Optional[Dict[str, Any]], str]:
+def _classify_tool_call(data: dict) -> tuple[dict[str, Any] | None, str]:
     """按结构判断是否为工具调用（不依赖 type 字段）
 
     Returns:
@@ -243,8 +235,7 @@ def _classify_tool_call(data: dict) -> Tuple[Optional[Dict[str, Any]], str]:
 
     return None, "JSON structure does not match any tool call format (missing 'tool' or 'calls' field)"
 
-
-def parse_tool_call(text: str) -> Tuple[Optional[Dict[str, Any]], str]:
+def parse_tool_call(text: str) -> tuple[dict[str, Any] | None, str]:
     """从 AI 回复中解析工具调用
 
     Returns:

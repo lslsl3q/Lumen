@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ChevronRight, ChevronDown, GripVertical, SquarePen, Trash2, MoreVertical } from "lucide-react";
 import {
   DropdownMenu,
@@ -25,12 +26,14 @@ export function PlanChapterRow({ chapter, children }: PlanChapterRowProps) {
   const [title, setTitle] = useState(chapter.title);
   const [open, setOpen] = useState(true);
 
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: chapter.id,
-    data: { type: "chapter" },
-  });
-
-  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: chapter.id,
     data: {
       type: "chapter",
@@ -39,10 +42,10 @@ export function PlanChapterRow({ chapter, children }: PlanChapterRowProps) {
     } satisfies ChapterDragData,
   });
 
-  const setRefs = useCallback((node: HTMLDivElement | null) => {
-    setDropRef(node);
-    setDragRef(node);
-  }, [setDropRef, setDragRef]);
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const chapterNumber = (chapter.sort_order ?? 0) + 1;
 
@@ -73,11 +76,21 @@ export function PlanChapterRow({ chapter, children }: PlanChapterRowProps) {
     useWritingStore.getState().deleteChapterAction(chapter.id);
   }, [chapter.id]);
 
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={{ ...style, minHeight: 40 }}
+        className="rounded bg-zinc-700/30 border border-dashed border-zinc-600/50"
+      />
+    );
+  }
+
   return (
     <div
-      ref={setRefs}
-      style={{ opacity: isDragging ? 0.3 : 1 }}
-      className={`rounded transition-colors ${isOver ? "bg-zinc-700/20" : ""}`}
+      ref={setNodeRef}
+      style={style}
+      className="rounded"
     >
       <Collapsible open={open} onOpenChange={setOpen}>
         <div className="flex items-center">

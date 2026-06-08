@@ -319,7 +319,7 @@ def get_scene(scene_id: str) -> dict | None:
 def update_scene(scene_id: str, **kwargs) -> dict | None:
     with write_lock:
         conn = get_conn()
-        allowed = {"content", "summary", "subtitle", "chapter_id", "codex_ids", "label_ids"}
+        allowed = {"content", "summary", "subtitle", "chapter_id", "codex_ids", "label_ids", "pov_codex_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return get_scene(scene_id)

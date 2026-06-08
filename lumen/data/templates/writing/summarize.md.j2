@@ -2,6 +2,16 @@
 name: "场景摘要"
 type: scene_summarization
 category: writing
+inputs:
+  - name: words
+    label: Words
+    description: Target word count for the summary
+    required: true
+    custom_content: true
+  - name: instructions
+    label: Instructions
+    description: Additional instructions for summarization
+    custom_content: true
 ---
 
 # --- SYSTEM ---

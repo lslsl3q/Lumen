@@ -5,8 +5,7 @@ Lumen - 世界书类型定义
 核心功能：关键词触发 → 自动注入相关设定
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
-
+from typing import Optional, Literal
 
 class WorldBookEntry(BaseModel):
     """世界书条目定义
@@ -19,8 +18,8 @@ class WorldBookEntry(BaseModel):
     enabled: bool = Field(default=True, description="是否启用")
 
     # === 触发条件 ===
-    keywords: List[str] = Field(..., description="触发关键词列表")
-    secondary_keywords: List[str] = Field(default_factory=list, description="次关键词列表（配合 selective 使用）")
+    keywords: list[str] = Field(..., description="触发关键词列表")
+    secondary_keywords: list[str] = Field(default_factory=list, description="次关键词列表（配合 selective 使用）")
     selective: bool = Field(default=False, description="是否启用次关键词条件")
     selective_logic: Literal["and", "not"] = Field(default="and", description="and=次关键词也必须命中 / not=次关键词不能命中")
     case_sensitive: bool = Field(default=False, description="是否区分大小写")
@@ -39,20 +38,19 @@ class WorldBookEntry(BaseModel):
     scan_depth: int = Field(default=10, ge=1, description="扫描最近N条消息")
 
     # === 角色关联 ===
-    character_ids: List[str] = Field(default_factory=list, description="生效的角色ID列表（空=全局生效）")
+    character_ids: list[str] = Field(default_factory=list, description="生效的角色ID列表（空=全局生效）")
 
     # === 元数据 ===
     comment: str = Field(default="", description="备注说明")
 
-
 class WorldBookCreateRequest(BaseModel):
     """创建世界书条目请求"""
-    id: Optional[str] = None  # ID 可选，未提供时自动生成
+    id: str | None = None  # ID 可选，未提供时自动生成
     name: str
-    keywords: List[str]
+    keywords: list[str]
     content: str
     enabled: bool = True
-    secondary_keywords: List[str] = []
+    secondary_keywords: list[str] = []
     selective: bool = False
     selective_logic: Literal["and", "not"] = "and"
     case_sensitive: bool = False
@@ -61,33 +59,31 @@ class WorldBookCreateRequest(BaseModel):
     depth: int = 4
     order: int = 0
     scan_depth: int = 10
-    character_ids: List[str] = []
+    character_ids: list[str] = []
     comment: str = ""
-
 
 class WorldBookUpdateRequest(BaseModel):
     """更新世界书条目请求（所有字段可选，支持部分更新）"""
-    name: Optional[str] = None
-    enabled: Optional[bool] = None
-    keywords: Optional[List[str]] = None
-    content: Optional[str] = None
-    secondary_keywords: Optional[List[str]] = None
-    selective: Optional[bool] = None
-    selective_logic: Optional[Literal["and", "not"]] = None
-    case_sensitive: Optional[bool] = None
-    whole_word: Optional[bool] = None
-    position: Optional[Literal["before_sys", "after_sys", "before_user", "after_user"]] = None
-    depth: Optional[int] = None
-    order: Optional[int] = None
-    scan_depth: Optional[int] = None
-    character_ids: Optional[List[str]] = None
-    comment: Optional[str] = None
-
+    name: str | None = None
+    enabled: bool | None = None
+    keywords: list[str] | None = None
+    content: str | None = None
+    secondary_keywords: list[str] | None = None
+    selective: bool | None = None
+    selective_logic: Literal["and", "not"] | None = None
+    case_sensitive: bool | None = None
+    whole_word: bool | None = None
+    position: Literal["before_sys", "after_sys", "before_user", "after_user"] | None = None
+    depth: int | None = None
+    order: int | None = None
+    scan_depth: int | None = None
+    character_ids: list[str] | None = None
+    comment: str | None = None
 
 class WorldBookListItem(BaseModel):
     """世界书列表项（轻量级，用于列表展示）"""
     id: str
     name: str
     enabled: bool
-    keywords: List[str]
+    keywords: list[str]
     comment: str

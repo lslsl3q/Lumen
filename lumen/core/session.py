@@ -6,9 +6,8 @@ T24 注意：system prompt 由 Agent + Components 动态构建，
 messages[0] 只是占位（角色名），不在初始化时拼装完整 prompt。
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Optional
 from dataclasses import dataclass, field
-
 
 @dataclass
 class ChatSession:
@@ -20,8 +19,8 @@ class ChatSession:
     - messages: 消息历史
     """
     character_id: str = "default"
-    session_id: Optional[str] = None
-    messages: List[Dict[str, Any]] = field(default_factory=list)
+    session_id: str | None = None
+    messages: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self):
         """初始化后自动加载角色"""
@@ -73,16 +72,15 @@ class ChatSession:
         """
         self.messages[0] = {"role": "system", "content": self._make_placeholder()}
 
-
 class SessionManager:
     """全局会话管理器（单例，带最大容量限制）"""
 
-    _instance: Optional["SessionManager"] = None
+    _instance: "SessionManager" | None = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._sessions: Dict[str, ChatSession] = {}
+            cls._instance._sessions: dict[str, ChatSession] = {}
             cls._instance.MAX_SESSIONS = 50
         return cls._instance
 
@@ -119,7 +117,7 @@ class SessionManager:
         self._evict_if_needed()
         return session
 
-    def get(self, session_id: str) -> Optional[ChatSession]:
+    def get(self, session_id: str) -> ChatSession | None:
         """获取会话（不存在返回 None）
 
         Args:
@@ -144,10 +142,8 @@ class SessionManager:
         for session in self._sessions.values():
             session.reload_system_prompt()
 
-
 # 全局单例
 _manager = SessionManager()
-
 
 def get_session_manager() -> SessionManager:
     """获取会话管理器单例

@@ -52,6 +52,14 @@ async def lifespan(app):
     t = threading.Thread(target=_preload, daemon=True, name="preload")
     t.start()
 
+    # 模板 DB 同步：从 .md.j2 文件 seed 到 SQLite
+    try:
+        from lumen.services.storage.template_store import sync_seed_templates
+        from lumen.prompt.template_engine import _TEMPLATES_DIR
+        sync_seed_templates(_TEMPLATES_DIR)
+    except Exception as e:
+        logger.warning(f"模板 DB 同步失败: {e}")
+
     # 预加载完成后，异步触发知识库自动重建（如果 TDB 为空）+ registry 孤儿清理
     async def _auto_rebuild():
         # 等预加载线程完成（最多等 30 秒）

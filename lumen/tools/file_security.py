@@ -12,25 +12,23 @@ import os
 import json
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, TypedDict
+from typing import Optional, TypedDict
 
 from lumen.config import FILE_WORKSPACES_PATH
-
 
 class PathValidationResult(TypedDict):
     """路径验证结果 — file_security → file_read/file_write 内部传递"""
     allowed: bool
     real_path: str
-    reason: Optional[str]
+    reason: str | None
 
 logger = logging.getLogger(__name__)
-
 
 # ========================================
 # 系统黑名单 — 这些目录永远不可访问
 # ========================================
 
-def _build_blacklist() -> List[str]:
+def _build_blacklist() -> list[str]:
     """构建系统敏感目录黑名单（全部转为小写，便于比较）"""
     blacklist = []
 
@@ -54,7 +52,6 @@ def _build_blacklist() -> List[str]:
 
     return blacklist
 
-
 _SYSTEM_BLACKLIST = _build_blacklist()
 
 # 敏感文件名（不管在哪个目录都禁止）
@@ -67,7 +64,6 @@ _WINDOWS_DEVICE_NAMES = {
     "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
 }
 
-
 # ========================================
 # 工作区管理
 # ========================================
@@ -75,7 +71,6 @@ _WINDOWS_DEVICE_NAMES = {
 def _get_workspaces_path() -> Path:
     """获取工作区配置文件路径"""
     return Path(FILE_WORKSPACES_PATH)
-
 
 def load_workspaces() -> Dict:
     """加载工作区配置
@@ -103,31 +98,26 @@ def load_workspaces() -> Dict:
         logger.warning(f"工作区配置文件读取失败: {e}，使用默认配置")
         return {"workspaces": [], "readonly_mode": False, "max_file_size_mb": 10}
 
-
 def save_workspaces(config: Dict) -> None:
     """保存工作区配置"""
     config_path = _get_workspaces_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
 
-
-def get_workspace_dirs() -> List[str]:
+def get_workspace_dirs() -> list[str]:
     """获取工作区目录列表（已标准化为小写，去掉尾部斜杠）"""
     config = load_workspaces()
     return [os.path.normpath(w).lower().rstrip(os.sep) for w in config.get("workspaces", [])]
-
 
 def is_readonly_mode() -> bool:
     """是否处于只读模式"""
     config = load_workspaces()
     return config.get("readonly_mode", False)
 
-
 def get_max_file_size_mb() -> int:
     """获取单文件最大大小（MB）"""
     config = load_workspaces()
     return config.get("max_file_size_mb", 10)
-
 
 # ========================================
 # 路径验证
@@ -143,7 +133,6 @@ def resolve_path(path: str) -> str:
     """
     return os.path.normpath(os.path.realpath(path))
 
-
 def is_in_blacklist(real_path: str) -> bool:
     """检查路径是否在系统黑名单内"""
     path_lower = real_path.lower()
@@ -155,14 +144,12 @@ def is_in_blacklist(real_path: str) -> bool:
 
     return False
 
-
 def is_sensitive_filename(path: str) -> bool:
     """检查文件名是否敏感（.env、密钥文件、Windows 设备名等）"""
     filename = os.path.basename(path).lower()
     # 去掉扩展名后再检查设备名（con.txt → con）
     stem = os.path.splitext(filename)[0]
     return filename in _SENSITIVE_FILENAMES or stem in _WINDOWS_DEVICE_NAMES
-
 
 def is_in_workspace(real_path: str) -> bool:
     """检查路径是否在工作区内"""
@@ -175,7 +162,6 @@ def is_in_workspace(real_path: str) -> bool:
             return True
 
     return False
-
 
 def validate_path(path: str, require_write: bool = False) -> PathValidationResult:
     """验证路径是否安全可访问

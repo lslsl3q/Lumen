@@ -16,7 +16,7 @@ from datetime import datetime
 
 import yaml
 
-from jinja2 import FileSystemLoader, select_autoescape
+from jinja2 import FileSystemLoader, select_autoescape, BaseLoader
 from jinja2.sandbox import SandboxedEnvironment
 from jinja2.exceptions import TemplateSyntaxError, TemplateNotFound
 
@@ -36,16 +36,38 @@ def _strip_frontmatter(source: str) -> str:
     return source
 
 
-class _FrontmatterLoader(FileSystemLoader):
-    """自定义加载器：返回模板源前剥离 YAML frontmatter"""
+class _TemplateLoader(BaseLoader):
+    """混合加载器：优先从 SQLite 读，回退到文件系统"""
+
+    def __init__(self, templates_dir: str):
+        self._fs_loader = FileSystemLoader(templates_dir)
+        self._templates_dir = templates_dir
 
     def get_source(self, environment, template):
-        source, filename, uptodate = super().get_source(environment, template)
-        return _strip_frontmatter(source), filename, uptodate
+        name = template.removesuffix(".md.j2")
+
+        # 优先从 SQLite 读
+        try:
+            from lumen.services.storage.template_store import get_template
+            tmpl = get_template(name)
+            if tmpl and tmpl["body"]:
+                source = tmpl["body"]
+                updated_at = tmpl["updated_at"]
+                def uptodate():
+                    from lumen.services.storage.template_store import get_template
+                    current = get_template(name)
+                    return current is not None and current["updated_at"] == updated_at
+                return source, template, uptodate
+        except Exception as e:
+            logger.debug("SQLite 加载失败 %s，回退文件: %s", template, e)
+
+        # 回退：从文件系统读（兼容旧路径 / 首次启动）
+        source, filename, fs_uptodate = self._fs_loader.get_source(environment, template)
+        return _strip_frontmatter(source), filename, fs_uptodate
 
 
 _env = SandboxedEnvironment(
-    loader=_FrontmatterLoader(_TEMPLATES_DIR),
+    loader=_TemplateLoader(_TEMPLATES_DIR),
     auto_reload=True,
     cache_size=50,
     autoescape=select_autoescape(default=False),
@@ -168,9 +190,13 @@ class TemplateError(Exception):
         super().__init__(f"模板 {template_name} 第 {line} 行错误: {message}")
 
 
-# 模板内 system/user 分隔标记
-_SYSTEM_USER_SPLIT = re.compile(r"^# --- SYSTEM ---\s*$", re.MULTILINE)
+# 模板内消息分隔标记
+_SYSTEM_SPLIT = re.compile(r"^# --- SYSTEM ---\s*$", re.MULTILINE)
+_ASSISTANT_SPLIT = re.compile(r"^# --- ASSISTANT ---\s*$", re.MULTILINE)
 _USER_SPLIT = re.compile(r"^# --- USER ---\s*$", re.MULTILINE)
+
+# 保留旧别名兼容
+_SYSTEM_USER_SPLIT = _SYSTEM_SPLIT
 
 
 def render(template_name: str, context: dict) -> str:
@@ -208,34 +234,62 @@ def render_message(template_name: str, context: dict) -> tuple[str, str]:
     Returns:
         (system_prompt, user_prompt)
     """
+    messages = render_messages(template_name, context)
+    if not messages:
+        return "", ""
+    system_part = next((m["content"] for m in messages if m["role"] == "system"), "")
+    user_part = next((m["content"] for m in messages if m["role"] == "user"), "")
+    return system_part, user_part
+
+
+def render_messages(template_name: str, context: dict) -> list[dict]:
+    """渲染多消息模板，返回 [{"role": ..., "content": ...}, ...]
+
+    支持 # --- SYSTEM --- / # --- ASSISTANT --- / # --- USER --- 分隔。
+    可有多条 USER 段，按出现顺序排列。
+
+    Args:
+        template_name: 模板名
+        context: 模板上下文数据
+
+    Returns:
+        消息列表 [{"role": "system"|"user"|"assistant", "content": str}, ...]
+    """
     try:
         source, _, _ = _env.loader.get_source(_env, f"{template_name}.md.j2")
     except TemplateNotFound:
         raise TemplateError(template_name, 0, "模板文件不存在")
 
-    sys_start = _SYSTEM_USER_SPLIT.search(source)
-    user_start = _USER_SPLIT.search(source)
+    # 找出所有分隔标记（match_start, content_start, role）
+    _ALL_SPLITS = [
+        (_SYSTEM_SPLIT, "system"),
+        (_ASSISTANT_SPLIT, "assistant"),
+        (_USER_SPLIT, "user"),
+    ]
+    markers = []
+    for pattern, role in _ALL_SPLITS:
+        for m in pattern.finditer(source):
+            markers.append((m.start(), m.end(), role))
 
-    if not sys_start:
-        # 无分隔线 → 整个是 system（component 单层模板用 render() 就够了）
-        return render(template_name, context), ""
+    if not markers:
+        return [{"role": "system", "content": render(template_name, context)}]
 
-    system_tpl = source[sys_start.end():user_start.start() if user_start else None].strip()
-    user_tpl = source[user_start.end():].strip() if user_start else ""
+    markers.sort(key=lambda x: x[0])
 
-    try:
-        system_rendered = _env.from_string(system_tpl).render(**context)
-    except TemplateSyntaxError as e:
-        raise TemplateError(template_name, e.lineno or 0, str(e.message)) from e
+    segments = []
+    for i, (line_start, content_start, role) in enumerate(markers):
+        end = markers[i + 1][0] if i + 1 < len(markers) else len(source)
+        raw = source[content_start:end].strip()
 
-    user_rendered = ""
-    if user_tpl:
         try:
-            user_rendered = _env.from_string(user_tpl).render(**context)
+            rendered = _env.from_string(raw).render(**context)
         except TemplateSyntaxError as e:
             raise TemplateError(template_name, e.lineno or 0, str(e.message)) from e
 
-    return system_rendered, user_rendered
+        if rendered.strip():
+            segments.append({"role": role, "content": rendered})
+
+    return segments
 
 
 def _parse_frontmatter(file_path: str) -> tuple[dict, str]:
@@ -274,22 +328,125 @@ def _parse_frontmatter(file_path: str) -> tuple[dict, str]:
     return meta, _strip_frontmatter(content)
 
 
-def get_template_names(category: str = "") -> list[dict]:
-    """列出可用模板（含 frontmatter 元数据）
+# ── Include 链 inputs 解析 ──
 
-    Args:
-        category: 按目录过滤，如 "writing"。空字符串列出所有。
+_INCLUDE_RE = re.compile(r'\{%[-\s]*include\s+"([^"]+)"\s*[-]?%}')
 
-    Returns:
-        [{"name": "writing/continue", "path": "writing/continue.md.j2",
-          "label": "续写", "type": "text_replacement", "category": "writing"}, ...]
+
+def resolve_inputs(template_name: str) -> list[dict]:
+    """解析模板及其 include 链的完整 inputs 列表
+
+    优先从 SQLite 读取（模板 DB），回退到文件解析。
     """
+    try:
+        from lumen.services.storage.template_store import get_template
+        tmpl = get_template(template_name)
+        if tmpl:
+            return _resolve_includes_from_db(template_name, set())
+    except Exception:
+        pass
+    return _resolve_inputs_from_files(template_name, set())
+
+
+def _resolve_includes_from_db(template_name: str, visited: set[str]) -> list[dict]:
+    """从 SQLite 递归解析 include 链的 inputs"""
+    from lumen.services.storage.template_store import get_template as db_get
+
+    if template_name in visited:
+        return []
+    visited.add(template_name)
+
+    tmpl = db_get(template_name)
+    if not tmpl:
+        return []
+
+    own_inputs = [i for i in (tmpl.get("inputs") or []) if not i.get("source_component")]
+
+    inherited: list[dict] = []
+    for match in _INCLUDE_RE.finditer(tmpl.get("body", "")):
+        comp_name = match.group(1).removesuffix(".md.j2")
+        child_inputs = _resolve_includes_from_db(comp_name, visited)
+        for inp in child_inputs:
+            entry = dict(inp)
+            if "source_component" not in entry:
+                entry["source_component"] = comp_name
+            inherited.append(entry)
+
+    # 合并：own inputs 优先，去重（同名只保留 own 版本）
+    own_names = {inp["name"] for inp in own_inputs if "name" in inp}
+    result = list(own_inputs)
+    seen = set(own_names)
+    for inp in inherited:
+        name = inp.get("name")
+        if name and name not in seen:
+            result.append(inp)
+            seen.add(name)
+
+    return result
+
+
+def _resolve_inputs_from_files(template_name: str, visited: set[str]) -> list[dict]:
+    """文件系统回退：递归解析 include 链的 inputs"""
+    if template_name in visited:
+        return []
+    visited.add(template_name)
+
+    j2_path = os.path.join(_TEMPLATES_DIR, f"{template_name}.md.j2")
+    if not os.path.isfile(j2_path):
+        return []
+
+    meta, body = _parse_frontmatter(j2_path)
+    own_inputs = list(meta.get("inputs") or [])
+
+    inherited: list[dict] = []
+    for match in _INCLUDE_RE.finditer(body):
+        comp_name = match.group(1).removesuffix(".md.j2")
+        child_inputs = _resolve_inputs_from_files(comp_name, visited)
+        for inp in child_inputs:
+            entry = dict(inp)
+            if "source_component" not in entry:
+                entry["source_component"] = comp_name
+            inherited.append(entry)
+
+    own_names = {inp["name"] for inp in own_inputs if "name" in inp}
+    result = list(own_inputs)
+    seen = set(own_names)
+    for inp in inherited:
+        name = inp.get("name")
+        if name and name not in seen:
+            result.append(inp)
+            seen.add(name)
+
+    return result
+
+
+def get_template_names(category: str = "") -> list[dict]:
+    """列出可用模板（优先从 DB 读取，回退到文件系统）"""
+    try:
+        from lumen.services.storage.template_store import list_templates as db_list
+        items = db_list(category)
+        return [
+            {
+                "name": t["name"],
+                "path": f"{t['name']}.md.j2",
+                "label": t.get("label", t["name"]),
+                "type": t.get("type", ""),
+                "category": t.get("category", ""),
+                "model": t.get("model", "default"),
+                "inputs": t.get("inputs", []),
+                "description": t.get("description", ""),
+                "user_created": bool(t.get("user_created", False)),
+            }
+            for t in items
+        ]
+    except Exception:
+        pass
+
+    # 文件系统回退
     results = []
     search_dir = os.path.join(_TEMPLATES_DIR, category) if category else _TEMPLATES_DIR
-
     if not os.path.isdir(search_dir):
         return results
-
     for root, _dirs, files in os.walk(search_dir):
         for f in sorted(files):
             if not f.endswith(".md.j2"):
@@ -297,18 +454,18 @@ def get_template_names(category: str = "") -> list[dict]:
             full_path = os.path.join(root, f)
             rel = os.path.relpath(full_path, _TEMPLATES_DIR)
             name = rel.removesuffix(".md.j2").replace("\\", "/")
-
             meta, _ = _parse_frontmatter(full_path)
-            entry = {
+            results.append({
                 "name": name,
                 "path": rel.replace("\\", "/"),
                 "label": meta.get("name", name),
                 "type": meta.get("type", ""),
                 "category": meta.get("category", name.split("/")[0]),
                 "model": meta.get("model", "default"),
-            }
-            results.append(entry)
-
+                "inputs": meta.get("inputs", []),
+                "description": meta.get("description", ""),
+                "user_created": meta.get("user_created", False),
+            })
     return results
 
 

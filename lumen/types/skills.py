@@ -9,8 +9,7 @@ Skills 定义 AI 的工作方式（提示词模板/工作流）
 - enabled=False → 不注入，但用户可通过 /skill-name 手动调用
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
-
+from typing import Optional
 
 class SkillCard(BaseModel):
     """Skill 完整定义"""
@@ -20,38 +19,35 @@ class SkillCard(BaseModel):
     enabled: bool = Field(default=True, description="是否预注入到提示词")
     # --- 参考 Claude Code 设计 ---
     when_to_use: str = Field(default="", description="什么时候用这个 skill（帮助 AI 判断）")
-    allowed_tools: List[str] = Field(default_factory=list, description="这个 skill 需要哪些工具")
+    allowed_tools: list[str] = Field(default_factory=list, description="这个 skill 需要哪些工具")
     argument_hint: str = Field(default="", description="参数提示（未来斜杠命令用）")
     priority: int = Field(default=0, description="注入优先级（高先注入）")
     script: str = Field(default="", description="可执行脚本路径（相对于 skill 目录）")
 
-
 class SkillCreateRequest(BaseModel):
     """创建 Skill 请求"""
-    id: Optional[str] = None
+    id: str | None = None
     name: str
     description: str = ""
     content: str = ""
     enabled: bool = True
     when_to_use: str = ""
-    allowed_tools: List[str] = Field(default_factory=list)
+    allowed_tools: list[str] = Field(default_factory=list)
     argument_hint: str = ""
     priority: int = 0
     script: str = ""
 
-
 class SkillUpdateRequest(BaseModel):
     """更新 Skill 请求（部分更新）"""
-    name: Optional[str] = None
-    description: Optional[str] = None
-    content: Optional[str] = None
-    enabled: Optional[bool] = None
-    when_to_use: Optional[str] = None
-    allowed_tools: Optional[List[str]] = None
-    argument_hint: Optional[str] = None
-    priority: Optional[int] = None
-    script: Optional[str] = None
-
+    name: str | None = None
+    description: str | None = None
+    content: str | None = None
+    enabled: bool | None = None
+    when_to_use: str | None = None
+    allowed_tools: list[str] | None = None
+    argument_hint: str | None = None
+    priority: int | None = None
+    script: str | None = None
 
 class SkillListItem(BaseModel):
     """Skill 列表项"""

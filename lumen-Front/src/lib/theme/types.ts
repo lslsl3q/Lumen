@@ -50,6 +50,10 @@ export interface ThemeTokens {
   glowPrimary: string;
   glowSubtle: string;
 
+  // === 组件专属：SceneBeat ===
+  beatSurface: string;
+  beatSettingsSurface: string;
+
   // === 间距（4 级）===
   spacingTight: string;
   spacingNormal: string;

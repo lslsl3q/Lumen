@@ -2,6 +2,21 @@
 name: "额外上下文"
 type: prompt_component
 category: components
+inputs:
+  - name: additional_context
+    label: Additional Context
+    description: Add context from your novel to the prompt
+    content_selection: true
+    multi: true
+    content_types:
+      - fullNovelText
+      - act
+      - chapter
+      - scene
+      - snippet
+      - codexEntry
+    add_to_context: true
+    display_name: "Context"
 ---
 
 {% if additional_context %}

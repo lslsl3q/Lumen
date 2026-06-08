@@ -12,22 +12,20 @@ Markdown 文件存储（YAML frontmatter + 正文）+ 内存缓存
 import os
 import re
 import logging
-from typing import List, Dict, Optional
+from typing import Optional
 from lumen.types.skills import SkillCard
 from lumen.config import SKILLS_DIR
 
 logger = logging.getLogger(__name__)
 
-_cached_skills: Optional[List[Dict]] = None
-
+_cached_skills: list[dict] | None = None
 
 def _validate_id(skill_id: str) -> str:
     if not re.match(r'^[a-zA-Z0-9_\-]+$', skill_id):
         raise ValueError(f"非法的 Skill ID: {skill_id}")
     return skill_id
 
-
-def _skill_path(skill_id: str) -> Optional[str]:
+def _skill_path(skill_id: str) -> str | None:
     """找到 skill 文件路径（优先目录格式，兼容单文件）"""
     dir_path = os.path.join(SKILLS_DIR, skill_id, "SKILL.md")
     if os.path.exists(dir_path):
@@ -36,7 +34,6 @@ def _skill_path(skill_id: str) -> Optional[str]:
     if os.path.exists(file_path):
         return file_path
     return None
-
 
 def _parse_md(filepath: str) -> Dict:
     """解析 YAML frontmatter + Markdown 正文的 .md 文件"""
@@ -84,7 +81,6 @@ def _parse_md(filepath: str) -> Dict:
     meta["content"] = content
     return meta
 
-
 def _serialize_md(skill: Dict) -> str:
     """将 skill 数据序列化为 Markdown + YAML frontmatter"""
     tools = skill.get("allowed_tools", [])
@@ -106,8 +102,7 @@ def _serialize_md(skill: Dict) -> str:
     ]
     return "\n".join(lines)
 
-
-def list_skills() -> List[Dict]:
+def list_skills() -> list[dict]:
     """列出所有 Skill（目录格式 + 单文件格式）"""
     global _cached_skills
     if _cached_skills is not None:
@@ -150,7 +145,6 @@ def list_skills() -> List[Dict]:
     _cached_skills = skills
     return skills
 
-
 def load_skill(skill_id: str) -> Dict:
     """加载单个 Skill"""
     _validate_id(skill_id)
@@ -161,7 +155,6 @@ def load_skill(skill_id: str) -> Dict:
     raw = _parse_md(filepath)
     skill = SkillCard.model_validate(raw)
     return {**skill.model_dump(), "id": skill_id}
-
 
 def create_skill(skill_id: str, data: Dict) -> Dict:
     """创建 Skill（用目录格式）"""
@@ -184,7 +177,6 @@ def create_skill(skill_id: str, data: Dict) -> Dict:
     _clear_cache()
     logger.info("创建 Skill: %s", skill_id)
     return {**raw, "id": skill_id}
-
 
 def update_skill(skill_id: str, updates: Dict) -> Dict:
     """更新 Skill（部分更新，自动迁移到目录格式）"""
@@ -216,7 +208,6 @@ def update_skill(skill_id: str, updates: Dict) -> Dict:
     logger.info("更新 Skill: %s", skill_id)
     return {**raw, "id": skill_id}
 
-
 def delete_skill(skill_id: str) -> None:
     """删除 Skill（目录或单文件）"""
     _validate_id(skill_id)
@@ -239,7 +230,6 @@ def delete_skill(skill_id: str) -> None:
         return
 
     raise FileNotFoundError(f"Skill 不存在: {skill_id}")
-
 
 def _clear_cache():
     global _cached_skills
