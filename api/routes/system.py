@@ -133,3 +133,14 @@ async def check_embedding_health():
         return {"status": "error", "message": "嵌入服务返回空向量，请检查模型配置。"}
     except Exception as e:
         return {"status": "error", "message": f"嵌入服务连接失败: {e}"}
+
+
+@router.post("/extensions/reload")
+async def reload_extensions():
+    """热重载所有扩展（开发用，不需要重启后端）
+
+    WARNING: 期间如果有正在执行的工具调用可能短暂报错。
+    """
+    from lumen.extensions import reload_extensions
+    result = await reload_extensions()
+    return {"status": "ok", **result}

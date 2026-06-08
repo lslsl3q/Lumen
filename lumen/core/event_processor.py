@@ -5,7 +5,7 @@
 支持跑团隔离（campaign_id 限定图谱）和日常模式（全局 knowledge 图谱）。
 
 生命周期：绑定 FastAPI startup/shutdown，asyncio.Queue + 消费者模式。
-T27 Phase 3：订阅 HookBus 事件，RPG 动作完成后自动触发图谱提取。
+HookBus 事件订阅已迁移到 extensions/event_bridge.py。
 """
 
 import asyncio
@@ -82,54 +82,3 @@ async def shutdown_event_processor():
         await _consumer_task
         _consumer_task = None
         logger.info("事件处理器已停止")
-
-
-# ── T27 Phase 3: HookBus 订阅 ──
-
-def register_hook_handlers():
-    """注册 EventProcessor 为 HookBus 事件处理器。
-
-    RPG 动作完成后自动触发图谱提取，不再需要 world_state.py 直接调用 enqueue_event。
-    旧的直接调用路径（daily_note/dream/system）保留，逐步迁移。
-    """
-    from lumen.core.hook_bus import HookBus
-
-    bus = HookBus.get()
-
-    async def _on_content_created(payload):
-        """content.created → enqueue_event"""
-        enqueue_event(
-            content=payload.content,
-            event_type=payload.content_type,
-            character_id=payload.character_id,
-            session_id=payload.session_id,
-            source_id=payload.source_id,
-            campaign_id=payload.campaign_id,
-        )
-
-    bus.register(
-        "content.created",
-        _on_content_created,
-        priority=50,
-        name="event_processor.on_content_created",
-    )
-
-    async def _on_rpg_action_completed(payload):
-        """rpg.action.completed → 自动提取图谱（RPG 场景摘要文本）"""
-        if payload.result_text:
-            # TODO: room_id 是 campaign_id 的临时替代；等 RPG session 管理完成后
-            # 应从 payload 取 campaign_id 或从 WorldState 查询
-            enqueue_event(
-                content=payload.result_text,
-                event_type="rpg",
-                character_id=payload.actor_id,
-                source_id=f"rpg_{payload.actor_id}",
-                campaign_id=payload.room_id,
-            )
-
-    bus.register(
-        "rpg.action.completed",
-        _on_rpg_action_completed,
-        priority=95,  # 在 PlotEngine(80) 之后执行
-        name="event_processor.on_rpg_action",
-    )

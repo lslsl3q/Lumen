@@ -9,7 +9,7 @@ import asyncio
 import logging
 import time
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from lumen.core.hook_types import HookEvent
 
@@ -49,6 +49,62 @@ class HookBus:
     def __init__(self):
         self._handlers: dict[str, list[_HandlerEntry]] = {}
         self._loaded_configs: set[str] = set()
+        self._registered_tools: dict[str, dict] = {}
+
+    def register_tool(self, name: str, definition: dict) -> bool:
+        """注册工具到 ToolRegistry（桥接扩展系统和工具系统）。
+
+        扩展调用此方法注册工具，工具同时进入 ToolRegistry（供 character.tools 过滤）
+        和 HookBus 内部缓存（供扩展查询已注册工具）。
+
+        Args:
+            name: 工具名称
+            definition: 工具定义（需符合 registry.json 格式）
+
+        Returns:
+            是否注册成功
+        """
+        from lumen.tools.registry import get_registry, validate_tool_definition
+
+        is_valid, error = validate_tool_definition(name, definition)
+        if not is_valid:
+            logger.error(f"HookBus: tool '{name}' validation failed: {error}")
+            return False
+
+        registry = get_registry()
+        registry.tools[name] = definition
+        self._registered_tools[name] = definition
+        logger.info(f"HookBus: registered tool '{name}'")
+        return True
+
+    def get_registered_tools(self) -> dict[str, dict]:
+        """获取通过 HookBus 注册的所有工具"""
+        return self._registered_tools.copy()
+
+    def unregister_tool(self, name: str) -> bool:
+        """注销通过 HookBus 注册的工具（同时清理 ToolRegistry）
+
+        Args:
+            name: 工具名称
+
+        Returns:
+            是否成功注销
+        """
+        removed = False
+        if name in self._registered_tools:
+            del self._registered_tools[name]
+            removed = True
+        try:
+            from lumen.tools.registry import get_registry
+            registry = get_registry()
+            if name in registry.tools:
+                del registry.tools[name]
+                removed = True
+        except Exception:
+            pass
+        if removed:
+            logger.info(f"HookBus: unregistered tool '{name}'")
+        return removed
 
     def register(
         self,
@@ -79,12 +135,8 @@ class HookBus:
     async def emit(self, event: str, payload: HookEvent) -> None:
         """按 priority 顺序执行所有匹配 handler。
 
-        同 priority 的 handler 并发执行（asyncio.gather）。
+        同 priority 的 handler 并发执行（TaskGroup）。
         不同 priority 组之间串行，支持 HookStopPropagation 阻断。
-
-        注意：并发组内若有多个 handler，其中一个抛 HookStopPropagation 时，
-        gather 会继续执行同组其余 handler（已调度无法取消），
-        但后续 priority 组会被阻断。这是有意为之——并发组内不保证原子取消。
         """
         if event not in self._handlers:
             return
@@ -107,19 +159,20 @@ class HookBus:
                 except Exception:
                     logger.exception(f"HookBus: {entries[0].name} failed for '{event}'")
             else:
-                # 同 priority 并发执行
-                results = await asyncio.gather(
-                    *[self._safe_call(e, payload) for e in entries],
-                    return_exceptions=True,
-                )
-                for r in results:
-                    if isinstance(r, HookStopPropagation):
-                        logger.info(f"HookBus: handler stopped propagation for '{event}'")
-                        return
-
-    async def _safe_call(self, entry: _HandlerEntry, payload: HookEvent) -> Any:
-        """调用单个 handler，异常向上传播（由 emit 处理）"""
-        return await entry.callback(payload)
+                # 同 priority 并发执行，except* 统一处理异常组
+                stopped = False
+                try:
+                    async with asyncio.TaskGroup() as tg:
+                        for entry in entries:
+                            tg.create_task(entry.callback(payload))
+                except* HookStopPropagation:
+                    logger.info(f"HookBus: handler stopped propagation for '{event}'")
+                    stopped = True
+                except* Exception as eg:
+                    for exc in eg.exceptions:
+                        logger.exception(f"HookBus: handler failed for '{event}': {exc}")
+                if stopped:
+                    return
 
     def from_config(self, path: Path) -> None:
         """从 YAML 文件加载规则，注册为 handler"""

@@ -10,7 +10,7 @@ import threading
 import importlib
 import logging
 from datetime import datetime
-from typing import List, Dict, Optional, Any
+from typing import Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from lumen.types.tools import ToolResult, ErrorCode, success_result, error_result
@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 # ========================================
 
 _current_context = threading.local()
-
 
 def set_tool_context(session_id: str = "", character_id: str = "",
                      on_room_move=None):
@@ -36,15 +35,13 @@ def set_tool_context(session_id: str = "", character_id: str = "",
     _current_context.character_id = character_id
     _current_context.on_room_move = on_room_move
 
-
-def get_tool_context() -> Dict[str, Any]:
+def get_tool_context() -> dict[str, Any]:
     """获取当前工具执行的上下文"""
     return {
         "session_id": getattr(_current_context, "session_id", ""),
         "character_id": getattr(_current_context, "character_id", ""),
         "on_room_move": getattr(_current_context, "on_room_move", None),
     }
-
 
 # ========================================
 # 工具结果格式化
@@ -70,8 +67,7 @@ def _format_data_readable(data: Any) -> str:
     # 复杂嵌套结构用缩进 JSON 兜底
     return json.dumps(data, ensure_ascii=False, indent=2)
 
-
-def format_result_for_ai(result: Dict[str, Any], caller: str = "") -> str:
+def format_result_for_ai(result: dict[str, Any], caller: str = "") -> str:
     """将工具结果格式化为 XML 格式发送给 AI
 
     XML 包裹让 AI 明确区分工具返回与用户消息，减少 token 消耗
@@ -93,18 +89,24 @@ def format_result_for_ai(result: Dict[str, Any], caller: str = "") -> str:
     content = "\n".join(parts)
     return f'<tool_result tool="{tool}" status="error"{caller_attr}>\n{content}\n</tool_result>'
 
-
 # ========================================
 # 工具注册表（名称 → 执行函数的映射）
 # ========================================
 
-_TOOL_HANDLERS: Dict[str, callable] = {}
-
+_TOOL_HANDLERS: dict[str, callable] = {}
 
 def register_handler(name: str, handler: callable):
     """注册工具执行函数"""
     _TOOL_HANDLERS[name] = handler
 
+
+def unregister_handler(name: str) -> bool:
+    """注销工具执行函数（热重载时清理旧引用）"""
+    if name in _TOOL_HANDLERS:
+        del _TOOL_HANDLERS[name]
+        logger.info(f"已注销工具 handler: {name}")
+        return True
+    return False
 
 def _load_builtin_tools():
     """自动加载工具：从 registry.json 读取工具名 → import 对应模块 → 注册 execute 函数"""
@@ -126,7 +128,6 @@ def _load_builtin_tools():
 
     # 加载 MCP 外部工具
     _load_mcp_tools()
-
 
 def _load_mcp_tools():
     """发现并注册 MCP 外部工具（后台线程加载，不阻塞事件循环）"""
@@ -163,12 +164,11 @@ def _load_mcp_tools():
     except Exception as e:
         logger.warning(f"MCP 工具加载失败（跳过）: {e}")
 
-
 # ========================================
 # 工具执行
 # ========================================
 
-async def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, Any]:
+async def execute_tool(name: str, params: dict, command: str = "") -> dict[str, Any]:
     """执行工具调用，返回标准化结果（支持同步和异步 handler）"""
     import asyncio
     import inspect
@@ -200,8 +200,7 @@ async def execute_tool(name: str, params: dict, command: str = "") -> Dict[str, 
         f"未知工具: {name}",
     )
 
-
-async def execute_tools_parallel(calls: List[Dict], max_workers: int = 5, timeout: Optional[float] = None) -> List[Dict[str, Any]]:
+async def execute_tools_parallel(calls: list[dict], max_workers: int = 5, timeout: float | None = None) -> list[dict[str, Any]]:
     """并发执行多个工具调用（支持同步和异步 handler）"""
     import asyncio
 

@@ -51,16 +51,18 @@ def _ensure_hookbus():
         bus.from_config(config_path)
     _plot_engine = PlotEngine(bus)
 
-    # T27 Phase 3: EventProcessor 订阅 HookBus 事件
-    from lumen.core.event_processor import register_hook_handlers
-    register_hook_handlers()
-
     # T27 Phase 4: WorldBook 注册为 agent.before_act handler
     from lumen.prompt.worldbook_matcher import register_worldbook_hook
     register_worldbook_hook(bus)
 
+    # T44 Phase 3: 加载 extensions/ 目录中的扩展
+    from lumen.extensions import discover_and_register
+    loaded = discover_and_register()
+    if loaded:
+        logger.info(f"Extensions loaded: {', '.join(loaded)}")
+
     _hookbus_initialized = True
-    logger.info("HookBus initialized with RPG hooks + PlotEngine + EventProcessor + WorldBook")
+    logger.info("HookBus initialized with RPG hooks + PlotEngine + WorldBook + Extensions")
 
 
 def _build_chat_agent(
@@ -81,12 +83,19 @@ def _build_chat_agent(
         agent.mailbox = mailbox
 
     # ContextComponents — 按 priority 排序后拼装 system prompt
-    agent.add_component(IdentityComponent())    # priority=10
-    agent.add_component(LoreComponent())        # priority=20
-    agent.add_component(MemoryComponent())      # priority=30
-    agent.add_component(SkillsComponent())      # priority=50
-    agent.add_component(ThinkingClusterComponent())  # priority=60
-    agent.add_component(ToolComponent())        # priority=90
+    components = [
+        IdentityComponent(),           # priority=10
+        LoreComponent(),               # priority=20
+        MemoryComponent(),             # priority=30
+        SkillsComponent(),             # priority=50
+        ThinkingClusterComponent(),    # priority=60
+        ToolComponent(),               # priority=90
+    ]
+    from lumen.core.hook_bus import HookBus
+    hook_bus = HookBus.get()
+    for comp in components:
+        agent.add_component(comp)
+        comp.register(hook_bus)
 
     # ActingComponent — ReAct 决策循环
     agent.act_component = ReActActingComponent(
@@ -122,6 +131,26 @@ async def agent_chat_stream(
     character_config["response_style"] = response_style
 
     _ensure_hookbus()
+
+    # HookBus: 用户输入到达（handler 可转换或拦截）
+    try:
+        from lumen.core.hook_bus import HookBus
+        from lumen.core.hook_types import InputReceivedPayload
+
+        input_payload = InputReceivedPayload(
+            user_input=user_input,
+            session_id=session.session_id or "",
+            character_id=session.character_id or "",
+            channel_id=getattr(session, "channel_id", "") or "",
+        )
+        await HookBus.get().emit("input.received", input_payload)
+        if input_payload.blocked:
+            logger.info(f"HookBus: input blocked by extension")
+            return
+        if input_payload.transformed:
+            user_input = input_payload.user_input
+    except Exception as e:
+        logger.warning(f"HookBus input.received emit failed: {e}")
 
     agent = _build_chat_agent(
         session,
