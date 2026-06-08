@@ -47,6 +47,7 @@ class AgentConfig:
     thinking: str = ""       # high/medium/low/空(不启用)
     system_prompt_mode: str = "replace"  # replace(覆盖) / append(追加到默认)
     default_reads: list[str] = field(default_factory=list)  # 启动时自动读取的文件
+    max_iterations: int = 8  # 工具调用循环最大轮次
 
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
@@ -115,6 +116,7 @@ def _load_agent_file(filepath: str, source: str) -> AgentConfig | None:
         thinking=thinking,
         system_prompt_mode=prompt_mode,
         default_reads=default_reads,
+        max_iterations=int(meta.get("max_iterations", meta.get("maxIterations", 8))),
     )
 
 

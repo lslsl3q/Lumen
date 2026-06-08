@@ -15,7 +15,13 @@ from .output import manage_output
 
 logger = logging.getLogger(__name__)
 
-_MAX_TOOL_ITERATIONS = 8
+# 全局工具禁止列表：所有子代理都不能调用的工具
+# 子代理不应修改用户环境、控制浏览器、或递归调用自身
+_DISALLOWED_TOOLS: set[str] = {
+    "subagent_call",   # 递归防护（contextvars 深度检查的补充）
+    "chrome_bridge",   # 子代理不应控制用户浏览器
+    "theme",           # 子代理不应修改主题
+}
 
 
 async def run_single(
@@ -119,8 +125,9 @@ async def run_single(
         session.log_message(session_file, "user", user_content[:500])
 
     total_tool_calls = 0
+    max_iterations = agent.max_iterations or 8
 
-    for iteration in range(_MAX_TOOL_ITERATIONS):
+    for iteration in range(max_iterations):
         response = await chat(
             messages=messages, model=model, stream=False,
             extra_body=thinking_extra or None,
@@ -158,6 +165,15 @@ async def run_single(
         tool_params = tool_data.get("params", {})
         tool_command = tool_data.get("command", "")
 
+        # 全局禁止列表检查（安全边界）
+        if tool_name in _DISALLOWED_TOOLS:
+            error_msg = f"错误：工具 {tool_name} 被禁止在子代理中使用。"
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": error_msg})
+            if enable_session:
+                session.log_message(session_file, "system", error_msg)
+            continue
+
         # 检查工具是否在白名单中
         if agent.tools and tool_name not in agent.tools:
             error_msg = f"错误：工具 {tool_name} 不在可用工具列表中。可用工具：{', '.join(agent.tools)}"
@@ -192,7 +208,7 @@ async def run_single(
         output = response.choices[0].message.content or ""
 
     if enable_session:
-        session.end_session(session_file, output, total_tool_calls, _MAX_TOOL_ITERATIONS, bool(output))
+        session.end_session(session_file, output, total_tool_calls, max_iterations, bool(output))
 
     om = manage_output(output, run_id)
     return {
@@ -201,10 +217,13 @@ async def run_single(
         "output_file": om["output_file"],
         "full_length": om["full_length"],
         "tool_calls": total_tool_calls,
-        "iterations": _MAX_TOOL_ITERATIONS,
+        "iterations": max_iterations,
         "run_id": run_id,
         "session_file": session_file,
     }
+
+
+_RESUME_MAX_ITERATIONS = 8
 
 
 async def resume_single(
@@ -252,7 +271,7 @@ async def resume_single(
 
     total_tool_calls = 0
 
-    for iteration in range(_MAX_TOOL_ITERATIONS):
+    for iteration in range(_RESUME_MAX_ITERATIONS):
         response = await chat(messages=messages, model=model, stream=False)
         if not response or not response.choices:
             break
@@ -281,6 +300,12 @@ async def resume_single(
         tool_params = tool_data.get("params", {})
         tool_command = tool_data.get("command", "")
 
+        if tool_name in _DISALLOWED_TOOLS:
+            error_msg = f"错误：工具 {tool_name} 被禁止在子代理中使用。"
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": error_msg})
+            continue
+
         if agent.tools and tool_name not in agent.tools:
             error_msg = f"错误：工具 {tool_name} 不可用。可用：{', '.join(agent.tools)}"
             messages.append({"role": "assistant", "content": content})
@@ -302,7 +327,7 @@ async def resume_single(
         output = response.choices[0].message.content or ""
     else:
         output = ""
-    session.end_session(session_file, output, total_tool_calls, _MAX_TOOL_ITERATIONS, bool(output))
+    session.end_session(session_file, output, total_tool_calls, _RESUME_MAX_ITERATIONS, bool(output))
 
     om = manage_output(output, new_run_id)
     return {
@@ -311,7 +336,7 @@ async def resume_single(
         "output_file": om["output_file"],
         "full_length": om["full_length"],
         "tool_calls": total_tool_calls,
-        "iterations": _MAX_TOOL_ITERATIONS,
+        "iterations": _RESUME_MAX_ITERATIONS,
         "run_id": new_run_id,
         "session_file": session_file,
         "resumed_from": run_id,
