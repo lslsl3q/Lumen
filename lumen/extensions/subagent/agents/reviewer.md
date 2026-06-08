@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Code review — check correctness, security, maintainability
-model: default
+model:
 tools: file_manager
 max_depth: 1
 ---

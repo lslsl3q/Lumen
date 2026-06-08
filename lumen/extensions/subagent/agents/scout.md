@@ -1,7 +1,7 @@
 ---
 name: scout
 description: Fast reconnaissance — search codebase, collect context, return compressed summary
-model: haiku
+model:
 tools: web_search
 max_depth: 1
 ---

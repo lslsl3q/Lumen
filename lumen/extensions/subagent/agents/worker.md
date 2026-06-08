@@ -1,7 +1,7 @@
 ---
 name: worker
 description: General-purpose agent — execute coding, modification, and creation tasks
-model: default
+model:
 tools: file_manager
 max_depth: 1
 ---
