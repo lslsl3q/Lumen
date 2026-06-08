@@ -1,6 +1,6 @@
 {
   "name": "lumen-tauri2",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "Lumen AI - Tauri 2 Desktop App",
   "type": "module",
   "scripts": {

@@ -4,7 +4,7 @@ Lumen - 统一配置管理
 """
 
 # 项目版本号（三处同步：config.py / package.json / tauri.conf.json）
-__version__ = "0.0.5"
+__version__ = "0.1.0"
 
 import os
 import sys
